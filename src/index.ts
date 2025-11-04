@@ -59,7 +59,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: 'get_forecast',
-        description: 'Get weather forecast for a location. Provide either a location name or coordinates (latitude and longitude).',
+        description: 'Get future weather forecast for a location (US only). Use this for upcoming weather predictions (e.g., "tomorrow", "this week", "next 7 days"). Returns forecast data including temperature, precipitation, wind, and conditions. For current weather, use get_current_conditions. For past weather, use get_historical_weather.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -88,7 +88,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'get_current_conditions',
-        description: 'Get current weather conditions for a location. Provide coordinates (latitude and longitude).',
+        description: 'Get the most recent weather observation for a location (US only). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns the latest observation from the nearest weather station. For specific past dates or date ranges, use get_historical_weather instead.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -110,7 +110,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'get_historical_weather',
-        description: 'Get historical weather observations for a location. Provide coordinates and a date range.',
+        description: 'Get historical weather data for a specific date range in the past. Use this when the user asks about weather on specific past dates (e.g., "yesterday", "last week", "November 4, 2024", "30 years ago"). Automatically uses NOAA API for recent dates (last 7 days, US only) or Open-Meteo API for older dates (worldwide, back to 1940). Do NOT use for current conditions - use get_current_conditions instead.',
         inputSchema: {
           type: 'object',
           properties: {
