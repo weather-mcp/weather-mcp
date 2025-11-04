@@ -177,18 +177,51 @@ Get historical weather observations for a location.
 - `limit` (optional): Max observations to return (1-500, default: 168)
 
 **Data Source Selection:**
-- **Last 7 days**: Uses NOAA real-time API for detailed hourly observations (temperature, conditions, wind, etc.)
-- **Older than 7 days**: Automatically switches to Climate Data Online for daily summaries (high/low temps, precipitation, snowfall)
-  - Requires CDO API token (see Installation section)
-  - Returns daily summaries instead of hourly data
+The server automatically chooses the best data source based on your date range:
+
+- **Last 7 days** (Recommended): Uses NOAA real-time API
+  - ✓ No token required
+  - ✓ Detailed hourly observations
+  - ✓ Includes: temperature, conditions, wind speed, humidity, pressure
+  - ✓ High reliability and availability
+
+- **Older than 7 days**: Uses Climate Data Online (CDO) API
+  - ⚠️ Requires free CDO API token
+  - ⚠️ Returns daily summaries (high/low temps, precipitation, snowfall)
+  - ⚠️ Data availability varies by location and date
+  - ⚠️ Best for major cities and recent years (2010+)
+  - ⚠️ Some locations may have limited historical data
+
+**CDO API Limitations:**
+- Only covers United States locations
+- Data availability varies significantly by location
+- Remote areas may have limited or no historical data
+- Older dates (before 2000) may have gaps
+- Uses FIPS-based station lookup for better reliability
 
 **Examples:**
+
+Recent data (recommended, works reliably):
 ```
-Get recent weather: "What was the weather like in Chicago 3 days ago?" (latitude: 41.8781, longitude: -87.6298)
+"What was the weather like in Chicago 3 days ago?"
+Coordinates: latitude: 41.8781, longitude: -87.6298
+Date range: 3 days ago to 2 days ago
 ```
+
+Archival data (requires token, availability varies):
 ```
-Get archival weather: "What was the weather in New York on September 2, 2020?" (latitude: 40.7128, longitude: -74.0060)
+"What was the weather in New York on January 15, 2024?"
+Coordinates: latitude: 40.7128, longitude: -74.0060
+Date range: 2024-01-15 to 2024-01-15
 ```
+
+**Troubleshooting:**
+If you get "No historical data available":
+- For dates within last 7 days: Use more recent dates
+- For older dates: Try coordinates of a major city
+- Check that your CDO API token is configured (for dates >7 days old)
+- Try a shorter date range
+- Some locations simply may not have archived data available
 
 ## Testing
 
@@ -261,16 +294,36 @@ For more details, see [NOAA_API_RESEARCH.md](./NOAA_API_RESEARCH.md).
 
 ## Limitations
 
-- NOAA APIs only cover United States locations
-- Recent historical data (last 7 days): Hourly observations may have gaps depending on station
-- Archival historical data (>7 days):
-  - Requires free CDO API token
-  - Daily summaries only (no hourly detail)
-  - Data availability varies by location and date
-- Real-time observations may be delayed up to 20 minutes
-- Rate limits apply:
-  - Weather API: Automatic retry with exponential backoff
-  - CDO API: 5 requests/second, 10,000 requests/day
+### Geographic Coverage
+- All NOAA APIs only cover **United States locations**
+- International locations are not supported
+
+### Historical Data (get_historical_weather)
+
+**Recent Data (Last 7 Days)** - Most Reliable:
+- ✓ Works without CDO API token
+- ✓ Detailed hourly observations
+- ⚠️ May have occasional gaps depending on weather station
+- ⚠️ Observations may be delayed up to 20 minutes
+
+**Archival Data (Older than 7 Days)** - Limited Availability:
+- ⚠️ **Requires free CDO API token** (get at https://www.ncdc.noaa.gov/cdo-web/token)
+- ⚠️ Returns daily summaries only (high/low temps, precipitation, snowfall)
+- ⚠️ **Data availability varies significantly by location and date**:
+  - Major cities: Generally good coverage for recent years (2010+)
+  - Rural/remote areas: May have limited or no data
+  - Older dates (pre-2000): May have significant gaps
+- ⚠️ Station lookup uses FIPS-based search, which works best for populated areas
+- ⚠️ Some date ranges may return no data even with a valid token
+
+### Rate Limits
+- **NOAA Weather API**: Automatic retry with exponential backoff on rate limit errors
+- **CDO API**: 5 requests/second, 10,000 requests/day (enforced by NOAA)
+
+### Recommendations
+- **For historical data**: Use dates within the last 7 days when possible for best results
+- **For archival data**: Use coordinates of major cities rather than exact/remote locations
+- **For troubleshooting**: See the troubleshooting section under `get_historical_weather`
 
 ## License
 
