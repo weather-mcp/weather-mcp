@@ -64,6 +64,26 @@ Edit `%APPDATA%\claude-code\mcp_settings.json`:
 }
 ```
 
+## Finding Coordinates
+
+All tools require latitude and longitude coordinates. You can find coordinates for any location by:
+- Asking Claude Code: "What are the coordinates for [city name]?"
+- Using Google Maps: Right-click a location and select the coordinates
+- Using a geocoding service like geocode.maps.co or nominatim.org
+
+### Common US City Coordinates
+
+| City | Latitude | Longitude |
+|------|----------|-----------|
+| San Francisco, CA | 37.7749 | -122.4194 |
+| New York, NY | 40.7128 | -74.0060 |
+| Chicago, IL | 41.8781 | -87.6298 |
+| Los Angeles, CA | 34.0522 | -118.2437 |
+| Denver, CO | 39.7392 | -104.9903 |
+| Miami, FL | 25.7617 | -80.1918 |
+| Seattle, WA | 47.6062 | -122.3321 |
+| Austin, TX | 30.2672 | -97.7431 |
+
 ## Available Tools
 
 ### 1. get_forecast
@@ -106,6 +126,26 @@ Get historical weather observations for a location.
 Get historical weather data for Chicago from January 1-7, 2024 (latitude: 41.8781, longitude: -87.6298)
 ```
 
+## Testing
+
+### Quick Test
+
+Verify NOAA API connectivity:
+```bash
+npx tsx test_noaa_api.ts
+```
+
+This runs 5 tests covering all major functionality with real NOAA API calls.
+
+### Manual Testing with Claude Code
+
+See [TESTING_GUIDE.md](./TESTING_GUIDE.md) for comprehensive testing instructions including:
+- Setup steps
+- Test cases for all tools
+- Error handling verification
+- Performance testing
+- Debugging tips
+
 ## Development
 
 ### Available Scripts
@@ -113,6 +153,7 @@ Get historical weather data for Chicago from January 1-7, 2024 (latitude: 41.878
 - `npm run build` - Compile TypeScript to JavaScript
 - `npm run dev` - Run the server in development mode with tsx
 - `npm start` - Run the compiled server
+- `npx tsx test_noaa_api.ts` - Run API connectivity tests
 
 ### Project Structure
 
