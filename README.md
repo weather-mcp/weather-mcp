@@ -1,14 +1,14 @@
 # Weather MCP Server
 
-An MCP (Model Context Protocol) server that provides weather data from NOAA's API to AI systems like Claude Code.
+An MCP (Model Context Protocol) server that provides weather data to AI systems like Claude Code. Uses NOAA's API for US weather forecasts and current conditions, plus Open-Meteo for global historical weather data.
 
 ## Features
 
 - **Get Forecast**: Retrieve weather forecasts for any US location (7-day forecast)
-- **Current Conditions**: Get real-time weather observations
-- **Historical Data**: Access historical weather observations for custom date ranges
-  - Recent data (last 7 days): Detailed hourly observations from real-time API
-  - Archival data (>7 days old): Daily summaries from NOAA Climate Data Online
+- **Current Conditions**: Get real-time weather observations for US locations
+- **Historical Data**: Access historical weather observations for any location worldwide
+  - Recent data (last 7 days): Detailed hourly observations from NOAA real-time API (US only)
+  - Archival data (>7 days old): Hourly/daily weather data from 1940-present via Open-Meteo (global coverage)
 
 ## Installation
 
@@ -34,27 +34,6 @@ npm install
 npm run build
 ```
 
-4. (Optional) Configure CDO API token for archival data:
-
-To access historical weather data older than 7 days, you need a free NOAA Climate Data Online API token:
-
-- Request a token at: https://www.ncdc.noaa.gov/cdo-web/token
-- You'll receive the token via email (usually within minutes)
-
-**For local development and testing:**
-```bash
-# Copy the example file
-cp .env.example .env
-
-# Edit .env and add your token
-# NOAA_CDO_TOKEN=your_actual_token_here
-```
-
-**For use with Claude Code:**
-- Add the token as an environment variable in your MCP settings (see configuration examples below)
-
-**Note**: Without a CDO token, the server will still work for forecasts, current conditions, and recent historical data (last 7 days).
-
 ## Usage with Claude Code
 
 Add the server to your Claude Code MCP settings:
@@ -62,7 +41,6 @@ Add the server to your Claude Code MCP settings:
 ### macOS/Linux
 Edit `~/.config/claude-code/mcp_settings.json`:
 
-**Without CDO token** (forecasts, current conditions, and last 7 days of historical data):
 ```json
 {
   "mcpServers": {
@@ -74,46 +52,15 @@ Edit `~/.config/claude-code/mcp_settings.json`:
 }
 ```
 
-**With CDO token** (includes archival data older than 7 days):
-```json
-{
-  "mcpServers": {
-    "weather": {
-      "command": "node",
-      "args": ["/absolute/path/to/weather-mcp/dist/index.js"],
-      "env": {
-        "NOAA_CDO_TOKEN": "your_token_here"
-      }
-    }
-  }
-}
-```
-
 ### Windows
 Edit `%APPDATA%\claude-code\mcp_settings.json`:
 
-**Without CDO token**:
 ```json
 {
   "mcpServers": {
     "weather": {
       "command": "node",
       "args": ["C:\\absolute\\path\\to\\weather-mcp\\dist\\index.js"]
-    }
-  }
-}
-```
-
-**With CDO token**:
-```json
-{
-  "mcpServers": {
-    "weather": {
-      "command": "node",
-      "args": ["C:\\absolute\\path\\to\\weather-mcp\\dist\\index.js"],
-      "env": {
-        "NOAA_CDO_TOKEN": "your_token_here"
-      }
     }
   }
 }
@@ -179,49 +126,51 @@ Get historical weather observations for a location.
 **Data Source Selection:**
 The server automatically chooses the best data source based on your date range:
 
-- **Last 7 days** (Recommended): Uses NOAA real-time API
-  - ✓ No token required
-  - ✓ Detailed hourly observations
+- **Last 7 days**: Uses NOAA real-time API
+  - ✓ Detailed hourly observations from weather stations
   - ✓ Includes: temperature, conditions, wind speed, humidity, pressure
   - ✓ High reliability and availability
+  - ⚠️ US locations only
 
-- **Older than 7 days**: Uses Climate Data Online (CDO) API
-  - ⚠️ Requires free CDO API token
-  - ⚠️ Returns daily summaries (high/low temps, precipitation, snowfall)
-  - ⚠️ Data availability varies by location and date
-  - ⚠️ Best for major cities and recent years (2010+)
-  - ⚠️ Some locations may have limited historical data
-
-**CDO API Limitations:**
-- Only covers United States locations
-- Data availability varies significantly by location
-- Remote areas may have limited or no historical data
-- Older dates (before 2000) may have gaps
-- Uses FIPS-based station lookup for better reliability
+- **Older than 7 days**: Uses Open-Meteo Historical Weather API
+  - ✓ No API token required
+  - ✓ Global coverage (worldwide)
+  - ✓ Historical data from 1940 to present
+  - ✓ Hourly data for ranges up to 31 days
+  - ✓ Daily summaries for longer periods
+  - ✓ Includes: temperature, precipitation, wind, humidity, pressure, cloud cover
+  - ✓ High resolution reanalysis data (9-25km grid)
+  - ⚠️ 5-day delay for most recent data
 
 **Examples:**
 
-Recent data (recommended, works reliably):
+Recent data (US locations, detailed observations):
 ```
 "What was the weather like in Chicago 3 days ago?"
 Coordinates: latitude: 41.8781, longitude: -87.6298
 Date range: 3 days ago to 2 days ago
 ```
 
-Archival data (requires token, availability varies):
+Historical data (global coverage):
 ```
-"What was the weather in New York on January 15, 2024?"
-Coordinates: latitude: 40.7128, longitude: -74.0060
+"What was the weather in Paris on January 15, 2024?"
+Coordinates: latitude: 48.8566, longitude: 2.3522
 Date range: 2024-01-15 to 2024-01-15
+```
+
+Long-term historical analysis:
+```
+"Show me weather data for Tokyo from January 1, 2020 to December 31, 2020"
+Coordinates: latitude: 35.6762, longitude: 139.6503
+Date range: 2020-01-01 to 2020-12-31
 ```
 
 **Troubleshooting:**
 If you get "No historical data available":
-- For dates within last 7 days: Use more recent dates
-- For older dates: Try coordinates of a major city
-- Check that your CDO API token is configured (for dates >7 days old)
-- Try a shorter date range
-- Some locations simply may not have archived data available
+- For recent dates (last 7 days): Ensure you're using US coordinates
+- For older dates: Data should be available globally back to 1940
+- Note: Most recent data has a 5-day delay
+- Very recent dates (last 5 days) may not be available in archival data yet
 
 ## Testing
 
@@ -260,10 +209,10 @@ weather-mcp/
 │   ├── index.ts           # Main MCP server
 │   ├── services/
 │   │   ├── noaa.ts        # NOAA real-time API service
-│   │   └── cdo.ts         # Climate Data Online API service
+│   │   └── openmeteo.ts   # Open-Meteo historical weather API service
 │   ├── types/
 │   │   ├── noaa.ts        # NOAA TypeScript type definitions
-│   │   └── cdo.ts         # CDO TypeScript type definitions
+│   │   └── openmeteo.ts   # Open-Meteo TypeScript type definitions
 │   └── utils/
 │       └── units.ts       # Unit conversion utilities
 ├── dist/                  # Compiled JavaScript (generated)
@@ -273,57 +222,66 @@ weather-mcp/
 
 ## API Information
 
-This server uses two NOAA APIs:
+This server uses two weather APIs:
 
 ### NOAA Weather API (Real-time)
 - **Base URL**: https://api.weather.gov
 - **Authentication**: None required (User-Agent header only)
 - **Rate Limits**: Enforced with 5-second retry window
-- **Coverage**: United States locations
+- **Coverage**: United States locations only
 - **Use cases**: Forecasts, current conditions, recent observations (last 7 days)
+- **Data**: Detailed hourly observations from weather stations
 
-### Climate Data Online (CDO) API v2 (Archival)
-- **Base URL**: https://www.ncei.noaa.gov/cdo-web/api/v2
-- **Authentication**: Free API token required (get at https://www.ncdc.noaa.gov/cdo-web/token)
-- **Rate Limits**: 5 requests/second, 10,000 requests/day
-- **Coverage**: United States locations
-- **Use cases**: Historical daily summaries (older than 7 days)
-- **Data**: High/low temperatures, precipitation, snowfall
+### Open-Meteo Historical Weather API (Archival)
+- **Base URL**: https://archive-api.open-meteo.com/v1
+- **Authentication**: None required (no API token needed)
+- **Rate Limits**: 10,000 requests/day for non-commercial use
+- **Coverage**: Global (worldwide locations)
+- **Use cases**: Historical weather data from 1940 to present
+- **Data**: Hourly or daily temperature, precipitation, wind, humidity, pressure, cloud cover
+- **Resolution**: 9-25km grid resolution from reanalysis models
+- **Delay**: 5-day delay for most recent data
 
-For more details, see [NOAA_API_RESEARCH.md](./NOAA_API_RESEARCH.md).
+For more details on NOAA APIs, see [NOAA_API_RESEARCH.md](./NOAA_API_RESEARCH.md).
 
 ## Limitations
 
 ### Geographic Coverage
-- All NOAA APIs only cover **United States locations**
-- International locations are not supported
+
+**Forecasts and Current Conditions:**
+- NOAA APIs only cover **United States locations**
+- International locations are not supported for forecasts and current conditions
+
+**Historical Data:**
+- Recent data (last 7 days): **US locations only** (NOAA API)
+- Archival data (>7 days old): **Global coverage** (Open-Meteo API)
 
 ### Historical Data (get_historical_weather)
 
-**Recent Data (Last 7 Days)** - Most Reliable:
-- ✓ Works without CDO API token
-- ✓ Detailed hourly observations
+**Recent Data (Last 7 Days)** - US Only, High Detail:
+- ✓ Detailed hourly observations from weather stations
+- ✓ No API token required
+- ⚠️ US locations only
 - ⚠️ May have occasional gaps depending on weather station
 - ⚠️ Observations may be delayed up to 20 minutes
 
-**Archival Data (Older than 7 Days)** - Limited Availability:
-- ⚠️ **Requires free CDO API token** (get at https://www.ncdc.noaa.gov/cdo-web/token)
-- ⚠️ Returns daily summaries only (high/low temps, precipitation, snowfall)
-- ⚠️ **Data availability varies significantly by location and date**:
-  - Major cities: Generally good coverage for recent years (2010+)
-  - Rural/remote areas: May have limited or no data
-  - Older dates (pre-2000): May have significant gaps
-- ⚠️ Station lookup uses FIPS-based search, which works best for populated areas
-- ⚠️ Some date ranges may return no data even with a valid token
+**Archival Data (Older than 7 Days)** - Global, Reanalysis-Based:
+- ✓ Global coverage (any location worldwide)
+- ✓ No API token required
+- ✓ Reliable data from 1940 to present
+- ✓ Hourly data for date ranges up to 31 days
+- ✓ Daily summaries for longer periods
+- ⚠️ Most recent data has a 5-day delay
+- ⚠️ Reanalysis-based (grid model, not direct station observations)
 
 ### Rate Limits
 - **NOAA Weather API**: Automatic retry with exponential backoff on rate limit errors
-- **CDO API**: 5 requests/second, 10,000 requests/day (enforced by NOAA)
+- **Open-Meteo API**: 10,000 requests/day for non-commercial use
 
 ### Recommendations
-- **For historical data**: Use dates within the last 7 days when possible for best results
-- **For archival data**: Use coordinates of major cities rather than exact/remote locations
-- **For troubleshooting**: See the troubleshooting section under `get_historical_weather`
+- **For recent US weather**: Use dates within the last 7 days for detailed station observations
+- **For historical analysis**: Open-Meteo provides reliable global coverage back to 1940
+- **For international locations**: Only historical data (>7 days old) is supported
 
 ## License
 

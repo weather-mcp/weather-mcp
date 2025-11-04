@@ -4,6 +4,18 @@
 
 All core phases of the Weather MCP Server have been successfully completed. The project is fully functional, tested, documented, and ready for GitHub publication.
 
+### Recent Updates (November 2025)
+
+**Historical Weather Data Migration** ✅ COMPLETED
+- Successfully migrated from NOAA CDO API to Open-Meteo Historical Weather API
+- Resolved authentication and data availability issues with CDO
+- Implemented global coverage for historical data (1940-present)
+- Testing completed with multiple locations and date ranges:
+  - ✅ Detroit, MI: 1 year ago (Nov 4, 2024)
+  - ✅ Detroit, MI: 30 years ago (Nov 4, 1995)
+- All historical weather queries returning accurate, formatted data
+- Open-Meteo integration provides reliable service with no API token required
+
 ## Implementation Summary
 
 ### Phase 1: Project Setup & Research ✅ COMPLETED
