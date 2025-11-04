@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "weather": {
+      "command": "node",
+      "args": [
+        "/home/dgahagan/work/personal/weather-mcp/dist/index.js"
+      ]
+    }
+  }
+}
