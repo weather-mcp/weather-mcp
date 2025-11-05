@@ -150,7 +150,7 @@ Smithery is ideal for:
 
 3. Publish:
    ```bash
-   cd /home/dgahagan/work/personal/weather-mcp
+   cd /path/to/weather-mcp
    smithery publish
    ```
 
