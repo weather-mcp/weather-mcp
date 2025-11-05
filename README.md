@@ -16,16 +16,44 @@ An MCP (Model Context Protocol) server that provides weather data to AI systems 
 
 ## Installation
 
-### Prerequisites
+### Quick Install (Recommended)
+
+**Via npm:**
+```bash
+npm install -g weather-mcp
+```
+
+**Via npx (no installation):**
+```bash
+npx -y weather-mcp
+```
+
+Then configure in your MCP client using:
+```json
+{
+  "mcpServers": {
+    "weather": {
+      "command": "npx",
+      "args": ["-y", "weather-mcp"]
+    }
+  }
+}
+```
+
+### From Source
+
+If you prefer to build from source:
+
+**Prerequisites:**
 - Node.js 18 or higher
 - npm or yarn
 - **No API keys or tokens required**
 
-### Setup
+**Setup:**
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/dgahagan/weather-mcp.git
 cd weather-mcp
 ```
 

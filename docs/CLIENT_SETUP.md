@@ -6,15 +6,35 @@ This guide covers how to set up the Weather MCP Server with various AI assistant
 
 ## Prerequisites
 
-Before setting up with any client, make sure you've:
+Before setting up with any client, you need **Node.js 18 or higher** installed.
 
-1. Installed Node.js 18 or higher
-2. Cloned this repository and installed dependencies:
-   ```bash
-   npm install
-   npm run build
-   ```
-3. Noted the absolute path to your `weather-mcp/dist/index.js` file
+## Installation Options
+
+You have two options for installing the Weather MCP Server:
+
+### Option 1: Via npm/npx (Recommended)
+
+**No installation needed** - Use npx to run the server:
+```bash
+npx -y weather-mcp
+```
+
+Or install globally:
+```bash
+npm install -g weather-mcp
+```
+
+### Option 2: From Source
+
+Clone and build from source:
+```bash
+git clone https://github.com/dgahagan/weather-mcp.git
+cd weather-mcp
+npm install
+npm run build
+```
+
+Then note the absolute path to your `weather-mcp/dist/index.js` file.
 
 ---
 
@@ -36,6 +56,19 @@ Before setting up with any client, make sure you've:
 3. Click **Edit Config** to open the configuration file
 4. Add the weather server configuration:
 
+**Using npx (recommended):**
+```json
+{
+  "mcpServers": {
+    "weather": {
+      "command": "npx",
+      "args": ["-y", "weather-mcp"]
+    }
+  }
+}
+```
+
+**Or from source (if you built manually):**
 ```json
 {
   "mcpServers": {
@@ -67,6 +100,19 @@ Before setting up with any client, make sure you've:
 1. Create or edit the `mcp_settings.json` file at the location above
 2. Add the weather server configuration:
 
+**Using npx (recommended):**
+```json
+{
+  "mcpServers": {
+    "weather": {
+      "command": "npx",
+      "args": ["-y", "weather-mcp"]
+    }
+  }
+}
+```
+
+**Or from source (if you built manually):**
 ```json
 {
   "mcpServers": {
