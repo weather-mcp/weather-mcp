@@ -3,12 +3,12 @@
   "name": "io.github.dgahagan/weather-mcp",
   "title": "Weather Data MCP Server",
   "description": "Weather data from NOAA and Open-Meteo APIs. Forecasts, current conditions, and historical data.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@dangahagan/weather-mcp",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "transport": {
         "type": "stdio"
       }
