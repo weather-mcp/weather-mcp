@@ -1,0 +1,59 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/registry/server.json",
+  "name": "@dangahagan/weather-mcp",
+  "version": "0.1.0",
+  "description": "MCP server providing weather data from NOAA and Open-Meteo APIs. Supports forecasts, current conditions, and historical weather data (1940-present) with no API keys required.",
+  "homepage": "https://github.com/dgahagan/weather-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dgahagan/weather-mcp.git"
+  },
+  "license": "MIT",
+  "publisher": {
+    "name": "Dan Gahagan",
+    "url": "https://github.com/dgahagan"
+  },
+  "categories": [
+    "data",
+    "utilities"
+  ],
+  "keywords": [
+    "weather",
+    "forecast",
+    "noaa",
+    "open-meteo",
+    "historical-weather",
+    "climate"
+  ],
+  "installation": {
+    "npm": {
+      "package": "@dangahagan/weather-mcp"
+    }
+  },
+  "configuration": {
+    "command": "npx",
+    "args": ["-y", "@dangahagan/weather-mcp"]
+  },
+  "tools": [
+    {
+      "name": "check_service_status",
+      "description": "Check the operational status of NOAA and Open-Meteo weather APIs"
+    },
+    {
+      "name": "get_forecast",
+      "description": "Get 7-day weather forecasts for US locations via NOAA API"
+    },
+    {
+      "name": "get_current_conditions",
+      "description": "Get current weather conditions for US locations via NOAA API"
+    },
+    {
+      "name": "get_historical_weather",
+      "description": "Get historical weather data from 1940-present globally (NOAA for last 7 days US only, Open-Meteo for older dates worldwide)"
+    }
+  ],
+  "documentation": {
+    "readme": "https://github.com/dgahagan/weather-mcp#readme",
+    "clientSetup": "https://github.com/dgahagan/weather-mcp/blob/main/docs/CLIENT_SETUP.md"
+  }
+}

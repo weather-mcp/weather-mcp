@@ -1,0 +1,53 @@
+# Smithery Configuration
+# https://smithery.ai/docs/build/project-config/smithery.yaml
+
+runtime: typescript
+
+# Server metadata
+name: Weather MCP Server
+description: MCP server providing weather data from NOAA and Open-Meteo APIs with no API keys required
+author: Dan Gahagan
+homepage: https://github.com/dgahagan/weather-mcp
+repository: https://github.com/dgahagan/weather-mcp
+
+# Categories for discovery
+categories:
+  - weather
+  - data
+  - utilities
+
+# Keywords for search
+keywords:
+  - weather
+  - forecast
+  - noaa
+  - open-meteo
+  - historical-weather
+  - climate
+  - mcp
+  - model-context-protocol
+
+# npm package reference
+package: "@dangahagan/weather-mcp"
+
+# Tools provided by this server
+tools:
+  - name: check_service_status
+    description: Check operational status of NOAA and Open-Meteo weather APIs
+
+  - name: get_forecast
+    description: Get 7-day weather forecasts for US locations
+
+  - name: get_current_conditions
+    description: Get current weather conditions for US locations
+
+  - name: get_historical_weather
+    description: Get historical weather data from 1940-present globally
+
+# No environment variables required
+env: {}
+
+# Build configuration (TypeScript)
+build:
+  entry: src/index.ts
+  outDir: dist
