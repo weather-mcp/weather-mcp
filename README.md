@@ -1,9 +1,12 @@
 # Weather MCP Server
 
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
+[![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 An MCP (Model Context Protocol) server that provides weather data to AI systems like Claude Code. Uses NOAA's API for US weather forecasts and current conditions, plus Open-Meteo for global historical weather data.
+
+**📦 Available in the [Official MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)** as `io.github.dgahagan/weather-mcp`
 
 **No API keys required!** Both NOAA and Open-Meteo APIs are free to use with no authentication needed.
 
