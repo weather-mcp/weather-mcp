@@ -2,6 +2,8 @@
 
 An MCP (Model Context Protocol) server that provides weather data to AI systems like Claude Code. Uses NOAA's API for US weather forecasts and current conditions, plus Open-Meteo for global historical weather data.
 
+**No API keys required!** Both NOAA and Open-Meteo APIs are free to use with no authentication needed.
+
 ## Features
 
 - **Get Forecast**: Retrieve weather forecasts for any US location (7-day forecast)
@@ -15,6 +17,7 @@ An MCP (Model Context Protocol) server that provides weather data to AI systems 
 ### Prerequisites
 - Node.js 18 or higher
 - npm or yarn
+- **No API keys or tokens required**
 
 ### Setup
 
@@ -34,12 +37,24 @@ npm install
 npm run build
 ```
 
-## Usage with Claude Code
+## Usage with AI Assistants
 
-Add the server to your Claude Code MCP settings:
+This MCP server works with any client that supports the Model Context Protocol, including:
 
-### macOS/Linux
-Edit `~/.config/claude-code/mcp_settings.json`:
+- **Claude Desktop** - Official Claude desktop application
+- **Claude Code** - Official Claude CLI tool
+- **Cline** - VS Code extension for AI-assisted coding
+- **Cursor** - AI-powered code editor
+- **Zed** - High-performance code editor with AI features
+- **VS Code (GitHub Copilot)** - With MCP support enabled
+- **LM Studio** - Local AI model interface
+- **Postman** - API platform with MCP integration
+
+For detailed setup instructions for each client, see **[CLIENT_SETUP.md](./docs/CLIENT_SETUP.md)**.
+
+### Quick Start: Claude Code
+
+Edit `~/.config/claude-code/mcp_settings.json` (macOS/Linux) or `%APPDATA%\claude-code\mcp_settings.json` (Windows):
 
 ```json
 {
@@ -52,19 +67,7 @@ Edit `~/.config/claude-code/mcp_settings.json`:
 }
 ```
 
-### Windows
-Edit `%APPDATA%\claude-code\mcp_settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "weather": {
-      "command": "node",
-      "args": ["C:\\absolute\\path\\to\\weather-mcp\\dist\\index.js"]
-    }
-  }
-}
-```
+Restart Claude Code and the weather tools will be available.
 
 ## Finding Coordinates
 
