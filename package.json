@@ -1,6 +1,6 @@
 {
   "name": "@dangahagan/weather-mcp",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "description": "MCP (Model Context Protocol) server providing weather data from NOAA and Open-Meteo APIs. Supports forecasts, current conditions, and historical weather data (1940-present) with no API keys required.",
   "mcpName": "io.github.dgahagan/weather-mcp",
   "main": "dist/index.js",
