@@ -32,6 +32,7 @@ import { handleGetAlerts } from './handlers/alertsHandler.js';
 import { handleGetHistoricalWeather } from './handlers/historicalWeatherHandler.js';
 import { handleCheckServiceStatus } from './handlers/statusHandler.js';
 import { handleSearchLocation } from './handlers/locationHandler.js';
+import { handleGetAirQuality } from './handlers/airQualityHandler.js';
 
 /**
  * Server information
@@ -132,7 +133,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'get_current_conditions',
-        description: 'Get the most recent weather observation for a location (US only). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns the latest observation from the nearest weather station. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+        description: 'Get the most recent weather observation for a location (US only). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns the latest observation from the nearest weather station. Optionally includes fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) when requested. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -147,6 +148,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'Longitude of the location (-180 to 180)',
               minimum: -180,
               maximum: 180
+            },
+            include_fire_weather: {
+              type: 'boolean',
+              description: 'Include fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) in the response (default: false, US only)',
+              default: false
             }
           },
           required: ['latitude', 'longitude']
@@ -245,6 +251,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ['query']
         }
+      },
+      {
+        name: 'get_air_quality',
+        description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", or health-related environmental conditions. Returns current conditions and optional hourly forecast. Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            latitude: {
+              type: 'number',
+              description: 'Latitude of the location (-90 to 90)',
+              minimum: -90,
+              maximum: 90
+            },
+            longitude: {
+              type: 'number',
+              description: 'Longitude of the location (-180 to 180)',
+              minimum: -180,
+              maximum: 180
+            },
+            forecast: {
+              type: 'boolean',
+              description: 'Include hourly air quality forecast for next 5 days (default: false, shows current only)',
+              default: false
+            }
+          },
+          required: ['latitude', 'longitude']
+        }
       }
     ]
   };
@@ -275,6 +308,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'search_location':
         return await handleSearchLocation(args, openMeteoService);
+
+      case 'get_air_quality':
+        return await handleGetAirQuality(args, openMeteoService);
 
       default:
         throw new Error(`Unknown tool: ${name}`);

@@ -268,3 +268,84 @@ export type TemperatureUnit = 'F' | 'C' | 'K';
 export type SpeedUnit = 'mph' | 'kph' | 'mps' | 'knots';
 export type DistanceUnit = 'miles' | 'km' | 'meters' | 'feet';
 export type PressureUnit = 'mb' | 'hPa' | 'inHg' | 'Pa';
+
+/**
+ * Gridpoint data value with time range
+ */
+export interface GridpointValue {
+  validTime: string; // ISO 8601 time interval (e.g., "2025-11-06T06:00:00+00:00/PT12H")
+  value: number;
+}
+
+/**
+ * Gridpoint data series
+ */
+export interface GridpointDataSeries {
+  uom?: string; // Unit of measure
+  values: GridpointValue[];
+}
+
+/**
+ * Fire weather properties from gridpoint data
+ */
+export interface GridpointFireWeather {
+  grasslandFireDangerIndex?: GridpointDataSeries;
+  hainesIndex?: GridpointDataSeries;
+  redFlagThreatIndex?: GridpointDataSeries;
+  atmosphericDispersionIndex?: GridpointDataSeries;
+  mixingHeight?: GridpointDataSeries;
+  transportWindSpeed?: GridpointDataSeries;
+  transportWindDirection?: GridpointDataSeries;
+  twentyFootWindSpeed?: GridpointDataSeries;
+  twentyFootWindDirection?: GridpointDataSeries;
+}
+
+/**
+ * Gridpoint properties from /gridpoints/{office}/{gridX},{gridY} endpoint
+ * Contains detailed forecast data including fire weather indices
+ */
+export interface GridpointProperties extends GridpointFireWeather {
+  '@id': string;
+  '@type': string;
+  updateTime: string;
+  validTimes: string;
+  elevation: QuantitativeValue;
+  forecastOffice: string;
+  gridId: string;
+  gridX: number;
+  gridY: number;
+  temperature?: GridpointDataSeries;
+  dewpoint?: GridpointDataSeries;
+  relativeHumidity?: GridpointDataSeries;
+  apparentTemperature?: GridpointDataSeries;
+  heatIndex?: GridpointDataSeries;
+  windChill?: GridpointDataSeries;
+  skyCover?: GridpointDataSeries;
+  windDirection?: GridpointDataSeries;
+  windSpeed?: GridpointDataSeries;
+  windGust?: GridpointDataSeries;
+  weather?: {
+    values: Array<{
+      validTime: string;
+      value: Array<{
+        coverage: string | null;
+        weather: string | null;
+        intensity: string | null;
+        visibility: QuantitativeValue | null;
+        attributes: string[];
+      }>;
+    }>;
+  };
+  hazards?: {
+    values: Array<{
+      validTime: string;
+      value: Array<{
+        phenomenon: string;
+        significance: string;
+        event_number: number | null;
+      }>;
+    }>;
+  };
+}
+
+export type GridpointResponse = NOAAResponse<GridpointProperties>;

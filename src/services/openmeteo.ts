@@ -11,7 +11,8 @@ import type {
   OpenMeteoHistoricalResponse,
   OpenMeteoErrorResponse,
   GeocodingResponse,
-  OpenMeteoForecastResponse
+  OpenMeteoForecastResponse,
+  OpenMeteoAirQualityResponse
 } from '../types/openmeteo.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
@@ -28,6 +29,7 @@ export interface OpenMeteoServiceConfig {
   baseURL?: string;
   geocodingURL?: string;
   forecastURL?: string;
+  airQualityURL?: string;
   timeout?: number;
   maxRetries?: number;
 }
@@ -36,6 +38,7 @@ export class OpenMeteoService {
   private client: AxiosInstance;
   private geocodingClient: AxiosInstance;
   private forecastClient: AxiosInstance;
+  private airQualityClient: AxiosInstance;
   private maxRetries: number;
   private cache: Cache;
 
@@ -44,6 +47,7 @@ export class OpenMeteoService {
       baseURL = 'https://archive-api.open-meteo.com/v1',
       geocodingURL = 'https://geocoding-api.open-meteo.com/v1',
       forecastURL = 'https://api.open-meteo.com/v1',
+      airQualityURL = 'https://air-quality-api.open-meteo.com/v1',
       timeout = 30000,
       maxRetries = 3
     } = config;
@@ -57,7 +61,7 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.4.0'
+        'User-Agent': 'weather-mcp/0.5.0'
       }
     });
 
@@ -67,7 +71,7 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.4.0'
+        'User-Agent': 'weather-mcp/0.5.0'
       }
     });
 
@@ -77,7 +81,17 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.4.0'
+        'User-Agent': 'weather-mcp/0.5.0'
+      }
+    });
+
+    // Air quality client
+    this.airQualityClient = axios.create({
+      baseURL: airQualityURL,
+      timeout,
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'weather-mcp/0.5.0'
       }
     });
 
@@ -93,6 +107,11 @@ export class OpenMeteoService {
     );
 
     this.forecastClient.interceptors.response.use(
+      response => response,
+      error => this.handleError(error)
+    );
+
+    this.airQualityClient.interceptors.response.use(
       response => response,
       error => this.handleError(error)
     );
@@ -707,6 +726,191 @@ export class OpenMeteoService {
       throw new DataNotFoundError(
         'OpenMeteo',
         'No daily forecast data available for the specified location'
+      );
+    }
+  }
+
+  /**
+   * Get air quality data from Open-Meteo Air Quality API
+   *
+   * @param latitude - Latitude coordinate (-90 to 90)
+   * @param longitude - Longitude coordinate (-180 to 180)
+   * @param forecast - Whether to include hourly forecast (default: false, returns current only)
+   * @param forecastDays - Number of forecast days (1-7, default: 5)
+   * @returns Air quality data including AQI, pollutants, and UV index
+   */
+  async getAirQuality(
+    latitude: number,
+    longitude: number,
+    forecast: boolean = false,
+    forecastDays: number = 5
+  ): Promise<OpenMeteoAirQualityResponse> {
+    // Validate coordinates
+    validateLatitude(latitude);
+    validateLongitude(longitude);
+
+    // Validate forecast days
+    if (forecastDays < 1 || forecastDays > 7) {
+      throw new InvalidLocationError(
+        'OpenMeteo',
+        'Air quality forecast days must be between 1 and 7'
+      );
+    }
+
+    // Build parameters
+    const params = this.buildAirQualityParams(latitude, longitude, forecast, forecastDays);
+
+    // Check cache first
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('openmeteo-airquality', latitude, longitude, forecast, forecastDays);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as OpenMeteoAirQualityResponse;
+      }
+
+      const response = await this.makeRequestToAirQuality<OpenMeteoAirQualityResponse>('/air-quality', params);
+      this.validateAirQualityResponse(response, forecast);
+
+      // Cache for 1 hour (air quality updates hourly)
+      this.cache.set(cacheKey, response, 60 * 60 * 1000);
+
+      return response;
+    }
+
+    // No caching
+    const response = await this.makeRequestToAirQuality<OpenMeteoAirQualityResponse>('/air-quality', params);
+    this.validateAirQualityResponse(response, forecast);
+    return response;
+  }
+
+  /**
+   * Build request parameters for air quality data
+   * @private
+   */
+  private buildAirQualityParams(
+    latitude: number,
+    longitude: number,
+    forecast: boolean,
+    forecastDays: number
+  ): Record<string, string | number> {
+    const params: Record<string, string | number> = {
+      latitude,
+      longitude,
+      timezone: 'auto'
+    };
+
+    // Always include current data
+    params.current = [
+      'pm10',
+      'pm2_5',
+      'carbon_monoxide',
+      'nitrogen_dioxide',
+      'sulphur_dioxide',
+      'ozone',
+      'aerosol_optical_depth',
+      'dust',
+      'uv_index',
+      'uv_index_clear_sky',
+      'ammonia',
+      'european_aqi',
+      'european_aqi_pm2_5',
+      'european_aqi_pm10',
+      'european_aqi_nitrogen_dioxide',
+      'european_aqi_ozone',
+      'european_aqi_sulphur_dioxide',
+      'us_aqi',
+      'us_aqi_pm2_5',
+      'us_aqi_pm10',
+      'us_aqi_nitrogen_dioxide',
+      'us_aqi_ozone',
+      'us_aqi_sulphur_dioxide',
+      'us_aqi_carbon_monoxide'
+    ].join(',');
+
+    // Optionally include hourly forecast data
+    if (forecast) {
+      params.forecast_days = forecastDays;
+      params.hourly = [
+        'pm10',
+        'pm2_5',
+        'carbon_monoxide',
+        'nitrogen_dioxide',
+        'sulphur_dioxide',
+        'ozone',
+        'aerosol_optical_depth',
+        'dust',
+        'uv_index',
+        'uv_index_clear_sky',
+        'ammonia',
+        'european_aqi',
+        'european_aqi_pm2_5',
+        'european_aqi_pm10',
+        'european_aqi_nitrogen_dioxide',
+        'european_aqi_ozone',
+        'european_aqi_sulphur_dioxide',
+        'us_aqi',
+        'us_aqi_pm2_5',
+        'us_aqi_pm10',
+        'us_aqi_nitrogen_dioxide',
+        'us_aqi_ozone',
+        'us_aqi_sulphur_dioxide',
+        'us_aqi_carbon_monoxide'
+      ].join(',');
+    }
+
+    return params;
+  }
+
+  /**
+   * Make request to air quality API with retry logic
+   * @private
+   */
+  private async makeRequestToAirQuality<T>(
+    url: string,
+    params: Record<string, string | number>,
+    retries = 0
+  ): Promise<T> {
+    try {
+      const response = await this.airQualityClient.get<T>(url, { params });
+      return response.data;
+    } catch (error) {
+      // Retry on rate limit or server errors
+      if (retries < this.maxRetries) {
+        const shouldRetry =
+          (error as Error).message.includes('rate limit') ||
+          (error as Error).message.includes('server error') ||
+          (error as Error).message.includes('timed out');
+
+        if (shouldRetry) {
+          const baseDelay = Math.pow(2, retries) * 1000;
+          const delay = baseDelay * (0.5 + Math.random() * 0.5);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return this.makeRequestToAirQuality<T>(url, params, retries + 1);
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Validate that the air quality response contains the expected data
+   * @private
+   */
+  private validateAirQualityResponse(
+    response: OpenMeteoAirQualityResponse,
+    forecast: boolean
+  ): void {
+    if (!response.current || !response.current.time) {
+      throw new DataNotFoundError(
+        'OpenMeteo',
+        'No current air quality data available for the specified location'
+      );
+    }
+
+    if (forecast && (!response.hourly || !response.hourly.time || response.hourly.time.length === 0)) {
+      throw new DataNotFoundError(
+        'OpenMeteo',
+        'No hourly air quality forecast data available for the specified location'
       );
     }
   }

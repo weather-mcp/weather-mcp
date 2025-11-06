@@ -12,7 +12,22 @@ An MCP (Model Context Protocol) server that provides **global weather data** to 
 
 ## Features
 
-- **Location Search**: Find coordinates for any location worldwide (NEW in v0.4.0)
+- **Air Quality Monitoring**: Comprehensive air quality data for any location worldwide (NEW in v0.5.0)
+  - Air Quality Index (AQI) with automatic region detection (US AQI or European EAQI)
+  - Health recommendations based on AQI levels
+  - Pollutant concentrations (PM2.5, PM10, O₃, NO₂, SO₂, CO, NH₃)
+  - UV Index with sun protection recommendations
+  - Optional hourly air quality forecasts (5-day outlook)
+  - Categorized health risk levels (Good, Moderate, Unhealthy, etc.)
+  - Activity recommendations for sensitive populations
+- **Fire Weather Data**: Fire danger indices for US locations (NEW in v0.5.0)
+  - Haines Index (atmospheric fire growth potential)
+  - Grassland Fire Danger Index
+  - Red Flag Threat Index
+  - Mixing Height (smoke dispersion indicator)
+  - Transport Wind Speed (smoke transport)
+  - Optional enhancement to current conditions
+- **Location Search**: Find coordinates for any location worldwide (v0.4.0)
   - Convert location names to coordinates ("Paris" → 48.8534°, 2.3488°)
   - Support for cities, airports, landmarks, and regions globally
   - Detailed metadata: timezone, elevation, population, country
@@ -34,6 +49,7 @@ An MCP (Model Context Protocol) server that provides **global weather data** to 
   - 24-hour temperature range
   - Wind gusts and detailed cloud cover
   - Recent precipitation history
+  - Optional fire weather indices (see above)
 - **Historical Data**: Access historical weather observations for any location worldwide
   - Recent data (last 7 days): Detailed hourly observations from NOAA real-time API (US only)
   - Archival data (>7 days old): Hourly/daily weather data from 1940-present via Open-Meteo (global coverage)
@@ -56,7 +72,9 @@ The Weather MCP server includes an intelligent in-memory caching system that sig
 
 The cache automatically stores and retrieves weather data with intelligent expiration:
 
-- **Location Searches**: Cached for 30 days (locations don't move) - NEW in v0.4.0
+- **Location Searches**: Cached for 30 days (locations don't move)
+- **Air Quality Data**: Cached for 1 hour (air quality updates hourly) - NEW in v0.5.0
+- **Fire Weather Data**: Cached for 2 hours (gridpoint data updates ~hourly) - NEW in v0.5.0
 - **Weather Alerts**: Cached for 5 minutes (alerts can change rapidly)
 - **Forecasts**: Cached for 2 hours (updated approximately hourly)
 - **Current Conditions**: Cached for 15 minutes (observations update every 20-60 minutes)

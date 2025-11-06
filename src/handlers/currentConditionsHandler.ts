@@ -3,9 +3,23 @@
  */
 
 import { NOAAService } from '../services/noaa.js';
-import { validateCoordinates } from '../utils/validation.js';
+import { validateCoordinates, validateOptionalBoolean } from '../utils/validation.js';
 import { convertToFahrenheit } from '../utils/temperatureConversion.js';
 import { DisplayThresholds } from '../config/displayThresholds.js';
+import {
+  getHainesCategory,
+  getGrasslandFireDangerCategory,
+  getRedFlagCategory,
+  getCurrentFireWeatherValue,
+  formatMixingHeight,
+  interpretTransportWind
+} from '../utils/fireWeather.js';
+
+interface CurrentConditionsArgs {
+  latitude?: number;
+  longitude?: number;
+  include_fire_weather?: boolean;
+}
 
 export async function handleGetCurrentConditions(
   args: unknown,
@@ -13,6 +27,11 @@ export async function handleGetCurrentConditions(
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Validate input parameters with runtime checks
   const { latitude, longitude } = validateCoordinates(args);
+  const includeFireWeather = validateOptionalBoolean(
+    (args as CurrentConditionsArgs)?.include_fire_weather,
+    'include_fire_weather',
+    false
+  );
 
   // Get current observation
   const observation = await noaaService.getCurrentConditions(latitude, longitude);
@@ -174,6 +193,76 @@ export async function handleGetCurrentConditions(
         ? precip6h * 0.0393701
         : precip6h;
       output += `**Last 6 Hours:** ${precipIn.toFixed(2)} inches\n`;
+    }
+  }
+
+  // Fire Weather section (optional)
+  if (includeFireWeather) {
+    try {
+      const gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude);
+      const fireProps = gridpointData.properties;
+
+      // Check if any fire weather data is available
+      const hainesValue = getCurrentFireWeatherValue(fireProps.hainesIndex);
+      const grasslandValue = getCurrentFireWeatherValue(fireProps.grasslandFireDangerIndex);
+      const redFlagValue = getCurrentFireWeatherValue(fireProps.redFlagThreatIndex);
+      const mixingHeightValue = getCurrentFireWeatherValue(fireProps.mixingHeight);
+      const transportWindValue = getCurrentFireWeatherValue(fireProps.transportWindSpeed);
+
+      if (hainesValue !== null || grasslandValue !== null || redFlagValue !== null || mixingHeightValue !== null) {
+        output += `\n## Fire Weather\n\n`;
+
+        // Haines Index
+        if (hainesValue !== null) {
+          const hainesCategory = getHainesCategory(hainesValue);
+          const emoji = hainesCategory.level === 'Low' ? '🟢' :
+                        hainesCategory.level === 'Moderate' ? '🟡' :
+                        hainesCategory.level === 'High' ? '🟠' : '🔴';
+
+          output += `**${emoji} Haines Index:** ${hainesValue} (${hainesCategory.level})\n`;
+          output += `${hainesCategory.fireGrowthPotential}\n\n`;
+        }
+
+        // Grassland Fire Danger Index
+        if (grasslandValue !== null) {
+          const grasslandCategory = getGrasslandFireDangerCategory(grasslandValue);
+          const emoji = grasslandCategory.level === 'Low' ? '🟢' :
+                        grasslandCategory.level === 'Moderate' ? '🟡' :
+                        grasslandCategory.level === 'High' ? '🟠' : '🔴';
+
+          output += `**${emoji} Grassland Fire Danger:** ${grasslandValue} (${grasslandCategory.level})\n`;
+          output += `${grasslandCategory.description}\n\n`;
+        }
+
+        // Red Flag Threat Index
+        if (redFlagValue !== null) {
+          const redFlagCategory = getRedFlagCategory(redFlagValue);
+          const emoji = redFlagCategory.level === 'Low' ? '🟢' :
+                        redFlagCategory.level === 'Moderate' ? '🟡' :
+                        redFlagCategory.level === 'High' ? '🟠' : '🔴';
+
+          output += `**${emoji} Red Flag Threat:** ${Math.round(redFlagValue)} (${redFlagCategory.level})\n`;
+          output += `${redFlagCategory.description}\n\n`;
+        }
+
+        // Mixing Height (important for smoke dispersion)
+        if (mixingHeightValue !== null) {
+          const mixingHeightFt = mixingHeightValue; // Already in feet from API
+          output += `**Mixing Height:** ${formatMixingHeight(mixingHeightFt)}\n`;
+        }
+
+        // Transport Wind Speed (smoke transport)
+        if (transportWindValue !== null) {
+          output += `**Transport Wind:** ${interpretTransportWind(transportWindValue)}\n`;
+        }
+      } else {
+        output += `\n## Fire Weather\n\n`;
+        output += `No fire weather data available for this location.\n`;
+      }
+    } catch (error) {
+      // If fire weather data fetch fails, just skip it (don't error the whole request)
+      output += `\n## Fire Weather\n\n`;
+      output += `⚠️ Fire weather data not available for this location.\n`;
     }
   }
 

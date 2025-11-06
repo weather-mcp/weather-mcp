@@ -283,3 +283,170 @@ export interface OpenMeteoForecastResponse {
   daily_units?: OpenMeteoForecastDailyUnits;
   daily?: OpenMeteoForecastDailyData;
 }
+
+/**
+ * Current air quality data from Open-Meteo Air Quality API
+ */
+export interface OpenMeteoAirQualityCurrentData {
+  time: string;
+  interval: number;
+  pm10?: number;
+  pm2_5?: number;
+  carbon_monoxide?: number;
+  nitrogen_dioxide?: number;
+  sulphur_dioxide?: number;
+  ozone?: number;
+  aerosol_optical_depth?: number;
+  dust?: number;
+  uv_index?: number;
+  uv_index_clear_sky?: number;
+  ammonia?: number;
+  alder_pollen?: number;
+  birch_pollen?: number;
+  grass_pollen?: number;
+  mugwort_pollen?: number;
+  olive_pollen?: number;
+  ragweed_pollen?: number;
+  european_aqi?: number;
+  european_aqi_pm2_5?: number;
+  european_aqi_pm10?: number;
+  european_aqi_nitrogen_dioxide?: number;
+  european_aqi_ozone?: number;
+  european_aqi_sulphur_dioxide?: number;
+  us_aqi?: number;
+  us_aqi_pm2_5?: number;
+  us_aqi_pm10?: number;
+  us_aqi_nitrogen_dioxide?: number;
+  us_aqi_ozone?: number;
+  us_aqi_sulphur_dioxide?: number;
+  us_aqi_carbon_monoxide?: number;
+}
+
+/**
+ * Hourly air quality data from Open-Meteo Air Quality API
+ */
+export interface OpenMeteoAirQualityHourlyData {
+  time: string[];
+  pm10?: number[];
+  pm2_5?: number[];
+  carbon_monoxide?: number[];
+  nitrogen_dioxide?: number[];
+  sulphur_dioxide?: number[];
+  ozone?: number[];
+  aerosol_optical_depth?: number[];
+  dust?: number[];
+  uv_index?: number[];
+  uv_index_clear_sky?: number[];
+  ammonia?: number[];
+  alder_pollen?: number[];
+  birch_pollen?: number[];
+  grass_pollen?: number[];
+  mugwort_pollen?: number[];
+  olive_pollen?: number[];
+  ragweed_pollen?: number[];
+  european_aqi?: number[];
+  european_aqi_pm2_5?: number[];
+  european_aqi_pm10?: number[];
+  european_aqi_nitrogen_dioxide?: number[];
+  european_aqi_ozone?: number[];
+  european_aqi_sulphur_dioxide?: number[];
+  us_aqi?: number[];
+  us_aqi_pm2_5?: number[];
+  us_aqi_pm10?: number[];
+  us_aqi_nitrogen_dioxide?: number[];
+  us_aqi_ozone?: number[];
+  us_aqi_sulphur_dioxide?: number[];
+  us_aqi_carbon_monoxide?: number[];
+}
+
+/**
+ * Units for current air quality data
+ */
+export interface OpenMeteoAirQualityCurrentUnits {
+  time?: string;
+  interval?: string;
+  pm10?: string;
+  pm2_5?: string;
+  carbon_monoxide?: string;
+  nitrogen_dioxide?: string;
+  sulphur_dioxide?: string;
+  ozone?: string;
+  aerosol_optical_depth?: string;
+  dust?: string;
+  uv_index?: string;
+  uv_index_clear_sky?: string;
+  ammonia?: string;
+  alder_pollen?: string;
+  birch_pollen?: string;
+  grass_pollen?: string;
+  mugwort_pollen?: string;
+  olive_pollen?: string;
+  ragweed_pollen?: string;
+  european_aqi?: string;
+  european_aqi_pm2_5?: string;
+  european_aqi_pm10?: string;
+  european_aqi_nitrogen_dioxide?: string;
+  european_aqi_ozone?: string;
+  european_aqi_sulphur_dioxide?: string;
+  us_aqi?: string;
+  us_aqi_pm2_5?: string;
+  us_aqi_pm10?: string;
+  us_aqi_nitrogen_dioxide?: string;
+  us_aqi_ozone?: string;
+  us_aqi_sulphur_dioxide?: string;
+  us_aqi_carbon_monoxide?: string;
+}
+
+/**
+ * Units for hourly air quality data
+ */
+export interface OpenMeteoAirQualityHourlyUnits {
+  time?: string;
+  pm10?: string;
+  pm2_5?: string;
+  carbon_monoxide?: string;
+  nitrogen_dioxide?: string;
+  sulphur_dioxide?: string;
+  ozone?: string;
+  aerosol_optical_depth?: string;
+  dust?: string;
+  uv_index?: string;
+  uv_index_clear_sky?: string;
+  ammonia?: string;
+  alder_pollen?: string;
+  birch_pollen?: string;
+  grass_pollen?: string;
+  mugwort_pollen?: string;
+  olive_pollen?: string;
+  ragweed_pollen?: string;
+  european_aqi?: string;
+  european_aqi_pm2_5?: string;
+  european_aqi_pm10?: string;
+  european_aqi_nitrogen_dioxide?: string;
+  european_aqi_ozone?: string;
+  european_aqi_sulphur_dioxide?: string;
+  us_aqi?: string;
+  us_aqi_pm2_5?: string;
+  us_aqi_pm10?: string;
+  us_aqi_nitrogen_dioxide?: string;
+  us_aqi_ozone?: string;
+  us_aqi_sulphur_dioxide?: string;
+  us_aqi_carbon_monoxide?: string;
+}
+
+/**
+ * Complete API response from Open-Meteo Air Quality API
+ */
+export interface OpenMeteoAirQualityResponse {
+  latitude: number;
+  longitude: number;
+  generationtime_ms: number;
+  utc_offset_seconds: number;
+  timezone: string;
+  timezone_abbreviation: string;
+  elevation: number;
+  current_units?: OpenMeteoAirQualityCurrentUnits;
+  current?: OpenMeteoAirQualityCurrentData;
+  hourly_units?: OpenMeteoAirQualityHourlyUnits;
+  hourly?: OpenMeteoAirQualityHourlyData;
+}

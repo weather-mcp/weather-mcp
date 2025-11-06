@@ -323,6 +323,41 @@ export class NOAAService {
   }
 
   /**
+   * Get gridpoint data for a location using grid coordinates
+   * Contains detailed forecast data including fire weather indices
+   */
+  async getGridpointData(office: string, gridX: number, gridY: number): Promise<import('../types/noaa.js').GridpointResponse> {
+    // Check cache first (if enabled)
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('gridpoint', office, gridX, gridY);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as import('../types/noaa.js').GridpointResponse;
+      }
+
+      const url = `/gridpoints/${office}/${gridX},${gridY}`;
+      const result = await this.makeRequest<import('../types/noaa.js').GridpointResponse>(url);
+
+      // Cache with forecast TTL (2 hours)
+      this.cache.set(cacheKey, result, CacheConfig.ttl.forecast);
+      return result;
+    }
+
+    const url = `/gridpoints/${office}/${gridX},${gridY}`;
+    return this.makeRequest<import('../types/noaa.js').GridpointResponse>(url);
+  }
+
+  /**
+   * Get gridpoint data for a location using lat/lon (convenience method)
+   * This combines getPointData and getGridpointData
+   */
+  async getGridpointDataByCoordinates(latitude: number, longitude: number): Promise<import('../types/noaa.js').GridpointResponse> {
+    const pointData = await this.getPointData(latitude, longitude);
+    const { gridId, gridX, gridY } = pointData.properties;
+    return this.getGridpointData(gridId, gridX, gridY);
+  }
+
+  /**
    * Get nearest observation stations for a location
    */
   async getStations(latitude: number, longitude: number): Promise<StationCollectionResponse> {
