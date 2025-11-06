@@ -593,6 +593,128 @@ If there's demand and we need to add more:
 
 ---
 
+## Release & Development Strategy
+
+### Git Branching Model
+
+**Branch Structure:**
+```
+main (stable releases only)
+├── develop (integration branch)
+    ├── feature/v0.X.0-feature-name
+    ├── feature/v0.X.0-another-feature
+```
+
+### Workflow for Each Version
+
+**Example: Implementing v0.3.0**
+
+1. **Preparation**
+   - Merge completed feature branch to `main` → tag current release
+   - Create/update `develop` branch from `main`
+
+2. **Feature Development**
+   - Create feature branches for each enhancement:
+     - `feature/v0.3.0-alerts` (new get_alerts tool)
+     - `feature/v0.3.0-hourly-forecast` (enhance get_forecast)
+     - `feature/v0.3.0-enhanced-conditions` (enhance get_current_conditions)
+   - Branch from `develop` for each feature
+   - Develop and test each feature independently
+
+3. **Integration**
+   - Merge each completed feature to `develop`
+   - Test integrated version on `develop`
+   - Fix any integration issues
+
+4. **Release**
+   - When ALL version features complete → merge `develop` to `main`
+   - Tag as version release (e.g., `v0.3.0`)
+   - Publish to npm
+
+### Release Strategy
+
+**Version-Based Releases (Recommended)**
+
+Release complete versions (v0.3.0, v0.4.0, etc.) rather than individual features.
+
+**Why:**
+- ✅ Roadmap already organized by cohesive version themes
+- ✅ Features within versions are related and tested together
+- ✅ Clearer communication to users ("v0.3.0 adds safety & hourly forecasts")
+- ✅ Reduced release overhead and changelog management
+- ✅ Better integration testing before release
+
+**Timeline:**
+- v0.3.0: ~1 week → Release when complete
+- v0.4.0: ~1.5 weeks → Release when complete
+- v0.5.0: ~1.5 weeks → Release when complete
+
+**Semantic Versioning:**
+- **v0.X.0** - Major version milestone (all planned features complete)
+- **v0.X.Y** - Patch releases (bug fixes, minor improvements)
+- **v1.0.0** - Production-ready with all core features (versions 0.3-0.6 complete)
+
+### Alternative: Individual Feature Releases
+
+If faster user feedback is needed:
+
+**Hybrid Approach:**
+- Release major new tools individually (e.g., v0.2.1, v0.2.2)
+- Bundle smaller enhancements together
+- Use `develop` branch with npm `next` tag for preview releases
+
+**Versioning:**
+- **v0.X.0** - Version milestone complete
+- **v0.X.Y** - Individual feature releases within a version
+
+### Development Workflow
+
+1. **Start New Version Development**
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b develop  # or git checkout develop && git merge main
+   ```
+
+2. **Create Feature Branch**
+   ```bash
+   git checkout develop
+   git checkout -b feature/v0.3.0-alerts
+   # ... develop feature ...
+   git commit -m "Add get_alerts tool for weather warnings"
+   ```
+
+3. **Merge to Develop**
+   ```bash
+   git checkout develop
+   git merge feature/v0.3.0-alerts
+   git push origin develop
+   ```
+
+4. **Release Version**
+   ```bash
+   git checkout main
+   git merge develop
+   git tag -a v0.3.0 -m "Release v0.3.0: Enhanced Core Tools"
+   git push origin main --tags
+   npm publish
+   ```
+
+### Preview Releases
+
+For testing integrated features before official release:
+
+```bash
+# On develop branch
+npm version prerelease --preid=beta  # v0.3.0-beta.0
+npm publish --tag next
+
+# Users can test with:
+# npx @modelcontextprotocol/create-server weather-mcp@next
+```
+
+---
+
 ## Contributing
 
 When implementing features from this roadmap:
