@@ -10,6 +10,14 @@ import type {
 } from '../types/openmeteo.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
+import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import {
+  RateLimitError,
+  ServiceUnavailableError,
+  InvalidLocationError,
+  DataNotFoundError,
+  ApiError
+} from '../errors/ApiError.js';
 
 export interface OpenMeteoServiceConfig {
   baseURL?: string;
@@ -59,77 +67,58 @@ export class OpenMeteoService {
       // Bad request
       if (status === 400) {
         const reason = data.reason || 'Invalid request parameters';
-        throw new Error(
-          `Open-Meteo API error: ${reason}\n\n` +
-          `Please verify:\n` +
+        throw new InvalidLocationError(
+          'OpenMeteo',
+          `${reason}\n\nPlease verify:\n` +
           `- Coordinates are valid (latitude: -90 to 90, longitude: -180 to 180)\n` +
           `- Date range is valid (1940 to 5 days ago)\n` +
-          `- Parameters are correctly formatted\n\n` +
-          `API documentation: https://open-meteo.com/en/docs/historical-weather-api`
+          `- Parameters are correctly formatted`
         );
       }
 
       // Rate limit error
       if (status === 429) {
-        throw new Error(
-          `Open-Meteo API rate limit exceeded (10,000 requests/day for non-commercial use).\n\n` +
-          `Please retry later or consider:\n` +
-          `- Reducing request frequency\n` +
-          `- Using daily instead of hourly data for longer periods\n` +
-          `- Upgrading to a commercial plan for higher limits\n\n` +
-          `More info: https://open-meteo.com/en/pricing`
-        );
+        throw new RateLimitError('OpenMeteo');
       }
 
       // Server errors
       if (status >= 500) {
-        throw new Error(
-          `Open-Meteo API server error: Service temporarily unavailable\n\n` +
-          `The Open-Meteo API may be experiencing an outage.\n\n` +
-          `Check service status:\n` +
-          `- Production status: https://open-meteo.com/en/docs/model-updates\n` +
-          `- GitHub issues: https://github.com/open-meteo/open-meteo/issues`
-        );
+        throw new ServiceUnavailableError('OpenMeteo', error);
       }
 
       // Other errors
-      throw new Error(
-        `Open-Meteo API error (${status}): ${data.reason || 'Request failed'}\n\n` +
-        `For assistance, visit:\n` +
-        `- API documentation: https://open-meteo.com/en/docs\n` +
-        `- GitHub issues: https://github.com/open-meteo/open-meteo/issues`
+      throw new ApiError(
+        `Open-Meteo API error (${status})`,
+        status,
+        'OpenMeteo',
+        data.reason || 'Request failed',
+        [
+          'https://open-meteo.com/en/docs',
+          'https://github.com/open-meteo/open-meteo/issues'
+        ]
       );
     }
 
     // Network errors
     if (error.code === 'ECONNABORTED') {
-      throw new Error(
-        `Request to Open-Meteo API timed out. Please try again.\n\n` +
-        `If timeouts persist, check:\n` +
-        `- Your internet connection\n` +
-        `- Service status: https://open-meteo.com/en/docs/model-updates`
-      );
+      throw new ServiceUnavailableError('OpenMeteo', error);
     }
 
     if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-      throw new Error(
-        `Unable to connect to Open-Meteo API.\n\n` +
-        `Possible causes:\n` +
-        `- Internet connection issues\n` +
-        `- Open-Meteo API service outage\n` +
-        `- DNS resolution problems\n\n` +
-        `Check:\n` +
-        `- Your internet connection\n` +
-        `- Service status: https://open-meteo.com/en/docs/model-updates`
-      );
+      throw new ServiceUnavailableError('OpenMeteo', error);
     }
 
     // Generic error
-    throw new Error(
-      `Open-Meteo API request failed: ${error.message}\n\n` +
-      `For assistance, visit:\n` +
-      `- GitHub issues: https://github.com/open-meteo/open-meteo/issues\n` +
-      `- Documentation: https://open-meteo.com/en/docs`
+    throw new ApiError(
+      `Open-Meteo API request failed: ${error.message}`,
+      500,
+      'OpenMeteo',
+      `Request failed: ${error.message}`,
+      [
+        'https://github.com/open-meteo/open-meteo/issues',
+        'https://open-meteo.com/en/docs'
+      ],
+      true
     );
   }
 
@@ -153,7 +142,9 @@ export class OpenMeteoService {
           (error as Error).message.includes('timed out');
 
         if (shouldRetry) {
-          const delay = Math.pow(2, retries) * 1000; // Exponential backoff
+          // Exponential backoff with jitter to prevent thundering herd
+          const baseDelay = Math.pow(2, retries) * 1000;
+          const delay = baseDelay * (0.5 + Math.random() * 0.5);
           await new Promise(resolve => setTimeout(resolve, delay));
           return this.makeRequest<T>(url, params, retries + 1);
         }
@@ -269,13 +260,12 @@ export class OpenMeteoService {
     endDate: string,
     useHourly: boolean = true
   ): Promise<OpenMeteoHistoricalResponse> {
-    // Validate coordinates
-    if (latitude < -90 || latitude > 90) {
-      throw new Error(`Invalid latitude: ${latitude}. Must be between -90 and 90.`);
-    }
-    if (longitude < -180 || longitude > 180) {
-      throw new Error(`Invalid longitude: ${longitude}. Must be between -180 and 180.`);
-    }
+    // Validate coordinates (checks for NaN, Infinity, and range)
+    validateLatitude(latitude);
+    validateLongitude(longitude);
+
+    // Build parameters once
+    const params = this.buildHistoricalParams(latitude, longitude, startDate, endDate, useHourly);
 
     // Check cache first (if enabled)
     if (CacheConfig.enabled) {
@@ -285,77 +275,8 @@ export class OpenMeteoService {
         return cached as OpenMeteoHistoricalResponse;
       }
 
-      // Build request parameters
-      const params: Record<string, string | number> = {
-        latitude,
-        longitude,
-        start_date: startDate,
-        end_date: endDate,
-        temperature_unit: 'fahrenheit',
-        wind_speed_unit: 'mph',
-        precipitation_unit: 'inch',
-        timezone: 'auto'
-      };
-
-      // Request appropriate data granularity
-      if (useHourly) {
-        // Hourly data for detailed observations
-        params.hourly = [
-          'temperature_2m',
-          'relative_humidity_2m',
-          'dewpoint_2m',
-          'apparent_temperature',
-          'precipitation',
-          'rain',
-          'snowfall',
-          'weather_code',
-          'pressure_msl',
-          'cloud_cover',
-          'wind_speed_10m',
-          'wind_direction_10m',
-          'wind_gusts_10m'
-        ].join(',');
-      } else {
-        // Daily summaries for longer time periods
-        params.daily = [
-          'temperature_2m_max',
-          'temperature_2m_min',
-          'temperature_2m_mean',
-          'apparent_temperature_max',
-          'apparent_temperature_min',
-          'precipitation_sum',
-          'rain_sum',
-          'snowfall_sum',
-          'precipitation_hours',
-          'weather_code',
-          'wind_speed_10m_max',
-          'wind_gusts_10m_max',
-          'wind_direction_10m_dominant'
-        ].join(',');
-      }
-
-      const response = await this.makeRequest<OpenMeteoHistoricalResponse>(
-        '/archive',
-        params
-      );
-
-      // Validate response has data
-      if (useHourly && (!response.hourly || !response.hourly.time || response.hourly.time.length === 0)) {
-        throw new Error(
-          `No historical weather data available for the specified date range (${startDate} to ${endDate}).\n\n` +
-          'This may occur because:\n' +
-          '- The dates are too recent (data has a 5-day delay for most models)\n' +
-          '- The dates are before 1940 (earliest available data)\n\n' +
-          'Please try adjusting your date range.'
-        );
-      }
-
-      if (!useHourly && (!response.daily || !response.daily.time || response.daily.time.length === 0)) {
-        throw new Error(
-          `No historical weather data available for the specified date range (${startDate} to ${endDate}).\n\n` +
-          'Please try adjusting your date range.'
-        );
-      }
+      const response = await this.makeRequest<OpenMeteoHistoricalResponse>('/archive', params);
+      this.validateResponse(response, startDate, endDate, useHourly);
 
       // Use smart TTL based on date range
       const ttl = getHistoricalDataTTL(startDate);
@@ -364,8 +285,23 @@ export class OpenMeteoService {
       return response;
     }
 
-    // No caching - original logic
-    // Build request parameters
+    // No caching
+    const response = await this.makeRequest<OpenMeteoHistoricalResponse>('/archive', params);
+    this.validateResponse(response, startDate, endDate, useHourly);
+    return response;
+  }
+
+  /**
+   * Build request parameters for historical weather data
+   * @private
+   */
+  private buildHistoricalParams(
+    latitude: number,
+    longitude: number,
+    startDate: string,
+    endDate: string,
+    useHourly: boolean
+  ): Record<string, string | number> {
     const params: Record<string, string | number> = {
       latitude,
       longitude,
@@ -414,12 +350,19 @@ export class OpenMeteoService {
       ].join(',');
     }
 
-    const response = await this.makeRequest<OpenMeteoHistoricalResponse>(
-      '/archive',
-      params
-    );
+    return params;
+  }
 
-    // Validate response has data
+  /**
+   * Validate that the response contains the expected data
+   * @private
+   */
+  private validateResponse(
+    response: OpenMeteoHistoricalResponse,
+    startDate: string,
+    endDate: string,
+    useHourly: boolean
+  ): void {
     if (useHourly && (!response.hourly || !response.hourly.time || response.hourly.time.length === 0)) {
       throw new Error(
         `No historical weather data available for the specified date range (${startDate} to ${endDate}).\n\n` +
@@ -436,8 +379,6 @@ export class OpenMeteoService {
         'Please try adjusting your date range.'
       );
     }
-
-    return response;
   }
 
   /**

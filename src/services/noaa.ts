@@ -14,6 +14,14 @@ import type {
 } from '../types/noaa.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
+import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import {
+  RateLimitError,
+  ServiceUnavailableError,
+  InvalidLocationError,
+  DataNotFoundError,
+  ApiError
+} from '../errors/ApiError.js';
 
 export interface NOAAServiceConfig {
   userAgent?: string;
@@ -64,71 +72,49 @@ export class NOAAService {
 
       // Rate limit error - suggest retry
       if (status === 429) {
-        throw new Error(
-          `NOAA API rate limit exceeded. Please retry in a few seconds.\n\n` +
-          `Details: ${data.detail || 'Too many requests'}\n\n` +
-          `For more information about rate limits, visit:\n` +
-          `https://weather-gov.github.io/api/`
+        throw new RateLimitError('NOAA');
+      }
+
+      // 404 errors - location not found
+      if (status === 404) {
+        throw new DataNotFoundError(
+          'NOAA',
+          `${data.detail || data.title || 'Location not found'}\n\n` +
+          `This location may be outside NOAA's coverage area (US only).`
         );
       }
 
       // Other client errors
       if (status >= 400 && status < 500) {
-        let errorMsg = `NOAA API error: ${data.detail || data.title || 'Invalid request'}\n\n`;
-
-        // Add contextual help based on error type
-        if (status === 404) {
-          errorMsg += `This location may be outside NOAA's coverage area (US only).\n\n`;
-        }
-
-        errorMsg += `If this persists, check:\n` +
-          `- Planned outages: https://weather-gov.github.io/api/planned-outages\n` +
-          `- Service notices: https://www.weather.gov/notification\n` +
-          `- Report issues: https://weather-gov.github.io/api/reporting-issues`;
-
-        throw new Error(errorMsg);
+        throw new InvalidLocationError(
+          'NOAA',
+          data.detail || data.title || 'Invalid request'
+        );
       }
 
       // Server errors
       if (status >= 500) {
-        throw new Error(
-          `NOAA API server error: ${data.detail || 'Service temporarily unavailable'}\n\n` +
-          `The NOAA Weather API may be experiencing an outage.\n\n` +
-          `Check service status:\n` +
-          `- Planned outages: https://weather-gov.github.io/api/planned-outages\n` +
-          `- Service notices: https://www.weather.gov/notification\n` +
-          `- Report issues: nco.ops@noaa.gov or (301) 683-1518`
-        );
+        throw new ServiceUnavailableError('NOAA', error);
       }
     }
 
     // Network errors
     if (error.code === 'ECONNABORTED') {
-      throw new Error(
-        `Request to NOAA API timed out. Please try again.\n\n` +
-        `If timeouts persist, the service may be experiencing issues:\n` +
-        `https://weather-gov.github.io/api/planned-outages`
-      );
+      throw new ServiceUnavailableError('NOAA', error);
     }
 
     if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-      throw new Error(
-        `Unable to connect to NOAA API.\n\n` +
-        `Possible causes:\n` +
-        `- Internet connection issues\n` +
-        `- NOAA API service outage\n` +
-        `- DNS resolution problems\n\n` +
-        `Check:\n` +
-        `- Your internet connection\n` +
-        `- Service status: https://weather-gov.github.io/api/planned-outages`
-      );
+      throw new ServiceUnavailableError('NOAA', error);
     }
 
     // Generic error
-    throw new Error(
-      `NOAA API request failed: ${error.message}\n\n` +
-      `For assistance, visit:\n` +
-      `https://weather-gov.github.io/api/reporting-issues`
+    throw new ApiError(
+      `NOAA API request failed: ${error.message}`,
+      500,
+      'NOAA',
+      `Request failed: ${error.message}`,
+      ['https://weather-gov.github.io/api/reporting-issues'],
+      true
     );
   }
 
@@ -151,7 +137,9 @@ export class NOAAService {
           (error as Error).message.includes('timed out');
 
         if (shouldRetry) {
-          const delay = Math.pow(2, retries) * 1000; // Exponential backoff
+          // Exponential backoff with jitter to prevent thundering herd
+          const baseDelay = Math.pow(2, retries) * 1000;
+          const delay = baseDelay * (0.5 + Math.random() * 0.5);
           await new Promise(resolve => setTimeout(resolve, delay));
           return this.makeRequest<T>(url, retries + 1);
         }
@@ -242,13 +230,9 @@ export class NOAAService {
    * This is the first step for getting forecast or observation data
    */
   async getPointData(latitude: number, longitude: number): Promise<PointsResponse> {
-    // Validate coordinates
-    if (latitude < -90 || latitude > 90) {
-      throw new Error(`Invalid latitude: ${latitude}. Must be between -90 and 90.`);
-    }
-    if (longitude < -180 || longitude > 180) {
-      throw new Error(`Invalid longitude: ${longitude}. Must be between -180 and 180.`);
-    }
+    // Validate coordinates (checks for NaN, Infinity, and range)
+    validateLatitude(latitude);
+    validateLongitude(longitude);
 
     // Check cache first (if enabled)
     if (CacheConfig.enabled) {
@@ -298,6 +282,22 @@ export class NOAAService {
    * Get hourly forecast for a location using grid coordinates
    */
   async getHourlyForecast(office: string, gridX: number, gridY: number): Promise<ForecastResponse> {
+    // Check cache first (if enabled)
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('hourly-forecast', office, gridX, gridY);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as ForecastResponse;
+      }
+
+      const url = `/gridpoints/${office}/${gridX},${gridY}/forecast/hourly`;
+      const result = await this.makeRequest<ForecastResponse>(url);
+
+      // Cache with forecast TTL (2 hours) - hourly forecasts update at same rate as daily
+      this.cache.set(cacheKey, result, CacheConfig.ttl.forecast);
+      return result;
+    }
+
     const url = `/gridpoints/${office}/${gridX},${gridY}/forecast/hourly`;
     return this.makeRequest<ForecastResponse>(url);
   }
@@ -505,13 +505,9 @@ export class NOAAService {
     longitude: number,
     activeOnly: boolean = true
   ): Promise<AlertCollectionResponse> {
-    // Validate coordinates
-    if (latitude < -90 || latitude > 90) {
-      throw new Error(`Invalid latitude: ${latitude}. Must be between -90 and 90.`);
-    }
-    if (longitude < -180 || longitude > 180) {
-      throw new Error(`Invalid longitude: ${longitude}. Must be between -180 and 180.`);
-    }
+    // Validate coordinates (checks for NaN, Infinity, and range)
+    validateLatitude(latitude);
+    validateLongitude(longitude);
 
     // Check cache first (if enabled)
     if (CacheConfig.enabled) {
