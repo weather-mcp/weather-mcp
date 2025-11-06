@@ -17,12 +17,33 @@ import {
 import { NOAAService } from './services/noaa.js';
 import { OpenMeteoService } from './services/openmeteo.js';
 import { CacheConfig } from './config/cache.js';
+import {
+  validateCoordinates,
+  validateForecastDays,
+  validateGranularity,
+  validateOptionalBoolean,
+  validateHistoricalWeatherParams,
+} from './utils/validation.js';
+import { logger } from './utils/logger.js';
+import { formatErrorForUser } from './errors/ApiError.js';
+import { DisplayThresholds, ApiConstants } from './config/displayThresholds.js';
 
 /**
  * Server information
  */
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Read version from package.json to ensure single source of truth
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+  readFileSync(join(__dirname, '../package.json'), 'utf-8')
+);
+
 const SERVER_NAME = 'weather-mcp';
-const SERVER_VERSION = '0.1.0';
+const SERVER_VERSION = packageJson.version;
 
 /**
  * Initialize the NOAA service
@@ -206,19 +227,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'get_forecast': {
-        const {
-          latitude,
-          longitude,
-          days = 7,
-          granularity = 'daily',
-          include_precipitation_probability = true
-        } = args as {
-          latitude: number;
-          longitude: number;
-          days?: number;
-          granularity?: 'daily' | 'hourly';
-          include_precipitation_probability?: boolean;
-        };
+        // Validate input parameters with runtime checks
+        const { latitude, longitude } = validateCoordinates(args);
+        const days = validateForecastDays(args);
+        const granularity = validateGranularity((args as any)?.granularity);
+        const include_precipitation_probability = validateOptionalBoolean(
+          (args as any)?.include_precipitation_probability,
+          'include_precipitation_probability',
+          true
+        );
 
         // Get forecast data based on granularity
         const forecast = granularity === 'hourly'
@@ -291,10 +308,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_current_conditions': {
-        const { latitude, longitude } = args as {
-          latitude: number;
-          longitude: number;
-        };
+        // Validate input parameters with runtime checks
+        const { latitude, longitude } = validateCoordinates(args);
 
         // Get current observation
         const observation = await noaaService.getCurrentConditions(latitude, longitude);
@@ -324,7 +339,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           // Show heat index when temperature is high (>80°F) and heat index is available
           if (props.heatIndex) {
             const heatIndexF = toFahrenheit(props.heatIndex.value, props.heatIndex.unitCode);
-            if (heatIndexF !== null && tempF > 80 && heatIndexF > tempF) {
+            if (heatIndexF !== null && tempF > DisplayThresholds.temperature.showHeatIndex && heatIndexF > tempF) {
               output += `**Feels Like (Heat Index):** ${Math.round(heatIndexF)}°F\n`;
             }
           }
@@ -332,7 +347,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           // Show wind chill when temperature is low (<50°F) and wind chill is available
           if (props.windChill) {
             const windChillF = toFahrenheit(props.windChill.value, props.windChill.unitCode);
-            if (windChillF !== null && tempF < 50 && windChillF < tempF) {
+            if (windChillF !== null && tempF < DisplayThresholds.temperature.showWindChill && windChillF < tempF) {
               output += `**Feels Like (Wind Chill):** ${Math.round(windChillF)}°F\n`;
             }
           }
@@ -376,7 +391,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const gustMph = props.windGust.unitCode.includes('km_h')
               ? props.windGust.value * 0.621371
               : props.windGust.value * 2.23694;
-            if (gustMph > windMph * 1.2) { // Only show if gusts are 20% higher
+            if (gustMph > windMph * DisplayThresholds.wind.gustSignificanceRatio) {
               output += `, gusting to ${Math.round(gustMph)} mph`;
             }
           }
@@ -479,11 +494,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_alerts': {
-        const { latitude, longitude, active_only = true } = args as {
-          latitude: number;
-          longitude: number;
-          active_only?: boolean;
-        };
+        // Validate input parameters with runtime checks
+        const { latitude, longitude } = validateCoordinates(args);
+        const active_only = validateOptionalBoolean(
+          (args as any)?.active_only,
+          'active_only',
+          true
+        );
 
         // Get alerts data
         const alertsData = await noaaService.getAlerts(latitude, longitude, active_only);
@@ -566,27 +583,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_historical_weather': {
-        const { latitude, longitude, start_date, end_date, limit = 168 } = args as {
-          latitude: number;
-          longitude: number;
-          start_date: string;
-          end_date: string;
-          limit?: number;
-        };
+        // Validate input parameters with runtime checks
+        const { latitude, longitude, start_date, end_date, limit = 168 } = validateHistoricalWeatherParams(args);
 
         // Parse dates
         const startTime = new Date(start_date);
         const endTime = new Date(end_date);
-
-        // Validate date parsing
-        if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-          throw new Error('Invalid date format. Please use ISO format (YYYY-MM-DD or full ISO 8601 datetime).');
-        }
-
-        // Validate date range
-        if (startTime > endTime) {
-          throw new Error(`Invalid date range: start date (${start_date}) must be before end date (${end_date}).`);
-        }
 
         // Validate dates are not in the future
         const now = new Date();
@@ -598,16 +600,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         // Determine which API to use based on date range
-        // If start date is more than 7 days old, use CDO API for archival data
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const useArchivalData = startTime < sevenDaysAgo;
+        // If start date is older than threshold, use archival API
+        const thresholdDate = new Date(now.getTime() - ApiConstants.historicalDataThresholdDays * 24 * 60 * 60 * 1000);
+        const useArchivalData = startTime < thresholdDate;
 
         if (useArchivalData) {
           // Use Open-Meteo API for historical/archival data
           try {
             // Determine whether to use hourly or daily data based on date range
             const daysDiff = Math.ceil((endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60 * 24));
-            const useHourly = daysDiff <= 31; // Use hourly for up to 31 days
+            const useHourly = daysDiff <= ApiConstants.maxHourlyHistoricalDays;
 
             const weatherData = await openMeteoService.getHistoricalWeather(
               latitude,
@@ -915,12 +917,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    // Log the error with full details
+    logger.error('Tool execution error', error as Error, {
+      tool: name,
+      args: args ? JSON.stringify(args) : undefined,
+    });
+
+    // Format error for user display (sanitized)
+    const userMessage = formatErrorForUser(error as Error);
+
     return {
       content: [
         {
           type: 'text',
-          text: `Error: ${errorMessage}`
+          text: userMessage
         }
       ],
       isError: true
@@ -933,13 +943,57 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
  */
 async function main() {
   const transport = new StdioServerTransport();
-  await server.connect(transport);
 
-  // Log to stderr so it doesn't interfere with MCP communication
-  console.error('Weather MCP Server running on stdio');
+  // Set up graceful shutdown handlers
+  const shutdown = async (signal: string) => {
+    logger.info(`Received ${signal}, shutting down gracefully...`);
+
+    try {
+      // Clean up resources
+      noaaService.clearCache();
+      openMeteoService.clearCache();
+      logger.info('Cache cleared');
+
+      // Close server connection
+      await server.close();
+      logger.info('Server closed');
+
+      process.exit(0);
+    } catch (error) {
+      logger.error('Error during shutdown', error as Error);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  try {
+    await server.connect(transport);
+    logger.info('Weather MCP Server started', {
+      version: SERVER_VERSION,
+      cacheEnabled: CacheConfig.enabled,
+      logLevel: process.env.LOG_LEVEL || 'INFO',
+    });
+  } catch (error) {
+    logger.error('Failed to start server', error as Error);
+    throw error;
+  }
 }
 
 main().catch((error) => {
-  console.error('Fatal error in main():', error);
+  logger.error('Fatal error in main()', error);
+
+  // Log structured error for monitoring
+  console.error(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level: 'FATAL',
+    message: 'Application failed to start',
+    error: {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    }
+  }));
+
   process.exit(1);
 });

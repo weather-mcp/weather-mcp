@@ -26,8 +26,9 @@ export class Cache<T = any> {
   private cache: Map<string, CacheEntry<T>> = new Map();
   private stats: CacheStats;
   private maxSize: number;
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
-  constructor(maxSize: number = 1000) {
+  constructor(maxSize: number = 1000, cleanupIntervalMs: number = 5 * 60 * 1000) {
     this.maxSize = maxSize;
     this.stats = {
       hits: 0,
@@ -36,6 +37,11 @@ export class Cache<T = any> {
       size: 0,
       maxSize: maxSize,
     };
+
+    // Automatic cleanup of expired entries every 5 minutes by default
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpired();
+    }, cleanupIntervalMs);
   }
 
   /**
@@ -119,6 +125,18 @@ export class Cache<T = any> {
   }
 
   /**
+   * Destroy the cache and clean up resources
+   * Call this when the cache is no longer needed to prevent memory leaks
+   */
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.clear();
+  }
+
+  /**
    * Get cache statistics
    */
   getStats(): CacheStats {
@@ -150,11 +168,25 @@ export class Cache<T = any> {
 
   /**
    * Generate a cache key from components
-   * @param components Parts to combine into a cache key
-   * @returns Hash-like cache key
+   * @param components Parts to combine into a cache key (only primitives allowed)
+   * @returns Cache key string
+   * @throws {Error} If components contain objects or invalid types
    */
-  static generateKey(...components: any[]): string {
-    return JSON.stringify(components);
+  static generateKey(...components: (string | number | boolean | null | undefined)[]): string {
+    // Validate and sanitize inputs to prevent cache poisoning
+    const sanitized = components.map((c, index) => {
+      if (c === null || c === undefined) {
+        return 'null';
+      }
+      if (typeof c === 'object') {
+        throw new Error(`Cache key generation error: Object not allowed at position ${index}. Only primitives (string, number, boolean) are supported.`);
+      }
+      // Convert to string safely
+      return String(c);
+    });
+
+    // Use colon separator instead of JSON.stringify to avoid circular reference issues
+    return sanitized.join(':');
   }
 
   /**
