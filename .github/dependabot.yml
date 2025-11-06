@@ -1,0 +1,47 @@
+# Dependabot configuration for automated dependency updates
+# Documentation: https://docs.github.com/en/code-security/dependabot
+
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      # Check for updates weekly on Mondays
+      interval: "weekly"
+      day: "monday"
+    # Allow up to 10 open pull requests for npm dependencies
+    open-pull-requests-limit: 10
+    # Group patch and minor updates together to reduce PR noise
+    groups:
+      development-dependencies:
+        patterns:
+          - "@types/*"
+          - "@vitest/*"
+          - "typescript"
+          - "tsx"
+          - "vitest"
+        update-types:
+          - "minor"
+          - "patch"
+      production-dependencies:
+        patterns:
+          - "@modelcontextprotocol/*"
+          - "axios"
+          - "dotenv"
+        update-types:
+          - "minor"
+          - "patch"
+    # Automatically rebase PRs when they become outdated
+    rebase-strategy: "auto"
+    # Add reviewers (customize with actual GitHub usernames if desired)
+    # reviewers:
+    #   - "dgahagan"
+    # Add labels to Dependabot PRs
+    labels:
+      - "dependencies"
+      - "automated"
+    # Commit message prefix
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
