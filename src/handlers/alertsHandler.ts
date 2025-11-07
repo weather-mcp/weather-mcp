@@ -52,11 +52,15 @@ export async function handleGetAlerts(
       'Unknown': 4
     };
 
-    const sortedAlerts = alerts.sort((a, b) => {
-      const severityA = severityOrder[a.properties.severity as SeverityLevel] ?? 4;
-      const severityB = severityOrder[b.properties.severity as SeverityLevel] ?? 4;
-      return severityA - severityB;
-    });
+    // Cache severity values to avoid repeated lookups during sort
+    const alertsWithSeverity = alerts.map(alert => ({
+      alert,
+      severityValue: severityOrder[alert.properties.severity as SeverityLevel] ?? 4
+    }));
+
+    const sortedAlerts = alertsWithSeverity
+      .sort((a, b) => a.severityValue - b.severityValue)
+      .map(item => item.alert);
 
     for (const alert of sortedAlerts) {
       const props = alert.properties;

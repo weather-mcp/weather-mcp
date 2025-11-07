@@ -15,6 +15,7 @@ import type {
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -39,7 +40,7 @@ export class NOAAService {
     const {
       userAgent = '(weather-mcp, contact@example.com)',
       baseURL = 'https://api.weather.gov',
-      timeout = 30000,
+      timeout = CacheConfig.apiTimeoutMs,
       maxRetries = 3
     } = config;
 
@@ -72,6 +73,10 @@ export class NOAAService {
 
       // Rate limit error - suggest retry
       if (status === 429) {
+        logger.warn('Rate limit exceeded', {
+          service: 'NOAA',
+          securityEvent: true
+        });
         throw new RateLimitError('NOAA');
       }
 
@@ -86,6 +91,12 @@ export class NOAAService {
 
       // Other client errors
       if (status >= 400 && status < 500) {
+        logger.warn('Invalid request parameters', {
+          service: 'NOAA',
+          status,
+          detail: data.detail || data.title,
+          securityEvent: true
+        });
         throw new InvalidLocationError(
           'NOAA',
           data.detail || data.title || 'Invalid request'
@@ -320,6 +331,41 @@ export class NOAAService {
     const pointData = await this.getPointData(latitude, longitude);
     const { gridId, gridX, gridY } = pointData.properties;
     return this.getHourlyForecast(gridId, gridX, gridY);
+  }
+
+  /**
+   * Get gridpoint data for a location using grid coordinates
+   * Contains detailed forecast data including fire weather indices
+   */
+  async getGridpointData(office: string, gridX: number, gridY: number): Promise<import('../types/noaa.js').GridpointResponse> {
+    // Check cache first (if enabled)
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('gridpoint', office, gridX, gridY);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as import('../types/noaa.js').GridpointResponse;
+      }
+
+      const url = `/gridpoints/${office}/${gridX},${gridY}`;
+      const result = await this.makeRequest<import('../types/noaa.js').GridpointResponse>(url);
+
+      // Cache with forecast TTL (2 hours)
+      this.cache.set(cacheKey, result, CacheConfig.ttl.forecast);
+      return result;
+    }
+
+    const url = `/gridpoints/${office}/${gridX},${gridY}`;
+    return this.makeRequest<import('../types/noaa.js').GridpointResponse>(url);
+  }
+
+  /**
+   * Get gridpoint data for a location using lat/lon (convenience method)
+   * This combines getPointData and getGridpointData
+   */
+  async getGridpointDataByCoordinates(latitude: number, longitude: number): Promise<import('../types/noaa.js').GridpointResponse> {
+    const pointData = await this.getPointData(latitude, longitude);
+    const { gridId, gridX, gridY } = pointData.properties;
+    return this.getGridpointData(gridId, gridX, gridY);
   }
 
   /**

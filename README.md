@@ -12,7 +12,41 @@ An MCP (Model Context Protocol) server that provides **global weather data** to 
 
 ## Features
 
-- **Location Search**: Find coordinates for any location worldwide (NEW in v0.4.0)
+- **Marine Conditions**: Comprehensive marine weather for coastal and ocean areas (NEW in v0.6.0)
+  - Global coverage for waves, swell, and ocean currents
+  - Significant wave height with safety categorization (Calm to Extreme)
+  - Wind waves (locally generated) and swell (distant systems) separation
+  - Wave period and direction for planning
+  - Ocean current velocity and direction
+  - Optional 5-day marine forecast with daily summaries
+  - Safety assessment for maritime activities (sailing, boating, surfing)
+  - Wave interpretation guide based on Douglas Sea Scale
+  - Important: Data has limited coastal accuracy - NOT for navigation
+- **Severe Weather Probabilities**: Probabilistic severe weather forecasting (NEW in v0.6.0)
+  - US locations only (NOAA gridpoint data)
+  - Optional enhancement to forecasts (`include_severe_weather` parameter)
+  - Thunderstorm probability for next 48 hours
+  - Wind gust probabilities (20-60+ mph categories)
+  - Tropical storm and hurricane wind probabilities
+  - Lightning activity levels
+  - Smart display showing only significant threats
+  - Works with both daily and hourly forecasts
+- **Air Quality Monitoring**: Comprehensive air quality data for any location worldwide (v0.5.0)
+  - Air Quality Index (AQI) with automatic region detection (US AQI or European EAQI)
+  - Health recommendations based on AQI levels
+  - Pollutant concentrations (PM2.5, PM10, O₃, NO₂, SO₂, CO, NH₃)
+  - UV Index with sun protection recommendations
+  - Optional hourly air quality forecasts (5-day outlook)
+  - Categorized health risk levels (Good, Moderate, Unhealthy, etc.)
+  - Activity recommendations for sensitive populations
+- **Fire Weather Data**: Fire danger indices for US locations (v0.5.0)
+  - Haines Index (atmospheric fire growth potential)
+  - Grassland Fire Danger Index
+  - Red Flag Threat Index
+  - Mixing Height (smoke dispersion indicator)
+  - Transport Wind Speed (smoke transport)
+  - Optional enhancement to current conditions
+- **Location Search**: Find coordinates for any location worldwide (v0.4.0)
   - Convert location names to coordinates ("Paris" → 48.8534°, 2.3488°)
   - Support for cities, airports, landmarks, and regions globally
   - Detailed metadata: timezone, elevation, population, country
@@ -34,6 +68,7 @@ An MCP (Model Context Protocol) server that provides **global weather data** to 
   - 24-hour temperature range
   - Wind gusts and detailed cloud cover
   - Recent precipitation history
+  - Optional fire weather indices (see above)
 - **Historical Data**: Access historical weather observations for any location worldwide
   - Recent data (last 7 days): Detailed hourly observations from NOAA real-time API (US only)
   - Archival data (>7 days old): Hourly/daily weather data from 1940-present via Open-Meteo (global coverage)
@@ -56,7 +91,10 @@ The Weather MCP server includes an intelligent in-memory caching system that sig
 
 The cache automatically stores and retrieves weather data with intelligent expiration:
 
-- **Location Searches**: Cached for 30 days (locations don't move) - NEW in v0.4.0
+- **Location Searches**: Cached for 30 days (locations don't move)
+- **Marine Conditions**: Cached for 1 hour (marine data updates hourly) - NEW in v0.6.0
+- **Air Quality Data**: Cached for 1 hour (air quality updates hourly) - v0.5.0
+- **Fire Weather Data**: Cached for 2 hours (gridpoint data updates ~hourly) - v0.5.0
 - **Weather Alerts**: Cached for 5 minutes (alerts can change rapidly)
 - **Forecasts**: Cached for 2 hours (updated approximately hourly)
 - **Current Conditions**: Cached for 15 minutes (observations update every 20-60 minutes)
@@ -344,6 +382,88 @@ If you get "No historical data available":
 - For older dates: Data should be available globally back to 1940
 - Note: Most recent data has a 5-day delay
 - Very recent dates (last 5 days) may not be available in archival data yet
+
+### 6. get_alerts
+Get active weather alerts, watches, warnings, and advisories for US locations.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `active_only` (optional): Show only active alerts (default: true)
+
+**Description:**
+Retrieves current weather alerts from the NOAA API for safety-critical weather information. Returns severity levels (Extreme, Severe, Moderate, Minor), urgency indicators, effective/expiration times, and affected areas. Alerts are automatically sorted by severity with the most critical first.
+
+**Examples:**
+```
+"Are there any weather alerts for Miami, Florida?"
+"Check for severe weather warnings in Oklahoma City"
+"What weather watches are active in my area?" (latitude: 40.7128, longitude: -74.0060)
+```
+
+**Returns:**
+- Alert type and severity (Extreme → Severe → Moderate → Minor)
+- Urgency, certainty, and response type
+- Event description and instructions
+- Effective and expiration times
+- Affected geographic areas
+- Recommended actions and safety information
+
+### 7. get_air_quality (NEW in v0.5.0)
+Get comprehensive air quality data for any location worldwide.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `forecast` (optional): Include hourly forecast for next 5 days (default: false)
+
+**Description:**
+Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index.
+
+**Examples:**
+```
+"What's the air quality in Los Angeles?"
+"Check pollution levels in Beijing"
+"Get air quality forecast for Paris for the next 5 days"
+```
+
+**Returns:**
+- Air Quality Index (AQI) with appropriate scale (US or European)
+- Health risk category and recommendations
+- Pollutant concentrations (PM2.5, PM10, O₃, NO₂, SO₂, CO, NH₃)
+- UV Index with sun protection guidance
+- Activity recommendations for sensitive groups
+- Optional 5-day hourly forecast
+
+### 8. get_marine_conditions (NEW in v0.6.0)
+Get marine weather conditions including wave height, swell, ocean currents, and sea state.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `forecast` (optional): Include 5-day marine forecast (default: false)
+
+**Description:**
+Provides comprehensive marine weather data using the Open-Meteo Marine API with global ocean coverage. Includes significant wave height with Douglas Sea Scale categorization, wind waves vs swell separation, wave period/direction, ocean currents, and safety assessment for maritime activities.
+
+**Important:** Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.
+
+**Examples:**
+```
+"What are the ocean conditions off the coast of California?"
+"Get wave height and swell for surfing in Hawaii"
+"Check marine conditions in the Atlantic Ocean" (latitude: 30.0, longitude: -60.0)
+```
+
+**Returns:**
+- Significant wave height (meters/feet) with safety category
+- Wind waves (locally generated) height and direction
+- Swell height, period, and direction (from distant systems)
+- Ocean current velocity and direction
+- Sea state interpretation (Calm → Phenomenal based on Douglas Sea Scale)
+- Safety assessment for maritime activities
+- Wave period for planning and safety
+- Optional 5-day forecast with daily summaries
 
 ## Error Handling & Service Status
 

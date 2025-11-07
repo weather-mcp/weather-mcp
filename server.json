@@ -2,13 +2,13 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "name": "io.github.dgahagan/weather-mcp",
   "title": "Weather Data MCP Server",
-  "description": "Global weather forecasts, location search, current conditions & historical data (1940-present).",
-  "version": "0.4.0",
+  "description": "Weather forecasts, alerts, air quality, marine conditions & historical data. NOAA + Open-Meteo.",
+  "version": "1.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@dangahagan/weather-mcp",
-      "version": "0.4.0",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
       }

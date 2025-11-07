@@ -64,6 +64,10 @@ export const CacheConfig = {
   // Min: 100, Max: 10000, Default: 1000
   maxSize: getEnvNumber('CACHE_MAX_SIZE', 1000, 100, 10000),
 
+  // API timeout configuration
+  // Min: 5000ms (5 seconds), Max: 120000ms (2 minutes), Default: 30000ms (30 seconds)
+  apiTimeoutMs: getEnvNumber('API_TIMEOUT_MS', 30000, 5000, 120000),
+
   // TTL values for different data types
   ttl: {
     // Grid coordinate lookups (lat/lon -> grid mapping)

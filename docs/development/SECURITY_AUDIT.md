@@ -1,17 +1,18 @@
 # Weather MCP Server - Security Audit Report
 
-**Audit Date:** November 6, 2025
+**Audit Date:** November 6, 2025 (Updated for v0.6.0)
 **Auditor:** Security Assessment Team
-**Project:** Weather MCP Server v0.2.0
+**Project:** Weather MCP Server v0.6.0
 **Audit Scope:** Comprehensive security assessment including code review, dependency analysis, and compliance evaluation
+**Features Audited:** v0.5.0 (Air Quality & Fire Weather), v0.6.0 (Marine Conditions & Severe Weather)
 
 ---
 
 ## Executive Summary
 
-### Overall Security Posture: **B+ (Good)**
+### Overall Security Posture: **A- (Excellent)**
 
-The Weather MCP Server demonstrates a **strong security posture** with well-implemented controls across most security domains. The project has undergone significant security hardening, with all critical vulnerabilities addressed and comprehensive testing in place (131 tests). The application follows security best practices for a Node.js/TypeScript MCP server and demonstrates mature input validation, error handling, and defensive coding practices.
+The Weather MCP Server demonstrates an **excellent security posture** with well-implemented controls across all security domains. The project has undergone significant security hardening, with all critical vulnerabilities addressed and comprehensive testing in place (247 tests, up from 131). The application follows security best practices for a Node.js/TypeScript MCP server and demonstrates mature input validation, error handling, and defensive coding practices. **v0.5.0 and v0.6.0 features maintain the same high security standards with zero new critical or high-severity vulnerabilities introduced.**
 
 **Key Strengths:**
 - ✅ All critical security vulnerabilities resolved
@@ -24,12 +25,14 @@ The Weather MCP Server demonstrates a **strong security posture** with well-impl
 - ✅ Comprehensive test coverage (131 tests)
 
 **Areas for Improvement:**
-- ⚠️ Rate limiting not implemented (client-side protection)
-- ⚠️ Dependency security monitoring not automated
-- ⚠️ No formal incident response plan documented
+- ⚠️ Rate limiting not implemented (client-side protection across 5 API endpoints)
+- ⚠️ Dependency security monitoring not automated (though SECURITY.md now exists)
+- ⚠️ Severe weather array processing could benefit from explicit bounds (defense-in-depth)
 - ℹ️ Additional JSDoc documentation would improve security understanding
 
 **Risk Level:** **LOW** - No critical or high-risk vulnerabilities identified. The application is production-ready from a security perspective.
+
+**v1.0.0 Production Readiness:** ✅ **APPROVED** - All security requirements met for production release
 
 ---
 
@@ -59,9 +62,9 @@ The Weather MCP Server demonstrates a **strong security posture** with well-impl
 |----------|-------|--------|
 | Critical | 0 | ✅ None Found |
 | High | 0 | ✅ None Found |
-| Medium | 3 | ⚠️ Recommended |
-| Low | 5 | ℹ️ Advisory |
-| Informational | 4 | ✅ Best Practices |
+| Medium | 4 | ⚠️ Recommended (1 new in v0.6.0) |
+| Low | 3 | ℹ️ Advisory (2 resolved) |
+| Informational | 6 | ✅ Best Practices (2 new positive findings) |
 
 ---
 
@@ -180,44 +183,87 @@ The project does not have automated dependency vulnerability scanning integrated
 
 ---
 
-#### M-003: Insufficient NaN and Infinity Validation
+#### M-003: Insufficient NaN and Infinity Validation ✅ RESOLVED
 **Risk Level:** MEDIUM
 **CWE:** CWE-1286 (Improper Validation of Syntactic Correctness of Input)
 **CVSS v3.1:** 4.3 (Medium)
 
 **Description:**
-While coordinate validation checks for range (-90 to 90, -180 to 180), it doesn't explicitly check for `NaN` or `Infinity` values in all code paths.
+Coordinate validation needed explicit checks for `NaN` and `Infinity` values.
+
+**Resolution:**
+All coordinate validation now uses centralized utility functions with `Number.isFinite()` checks:
+```typescript
+// src/utils/validation.ts
+export function validateLatitude(latitude: number): void {
+  if (typeof latitude !== 'number' || !Number.isFinite(latitude)) {
+    throw new Error('Invalid latitude: must be a finite number');
+  }
+  if (latitude < -90 || latitude > 90) {
+    throw new Error(`Invalid latitude: ${latitude}. Must be between -90 and 90.`);
+  }
+}
+```
+
+All handlers and services now use these centralized validation functions, ensuring consistent NaN/Infinity checking across the codebase.
+
+**Priority:** Medium
+**Effort:** Low (1-2 hours)
+**Status:** ✅ Resolved in v0.6.0
+
+---
+
+#### M-004: Unbounded Array Processing in Severe Weather Data (NEW in v0.6.0)
+**Risk Level:** MEDIUM
+**CWE:** CWE-770 (Allocation of Resources Without Limits or Throttling)
+**CVSS v3.1:** 4.3 (Medium)
+
+**Description:**
+The `getMaxProbabilityFromSeries()` function in the forecast handler processes NOAA gridpoint data arrays without explicit length limits. While NOAA is a trusted source, defense-in-depth principles suggest adding bounds checking.
 
 **Impact:**
-- Potential for API requests with invalid coordinates
-- Unexpected behavior in mathematical operations
-- Cache key generation with invalid values
+- Potential CPU exhaustion if API returns malformed data with extremely large arrays
+- Memory consumption during iteration
+- DoS risk (low, requires compromised/malicious API response)
 
 **Evidence:**
 ```typescript
-// src/services/openmeteo.ts:272-277
-if (latitude < -90 || latitude > 90) {
-  throw new Error(`Invalid latitude: ${latitude}. Must be between -90 and 90.`);
+// src/handlers/forecastHandler.ts:43-61
+function getMaxProbabilityFromSeries(series: GridpointValue[]): number {
+  // No explicit bounds checking on series length
+  const next48Hours = Date.now() + (48 * 60 * 60 * 1000);
+
+  for (const entry of series) {
+    // Iterates through entire array
+  }
 }
-// Does not check for NaN or Infinity
 ```
 
+**Assessment:**
+While the function filters to 48-hour window which naturally limits processing, an attacker who compromises the NOAA API could send thousands of entries within that window.
+
 **Recommendation:**
-Enhance validation to include finite number checking:
+Add defensive bounds checking:
 ```typescript
-function validateCoordinate(value: number, min: number, max: number, name: string): void {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new Error(`Invalid ${name}: must be a finite number`);
+function getMaxProbabilityFromSeries(
+  series: GridpointValue[],
+  maxEntries: number = 500  // ~1 week hourly data
+): number {
+  if (series.length > maxEntries) {
+    logger.warn(`Gridpoint series exceeds max entries`, {
+      length: series.length,
+      maxEntries
+    });
+    series = series.slice(0, maxEntries);
   }
-  if (value < min || value > max) {
-    throw new Error(`Invalid ${name}: ${value}. Must be between ${min} and ${max}.`);
-  }
+  // ... existing logic
 }
 ```
 
 **Priority:** Medium
-**Effort:** Low (1-2 hours)
+**Effort:** Low (1 hour)
 **Status:** Open
+**Introduced:** v0.6.0
 
 ---
 
@@ -271,26 +317,25 @@ For this application's threat model (CLI tool running on user's machine), this i
 
 ---
 
-#### L-004: No Rate Limit Backoff Jitter
+#### L-004: No Rate Limit Backoff Jitter ✅ RESOLVED
 **Risk Level:** LOW
 **CWE:** CWE-400 (Uncontrolled Resource Consumption)
 
 **Description:**
-Exponential backoff doesn't include jitter, potentially causing thundering herd problems.
+Exponential backoff didn't include jitter, potentially causing thundering herd problems.
 
-**Current Implementation:**
+**Resolution:**
+Jitter has been added to all retry logic in both NOAA and Open-Meteo services:
 ```typescript
-const delay = Math.pow(2, retries) * 1000; // No jitter
-```
-
-**Recommendation:**
-```typescript
-const delay = (Math.pow(2, retries) * 1000) * (0.5 + Math.random() * 0.5);
+// src/services/noaa.ts:154-158 and openmeteo.ts:156-160
+const baseDelay = Math.pow(2, retries) * 1000;
+const jitter = 0.5 + Math.random() * 0.5;
+const delay = baseDelay * jitter;
 ```
 
 **Priority:** Low
 **Effort:** Minimal (15 minutes)
-**Status:** Open
+**Status:** ✅ Resolved in v0.6.0
 
 ---
 
@@ -487,6 +532,126 @@ Add cache cleanup on application uninstall or provide a cache-clear command.
 
 ---
 
+## v0.5.0 & v0.6.0 Security Review
+
+### Features Audited
+
+**v0.5.0 - Air Quality & Fire Weather:**
+- `get_air_quality` tool - Air quality index and pollutant monitoring
+- Fire weather indices in `get_current_conditions` tool
+- New handlers: `airQualityHandler.ts`, utilities: `airQuality.ts`, `fireWeather.ts`
+
+**v0.6.0 - Marine Conditions & Severe Weather:**
+- `get_marine_conditions` tool - Wave height, swell, ocean currents
+- Severe weather probabilities in `get_forecast` tool
+- New handlers: `marineConditionsHandler.ts`, utilities: `marine.ts`
+
+### Security Assessment by Feature
+
+#### Air Quality (v0.5.0): ✅ EXCELLENT
+
+**Input Validation:**
+- ✅ Coordinates properly validated using centralized utilities
+- ✅ `forecastDays` hardcoded to 5 (no user input vulnerability)
+- ✅ Boolean `forecast` parameter validated
+
+**API Security:**
+- ✅ Open-Meteo Air Quality API uses HTTPS
+- ✅ No authentication required (public API)
+- ✅ Proper error handling with sanitized messages
+
+**Data Processing:**
+- ✅ Safe AQI calculations with bounds checking
+- ✅ Array processing bounded by API response (hourly data, max ~120 entries)
+- ✅ No injection vulnerabilities in formatting
+
+**Findings:** Zero vulnerabilities identified
+
+---
+
+#### Marine Conditions (v0.6.0): ✅ EXCELLENT
+
+**Input Validation:**
+- ✅ Coordinates properly validated
+- ✅ `forecastDays` hardcoded to 7 (no user input vulnerability)
+- ✅ Boolean `forecast` parameter validated
+
+**Calculation Security:**
+- ✅ Direction calculations use safe modulo: `((degrees % 360) + 360) % 360`
+- ✅ Wave categorization with proper bounds (0-14+ meters)
+- ✅ No division by zero risks (checks for undefined/null)
+
+**API Security:**
+- ✅ Open-Meteo Marine API uses HTTPS
+- ✅ Proper caching with 1-hour TTL
+- ✅ Graceful error handling
+
+**Safety Disclaimers:**
+- ✅ Clear warnings about coastal navigation limitations
+- ✅ Recommends consulting official marine forecasts
+
+**Findings:** Zero vulnerabilities identified
+
+---
+
+#### Fire Weather (v0.5.0): ✅ EXCELLENT
+
+**Security:**
+- ✅ Uses existing validated NOAA gridpoint flow
+- ✅ No new attack surface introduced
+- ✅ Optional parameter properly validated
+- ✅ Haines Index calculations use safe arithmetic
+
+**Findings:** Zero vulnerabilities identified
+
+---
+
+#### Severe Weather (v0.6.0): ⚠️ GOOD (1 Minor Finding)
+
+**Input Validation:**
+- ✅ Uses existing validated NOAA gridpoint flow
+- ✅ Optional boolean parameter validated
+- ✅ Time-based filtering (48-hour window)
+
+**Array Processing:**
+- ⚠️ **M-004**: `getMaxProbabilityFromSeries()` lacks explicit bounds
+  - Mitigated by 48-hour time filtering
+  - Low risk (requires compromised NOAA API)
+  - Recommendation: Add defensive `maxEntries` limit
+
+**Error Handling:**
+- ✅ Graceful degradation if data unavailable
+- ✅ No failing on missing severe weather data
+- ✅ Safe undefined/null handling throughout
+
+**Findings:** 1 medium-priority recommendation (defense-in-depth)
+
+---
+
+### New Security Strengths in v0.5.0 & v0.6.0
+
+1. ✅ **Zero New Dependencies** - Excellent supply chain hygiene
+2. ✅ **Consistent Validation Patterns** - All new handlers use centralized utilities
+3. ✅ **247 Tests Passing** - 88% increase in test coverage
+4. ✅ **Custom Error Classes** - Proper error handling throughout
+5. ✅ **Jitter in Retry Logic** - Resolved L-004 (thundering herd prevention)
+6. ✅ **NaN/Infinity Validation** - Resolved M-003 (centralized coordinate validation)
+7. ✅ **Safe Mathematical Operations** - Direction normalization, modulo operations
+8. ✅ **Proper Safety Disclaimers** - Marine conditions includes navigation warnings
+
+### Regression Testing
+
+All previously identified vulnerabilities remain fixed:
+- ✅ Cache key generation (CRITICAL) - Still secure
+- ✅ Type assertions (HIGH) - Still using validated inputs
+- ✅ Error sanitization (HIGH) - Still properly sanitized
+- ✅ User-Agent (MEDIUM) - Still includes version
+- ✅ Environment validation (MEDIUM) - Still validated
+
+**No regressions detected in v0.5.0 or v0.6.0**
+
+---
+
 ## Recommendations
 
 ### Priority 1: High Priority (Next Sprint)
@@ -498,21 +663,24 @@ None - All high-priority security issues have been resolved.
 1. **Implement Rate Limiting** (M-001)
    - Effort: Low (2-4 hours)
    - Benefit: Prevents API service disruption
-   - Implementation: Token bucket algorithm
+   - Implementation: Token bucket algorithm across all 5 API endpoints
 
 2. **Add Dependency Scanning** (M-002)
    - Effort: Low (1-2 hours)
    - Benefit: Continuous vulnerability monitoring
    - Implementation: GitHub Dependabot or `npm audit` in CI
 
-3. **Enhance Coordinate Validation** (M-003)
-   - Effort: Low (1-2 hours)
-   - Benefit: Prevents edge case failures
-   - Implementation: Add `Number.isFinite()` checks
+3. ~~**Enhance Coordinate Validation** (M-003)~~ ✅ RESOLVED in v0.6.0
+   - Status: Implemented with centralized validation utilities
+
+4. **Add Array Bounds to Severe Weather Processing** (M-004) - NEW
+   - Effort: Low (1 hour)
+   - Benefit: Defense-in-depth against malformed API responses
+   - Implementation: Add `maxEntries` parameter to `getMaxProbabilityFromSeries()`
 
 ### Priority 3: Low Priority (Future)
 
-1. Add jitter to exponential backoff (L-004)
+1. ~~Add jitter to exponential backoff (L-004)~~ ✅ RESOLVED in v0.6.0
 2. Enhance security event logging (L-005)
 3. Make timeout configurable (L-001)
 
@@ -613,32 +781,34 @@ All development dependencies are from reputable sources (TypeScript, Vitest) wit
 
 ### Overall Assessment
 
-The Weather MCP Server demonstrates **excellent security hygiene** with comprehensive controls addressing all critical and high-severity security risks. The project has undergone significant security hardening, resulting in:
+The Weather MCP Server demonstrates **excellent security hygiene** with comprehensive controls addressing all critical and high-severity security risks. The project has undergone significant security hardening through v0.6.0, resulting in:
 
 - **Zero critical vulnerabilities**
 - **Zero high-risk findings**
 - **Strong input validation and error handling**
-- **Comprehensive test coverage (131 tests)**
-- **Clean security track record**
+- **Comprehensive test coverage (247 tests, 88% increase)**
+- **Clean security track record across all 8 tools**
+- **Two medium-priority findings resolved** (M-003, L-004)
+- **One new medium-priority recommendation** (M-004, defense-in-depth)
 
-### Production Readiness: ✅ **APPROVED**
+### Production Readiness: ✅ **APPROVED FOR v1.0.0**
 
-The application is **production-ready from a security perspective** with only medium and low-priority recommendations for future enhancement.
+The application is **production-ready from a security perspective** with only medium and low-priority recommendations for future enhancement. All security requirements for v1.0.0 release are met.
 
 ### Risk Level: **LOW**
 
 The application presents minimal security risk for its intended use case (CLI weather data tool). Recommended improvements are focused on defense-in-depth and operational excellence rather than addressing active vulnerabilities.
 
-### Security Score: **B+ (85/100)**
+### Security Score: **A- (92/100)** ⬆️ *Improved from B+ (85/100)*
 
 **Breakdown:**
-- Input Validation: A (95/100)
+- Input Validation: A+ (98/100) ⬆️ *Improved with centralized validation*
 - Error Handling: A (95/100)
-- Dependencies: B+ (85/100) - Could improve with automated scanning
+- Dependencies: A (95/100) ⬆️ *Improved with zero new dependencies, SECURITY.md added*
 - Configuration: A (90/100)
 - Logging: B+ (85/100) - Good foundation, could enhance security events
-- Testing: A (95/100)
-- Documentation: B (80/100) - Could add security docs
+- Testing: A+ (98/100) ⬆️ *Improved with 247 tests*
+- Documentation: B+ (88/100) ⬆️ *Improved with SECURITY.md*
 
 ---
 
@@ -698,6 +868,8 @@ The following items were **out of scope** for this audit:
 
 **End of Security Audit Report**
 
-**Report Version:** 1.0
+**Report Version:** 2.0 (Updated for v0.6.0)
 **Date:** November 6, 2025
-**Next Review Recommended:** May 2026 (6 months) or upon major version release
+**Previous Version:** v1.0 (v0.4.0 audit)
+**Changes:** Added v0.5.0 & v0.6.0 security review, resolved 2 findings (M-003, L-004), added 1 new finding (M-004)
+**Next Review Recommended:** May 2026 (6 months) or upon v2.0.0 release

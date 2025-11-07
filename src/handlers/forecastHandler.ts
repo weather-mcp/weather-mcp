@@ -5,12 +5,14 @@
 
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
+import type { GridpointProperties, GridpointDataSeries } from '../types/noaa.js';
 import {
   validateCoordinates,
   validateForecastDays,
   validateGranularity,
   validateOptionalBoolean,
 } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 interface ForecastArgs {
   latitude?: number;
@@ -18,6 +20,7 @@ interface ForecastArgs {
   days?: number;
   granularity?: 'daily' | 'hourly';
   include_precipitation_probability?: boolean;
+  include_severe_weather?: boolean;
   source?: 'auto' | 'noaa' | 'openmeteo';
 }
 
@@ -35,6 +38,114 @@ function isInUS(latitude: number, longitude: number): boolean {
   return inContinentalUS || inAlaska || inHawaii || inPuertoRico;
 }
 
+/**
+ * Extract maximum value from gridpoint data series for the next 24-48 hours
+ * @param series - The gridpoint data series to process
+ * @param hours - Number of hours to look ahead (default: 48)
+ * @param maxEntries - Maximum number of entries to process for defense-in-depth (default: 500 ~ 1 week hourly data)
+ */
+function getMaxProbabilityFromSeries(series: GridpointDataSeries | undefined, hours: number = 48, maxEntries: number = 500): number {
+  if (!series || !series.values || series.values.length === 0) {
+    return 0;
+  }
+
+  // Defense-in-depth: Add bounds checking to prevent resource exhaustion
+  if (series.values.length > maxEntries) {
+    logger.warn('Gridpoint series exceeds max entries', {
+      length: series.values.length,
+      maxEntries,
+      securityEvent: true
+    });
+    // Slice to limit processing
+    series.values = series.values.slice(0, maxEntries);
+  }
+
+  const now = new Date();
+  const futureTime = new Date(now.getTime() + hours * 60 * 60 * 1000);
+
+  let maxValue = 0;
+  for (const entry of series.values) {
+    // Parse ISO 8601 interval (e.g., "2025-11-06T15:00:00+00:00/PT1H")
+    const validTimeStart = new Date(entry.validTime.split('/')[0]);
+
+    if (validTimeStart >= now && validTimeStart <= futureTime && entry.value !== null) {
+      maxValue = Math.max(maxValue, entry.value);
+    }
+  }
+
+  return maxValue;
+}
+
+/**
+ * Format severe weather probabilities for display
+ */
+function formatSevereWeather(properties: GridpointProperties): string | null {
+  let output = '';
+  let hasData = false;
+
+  output += `\n## ⚠️ Severe Weather Probabilities (Next 48 Hours)\n\n`;
+
+  // Thunder probability
+  const thunderProb = getMaxProbabilityFromSeries(properties.probabilityOfThunder);
+  if (thunderProb > 0) {
+    hasData = true;
+    const emoji = thunderProb > 50 ? '🌩️' : thunderProb > 20 ? '⚡' : '🌤️';
+    output += `${emoji} **Thunderstorms:** ${thunderProb}% chance\n`;
+  }
+
+  // Wind gust probabilities (show highest risk category)
+  const windGust60 = getMaxProbabilityFromSeries(properties.potentialOf60mphWindGusts);
+  const windGust50 = getMaxProbabilityFromSeries(properties.potentialOf50mphWindGusts);
+  const windGust40 = getMaxProbabilityFromSeries(properties.potentialOf40mphWindGusts);
+  const windGust30 = getMaxProbabilityFromSeries(properties.potentialOf30mphWindGusts);
+
+  if (windGust60 > 0) {
+    hasData = true;
+    output += `💨 **Very High Wind Gusts (60+ mph):** ${windGust60}% chance\n`;
+  } else if (windGust50 > 0) {
+    hasData = true;
+    output += `💨 **High Wind Gusts (50+ mph):** ${windGust50}% chance\n`;
+  } else if (windGust40 > 0) {
+    hasData = true;
+    output += `💨 **Strong Wind Gusts (40+ mph):** ${windGust40}% chance\n`;
+  } else if (windGust30 > 20) {
+    // Only show moderate gusts if probability is significant
+    hasData = true;
+    output += `💨 **Moderate Wind Gusts (30+ mph):** ${windGust30}% chance\n`;
+  }
+
+  // Tropical storm/hurricane winds (if present)
+  const tropicalStormProb = getMaxProbabilityFromSeries(properties.probabilityOfTropicalStormWinds);
+  const hurricaneProb = getMaxProbabilityFromSeries(properties.probabilityOfHurricaneWinds);
+
+  if (hurricaneProb > 0) {
+    hasData = true;
+    output += `🌀 **Hurricane-Force Winds (74+ mph):** ${hurricaneProb}% chance\n`;
+  } else if (tropicalStormProb > 0) {
+    hasData = true;
+    output += `🌀 **Tropical Storm Winds (39-73 mph):** ${tropicalStormProb}% chance\n`;
+  }
+
+  // Lightning activity
+  if (properties.lightningActivityLevel && properties.lightningActivityLevel.values && properties.lightningActivityLevel.values.length > 0) {
+    const lightningLevels = properties.lightningActivityLevel.values.filter(v => v.value !== null && v.value > 0);
+    if (lightningLevels.length > 0) {
+      hasData = true;
+      const maxLevel = Math.max(...lightningLevels.map(v => v.value || 0));
+      const levelDesc = maxLevel >= 4 ? 'Very High' : maxLevel >= 3 ? 'High' : maxLevel >= 2 ? 'Moderate' : 'Low';
+      output += `⚡ **Lightning Activity:** ${levelDesc} (Level ${maxLevel})\n`;
+    }
+  }
+
+  if (!hasData) {
+    return null; // No severe weather data to display
+  }
+
+  output += `\n*Note: These are probabilistic forecasts and may change. Always monitor local weather alerts for official warnings.*\n`;
+
+  return output;
+}
+
 export async function handleGetForecast(
   args: unknown,
   noaaService: NOAAService,
@@ -48,6 +159,11 @@ export async function handleGetForecast(
     (args as ForecastArgs)?.include_precipitation_probability,
     'include_precipitation_probability',
     true
+  );
+  const include_severe_weather = validateOptionalBoolean(
+    (args as ForecastArgs)?.include_severe_weather,
+    'include_severe_weather',
+    false
   );
 
   // Get source preference or auto-detect
@@ -69,7 +185,8 @@ export async function handleGetForecast(
       longitude,
       days,
       granularity,
-      include_precipitation_probability
+      include_precipitation_probability,
+      include_severe_weather
     );
   } else {
     // Use Open-Meteo for international locations
@@ -93,7 +210,8 @@ async function formatNOAAForecast(
   longitude: number,
   days: number,
   granularity: 'daily' | 'hourly',
-  include_precipitation_probability: boolean
+  include_precipitation_probability: boolean,
+  include_severe_weather: boolean
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Get forecast data based on granularity
   const forecast = granularity === 'hourly'
@@ -155,6 +273,20 @@ async function formatNOAAForecast(
 
   output += `---\n`;
   output += `*Data source: NOAA National Weather Service (US)*\n`;
+
+  // Add severe weather probabilities if requested
+  if (include_severe_weather) {
+    try {
+      const gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude);
+      const severeWeatherSection = formatSevereWeather(gridpointData.properties);
+      if (severeWeatherSection) {
+        output += `\n${severeWeatherSection}`;
+      }
+    } catch (error) {
+      // If severe weather data is unavailable, just note it without failing the whole request
+      output += `\n*Note: Severe weather probability data is not available for this location.*\n`;
+    }
+  }
 
   return {
     content: [
