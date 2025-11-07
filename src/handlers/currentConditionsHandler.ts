@@ -15,6 +15,7 @@ import {
   interpretTransportWind
 } from '../utils/fireWeather.js';
 import { extractSnowDepth, formatSnowData, hasWinterWeather } from '../utils/snow.js';
+import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 
 interface CurrentConditionsArgs {
   latitude?: number;
@@ -38,10 +39,25 @@ export async function handleGetCurrentConditions(
   const observation = await noaaService.getCurrentConditions(latitude, longitude);
   const props = observation.properties;
 
+  // Get timezone for proper time formatting
+  let timezone = guessTimezoneFromCoords(latitude, longitude); // fallback
+  try {
+    // Try to get timezone from station (preferred)
+    const stations = await noaaService.getStations(latitude, longitude);
+    if (stations.features && stations.features.length > 0) {
+      const stationTimezone = stations.features[0].properties.timeZone;
+      if (stationTimezone) {
+        timezone = stationTimezone;
+      }
+    }
+  } catch (error) {
+    // Use fallback timezone
+  }
+
   // Format current conditions
   let output = `# Current Weather Conditions\n\n`;
   output += `**Station:** ${props.station}\n`;
-  output += `**Time:** ${new Date(props.timestamp).toLocaleString()}\n\n`;
+  output += `**Time:** ${formatInTimezone(props.timestamp, timezone)}\n\n`;
 
   // Main conditions
   if (props.textDescription) {
