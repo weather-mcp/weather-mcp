@@ -2,6 +2,70 @@
  * Utility functions for marine conditions data formatting and interpretation
  */
 
+import type { GridpointResponse, GridpointDataSeries } from '../types/noaa.js';
+
+/**
+ * NOAA Marine Conditions extracted from gridpoint data
+ */
+export interface NOAAMarineConditions {
+  waveHeight?: number; // meters
+  wavePeriod?: number; // seconds
+  waveDirection?: number; // degrees
+  windSpeed?: number; // km/h
+  windDirection?: number; // degrees
+  windGust?: number; // km/h
+  timestamp: string; // ISO 8601
+}
+
+/**
+ * Extract current value from a gridpoint data series
+ */
+function extractCurrentValue(series: GridpointDataSeries | undefined): number | undefined {
+  if (!series || !series.values || series.values.length === 0) {
+    return undefined;
+  }
+
+  // Find the first valid value (gridpoint data is time-ordered)
+  for (const entry of series.values) {
+    const value = entry.value;
+    if (value !== null && value !== undefined) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Extract marine conditions from NOAA gridpoint response
+ */
+export function extractNOAAMarineConditions(gridpoint: GridpointResponse): NOAAMarineConditions | null {
+  const props = gridpoint.properties;
+
+  // Extract marine data
+  const waveHeight = extractCurrentValue(props.waveHeight);
+  const wavePeriod = extractCurrentValue(props.wavePeriod);
+  const waveDirection = extractCurrentValue(props.waveDirection);
+  const windSpeed = extractCurrentValue(props.windSpeed);
+  const windDirection = extractCurrentValue(props.windDirection);
+  const windGust = extractCurrentValue(props.windGust);
+
+  // Check if we have any marine data
+  if (waveHeight === undefined && wavePeriod === undefined && waveDirection === undefined) {
+    return null;
+  }
+
+  return {
+    waveHeight,
+    wavePeriod,
+    waveDirection,
+    windSpeed,
+    windDirection,
+    windGust,
+    timestamp: props.updateTime
+  };
+}
+
 /**
  * Format wave height with appropriate units and precision
  */
@@ -23,6 +87,19 @@ export function formatWavePeriod(seconds: number | undefined): string {
   }
 
   return `${seconds.toFixed(1)}s`;
+}
+
+/**
+ * Format wind speed with units (converts km/h to knots for marine)
+ */
+export function formatWindSpeed(kmh: number | undefined): string {
+  if (kmh === undefined || kmh === null) {
+    return 'N/A';
+  }
+
+  // Convert km/h to knots (1 km/h = 0.539957 knots)
+  const knots = kmh * 0.539957;
+  return `${knots.toFixed(1)} knots (${kmh.toFixed(1)} km/h)`;
 }
 
 /**

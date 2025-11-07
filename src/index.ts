@@ -339,7 +339,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await handleGetAirQuality(args, openMeteoService);
 
       case 'get_marine_conditions':
-        return await handleGetMarineConditions(args, openMeteoService);
+        return await handleGetMarineConditions(args, noaaService, openMeteoService);
 
       default:
         throw new Error(`Unknown tool: ${name}`);

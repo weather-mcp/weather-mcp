@@ -320,10 +320,25 @@ export interface GridpointSevereWeather {
 }
 
 /**
- * Gridpoint properties from /gridpoints/{office}/{gridX},{gridY} endpoint
- * Contains detailed forecast data including fire weather indices and severe weather
+ * Marine forecast properties from gridpoint data (Great Lakes and coastal areas)
  */
-export interface GridpointProperties extends GridpointFireWeather, GridpointSevereWeather {
+export interface GridpointMarineForecast {
+  waveHeight?: GridpointDataSeries; // Significant wave height (m)
+  wavePeriod?: GridpointDataSeries; // Wave period (seconds)
+  wavePeriod2?: GridpointDataSeries; // Secondary wave period (seconds)
+  waveDirection?: GridpointDataSeries; // Wave direction (degrees)
+  windWaveHeight?: GridpointDataSeries; // Wind-generated wave height (m)
+  primarySwellHeight?: GridpointDataSeries; // Primary swell height (m)
+  primarySwellDirection?: GridpointDataSeries; // Primary swell direction (degrees)
+  secondarySwellHeight?: GridpointDataSeries; // Secondary swell height (m)
+  secondarySwellDirection?: GridpointDataSeries; // Secondary swell direction (degrees)
+}
+
+/**
+ * Gridpoint properties from /gridpoints/{office}/{gridX},{gridY} endpoint
+ * Contains detailed forecast data including fire weather indices, severe weather, and marine conditions
+ */
+export interface GridpointProperties extends GridpointFireWeather, GridpointSevereWeather, GridpointMarineForecast {
   '@id': string;
   '@type': string;
   updateTime: string;

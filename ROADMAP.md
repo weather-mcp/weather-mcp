@@ -617,6 +617,191 @@ If there's demand and we need to add more:
 
 ---
 
+## v1.1.0 - Great Lakes & Coastal Marine Enhancement ✅ COMPLETE
+
+**Status:** Implemented and tested on 2025-11-07
+
+**Theme:** Replace limited Open-Meteo marine data with NOAA's superior Great Lakes and coastal forecasts
+
+**Goal:** Provide accurate marine forecasts for Great Lakes regions (currently limited/unavailable)
+
+**Priority:** Medium-High (high value for Great Lakes users)
+
+### Background
+
+**Current Limitation:**
+- `get_marine_conditions` currently uses Open-Meteo exclusively (global ocean coverage)
+- Open-Meteo has **limited/no data** for Great Lakes and smaller bays
+- Example: Traverse City, MI (Grand Traverse Bay) returns "N/A" for all marine data
+- Great Lakes boaters/sailors lack marine forecast access through the MCP
+
+**NOAA Coverage:**
+NOAA provides excellent zone-based marine forecasts for:
+- ✅ All 5 Great Lakes (Superior, Michigan, Huron, Erie, Ontario)
+- ✅ Major US coastal bays (Chesapeake, San Francisco Bay, Tampa Bay, etc.)
+- ✅ Lake Okeechobee and select large inland navigable lakes
+- ❌ NOT available: Most smaller inland lakes, reservoirs, private lakes
+
+**Available Data:**
+- Wave height and period forecasts
+- Wind speed/direction (zone-specific)
+- Weather conditions
+- Hazardous marine weather warnings
+- Multi-day marine forecasts
+- Available April-December (boating season) for Great Lakes
+
+### 1. Enhance `get_marine_conditions` for Dual-Source Support (NO new tool)
+
+**Add intelligent source selection based on location:**
+
+```typescript
+get_marine_conditions({
+  latitude: number,
+  longitude: number,
+  forecast?: boolean,
+  // NO new parameters needed - auto-detect source
+})
+```
+
+**What this adds:**
+- ✅ **Great Lakes regions:** Use NOAA gridpoint marine data (wave height, period, wind)
+- ✅ **Major US coastal bays:** Use NOAA gridpoint marine data
+- ✅ **Ocean/International:** Fall back to Open-Meteo (current behavior)
+- ✅ **Automatic detection:** No user parameter needed, smart routing by coordinates
+- ✅ Coverage for Traverse City, MI and other Great Lakes locations
+- **Token cost:** ~0 tokens (same tool description, better data source)
+- **New tools added:** 0
+- **User experience improved:**
+  - "Marine forecast for Traverse City" → Now works! (currently N/A)
+  - "Wave conditions on Lake Michigan" → NOAA data with zone forecasts
+  - "Safe to boat on Grand Traverse Bay?" → Real Great Lakes data
+
+### 2. Extend NOAA Type Definitions
+
+**Add marine properties to GridpointProperties:**
+
+```typescript
+// New marine fields in src/types/noaa.ts
+export interface GridpointProperties extends GridpointFireWeather, GridpointSevereWeather {
+  // ... existing fields ...
+
+  // NEW marine forecast fields
+  waveHeight?: GridpointDataSeries;           // Significant wave height
+  wavePeriod?: GridpointDataSeries;           // Wave period (seconds)
+  primarySwellHeight?: GridpointDataSeries;   // Primary swell height
+  primarySwellDirection?: GridpointDataSeries; // Primary swell direction
+  windWaveHeight?: GridpointDataSeries;       // Wind-generated wave height
+}
+```
+
+### 3. Implementation Details
+
+**Detection Logic:**
+1. Check if coordinates are within Great Lakes region (lat/lon bounds)
+2. Check if within major US coastal bay zones
+3. If yes → fetch NOAA gridpoint data, extract marine fields
+4. If no → use existing Open-Meteo marine API (current behavior)
+
+**Formatting:**
+- Dual formatting functions (NOAA marine vs Open-Meteo marine)
+- Unified output format regardless of source
+- Indicate data source in output footer
+
+**Caching:**
+- NOAA marine gridpoint data: 2-hour TTL (same as forecast gridpoint)
+- Open-Meteo marine data: 1-hour TTL (existing)
+
+**Error Handling:**
+- Graceful degradation if NOAA marine data unavailable
+- Fall back to Open-Meteo if NOAA gridpoint lacks marine fields
+- Clear messaging about data availability
+
+### Example Output (Traverse City, MI)
+
+**Before v1.1.0:**
+```
+# Marine Conditions Report
+
+**Location:** 44.7631, -85.6206
+**Current Conditions:** Unknown
+Marine conditions data not available
+```
+
+**After v1.1.0:**
+```
+# Marine Conditions Report - Great Lakes
+
+**Location:** Traverse City, MI (Grand Traverse Bay - Lake Michigan)
+**Zone:** LMZ043 - Grand Traverse and Leelanau Counties
+
+## Current Conditions
+**Wind:** SW 10-15 kt
+**Waves:** 2-4 ft (Slight)
+**Weather:** Partly cloudy
+**Visibility:** 5+ miles
+
+## Tonight
+**Wind:** S 15-20 kt becoming SW 10-15 kt after midnight
+**Waves:** 3-5 ft (Moderate)
+**Weather:** Chance of showers
+
+## Friday
+**Wind:** W 5-10 kt
+**Waves:** 1-3 ft (Calm)
+**Weather:** Sunny
+
+---
+*Data source: NOAA National Weather Service (Great Lakes Marine Forecast)*
+```
+
+### Geographic Coverage
+
+**Will work for:**
+- Lake Superior (all zones)
+- Lake Michigan (all zones including Green Bay, Grand Traverse Bay)
+- Lake Huron (all zones including Saginaw Bay)
+- Lake Erie (all zones)
+- Lake Ontario (all zones)
+- Major coastal bays (Chesapeake, SF Bay, Tampa Bay, etc.)
+- Lake Okeechobee (FL)
+
+**Will NOT work for:**
+- Most smaller inland lakes
+- State park lakes and reservoirs
+- Private lakes
+- International portions of Great Lakes (use current Open-Meteo)
+
+### Summary for v1.1.0 ✅ COMPLETE
+
+- **Tools added:** 0 (enhancement only) ✅
+- **Tools enhanced:** 1 (get_marine_conditions) ✅
+- **Token cost:** ~0 tokens (no description change needed) ✅
+- **Effort:** 1 day as estimated ✅
+- **Value:** HIGH for Great Lakes region users (Michigan, Wisconsin, Minnesota, Ohio, Pennsylvania, New York, Ontario) ✅
+- **Backward compatibility:** Maintained ✅ (existing Open-Meteo behavior for non-Great Lakes locations)
+
+**Benefits:**
+- ✅ Great Lakes boaters/sailors get accurate marine forecasts
+- ✅ NOAA gridpoint data provides wave height, period, and wind conditions
+- ✅ No new tools (maintains lean design philosophy)
+- ✅ Zero token overhead (smart routing, no new parameters)
+- ✅ Improves existing tool quality without proliferation
+
+**Implementation Details:**
+- ✅ Geographic detection with bounding boxes for all 5 Great Lakes
+- ✅ Coastal bay detection for 5 major US bays
+- ✅ Dual-source handler with NOAA-first logic and Open-Meteo fallback
+- ✅ Enhanced NOAA types with `GridpointMarineForecast` interface
+- ✅ Comprehensive test coverage: 15 integration tests + 26 unit tests
+- ✅ All tests passing
+
+**Cumulative Total (after v1.1.0):**
+- **Tools:** 8 (unchanged)
+- **Token overhead:** ~1,000 tokens (unchanged)
+- **Geographic coverage:** Oceans + Great Lakes + Major US coastal bays
+
+---
+
 ## Release & Development Strategy
 
 ### Git Branching Model
@@ -792,10 +977,10 @@ When implementing features from this roadmap:
 
 ---
 
-*Last Updated: 2025-11-06*
-*Current Version: v0.6.0 (Specialized Weather)* ✅
-*Previous: v0.5.0 (Health & Environment)* ✅
-*Next Target: v1.0.0 - Production Release (all core features complete)*
+*Last Updated: 2025-11-07*
+*Current Version: v1.1.0 (Great Lakes & Coastal Marine Enhancement)* ✅
+*Previous: v1.0.0 (Production Release)* ✅
+*Next Target: TBD - Post-v1.0.0 enhancements as needed*
 *Design Philosophy: Lean, efficient, user-focused*
 
 ---

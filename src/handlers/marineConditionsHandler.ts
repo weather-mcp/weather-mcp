@@ -1,7 +1,9 @@
 /**
  * Handler for get_marine_conditions tool
+ * Supports dual data sources: NOAA (Great Lakes/coastal) and Open-Meteo (oceans)
  */
 
+import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { validateCoordinates, validateOptionalBoolean } from '../utils/validation.js';
 import {
@@ -9,10 +11,15 @@ import {
   formatWavePeriod,
   formatDirection,
   formatCurrentVelocity,
+  formatWindSpeed,
   getWaveHeightCategory,
-  getSafetyAssessment
+  getSafetyAssessment,
+  extractNOAAMarineConditions,
+  type NOAAMarineConditions
 } from '../utils/marine.js';
+import { shouldUseNOAAMarine } from '../utils/geography.js';
 import type { OpenMeteoMarineResponse } from '../types/openmeteo.js';
+import { logger } from '../utils/logger.js';
 
 interface MarineConditionsArgs {
   latitude?: number;
@@ -22,6 +29,7 @@ interface MarineConditionsArgs {
 
 export async function handleGetMarineConditions(
   args: unknown,
+  noaaService: NOAAService,
   openMeteoService: OpenMeteoService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Validate input parameters with runtime checks
@@ -32,7 +40,57 @@ export async function handleGetMarineConditions(
     false
   );
 
-  // Get marine conditions data
+  // Check if we should try NOAA first (Great Lakes or major coastal bays)
+  const regionDetection = shouldUseNOAAMarine(latitude, longitude);
+
+  if (regionDetection.useNOAA) {
+    // Try NOAA first for Great Lakes and coastal bays
+    try {
+      logger.info('Attempting NOAA marine data', {
+        latitude,
+        longitude,
+        region: regionDetection.region,
+        source: regionDetection.source
+      });
+
+      const gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude);
+      const noaaMarineData = extractNOAAMarineConditions(gridpointData);
+
+      if (noaaMarineData) {
+        // Format NOAA marine data
+        const output = formatNOAAMarineConditions(
+          noaaMarineData,
+          latitude,
+          longitude,
+          regionDetection.region || 'Unknown Region',
+          forecast
+        );
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: output
+            }
+          ]
+        };
+      } else {
+        logger.info('NOAA gridpoint has no marine data, falling back to Open-Meteo', {
+          latitude,
+          longitude
+        });
+      }
+    } catch (error) {
+      // NOAA failed, fall back to Open-Meteo
+      logger.warn('NOAA marine data failed, falling back to Open-Meteo', {
+        latitude,
+        longitude,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  // Use Open-Meteo (default for oceans, or fallback for NOAA regions)
   const marineData = await openMeteoService.getMarine(
     latitude,
     longitude,
@@ -41,7 +99,7 @@ export async function handleGetMarineConditions(
   );
 
   // Format the marine data for display
-  const output = formatMarineConditions(marineData, latitude, longitude, forecast);
+  const output = formatOpenMeteoMarineConditions(marineData, latitude, longitude, forecast);
 
   return {
     content: [
@@ -54,9 +112,80 @@ export async function handleGetMarineConditions(
 }
 
 /**
- * Format marine conditions data as markdown
+ * Format NOAA marine conditions data as markdown
  */
-function formatMarineConditions(
+function formatNOAAMarineConditions(
+  data: NOAAMarineConditions,
+  latitude: number,
+  longitude: number,
+  region: string,
+  includeForecast: boolean
+): string {
+  let output = `# Marine Conditions Report - ${region}\n\n`;
+  output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
+  output += `**Region:** ${region}\n`;
+  output += `**Last Updated:** ${new Date(data.timestamp).toLocaleString()}\n\n`;
+
+  // Wave Conditions
+  output += `## 🌊 Wave Conditions\n\n`;
+
+  if (data.waveHeight !== undefined && data.waveHeight > 0) {
+    const waveCategory = getWaveHeightCategory(data.waveHeight);
+    output += `**Significant Wave Height:** ${formatWaveHeight(data.waveHeight)}`;
+    output += ` (${waveCategory.description})\n`;
+
+    if (data.waveDirection !== undefined) {
+      output += `**Wave Direction:** ${formatDirection(data.waveDirection)}\n`;
+    }
+
+    if (data.wavePeriod !== undefined) {
+      output += `**Wave Period:** ${formatWavePeriod(data.wavePeriod)}\n`;
+    }
+
+    output += `\n**Safety:** ${waveCategory.recommendation}\n\n`;
+  } else {
+    output += `**Wave Height:** Calm or minimal wave activity\n\n`;
+  }
+
+  // Wind Conditions
+  if (data.windSpeed !== undefined || data.windDirection !== undefined) {
+    output += `## 💨 Wind Conditions\n\n`;
+
+    if (data.windSpeed !== undefined) {
+      output += `**Wind Speed:** ${formatWindSpeed(data.windSpeed)}\n`;
+    }
+
+    if (data.windDirection !== undefined) {
+      output += `**Wind Direction:** ${formatDirection(data.windDirection)}\n`;
+    }
+
+    if (data.windGust !== undefined && data.windGust > data.windSpeed! * 1.2) {
+      output += `**Wind Gusts:** ${formatWindSpeed(data.windGust)}\n`;
+    }
+
+    output += `\n`;
+  }
+
+  // Forecast note
+  if (includeForecast) {
+    output += `---\n\n`;
+    output += `*Note: NOAA gridpoint data provides current conditions. `;
+    output += `For detailed multi-day marine forecasts, NOAA offers zone-based marine forecasts `;
+    output += `available through their website.*\n\n`;
+  }
+
+  // Footer
+  output += `---\n\n`;
+  output += `*Data source: NOAA National Weather Service*\n`;
+  output += `*Great Lakes and coastal marine conditions from NOAA gridpoint data*\n`;
+
+  return output;
+}
+
+/**
+ * Format Open-Meteo marine conditions data as markdown
+ */
+function formatOpenMeteoMarineConditions(
   data: OpenMeteoMarineResponse,
   latitude: number,
   longitude: number,

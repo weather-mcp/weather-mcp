@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-11-07
+
+### Enhanced
+
+#### Marine Conditions - Great Lakes & Coastal Bay Support
+- **Enhanced `get_marine_conditions`** with dual-source support for inland lakes
+  - **NOAA Data Integration**: Automatically uses NOAA gridpoint data for:
+    - All 5 Great Lakes (Superior, Michigan, Huron, Erie, Ontario)
+    - Major US coastal bays (Chesapeake Bay, San Francisco Bay, Tampa Bay, Puget Sound)
+    - Lake Okeechobee and other large navigable inland waters
+  - **Automatic Source Selection**: Intelligent geographic detection
+    - Detects Great Lakes coordinates and uses NOAA marine data
+    - Falls back to Open-Meteo for ocean locations and when NOAA data unavailable
+    - Zero token overhead - no new parameters required
+  - **Marine Data from NOAA**:
+    - Wave height, wave period, wave direction (from gridpoint forecasts)
+    - Wind speed, wind direction, wind gusts (in knots for marine use)
+    - Current conditions with safety assessments
+  - **Enhanced Coverage**: Addresses previous limitation where Great Lakes locations returned "N/A"
+    - Traverse City, MI (Grand Traverse Bay) - now provides wave/wind data
+    - Duluth, MN (Lake Superior) - full marine conditions
+    - Cleveland, OH (Lake Erie) - complete wind/wave information
+  - **Graceful Degradation**: Falls back to Open-Meteo if NOAA data unavailable
+  - **Clear Data Source Attribution**: Output indicates whether data is from NOAA or Open-Meteo
+
+### Technical Changes
+- Added geographic detection utilities (`src/utils/geography.ts`):
+  - `shouldUseNOAAMarine()`: Detects Great Lakes and coastal bay locations
+  - `getGreatLakeRegion()`: Identifies which Great Lake contains coordinates
+  - `getMajorCoastalBayRegion()`: Detects major US coastal bays
+  - Bounding box definitions for all 5 Great Lakes and 5 major coastal areas
+- Enhanced NOAA type definitions with marine forecast properties:
+  - New interface: `GridpointMarineForecast` with 9 marine data fields
+  - Added to `GridpointProperties`: waveHeight, wavePeriod, waveDirection, windWaveHeight, swellHeight/Direction
+- Enhanced marine utilities (`src/utils/marine.ts`):
+  - `extractNOAAMarineConditions()`: Extracts marine data from gridpoint response
+  - `formatWindSpeed()`: Converts km/h to knots for marine display
+  - New interface: `NOAAMarineConditions` for NOAA-sourced marine data
+- Updated `marineConditionsHandler`:
+  - Dual-source logic: tries NOAA first for Great Lakes/bays, falls back to Open-Meteo
+  - Separate formatters: `formatNOAAMarineConditions()` and `formatOpenMeteoMarineConditions()`
+  - Enhanced logging for source selection and fallback scenarios
+- Updated service injection: handler now receives both `noaaService` and `openMeteoService`
+
+### Testing
+- Added comprehensive integration test suite (`tests/integration/great-lakes-marine.test.ts`):
+  - Geographic detection validation (15 tests total)
+  - NOAA marine data retrieval for all Great Lakes
+  - Coastal bay detection (San Francisco Bay, Chesapeake Bay)
+  - Open-Meteo fallback for ocean locations
+  - Error handling and graceful degradation
+  - Marine data format validation
+- Added unit tests for geography utilities (`tests/unit/geography.test.ts`):
+  - Bounding box validation for all regions (26 tests)
+  - Edge case handling and boundary testing
+  - No overlaps between Great Lakes and coastal bay regions
+
+### Documentation
+- Updated ROADMAP.md with v1.1.0 completion status
+- No changes to tool descriptions (maintains lean design philosophy)
+- Zero token overhead - existing tool description unchanged
+
+### Benefits
+- ✅ Great Lakes boaters/sailors now get accurate marine forecasts
+- ✅ Addresses user feedback about N/A data for inland lakes
+- ✅ No new tools added (maintains 8-tool count from v1.0.0)
+- ✅ Zero token overhead (smart routing, no new parameters)
+- ✅ Backward compatible (Open-Meteo remains default for ocean locations)
+- ✅ Improves existing tool quality without API proliferation
+
 ## [0.6.0] - 2025-11-06
 
 ### Added

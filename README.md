@@ -435,8 +435,8 @@ Provides current air quality conditions using the Open-Meteo Air Quality API wit
 - Activity recommendations for sensitive groups
 - Optional 5-day hourly forecast
 
-### 8. get_marine_conditions (NEW in v0.6.0)
-Get marine weather conditions including wave height, swell, ocean currents, and sea state.
+### 8. get_marine_conditions (NEW in v0.6.0, Enhanced in v1.1.0)
+Get marine weather conditions including wave height, swell, ocean currents, and sea state with automatic source selection for Great Lakes and coastal bays.
 
 **Parameters:**
 - `latitude` (required): Latitude coordinate (-90 to 90)
@@ -444,7 +444,10 @@ Get marine weather conditions including wave height, swell, ocean currents, and 
 - `forecast` (optional): Include 5-day marine forecast (default: false)
 
 **Description:**
-Provides comprehensive marine weather data using the Open-Meteo Marine API with global ocean coverage. Includes significant wave height with Douglas Sea Scale categorization, wind waves vs swell separation, wave period/direction, ocean currents, and safety assessment for maritime activities.
+Provides comprehensive marine weather data with intelligent dual-source support:
+- **Great Lakes & Coastal Bays (NEW in v1.1.0)**: Automatically uses NOAA gridpoint data for all 5 Great Lakes (Superior, Michigan, Huron, Erie, Ontario) and major US coastal bays (Chesapeake Bay, San Francisco Bay, Tampa Bay, Puget Sound, Lake Okeechobee). Provides wave height, wave period, wave direction, and wind conditions.
+- **Ocean Coverage**: Uses Open-Meteo Marine API for global ocean coverage, including significant wave height with Douglas Sea Scale categorization, wind waves vs swell separation, wave period/direction, ocean currents, and safety assessment for maritime activities.
+- **Automatic Selection**: Intelligent geographic detection automatically selects the best data source with zero configuration required.
 
 **Important:** Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.
 
