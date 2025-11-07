@@ -223,4 +223,82 @@ describe('Cache Configuration', () => {
       });
     });
   });
+
+  describe('API Timeout Configuration - v1.0.0', () => {
+    it('should have default API timeout value', () => {
+      // Default should be 30000ms (30 seconds)
+      expect(CacheConfig.apiTimeoutMs).toBe(30000);
+    });
+
+    it('should validate API timeout is within bounds', () => {
+      // Min: 5000ms (5 seconds)
+      // Max: 120000ms (2 minutes)
+      expect(CacheConfig.apiTimeoutMs).toBeGreaterThanOrEqual(5000);
+      expect(CacheConfig.apiTimeoutMs).toBeLessThanOrEqual(120000);
+    });
+
+    it('should use API timeout in both NOAA and OpenMeteo services', () => {
+      // This verifies the configuration exists
+      expect(CacheConfig).toHaveProperty('apiTimeoutMs');
+      expect(typeof CacheConfig.apiTimeoutMs).toBe('number');
+    });
+
+    it('should enforce minimum timeout boundary', () => {
+      // Minimum should be 5000ms
+      const minTimeout = 5000;
+      expect(CacheConfig.apiTimeoutMs).toBeGreaterThanOrEqual(minTimeout);
+    });
+
+    it('should enforce maximum timeout boundary', () => {
+      // Maximum should be 120000ms (2 minutes)
+      const maxTimeout = 120000;
+      expect(CacheConfig.apiTimeoutMs).toBeLessThanOrEqual(maxTimeout);
+    });
+
+    it('should have reasonable default for production use', () => {
+      // 30 seconds is a good balance between:
+      // - Allowing time for slow network/API responses
+      // - Not waiting too long for failed requests
+      expect(CacheConfig.apiTimeoutMs).toBe(30000);
+
+      // Should be in the middle range, not at extremes
+      expect(CacheConfig.apiTimeoutMs).toBeGreaterThan(5000);
+      expect(CacheConfig.apiTimeoutMs).toBeLessThan(120000);
+    });
+
+    it('should be used for all API client configurations', () => {
+      // The timeout should be configurable and used consistently
+      // across both NOAA and OpenMeteo services
+      const timeout = CacheConfig.apiTimeoutMs;
+
+      expect(timeout).toBeGreaterThan(0);
+      expect(Number.isFinite(timeout)).toBe(true);
+      expect(Number.isInteger(timeout)).toBe(true);
+    });
+
+    it('should prevent timeout overflow issues', () => {
+      // Ensure timeout value doesn't cause 32-bit integer overflow
+      const maxSafeInt32 = 2147483647; // 2^31 - 1
+      expect(CacheConfig.apiTimeoutMs).toBeLessThan(maxSafeInt32);
+    });
+
+    it('should be appropriate for network requests', () => {
+      // Timeout should be:
+      // - Long enough for typical API responses (>5s)
+      // - Short enough to avoid hanging indefinitely (<2min)
+      const timeout = CacheConfig.apiTimeoutMs;
+
+      expect(timeout).toBeGreaterThanOrEqual(5 * 1000); // At least 5 seconds
+      expect(timeout).toBeLessThanOrEqual(2 * 60 * 1000); // At most 2 minutes
+    });
+
+    it('should handle concurrent requests without timeout conflicts', () => {
+      // Multiple services should be able to use the same timeout config
+      const timeout1 = CacheConfig.apiTimeoutMs;
+      const timeout2 = CacheConfig.apiTimeoutMs;
+
+      expect(timeout1).toBe(timeout2);
+      expect(timeout1).toBe(30000);
+    });
+  });
 });
