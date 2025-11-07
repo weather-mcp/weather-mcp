@@ -3,10 +3,17 @@
  *
  * Climate normals are 30-year averages (1991-2020) used to provide
  * context for current weather conditions.
+ *
+ * Hybrid Strategy:
+ * 1. Try NCEI (US only, requires token) for official normals
+ * 2. Fall back to Open-Meteo (global, no token) computed normals
  */
 
 import type { OpenMeteoHistoricalResponse, ClimateNormals } from '../types/openmeteo.js';
 import { celsiusToFahrenheit } from './units.js';
+import type { OpenMeteoService } from '../services/openmeteo.js';
+import type { NCEIService } from '../services/ncei.js';
+import { logger } from './logger.js';
 
 /**
  * Convert millimeters to inches
@@ -174,4 +181,93 @@ export function getDateComponents(date: Date | string): { month: number; day: nu
     month: d.getMonth() + 1, // JavaScript months are 0-indexed
     day: d.getDate()
   };
+}
+
+/**
+ * Check if coordinates are within the contiguous United States
+ *
+ * @param latitude - Latitude
+ * @param longitude - Longitude
+ * @returns true if location is in contiguous US
+ */
+export function isLocationInUS(latitude: number, longitude: number): boolean {
+  // Contiguous US bounding box (approximate)
+  // Latitude: ~25°N (Florida) to ~49°N (Canada border)
+  // Longitude: ~-125°W (Pacific) to ~-66°W (Atlantic)
+  return (
+    latitude >= 24 &&
+    latitude <= 50 &&
+    longitude >= -125 &&
+    longitude <= -66
+  );
+}
+
+/**
+ * Get climate normals using hybrid strategy
+ *
+ * Strategy:
+ * 1. If location is in US and NCEI token available, try NCEI first
+ * 2. Fall back to Open-Meteo computed normals (always works)
+ *
+ * @param openMeteoService - Open-Meteo service instance
+ * @param nceiService - NCEI service instance (optional)
+ * @param latitude - Latitude
+ * @param longitude - Longitude
+ * @param month - Month (1-12)
+ * @param day - Day of month (1-31)
+ * @returns Climate normals with source indication
+ */
+export async function getClimateNormals(
+  openMeteoService: OpenMeteoService,
+  nceiService: NCEIService | undefined,
+  latitude: number,
+  longitude: number,
+  month: number,
+  day: number
+): Promise<ClimateNormals> {
+  // Try NCEI if available and location is in US
+  if (nceiService && nceiService.isAvailable() && isLocationInUS(latitude, longitude)) {
+    try {
+      logger.info('Attempting to fetch climate normals from NCEI', {
+        latitude,
+        longitude,
+        month,
+        day
+      });
+
+      const normals = await nceiService.getClimateNormals(latitude, longitude, month, day);
+      logger.info('Successfully retrieved climate normals from NCEI', {
+        latitude,
+        longitude,
+        month,
+        day
+      });
+
+      return normals;
+    } catch (error) {
+      // NCEI failed, fall back to Open-Meteo
+      logger.warn('NCEI climate normals failed, falling back to Open-Meteo', {
+        latitude,
+        longitude,
+        month,
+        day,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  // Use Open-Meteo (default, always works)
+  logger.info('Using Open-Meteo for climate normals', {
+    latitude,
+    longitude,
+    month,
+    day,
+    reason: nceiService && nceiService.isAvailable()
+      ? 'NCEI fallback'
+      : !isLocationInUS(latitude, longitude)
+        ? 'Location outside US'
+        : 'NCEI token not configured'
+  });
+
+  return await openMeteoService.getClimateNormals(latitude, longitude, month, day);
 }

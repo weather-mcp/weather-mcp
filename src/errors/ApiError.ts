@@ -7,7 +7,7 @@
  */
 export class ApiError extends Error {
   public readonly statusCode: number;
-  public readonly service: 'NOAA' | 'OpenMeteo';
+  public readonly service: 'NOAA' | 'OpenMeteo' | 'NCEI';
   public readonly userMessage: string;
   public readonly helpLinks: string[];
   public readonly isRetryable: boolean;
@@ -15,7 +15,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     statusCode: number,
-    service: 'NOAA' | 'OpenMeteo',
+    service: 'NOAA' | 'OpenMeteo' | 'NCEI',
     userMessage: string,
     helpLinks: string[] = [],
     isRetryable: boolean = false
@@ -57,10 +57,22 @@ export class ApiError extends Error {
 export class RateLimitError extends ApiError {
   public readonly retryAfter?: number;
 
-  constructor(service: 'NOAA' | 'OpenMeteo', retryAfter?: number) {
-    const userMessage = retryAfter
-      ? `Rate limit exceeded. Please retry after ${retryAfter} seconds.`
-      : 'Rate limit exceeded. Please retry in a few seconds.';
+  constructor(service: 'NOAA' | 'OpenMeteo' | 'NCEI', messageOrRetryAfter?: string | number, retryAfter?: number) {
+    // Handle backwards compatibility: if second param is number, treat it as retryAfter
+    let message: string | undefined;
+    let retry: number | undefined;
+
+    if (typeof messageOrRetryAfter === 'number') {
+      message = undefined;
+      retry = messageOrRetryAfter;
+    } else if (typeof messageOrRetryAfter === 'string') {
+      message = messageOrRetryAfter;
+      retry = retryAfter;
+    }
+
+    const userMessage = message || (retry
+      ? `Rate limit exceeded. Please retry after ${retry} seconds.`
+      : 'Rate limit exceeded. Please retry in a few seconds.');
 
     super(
       `Rate limit exceeded for ${service}`,
@@ -70,12 +82,13 @@ export class RateLimitError extends ApiError {
       [
         'https://weather.gov/documentation/services-web-api',
         'https://open-meteo.com/en/features#api-documentation',
+        'https://www.ncdc.noaa.gov/cdo-web/webservices'
       ],
       true // Retryable after waiting
     );
 
     this.name = 'RateLimitError';
-    this.retryAfter = retryAfter;
+    this.retryAfter = retry;
   }
 }
 
@@ -83,24 +96,37 @@ export class RateLimitError extends ApiError {
  * Service unavailable error - API is down or timing out
  */
 export class ServiceUnavailableError extends ApiError {
-  constructor(service: 'NOAA' | 'OpenMeteo', originalError?: Error) {
+  constructor(service: 'NOAA' | 'OpenMeteo' | 'NCEI', messageOrError?: string | Error, originalError?: Error) {
+    // Handle backwards compatibility: if second param is Error, treat it as originalError
+    let message: string | undefined;
+    let error: Error | undefined;
+
+    if (typeof messageOrError === 'string') {
+      message = messageOrError;
+      error = originalError;
+    } else if (messageOrError instanceof Error) {
+      message = undefined;
+      error = messageOrError;
+    }
+
+    const userMessage = message || `The ${service} weather service is temporarily unavailable. Please try again in a few minutes.`;
+    const helpLink = service === 'NOAA' ? 'https://www.weather.gov/'
+      : service === 'NCEI' ? 'https://www.ncei.noaa.gov/'
+      : 'https://open-meteo.com/';
+
     super(
       `${service} API is currently unavailable`,
       503,
       service,
-      `The ${service} weather service is temporarily unavailable. Please try again in a few minutes.`,
-      [
-        service === 'NOAA'
-          ? 'https://www.weather.gov/'
-          : 'https://open-meteo.com/',
-      ],
+      userMessage,
+      [helpLink],
       true // Retryable
     );
 
     this.name = 'ServiceUnavailableError';
 
-    if (originalError && originalError.stack) {
-      this.stack = `${this.stack}\nCaused by: ${originalError.stack}`;
+    if (error && error.stack) {
+      this.stack = `${this.stack}\nCaused by: ${error.stack}`;
     }
   }
 }
@@ -113,7 +139,7 @@ export class InvalidLocationError extends ApiError {
   public readonly longitude?: number;
 
   constructor(
-    service: 'NOAA' | 'OpenMeteo',
+    service: 'NOAA' | 'OpenMeteo' | 'NCEI',
     message: string,
     latitude?: number,
     longitude?: number
@@ -137,7 +163,7 @@ export class InvalidLocationError extends ApiError {
  * Data not found error - requested data doesn't exist
  */
 export class DataNotFoundError extends ApiError {
-  constructor(service: 'NOAA' | 'OpenMeteo', message: string) {
+  constructor(service: 'NOAA' | 'OpenMeteo' | 'NCEI', message: string) {
     super(
       message,
       404,
