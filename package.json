@@ -57,9 +57,11 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.21.0",
     "axios": "^1.13.1",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "luxon": "^3.7.2"
   },
   "devDependencies": {
+    "@types/luxon": "^3.7.1",
     "@types/node": "^24.10.0",
     "@vitest/coverage-v8": "^4.0.7",
     "tsx": "^4.20.6",
