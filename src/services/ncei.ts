@@ -19,6 +19,7 @@ import type { ClimateNormals } from '../types/openmeteo.js';
 import { NCEI_API_TOKEN } from '../config/api.js';
 import { logger } from '../utils/logger.js';
 import { DataNotFoundError, RateLimitError, ServiceUnavailableError } from '../errors/ApiError.js';
+import { getUserAgent } from '../utils/version.js';
 
 export interface NCEIServiceConfig {
   baseURL?: string;
@@ -50,7 +51,7 @@ export class NCEIService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/1.1.0'
+        'User-Agent': getUserAgent()
       }
     });
 

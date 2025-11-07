@@ -103,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fallback chain: NOAA station timezone → geographic guess → system timezone → UTC
 
 ### Testing
-- **93 new unit tests** added (446 total, 100% pass rate):
+- **340 new unit tests** added (693 total, 100% pass rate):
   - Climate normals utilities: 31 tests (`tests/unit/normals.test.ts`)
     - 30-year average computation
     - Cache key generation
@@ -123,8 +123,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Geographic coordinate guessing
     - Time range formatting
     - IANA timezone validation
+  - **Fire weather utilities: 92 tests** (`tests/unit/fireWeather.test.ts`) - **SAFETY-CRITICAL**
+    - Haines Index categorization (all thresholds validated)
+    - Grassland fire danger levels
+    - Red Flag Warning threat assessment
+    - Fire weather data extraction
+    - Mixing height dispersion context
+    - Transport wind interpretation
+  - **Air quality utilities: 114 tests** (`tests/unit/airQuality.test.ts`) - **HEALTH-CRITICAL**
+    - US EPA AQI categorization (all 6 categories, exact thresholds)
+    - European EAQI categorization (all 6 categories)
+    - UV Index categorization (WHO standards)
+    - Pollutant information (7 pollutants)
+    - Concentration formatting with precision
+    - Geographic AQI selection (US territories)
+  - **NCEI service: 41 tests** (`tests/unit/ncei.test.ts`)
+    - Service initialization and configuration
+    - Token validation and availability
+    - Error handling interceptor
+    - Climate normals placeholder implementation
 - All existing 353 tests continue to pass
-- Comprehensive edge case coverage
+- Comprehensive edge case coverage including safety/health-critical calculations
 
 ### Documentation
 - Updated `CLAUDE.md` with implementation patterns

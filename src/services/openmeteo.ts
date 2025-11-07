@@ -23,6 +23,7 @@ import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 import { computeNormalsFrom30YearData, getNormalsCacheKey } from '../utils/normals.js';
+import { getUserAgent } from '../utils/version.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -70,7 +71,7 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.6.0'
+        'User-Agent': getUserAgent()
       }
     });
 
@@ -80,7 +81,7 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.6.0'
+        'User-Agent': getUserAgent()
       }
     });
 
@@ -90,7 +91,7 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.6.0'
+        'User-Agent': getUserAgent()
       }
     });
 
@@ -100,7 +101,7 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.6.0'
+        'User-Agent': getUserAgent()
       }
     });
 
@@ -110,7 +111,7 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.6.0'
+        'User-Agent': getUserAgent()
       }
     });
 

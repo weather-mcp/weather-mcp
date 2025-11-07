@@ -56,9 +56,9 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 
 ## Version Information
 
-- **Current Version:** 0.4.0 (Security & Quality Improvements)
-- **Security Posture:** B+ (Good)
-- **Test Coverage:** 247 tests, 100% on critical utilities
+- **Current Version:** 1.2.0 (Climate Normals, Snow/Ice, Timezone-Aware)
+- **Security Posture:** A+ (Excellent)
+- **Test Coverage:** 693 tests, 100% on critical utilities
 - **Risk Level:** LOW
 
 ---
