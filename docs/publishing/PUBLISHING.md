@@ -6,13 +6,14 @@ This guide covers how to publish the Weather MCP Server to npm, create GitHub re
 
 For experienced users, here's the recommended publishing workflow:
 
-1. **Update versions** → Update `package.json` and `server.json` to new version
-2. **Commit & push** → Commit version updates to main branch
-3. **Build & test** → Run `npm run build` and `npm test`
-4. **Publish to npm** → Run `npm publish --access public`
-5. **Create GitHub release** → Use `gh release create` or web UI
-6. **Publish to MCP registry** → Run `./mcp-publisher login github` then `./mcp-publisher publish`
-7. **Verify** → Check npm, GitHub releases, and MCP registry
+1. **Pre-release quality checks** → Run code-reviewer, security-auditor, and test-automator agents; fix all findings (see "Pre-Release Quality Automation")
+2. **Update versions** → Update `package.json` and `server.json` to new version
+3. **Commit & push** → Commit version updates to main branch
+4. **Build & test** → Run `npm run build` and `npm test`
+5. **Publish to npm** → Run `npm publish --access public`
+6. **Create GitHub release** → Use `gh release create` or web UI
+7. **Publish to MCP registry** → Run `./mcp-publisher login github` then `./mcp-publisher publish`
+8. **Verify** → Check npm, GitHub releases, and MCP registry
 
 See detailed instructions below for each step.
 
@@ -39,6 +40,11 @@ Before you begin:
 - [ ] README.md is up to date
 - [ ] CHANGELOG.md is updated with release notes
 - [ ] All changes committed to main branch
+- [ ] **Run code-reviewer agent** → Fix all CRITICAL/HIGH issues, commit fixes
+- [ ] **Run security-auditor agent** → Fix ALL security issues, commit fixes
+- [ ] **Run test-automator agent** → Enhance test coverage, commit improvements
+- [ ] Verification passed: build succeeds, all tests pass, no critical vulnerabilities
+- [ ] All pre-release fixes committed (see "Pre-Release Quality Automation" for details)
 
 ### Version Updates
 - [ ] **package.json** version incremented (e.g., 0.3.0 → 0.4.0)
@@ -63,6 +69,120 @@ Before you begin:
 - [ ] Installation tested: `npx @dangahagan/weather-mcp@latest`
 - [ ] MCP client configuration tested (Claude Code, Claude Desktop, etc.)
 - [ ] Release announced (if applicable)
+
+---
+
+## Pre-Release Quality Automation
+
+**⚠️ CRITICAL: Run this workflow BEFORE Step 0 (version bumping)**
+
+To avoid shipping releases with unreviewed code quality, security issues, or inadequate tests, run these three specialized agents. This automated review catches issues early and ensures consistent release quality.
+
+**Time estimate:** 30-60 minutes (including fixes)
+
+### Agent Workflow
+
+Run these agents **in sequence** (each may inform the next):
+
+#### 1. Code Quality Review
+
+**Agent:** `code-reviewer` (`.claude/agents/code-reviewer.md`)
+
+**How to invoke:**
+- In Claude Code, type: "Run the code-reviewer agent"
+- Or: Use Task tool with `subagent_type="code-reviewer"`
+
+**Output:** `docs/development/CODE_REVIEW.md`
+
+**What to do:**
+1. Review the generated report for code quality issues
+2. **Fix all CRITICAL issues** (marked with severity ratings)
+3. **Strongly consider** fixing HIGH priority issues
+4. Address MEDIUM/LOW issues if time permits
+5. Commit fixes: `git commit -m "fix: Address code review findings for vX.X.X release"`
+
+#### 2. Security Audit
+
+**Agent:** `security-auditor` (`.claude/agents/security-auditor.md`)
+
+**How to invoke:**
+- In Claude Code, type: "Run the security-auditor agent"
+- Or: Use Task tool with `subagent_type="security-auditor"`
+
+**Output:** `docs/development/SECURITY_AUDIT.md`
+
+**What to do:**
+1. Review security findings in the report
+2. **Fix ALL security vulnerabilities** (no exceptions for releases)
+3. Update dependencies if vulnerabilities found: `npm audit fix`
+4. If `npm audit` shows critical issues, resolve before proceeding
+5. Commit fixes: `git commit -m "security: Address security audit findings for vX.X.X release"`
+
+#### 3. Test Suite Enhancement
+
+**Agent:** `test-automator` (`.claude/agents/test-automator.md`)
+
+**How to invoke:**
+- In Claude Code, type: "Run the test-automator agent"
+- Or: Use Task tool with `subagent_type="test-automator"`
+
+**Output:** Updated test files + recommendations
+
+**What to do:**
+1. Review test coverage gaps and recommendations
+2. Implement critical test additions (especially for new features)
+3. Apply recommended test improvements
+4. Run full test suite: `npm test`
+5. Verify coverage: `npm run test:coverage`
+6. Commit changes: `git commit -m "test: Enhance test coverage for vX.X.X release"`
+
+### Verification Steps
+
+After completing all three agents and their fixes:
+
+```bash
+# 1. Ensure all changes are committed
+git status  # Should be clean
+
+# 2. Run full build
+npm run build  # Must succeed with 0 errors
+
+# 3. Run complete test suite
+npm test  # All tests must pass
+
+# 4. Check for vulnerabilities
+npm audit  # Should show 0 critical/high vulnerabilities
+
+# 5. Verify test coverage (optional but recommended)
+npm run test:coverage  # Check coverage metrics
+```
+
+### When to Skip
+
+You may skip this workflow if:
+- This is a hotfix release addressing an urgent bug
+- No code changes since last review (documentation-only releases)
+- Last review was < 7 days ago and no significant changes made
+
+**In all other cases, run the full workflow.**
+
+### Common Issues
+
+**Problem:** Agent outputs are outdated
+- **Solution:** Delete old reports in `docs/development/` and re-run agents
+
+**Problem:** Too many findings to address
+- **Solution:** Focus on CRITICAL/HIGH severity issues first. Create GitHub issues for MEDIUM/LOW items to address post-release.
+
+**Problem:** Tests fail after implementing fixes
+- **Solution:** This is expected! Fix the test failures or adjust the fixes. Never proceed with failing tests.
+
+**Problem:** Agent not available in Claude Code
+- **Solution:** Verify agents exist in `.claude/agents/`. If missing, skip automated review but manually review code, security, and tests before release.
+
+---
+
+**✅ Checkpoint:** Once all fixes are committed and verification passes, proceed to Step 0 (version bumping).
 
 ---
 
@@ -722,15 +842,18 @@ See section 5.6 "Common Issues" above for detailed solutions.
 
 The complete publishing workflow:
 
-1. ✅ Update `package.json` and `server.json` versions
-2. ✅ Commit and push version updates
-3. ✅ Build and test (`npm run build && npm test`)
-4. ✅ Publish to npm (`npm publish --access public`)
-5. ✅ Create GitHub release (`gh release create` or web UI)
-6. ✅ Publish to MCP Registry (`./mcp-publisher login github && ./mcp-publisher publish`)
-7. ✅ Verify all publications
-8. ✅ Test installation with npx
+1. ✅ **Pre-release quality checks** - Run code-reviewer, security-auditor, and test-automator agents; fix all findings (~30-60 min)
+2. ✅ Update `package.json` and `server.json` versions
+3. ✅ Commit and push version updates
+4. ✅ Build and test (`npm run build && npm test`)
+5. ✅ Publish to npm (`npm publish --access public`)
+6. ✅ Create GitHub release (`gh release create` or web UI)
+7. ✅ Publish to MCP Registry (`./mcp-publisher login github && ./mcp-publisher publish`)
+8. ✅ Verify all publications
+9. ✅ Test installation with npx
 
-**Time estimate:** ~10-15 minutes per release (once familiar with process)
+**Time estimate:**
+- First-time/major release: ~45-75 minutes (including pre-release quality workflow)
+- Minor/patch release: ~20-30 minutes (if minimal fixes needed from agents)
 
 Happy publishing! 🚀
