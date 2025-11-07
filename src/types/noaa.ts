@@ -154,6 +154,8 @@ export interface ObservationProperties {
     base: QuantitativeValue;
     amount: string; // "FEW", "SCT", "BKN", "OVC"
   }>;
+  // Winter weather observations (when available)
+  snowDepth?: QuantitativeValue; // Current snow depth on ground
 }
 
 export type ObservationResponse = NOAAResponse<ObservationProperties>;
@@ -358,6 +360,10 @@ export interface GridpointProperties extends GridpointFireWeather, GridpointSeve
   windDirection?: GridpointDataSeries;
   windSpeed?: GridpointDataSeries;
   windGust?: GridpointDataSeries;
+  // Winter weather fields
+  snowfallAmount?: GridpointDataSeries; // Quantitative snowfall forecast (mm)
+  iceAccumulation?: GridpointDataSeries; // Ice accumulation forecast (mm)
+  snowLevel?: GridpointDataSeries; // Elevation where snow begins (meters)
   weather?: {
     values: Array<{
       validTime: string;
