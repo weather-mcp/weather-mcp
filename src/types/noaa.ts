@@ -301,10 +301,29 @@ export interface GridpointFireWeather {
 }
 
 /**
- * Gridpoint properties from /gridpoints/{office}/{gridX},{gridY} endpoint
- * Contains detailed forecast data including fire weather indices
+ * Severe weather properties from gridpoint data
  */
-export interface GridpointProperties extends GridpointFireWeather {
+export interface GridpointSevereWeather {
+  probabilityOfThunder?: GridpointDataSeries;
+  probabilityOfTropicalStormWinds?: GridpointDataSeries;
+  probabilityOfHurricaneWinds?: GridpointDataSeries;
+  potentialOf15mphWinds?: GridpointDataSeries;
+  potentialOf20mphWindGusts?: GridpointDataSeries;
+  potentialOf25mphWinds?: GridpointDataSeries;
+  potentialOf30mphWindGusts?: GridpointDataSeries;
+  potentialOf35mphWinds?: GridpointDataSeries;
+  potentialOf40mphWindGusts?: GridpointDataSeries;
+  potentialOf45mphWinds?: GridpointDataSeries;
+  potentialOf50mphWindGusts?: GridpointDataSeries;
+  potentialOf60mphWindGusts?: GridpointDataSeries;
+  lightningActivityLevel?: GridpointDataSeries;
+}
+
+/**
+ * Gridpoint properties from /gridpoints/{office}/{gridX},{gridY} endpoint
+ * Contains detailed forecast data including fire weather indices and severe weather
+ */
+export interface GridpointProperties extends GridpointFireWeather, GridpointSevereWeather {
   '@id': string;
   '@type': string;
   updateTime: string;

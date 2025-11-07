@@ -17,13 +17,6 @@ import {
 import { NOAAService } from './services/noaa.js';
 import { OpenMeteoService } from './services/openmeteo.js';
 import { CacheConfig } from './config/cache.js';
-import {
-  validateCoordinates,
-  validateForecastDays,
-  validateGranularity,
-  validateOptionalBoolean,
-  validateHistoricalWeatherParams,
-} from './utils/validation.js';
 import { logger } from './utils/logger.js';
 import { formatErrorForUser } from './errors/ApiError.js';
 import { handleGetForecast } from './handlers/forecastHandler.js';
@@ -33,6 +26,7 @@ import { handleGetHistoricalWeather } from './handlers/historicalWeatherHandler.
 import { handleCheckServiceStatus } from './handlers/statusHandler.js';
 import { handleSearchLocation } from './handlers/locationHandler.js';
 import { handleGetAirQuality } from './handlers/airQualityHandler.js';
+import { handleGetMarineConditions } from './handlers/marineConditionsHandler.js';
 
 /**
  * Server information
@@ -120,6 +114,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'boolean',
               description: 'Include precipitation probability in the forecast output (default: true)',
               default: true
+            },
+            include_severe_weather: {
+              type: 'boolean',
+              description: 'Include severe weather probabilities such as thunderstorm chance, wind gust probabilities, and tropical storm/hurricane risks (default: false, US/NOAA only)',
+              default: false
             },
             source: {
               type: 'string',
@@ -278,6 +277,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ['latitude', 'longitude']
         }
+      },
+      {
+        name: 'get_marine_conditions',
+        description: 'Get marine conditions including wave height, swell, ocean currents, and sea state for a location (global coverage). Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Returns current conditions and optional daily/hourly forecast. Includes significant wave height, wind waves, swell, wave period, and ocean currents. Shows safety assessment for maritime activities. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            latitude: {
+              type: 'number',
+              description: 'Latitude of the location (-90 to 90)',
+              minimum: -90,
+              maximum: 90
+            },
+            longitude: {
+              type: 'number',
+              description: 'Longitude of the location (-180 to 180)',
+              minimum: -180,
+              maximum: 180
+            },
+            forecast: {
+              type: 'boolean',
+              description: 'Include marine forecast for next 5 days (default: false, shows current only)',
+              default: false
+            }
+          },
+          required: ['latitude', 'longitude']
+        }
       }
     ]
   };
@@ -311,6 +337,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_air_quality':
         return await handleGetAirQuality(args, openMeteoService);
+
+      case 'get_marine_conditions':
+        return await handleGetMarineConditions(args, openMeteoService);
 
       default:
         throw new Error(`Unknown tool: ${name}`);

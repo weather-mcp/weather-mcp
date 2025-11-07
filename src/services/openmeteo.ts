@@ -4,6 +4,8 @@
  * - Historical Weather: https://open-meteo.com/en/docs/historical-weather-api
  * - Forecast: https://open-meteo.com/en/docs
  * - Geocoding: https://open-meteo.com/en/docs/geocoding-api
+ * - Air Quality: https://open-meteo.com/en/docs/air-quality-api
+ * - Marine: https://open-meteo.com/en/docs/marine-weather-api
  */
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
@@ -12,11 +14,13 @@ import type {
   OpenMeteoErrorResponse,
   GeocodingResponse,
   OpenMeteoForecastResponse,
-  OpenMeteoAirQualityResponse
+  OpenMeteoAirQualityResponse,
+  OpenMeteoMarineResponse
 } from '../types/openmeteo.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -30,6 +34,7 @@ export interface OpenMeteoServiceConfig {
   geocodingURL?: string;
   forecastURL?: string;
   airQualityURL?: string;
+  marineURL?: string;
   timeout?: number;
   maxRetries?: number;
 }
@@ -39,6 +44,7 @@ export class OpenMeteoService {
   private geocodingClient: AxiosInstance;
   private forecastClient: AxiosInstance;
   private airQualityClient: AxiosInstance;
+  private marineClient: AxiosInstance;
   private maxRetries: number;
   private cache: Cache;
 
@@ -48,7 +54,8 @@ export class OpenMeteoService {
       geocodingURL = 'https://geocoding-api.open-meteo.com/v1',
       forecastURL = 'https://api.open-meteo.com/v1',
       airQualityURL = 'https://air-quality-api.open-meteo.com/v1',
-      timeout = 30000,
+      marineURL = 'https://marine-api.open-meteo.com/v1',
+      timeout = CacheConfig.apiTimeoutMs,
       maxRetries = 3
     } = config;
 
@@ -61,7 +68,7 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.5.0'
+        'User-Agent': 'weather-mcp/0.6.0'
       }
     });
 
@@ -71,7 +78,7 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.5.0'
+        'User-Agent': 'weather-mcp/0.6.0'
       }
     });
 
@@ -81,7 +88,7 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.5.0'
+        'User-Agent': 'weather-mcp/0.6.0'
       }
     });
 
@@ -91,7 +98,17 @@ export class OpenMeteoService {
       timeout,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'weather-mcp/0.5.0'
+        'User-Agent': 'weather-mcp/0.6.0'
+      }
+    });
+
+    // Marine client
+    this.marineClient = axios.create({
+      baseURL: marineURL,
+      timeout,
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'weather-mcp/0.6.0'
       }
     });
 
@@ -115,6 +132,11 @@ export class OpenMeteoService {
       response => response,
       error => this.handleError(error)
     );
+
+    this.marineClient.interceptors.response.use(
+      response => response,
+      error => this.handleError(error)
+    );
   }
 
   /**
@@ -128,6 +150,11 @@ export class OpenMeteoService {
       // Bad request
       if (status === 400) {
         const reason = data.reason || 'Invalid request parameters';
+        logger.warn('Invalid request parameters', {
+          service: 'OpenMeteo',
+          reason,
+          securityEvent: true
+        });
         throw new InvalidLocationError(
           'OpenMeteo',
           `${reason}\n\nPlease verify:\n` +
@@ -139,6 +166,10 @@ export class OpenMeteoService {
 
       // Rate limit error
       if (status === 429) {
+        logger.warn('Rate limit exceeded', {
+          service: 'OpenMeteo',
+          securityEvent: true
+        });
         throw new RateLimitError('OpenMeteo');
       }
 
@@ -911,6 +942,184 @@ export class OpenMeteoService {
       throw new DataNotFoundError(
         'OpenMeteo',
         'No hourly air quality forecast data available for the specified location'
+      );
+    }
+  }
+
+  /**
+   * Get marine conditions data from Open-Meteo Marine API
+   *
+   * @param latitude - Latitude coordinate (-90 to 90)
+   * @param longitude - Longitude coordinate (-180 to 180)
+   * @param forecast - Whether to include hourly forecast (default: false, returns current only)
+   * @param forecastDays - Number of forecast days (1-7, default: 5)
+   * @returns Marine conditions including waves, swell, and currents
+   */
+  async getMarine(
+    latitude: number,
+    longitude: number,
+    forecast: boolean = false,
+    forecastDays: number = 5
+  ): Promise<OpenMeteoMarineResponse> {
+    // Validate coordinates
+    validateLatitude(latitude);
+    validateLongitude(longitude);
+
+    // Validate forecast days
+    if (forecastDays < 1 || forecastDays > 7) {
+      throw new InvalidLocationError(
+        'OpenMeteo',
+        'Marine forecast days must be between 1 and 7'
+      );
+    }
+
+    // Build parameters
+    const params = this.buildMarineParams(latitude, longitude, forecast, forecastDays);
+
+    // Check cache first
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('openmeteo-marine', latitude, longitude, forecast, forecastDays);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as OpenMeteoMarineResponse;
+      }
+
+      const response = await this.makeRequestToMarine<OpenMeteoMarineResponse>('/marine', params);
+      this.validateMarineResponse(response, forecast);
+
+      // Cache for 1 hour (marine conditions update hourly)
+      this.cache.set(cacheKey, response, 60 * 60 * 1000);
+
+      return response;
+    }
+
+    // No caching
+    const response = await this.makeRequestToMarine<OpenMeteoMarineResponse>('/marine', params);
+    this.validateMarineResponse(response, forecast);
+    return response;
+  }
+
+  /**
+   * Build request parameters for marine data
+   * @private
+   */
+  private buildMarineParams(
+    latitude: number,
+    longitude: number,
+    forecast: boolean,
+    forecastDays: number
+  ): Record<string, string | number> {
+    const params: Record<string, string | number> = {
+      latitude,
+      longitude,
+      timezone: 'auto'
+    };
+
+    // Always include current data
+    params.current = [
+      'wave_height',
+      'wave_direction',
+      'wave_period',
+      'wind_wave_height',
+      'wind_wave_direction',
+      'wind_wave_period',
+      'wind_wave_peak_period',
+      'swell_wave_height',
+      'swell_wave_direction',
+      'swell_wave_period',
+      'swell_wave_peak_period',
+      'ocean_current_velocity',
+      'ocean_current_direction'
+    ].join(',');
+
+    // Optionally include hourly forecast data
+    if (forecast) {
+      params.forecast_days = forecastDays;
+      params.hourly = [
+        'wave_height',
+        'wave_direction',
+        'wave_period',
+        'wind_wave_height',
+        'wind_wave_direction',
+        'wind_wave_period',
+        'wind_wave_peak_period',
+        'swell_wave_height',
+        'swell_wave_direction',
+        'swell_wave_period',
+        'swell_wave_peak_period',
+        'ocean_current_velocity',
+        'ocean_current_direction'
+      ].join(',');
+
+      // Also include daily aggregates
+      params.daily = [
+        'wave_height_max',
+        'wave_direction_dominant',
+        'wave_period_max',
+        'wind_wave_height_max',
+        'wind_wave_direction_dominant',
+        'wind_wave_period_max',
+        'wind_wave_peak_period_max',
+        'swell_wave_height_max',
+        'swell_wave_direction_dominant',
+        'swell_wave_period_max',
+        'swell_wave_peak_period_max'
+      ].join(',');
+    }
+
+    return params;
+  }
+
+  /**
+   * Make request to marine API with retry logic
+   * @private
+   */
+  private async makeRequestToMarine<T>(
+    url: string,
+    params: Record<string, string | number>,
+    retries = 0
+  ): Promise<T> {
+    try {
+      const response = await this.marineClient.get<T>(url, { params });
+      return response.data;
+    } catch (error) {
+      // Retry on rate limit or server errors
+      if (retries < this.maxRetries) {
+        const shouldRetry =
+          (error as Error).message.includes('rate limit') ||
+          (error as Error).message.includes('server error') ||
+          (error as Error).message.includes('timed out');
+
+        if (shouldRetry) {
+          const baseDelay = Math.pow(2, retries) * 1000;
+          const delay = baseDelay * (0.5 + Math.random() * 0.5);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return this.makeRequestToMarine<T>(url, params, retries + 1);
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Validate that the marine response contains the expected data
+   * @private
+   */
+  private validateMarineResponse(
+    response: OpenMeteoMarineResponse,
+    forecast: boolean
+  ): void {
+    if (!response.current || !response.current.time) {
+      throw new DataNotFoundError(
+        'OpenMeteo',
+        'No current marine conditions data available for the specified location'
+      );
+    }
+
+    if (forecast && (!response.hourly || !response.hourly.time || response.hourly.time.length === 0)) {
+      throw new DataNotFoundError(
+        'OpenMeteo',
+        'No hourly marine forecast data available for the specified location'
       );
     }
   }

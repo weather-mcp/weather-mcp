@@ -1,0 +1,233 @@
+/**
+ * Handler for get_marine_conditions tool
+ */
+
+import { OpenMeteoService } from '../services/openmeteo.js';
+import { validateCoordinates, validateOptionalBoolean } from '../utils/validation.js';
+import {
+  formatWaveHeight,
+  formatWavePeriod,
+  formatDirection,
+  formatCurrentVelocity,
+  getWaveHeightCategory,
+  getSafetyAssessment
+} from '../utils/marine.js';
+import type { OpenMeteoMarineResponse } from '../types/openmeteo.js';
+
+interface MarineConditionsArgs {
+  latitude?: number;
+  longitude?: number;
+  forecast?: boolean;
+}
+
+export async function handleGetMarineConditions(
+  args: unknown,
+  openMeteoService: OpenMeteoService
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  // Validate input parameters with runtime checks
+  const { latitude, longitude } = validateCoordinates(args);
+  const forecast = validateOptionalBoolean(
+    (args as MarineConditionsArgs)?.forecast,
+    'forecast',
+    false
+  );
+
+  // Get marine conditions data
+  const marineData = await openMeteoService.getMarine(
+    latitude,
+    longitude,
+    forecast,
+    5 // Default 5-day forecast
+  );
+
+  // Format the marine data for display
+  const output = formatMarineConditions(marineData, latitude, longitude, forecast);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: output
+      }
+    ]
+  };
+}
+
+/**
+ * Format marine conditions data as markdown
+ */
+function formatMarineConditions(
+  data: OpenMeteoMarineResponse,
+  latitude: number,
+  longitude: number,
+  includeForecast: boolean
+): string {
+  let output = `# Marine Conditions Report\n\n`;
+  output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
+  output += `**Timezone:** ${data.timezone}\n`;
+  output += `\n`;
+
+  // Important disclaimer at the top
+  output += `⚠️ **DISCLAIMER:** This data is modeled and may have limited accuracy in coastal areas. `;
+  output += `**NOT suitable for coastal navigation.** Always consult official marine forecasts for safety-critical decisions.\n\n`;
+
+  if (!data.current) {
+    output += `⚠️ **No current marine conditions data available for this location.**\n`;
+    return output;
+  }
+
+  const current = data.current;
+  const currentTime = new Date(current.time);
+  output += `**Observation Time:** ${currentTime.toLocaleString()}\n\n`;
+
+  // Overall safety assessment
+  const safety = getSafetyAssessment(
+    current.wave_height,
+    current.wind_wave_height,
+    current.swell_wave_height,
+    current.wave_period
+  );
+
+  const safetyEmoji = safety.level === 'Calm' ? '🟢' :
+                      safety.level === 'Moderate' ? '🟡' :
+                      safety.level === 'Rough' ? '🟠' :
+                      safety.level === 'Very Rough' ? '🔴' : '🟤';
+
+  output += `## ${safetyEmoji} Current Conditions: ${safety.level}\n\n`;
+  output += `${safety.description}\n\n`;
+
+  // Wave Height Summary
+  output += `## 🌊 Wave Conditions\n\n`;
+
+  if (current.wave_height !== undefined) {
+    const waveCategory = getWaveHeightCategory(current.wave_height);
+    output += `**Significant Wave Height:** ${formatWaveHeight(current.wave_height)}`;
+    output += ` (${waveCategory.description})\n`;
+  }
+
+  if (current.wave_direction !== undefined) {
+    output += `**Wave Direction:** ${formatDirection(current.wave_direction)}\n`;
+  }
+
+  if (current.wave_period !== undefined) {
+    output += `**Wave Period:** ${formatWavePeriod(current.wave_period)}\n`;
+  }
+
+  output += `\n`;
+
+  // Wind Waves (locally generated)
+  if (current.wind_wave_height !== undefined && current.wind_wave_height > 0) {
+    output += `### Wind Waves\n\n`;
+    output += `**Height:** ${formatWaveHeight(current.wind_wave_height)}\n`;
+
+    if (current.wind_wave_direction !== undefined) {
+      output += `**Direction:** ${formatDirection(current.wind_wave_direction)}\n`;
+    }
+
+    if (current.wind_wave_period !== undefined) {
+      output += `**Period:** ${formatWavePeriod(current.wind_wave_period)}\n`;
+    }
+
+    if (current.wind_wave_peak_period !== undefined) {
+      output += `**Peak Period:** ${formatWavePeriod(current.wind_wave_peak_period)}\n`;
+    }
+
+    output += `\n`;
+  }
+
+  // Swell Waves (propagated from distant storms)
+  if (current.swell_wave_height !== undefined && current.swell_wave_height > 0) {
+    output += `### Swell\n\n`;
+    output += `**Height:** ${formatWaveHeight(current.swell_wave_height)}\n`;
+
+    if (current.swell_wave_direction !== undefined) {
+      output += `**Direction:** ${formatDirection(current.swell_wave_direction)}\n`;
+    }
+
+    if (current.swell_wave_period !== undefined) {
+      output += `**Period:** ${formatWavePeriod(current.swell_wave_period)}\n`;
+    }
+
+    if (current.swell_wave_peak_period !== undefined) {
+      output += `**Peak Period:** ${formatWavePeriod(current.swell_wave_peak_period)}\n`;
+    }
+
+    output += `\n`;
+  }
+
+  // Ocean Currents
+  if (current.ocean_current_velocity !== undefined || current.ocean_current_direction !== undefined) {
+    output += `## 🌀 Ocean Currents\n\n`;
+
+    if (current.ocean_current_velocity !== undefined) {
+      output += `**Velocity:** ${formatCurrentVelocity(current.ocean_current_velocity)}\n`;
+    }
+
+    if (current.ocean_current_direction !== undefined) {
+      output += `**Direction:** ${formatDirection(current.ocean_current_direction)}\n`;
+    }
+
+    output += `\n`;
+  }
+
+  // Add forecast summary if requested
+  if (includeForecast && data.daily && data.daily.time && data.daily.time.length > 0) {
+    output += `---\n\n`;
+    output += `## 📅 Marine Forecast\n\n`;
+
+    const daysToShow = Math.min(5, data.daily.time.length);
+    output += `**Next ${daysToShow} days:**\n\n`;
+
+    for (let i = 0; i < daysToShow; i++) {
+      const date = new Date(data.daily.time[i]);
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+      output += `**${dayName}:**\n`;
+
+      if (data.daily.wave_height_max?.[i] !== undefined) {
+        const maxWaveHeight = data.daily.wave_height_max[i];
+        const category = getWaveHeightCategory(maxWaveHeight);
+        output += `  • Max Wave Height: ${formatWaveHeight(maxWaveHeight)} (${category.description})\n`;
+      }
+
+      if (data.daily.wave_direction_dominant?.[i] !== undefined) {
+        output += `  • Wave Direction: ${formatDirection(data.daily.wave_direction_dominant[i])}\n`;
+      }
+
+      if (data.daily.wave_period_max?.[i] !== undefined) {
+        output += `  • Max Wave Period: ${formatWavePeriod(data.daily.wave_period_max[i])}\n`;
+      }
+
+      // Show swell info if significant
+      if (data.daily.swell_wave_height_max?.[i] !== undefined && data.daily.swell_wave_height_max[i] > 0.5) {
+        output += `  • Swell Height: ${formatWaveHeight(data.daily.swell_wave_height_max[i])}\n`;
+
+        if (data.daily.swell_wave_direction_dominant?.[i] !== undefined) {
+          output += `  • Swell Direction: ${formatDirection(data.daily.swell_wave_direction_dominant[i])}\n`;
+        }
+      }
+
+      output += `\n`;
+    }
+
+    // Add hourly forecast note if available
+    if (data.hourly && data.hourly.time && data.hourly.time.length > 0) {
+      output += `*Hourly forecast data available for ${data.hourly.time.length} hours*\n\n`;
+    }
+  }
+
+  // Footer with interpretation guidance
+  output += `---\n\n`;
+  output += `### Interpreting Marine Conditions\n\n`;
+  output += `**Significant Wave Height:** The average height of the highest 1/3 of waves\n`;
+  output += `**Wind Waves:** Waves generated by local winds (shorter period)\n`;
+  output += `**Swell:** Long-period waves from distant weather systems (longer period)\n`;
+  output += `**Wave Period:** Time between successive wave crests (longer = more powerful)\n\n`;
+  output += `🟢 **Calm** (0-2m): Safe for most vessels\n`;
+  output += `🟡 **Moderate** (2-4m): Challenging for small craft\n`;
+  output += `🟠 **Rough** (4-6m): Hazardous for small vessels\n`;
+  output += `🔴 **Very Rough** (6-9m): Dangerous for most vessels\n`;
+  output += `🟤 **High** (>9m): Extremely dangerous\n`;
+
+  return output;
+}

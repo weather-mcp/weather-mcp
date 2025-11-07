@@ -450,3 +450,140 @@ export interface OpenMeteoAirQualityResponse {
   hourly_units?: OpenMeteoAirQualityHourlyUnits;
   hourly?: OpenMeteoAirQualityHourlyData;
 }
+
+/**
+ * Current marine data from Open-Meteo Marine API
+ */
+export interface OpenMeteoMarineCurrentData {
+  time: string;
+  interval: number;
+  wave_height?: number;
+  wave_direction?: number;
+  wave_period?: number;
+  wind_wave_height?: number;
+  wind_wave_direction?: number;
+  wind_wave_period?: number;
+  wind_wave_peak_period?: number;
+  swell_wave_height?: number;
+  swell_wave_direction?: number;
+  swell_wave_period?: number;
+  swell_wave_peak_period?: number;
+  ocean_current_velocity?: number;
+  ocean_current_direction?: number;
+}
+
+/**
+ * Hourly marine data from Open-Meteo Marine API
+ */
+export interface OpenMeteoMarineHourlyData {
+  time: string[];
+  wave_height?: number[];
+  wave_direction?: number[];
+  wave_period?: number[];
+  wind_wave_height?: number[];
+  wind_wave_direction?: number[];
+  wind_wave_period?: number[];
+  wind_wave_peak_period?: number[];
+  swell_wave_height?: number[];
+  swell_wave_direction?: number[];
+  swell_wave_period?: number[];
+  swell_wave_peak_period?: number[];
+  ocean_current_velocity?: number[];
+  ocean_current_direction?: number[];
+}
+
+/**
+ * Daily marine data from Open-Meteo Marine API
+ */
+export interface OpenMeteoDailyMarineData {
+  time: string[];
+  wave_height_max?: number[];
+  wave_direction_dominant?: number[];
+  wave_period_max?: number[];
+  wind_wave_height_max?: number[];
+  wind_wave_direction_dominant?: number[];
+  wind_wave_period_max?: number[];
+  wind_wave_peak_period_max?: number[];
+  swell_wave_height_max?: number[];
+  swell_wave_direction_dominant?: number[];
+  swell_wave_period_max?: number[];
+  swell_wave_peak_period_max?: number[];
+}
+
+/**
+ * Units for current marine data
+ */
+export interface OpenMeteoMarineCurrentUnits {
+  time?: string;
+  interval?: string;
+  wave_height?: string;
+  wave_direction?: string;
+  wave_period?: string;
+  wind_wave_height?: string;
+  wind_wave_direction?: string;
+  wind_wave_period?: string;
+  wind_wave_peak_period?: string;
+  swell_wave_height?: string;
+  swell_wave_direction?: string;
+  swell_wave_period?: string;
+  swell_wave_peak_period?: string;
+  ocean_current_velocity?: string;
+  ocean_current_direction?: string;
+}
+
+/**
+ * Units for hourly marine data
+ */
+export interface OpenMeteoMarineHourlyUnits {
+  time?: string;
+  wave_height?: string;
+  wave_direction?: string;
+  wave_period?: string;
+  wind_wave_height?: string;
+  wind_wave_direction?: string;
+  wind_wave_period?: string;
+  wind_wave_peak_period?: string;
+  swell_wave_height?: string;
+  swell_wave_direction?: string;
+  swell_wave_period?: string;
+  swell_wave_peak_period?: string;
+  ocean_current_velocity?: string;
+  ocean_current_direction?: string;
+}
+
+/**
+ * Units for daily marine data
+ */
+export interface OpenMeteoDailyMarineUnits {
+  time?: string;
+  wave_height_max?: string;
+  wave_direction_dominant?: string;
+  wave_period_max?: string;
+  wind_wave_height_max?: string;
+  wind_wave_direction_dominant?: string;
+  wind_wave_period_max?: string;
+  wind_wave_peak_period_max?: string;
+  swell_wave_height_max?: string;
+  swell_wave_direction_dominant?: string;
+  swell_wave_period_max?: string;
+  swell_wave_peak_period_max?: string;
+}
+
+/**
+ * Complete API response from Open-Meteo Marine API
+ */
+export interface OpenMeteoMarineResponse {
+  latitude: number;
+  longitude: number;
+  generationtime_ms: number;
+  utc_offset_seconds: number;
+  timezone: string;
+  timezone_abbreviation: string;
+  elevation: number;
+  current_units?: OpenMeteoMarineCurrentUnits;
+  current?: OpenMeteoMarineCurrentData;
+  hourly_units?: OpenMeteoMarineHourlyUnits;
+  hourly?: OpenMeteoMarineHourlyData;
+  daily_units?: OpenMeteoDailyMarineUnits;
+  daily?: OpenMeteoDailyMarineData;
+}
