@@ -12,6 +12,56 @@ An MCP (Model Context Protocol) server that provides **global weather data** to 
 
 ## Features
 
+- **Global Weather Forecasts**: Get forecasts for any location worldwide (ENHANCED in v0.4.0)
+  - Automatic source selection: NOAA (US, more detailed) or Open-Meteo (international)
+  - Extended forecasts up to 16 days (was 7)
+  - Sunrise/sunset times with daylight duration
+  - Daily or hourly granularity
+  - Precipitation probability display
+  - Temperature trends, humidity, wind, and UV index
+- **Current Conditions**: Get enhanced real-time weather observations for US locations
+  - Heat index and wind chill when relevant
+  - 24-hour temperature range
+  - Wind gusts and detailed cloud cover
+  - Recent precipitation history
+  - Optional fire weather indices (see below)
+- **Location Search**: Find coordinates for any location worldwide (v0.4.0)
+  - Convert location names to coordinates ("Paris" → 48.8534°, 2.3488°)
+  - Support for cities, airports, landmarks, and regions globally
+  - Detailed metadata: timezone, elevation, population, country
+  - Enables natural language queries: "What's the weather in Tokyo?"
+- **Weather Alerts**: Get active weather watches, warnings, and advisories for US locations
+  - Severity levels (Extreme, Severe, Moderate, Minor)
+  - Urgency and certainty indicators
+  - Effective and expiration times
+  - Instructions and recommended responses
+- **Historical Data**: Access historical weather observations for any location worldwide
+  - Recent data (last 7 days): Detailed hourly observations from NOAA real-time API (US only)
+  - Archival data (>7 days old): Hourly/daily weather data from 1940-present via Open-Meteo (global coverage)
+- **Air Quality Monitoring**: Comprehensive air quality data for any location worldwide (v0.5.0)
+  - Air Quality Index (AQI) with automatic region detection (US AQI or European EAQI)
+  - Health recommendations based on AQI levels
+  - Pollutant concentrations (PM2.5, PM10, O₃, NO₂, SO₂, CO, NH₃)
+  - UV Index with sun protection recommendations
+  - Optional hourly air quality forecasts (5-day outlook)
+  - Categorized health risk levels (Good, Moderate, Unhealthy, etc.)
+  - Activity recommendations for sensitive populations
+- **Severe Weather Probabilities**: Probabilistic severe weather forecasting (NEW in v0.6.0)
+  - US locations only (NOAA gridpoint data)
+  - Optional enhancement to forecasts (`include_severe_weather` parameter)
+  - Thunderstorm probability for next 48 hours
+  - Wind gust probabilities (20-60+ mph categories)
+  - Tropical storm and hurricane wind probabilities
+  - Lightning activity levels
+  - Smart display showing only significant threats
+  - Works with both daily and hourly forecasts
+- **Fire Weather Data**: Fire danger indices for US locations (v0.5.0)
+  - Haines Index (atmospheric fire growth potential)
+  - Grassland Fire Danger Index
+  - Red Flag Threat Index
+  - Mixing Height (smoke dispersion indicator)
+  - Transport Wind Speed (smoke transport)
+  - Optional enhancement to current conditions
 - **Marine Conditions**: Comprehensive marine weather for coastal and ocean areas (NEW in v0.6.0)
   - Global coverage for waves, swell, and ocean currents
   - Significant wave height with safety categorization (Calm to Extreme)
@@ -22,56 +72,6 @@ An MCP (Model Context Protocol) server that provides **global weather data** to 
   - Safety assessment for maritime activities (sailing, boating, surfing)
   - Wave interpretation guide based on Douglas Sea Scale
   - Important: Data has limited coastal accuracy - NOT for navigation
-- **Severe Weather Probabilities**: Probabilistic severe weather forecasting (NEW in v0.6.0)
-  - US locations only (NOAA gridpoint data)
-  - Optional enhancement to forecasts (`include_severe_weather` parameter)
-  - Thunderstorm probability for next 48 hours
-  - Wind gust probabilities (20-60+ mph categories)
-  - Tropical storm and hurricane wind probabilities
-  - Lightning activity levels
-  - Smart display showing only significant threats
-  - Works with both daily and hourly forecasts
-- **Air Quality Monitoring**: Comprehensive air quality data for any location worldwide (v0.5.0)
-  - Air Quality Index (AQI) with automatic region detection (US AQI or European EAQI)
-  - Health recommendations based on AQI levels
-  - Pollutant concentrations (PM2.5, PM10, O₃, NO₂, SO₂, CO, NH₃)
-  - UV Index with sun protection recommendations
-  - Optional hourly air quality forecasts (5-day outlook)
-  - Categorized health risk levels (Good, Moderate, Unhealthy, etc.)
-  - Activity recommendations for sensitive populations
-- **Fire Weather Data**: Fire danger indices for US locations (v0.5.0)
-  - Haines Index (atmospheric fire growth potential)
-  - Grassland Fire Danger Index
-  - Red Flag Threat Index
-  - Mixing Height (smoke dispersion indicator)
-  - Transport Wind Speed (smoke transport)
-  - Optional enhancement to current conditions
-- **Location Search**: Find coordinates for any location worldwide (v0.4.0)
-  - Convert location names to coordinates ("Paris" → 48.8534°, 2.3488°)
-  - Support for cities, airports, landmarks, and regions globally
-  - Detailed metadata: timezone, elevation, population, country
-  - Enables natural language queries: "What's the weather in Tokyo?"
-- **Global Weather Forecasts**: Get forecasts for any location worldwide (ENHANCED in v0.4.0)
-  - Automatic source selection: NOAA (US, more detailed) or Open-Meteo (international)
-  - Extended forecasts up to 16 days (was 7)
-  - Sunrise/sunset times with daylight duration
-  - Daily or hourly granularity
-  - Precipitation probability display
-  - Temperature trends, humidity, wind, and UV index
-- **Weather Alerts**: Get active weather watches, warnings, and advisories for US locations
-  - Severity levels (Extreme, Severe, Moderate, Minor)
-  - Urgency and certainty indicators
-  - Effective and expiration times
-  - Instructions and recommended responses
-- **Current Conditions**: Get enhanced real-time weather observations for US locations
-  - Heat index and wind chill when relevant
-  - 24-hour temperature range
-  - Wind gusts and detailed cloud cover
-  - Recent precipitation history
-  - Optional fire weather indices (see above)
-- **Historical Data**: Access historical weather observations for any location worldwide
-  - Recent data (last 7 days): Detailed hourly observations from NOAA real-time API (US only)
-  - Archival data (>7 days old): Hourly/daily weather data from 1940-present via Open-Meteo (global coverage)
 - **Service Status Checking**: Proactively verify API availability with health checks
 - **Enhanced Error Handling**: Detailed, actionable error messages with status page links
 - **Intelligent Caching**: Built-in in-memory cache reduces API calls and improves performance
