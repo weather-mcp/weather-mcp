@@ -589,7 +589,7 @@ Use the `check_service_status` tool to proactively verify API availability:
 
 ### Automated Test Suite
 
-This project includes a comprehensive test suite with 693 automated tests:
+This project includes a comprehensive test suite with 722 automated tests:
 
 ```bash
 # Run all tests
@@ -606,7 +606,7 @@ npm run test:ui
 ```
 
 **Test Coverage:**
-- **693 tests** across unit and integration test suites (340 new tests in v1.2.0)
+- **722 tests** across unit and integration test suites (29 new tests in v1.2.1)
 - **100% coverage** on critical utilities (cache, validation, units, errors, normals, snow, timezone)
 - **54% overall coverage** with focus on reliability and security
 - All tests execute in ~1 second

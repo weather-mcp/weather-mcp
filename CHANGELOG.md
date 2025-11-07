@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2025-11-07
+
+### Enhanced
+
+#### Fire Weather Intelligence - Contextual Messaging
+- **Intelligent Fire Weather Explanations** - Smart contextual messages when fire weather indices unavailable
+  - **NEW: `getFireWeatherContext()`** utility - Provides region, season, and weather-aware explanations
+  - **Geographic Detection**: Identifies Western US, California, Southern states, Eastern US regions
+  - **Seasonal Awareness**: Differentiates winter vs. fire season with appropriate messaging
+  - **Humidity-Based Context**: Recognizes high humidity conditions that suppress fire risk
+  - **User Education**: Explains when and why fire danger indices are calculated
+  - **Improved UX**: Replaces confusing empty fields with clear, helpful information
+  - **Atmospheric Monitoring Section**: Always displays mixing height and transport wind data
+  - **Zero Breaking Changes**: All existing functionality preserved
+
+### Technical Changes
+- New utility function: `getFireWeatherContext()` in `src/utils/fireWeather.ts`
+  - Detects geographic region from coordinates
+  - Determines current season and date context
+  - Analyzes weather conditions (humidity, temperature)
+  - Generates tailored explanatory messages
+- Updated `currentConditionsHandler.ts`: Enhanced fire weather display logic with contextual messaging
+- Improved test organization: Moved test scripts from root to `tests/` directory
+
+### Testing
+- **29 new unit tests** added (722 total, 100% pass rate):
+  - Fire weather context detection: 29 tests (`tests/unit/fireWeatherContext.test.ts`)
+    - Geographic region detection (Western US, California, Southern, Eastern)
+    - Seasonal context (winter, fire season, shoulder months)
+    - Humidity-based messaging
+    - Temperature-based context
+    - Edge cases and boundary conditions
+
+### Documentation
+- Enhanced user experience with contextual fire weather explanations
+- Improved inline code documentation for fire weather utilities
+
 ## [1.2.0] - 2025-11-07
 
 ### Enhanced
@@ -499,7 +536,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/dgahagan/weather-mcp/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/dgahagan/weather-mcp/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/dgahagan/weather-mcp/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/dgahagan/weather-mcp/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/dgahagan/weather-mcp/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/dgahagan/weather-mcp/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/dgahagan/weather-mcp/compare/v0.5.0...v1.0.0
 [0.5.0]: https://github.com/dgahagan/weather-mcp/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dgahagan/weather-mcp/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dgahagan/weather-mcp/compare/v0.2.0...v0.3.0
