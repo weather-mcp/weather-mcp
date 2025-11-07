@@ -3,6 +3,7 @@
  * Supports dual data sources: NOAA (Great Lakes/coastal) and Open-Meteo (oceans)
  */
 
+import { DateTime } from 'luxon';
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { validateCoordinates, validateOptionalBoolean } from '../utils/validation.js';
@@ -20,6 +21,7 @@ import {
 import { shouldUseNOAAMarine } from '../utils/geography.js';
 import type { OpenMeteoMarineResponse } from '../types/openmeteo.js';
 import { logger } from '../utils/logger.js';
+import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 
 interface MarineConditionsArgs {
   latitude?: number;
@@ -39,6 +41,21 @@ export async function handleGetMarineConditions(
     'forecast',
     false
   );
+
+  // Get timezone for proper time formatting
+  let timezone = guessTimezoneFromCoords(latitude, longitude); // fallback
+  try {
+    // Try to get timezone from station (preferred)
+    const stations = await noaaService.getStations(latitude, longitude);
+    if (stations.features && stations.features.length > 0) {
+      const stationTimezone = stations.features[0].properties.timeZone;
+      if (stationTimezone) {
+        timezone = stationTimezone;
+      }
+    }
+  } catch (error) {
+    // Use fallback timezone
+  }
 
   // Check if we should try NOAA first (Great Lakes or major coastal bays)
   const regionDetection = shouldUseNOAAMarine(latitude, longitude);
@@ -63,6 +80,7 @@ export async function handleGetMarineConditions(
           latitude,
           longitude,
           regionDetection.region || 'Unknown Region',
+          timezone,
           forecast
         );
 
@@ -119,12 +137,13 @@ function formatNOAAMarineConditions(
   latitude: number,
   longitude: number,
   region: string,
+  timezone: string,
   includeForecast: boolean
 ): string {
   let output = `# Marine Conditions Report - ${region}\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Region:** ${region}\n`;
-  output += `**Last Updated:** ${new Date(data.timestamp).toLocaleString()}\n\n`;
+  output += `**Last Updated:** ${formatInTimezone(data.timestamp, timezone)}\n\n`;
 
   // Wave Conditions
   output += `## 🌊 Wave Conditions\n\n`;
@@ -206,8 +225,7 @@ function formatOpenMeteoMarineConditions(
   }
 
   const current = data.current;
-  const currentTime = new Date(current.time);
-  output += `**Observation Time:** ${currentTime.toLocaleString()}\n\n`;
+  output += `**Observation Time:** ${formatInTimezone(current.time, data.timezone)}\n\n`;
 
   // Overall safety assessment
   const safety = getSafetyAssessment(
@@ -308,8 +326,8 @@ function formatOpenMeteoMarineConditions(
     output += `**Next ${daysToShow} days:**\n\n`;
 
     for (let i = 0; i < daysToShow; i++) {
-      const date = new Date(data.daily.time[i]);
-      const dayName = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const dt = DateTime.fromISO(data.daily.time[i], { setZone: false }).setZone(data.timezone);
+      const dayName = dt.toLocaleString({ weekday: 'short', month: 'short', day: 'numeric' });
 
       output += `**${dayName}:**\n`;
 
