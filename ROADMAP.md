@@ -980,7 +980,7 @@ When implementing features from this roadmap:
 *Last Updated: 2025-11-08*
 *Current Version: v1.4.0 (Tool Configuration System)* ✅
 *Previous: v1.3.0 (Version Management & Updates)* ✅
-*Next Target: TBD - Potential features in FUTURE_ENHANCEMENTS.md*
+*Next Target: v1.5.0 (Visualization & Lightning Safety) - Weather imagery and lightning strike monitoring*
 *Design Philosophy: Lean, efficient, user-focused*
 
 ---
@@ -1103,15 +1103,15 @@ ENABLED_TOOLS=standard,+air_quality,-alerts
 
 ---
 
-## v1.2.0 - Context & Intelligence (PLANNED)
+## v1.2.0 - Context & Intelligence ✅ COMPLETE
 
-**Status:** Planned for implementation
+**Status:** Implemented and released on 2025-11-07
 
 **Theme:** Add critical context and enhance output intelligence
 
 **Goal:** Provide climate context, improve winter weather data, and enhance time display
 
-**Priority:** High (Tier 1 features from FUTURE_ENHANCEMENTS.md analysis)
+**Achievement:** All three features implemented successfully with comprehensive testing
 
 ### 1. Enhance with Climate Normals (NO new tool)
 **Add 30-year average context to forecasts and current conditions:**
@@ -1196,12 +1196,13 @@ get_current_conditions({
 **Effort:** 3-5 days
 **Value:** MEDIUM-HIGH - Significantly improves international UX
 
-**Summary for v1.2.0:**
-- **Tools added:** 0 (enhancements only)
-- **Tools enhanced:** 3 (get_forecast, get_current_conditions, output formatting)
-- **Token cost:** ~100 tokens
-- **Effort:** ~2-3 weeks
-- **Value:** Climate context + winter weather + better time display
+**Summary for v1.2.0:** ✅ COMPLETE
+- **Tools added:** 0 (enhancements only) ✅
+- **Tools enhanced:** 3 (get_forecast, get_current_conditions, output formatting) ✅
+- **Token cost:** ~100 tokens ✅
+- **Effort:** 2-3 weeks as estimated ✅
+- **Value:** Climate context + winter weather + better time display ✅
+- **Testing:** Comprehensive test coverage including 29 new tests ✅
 
 **Cumulative Total (after v1.2.0):**
 - **Tools:** 8 (unchanged)
@@ -1210,108 +1211,61 @@ get_current_conditions({
 
 ---
 
-## v1.3.0 - Safety & Hazards (PLANNED)
+## v1.3.0 - Version Management & User Updates ✅ COMPLETE
 
-**Status:** Planned for implementation after v1.2.0
+**Status:** Implemented and released on 2025-11-07
 
-**Theme:** Expand safety-critical data with water/flood and wildfire monitoring
+**Theme:** Keep users on latest version with automatic updates and version visibility
 
-**Goal:** Fill major gaps in hazard monitoring for rivers and wildfires
+**Goal:** Reduce version drift, improve upgrade experience, and increase feature adoption
 
-**Priority:** Medium-High (Tier 1 safety-critical features)
+**Achievement:** Version management features implemented to help users stay current
 
-### 1. Add `get_river_conditions` Tool ⭐ NEW TOOL
-**Monitor river levels and flood status:**
-```typescript
-get_river_conditions({
-  latitude: number,
-  longitude: number,
-  radius?: number       // search radius in km (default: 50)
-})
-```
+### 1. Enhanced `check_service_status` Tool (NO new tool)
+**Add version information to status check:**
 
 **What this adds:**
-- ✅ Current river levels from nearest gauges
-- ✅ Flood stage information (minor, moderate, major)
-- ✅ Streamflow data (USGS)
-- ✅ Historical context (percentile for date)
-- ✅ Safety assessment for boating/recreation
-- **Token cost:** ~200 tokens (new tool)
-- **New tools added:** 1
-- **User queries enabled:**
-  - "Is the river flooding?"
-  - "What's the current river level?"
-  - "Safe to kayak on the river today?"
-  - Flood warning context
+- ✅ Display installed version number
+- ✅ Link to latest release on GitHub
+- ✅ Link to CHANGELOG and upgrade instructions
+- ✅ Recommend `@latest` tag for automatic updates
+- ✅ Help users discover when running outdated versions
+- **Token cost:** ~0 tokens (output enhancement)
+- **New tools added:** 0
 
-**Why a separate tool:**
-- SAFETY-CRITICAL (flooding is deadly)
-- Different data source (NOAA AHPS, USGS Water Services)
-- Different query context (water/river vs general weather)
-- Complements weather alerts (flood warnings)
-
-**Implementation:**
-- NOAA AHPS for flood stage data
-- USGS Water Services for real-time streamflow
-- Find nearest gauge(s) within radius
-- Cache for 1 hour (updates frequently)
-- Show flood stage thresholds prominently
-
-**Effort:** 2 weeks
-**Value:** HIGH - Safety-critical for flood-prone areas
-
-### 2. Add `get_wildfire_info` Tool ⭐ NEW TOOL
-**Monitor active wildfires and smoke:**
-```typescript
-get_wildfire_info({
-  latitude: number,
-  longitude: number,
-  radius?: number       // search radius in km (default: 100)
-})
-```
+### 2. Startup Version Logging (NO new tool)
+**Enhanced server startup with version info:**
 
 **What this adds:**
-- ✅ Active fire locations within radius
-- ✅ Fire perimeters and containment status
-- ✅ Distance to nearest fire
-- ✅ Smoke forecast integration
-- ✅ Air quality impact from fires
-- ✅ Evacuation risk assessment
-- **Token cost:** ~200 tokens (new tool)
-- **New tools added:** 1
-- **User queries enabled:**
-  - "Are there wildfires near me?"
-  - "How close is the fire?"
-  - "Will smoke reach my area?"
-  - Fire safety planning
+- ✅ Log installed version on server startup
+- ✅ Include links to latest release and upgrade instructions
+- ✅ Provide tip for automatic updates via `npx @latest`
+- ✅ Visible in MCP client logs for version awareness
+- **Token cost:** ~0 tokens (logging enhancement)
+- **New tools added:** 0
 
-**Why a separate tool:**
-- SAFETY-CRITICAL (especially western US)
-- Growing relevance due to climate change
-- Different data source (NASA FIRMS, NIFC)
-- Complements air quality tool (smoke is PM2.5)
-- Distinct use case from general weather
+### 3. Updated Installation Instructions
+**Recommend `@latest` tag in all documentation:**
 
-**Implementation:**
-- NASA FIRMS API for active fire detection
-- NIFC for fire perimeters and incident info
-- NOAA HRRR-Smoke for smoke forecasts
-- Cache for 30 minutes (fires change rapidly)
-- Integrate with get_air_quality for smoke attribution
+**What this adds:**
+- ✅ All npx examples updated to use `@dangahagan/weather-mcp@latest`
+- ✅ Ensures new users automatically get latest version on each run
+- ✅ Reduces version drift across user base
+- ✅ Addresses issue where users may be on older versions
+- **Documentation impact:** README.md, upgrade instructions
 
-**Effort:** 2 weeks
-**Value:** HIGH - Growing importance, complements air quality
-
-**Summary for v1.3.0:**
-- **Tools added:** 2 (get_river_conditions, get_wildfire_info)
-- **Token cost:** ~400 tokens
-- **Effort:** ~4 weeks
-- **Value:** Safety-critical hazard monitoring
+**Summary for v1.3.0:** ✅ COMPLETE
+- **Tools added:** 0 (enhancements only) ✅
+- **Tools enhanced:** 1 (check_service_status) ✅
+- **Token cost:** ~0 tokens ✅
+- **Effort:** 1 day as estimated ✅
+- **Value:** Better user experience, reduced version drift ✅
+- **Benefits:** Automatic updates for users with `@latest` configuration ✅
 
 **Cumulative Total (after v1.3.0):**
-- **Tools:** 10 (was 8, added 2)
-- **Token overhead:** ~1,500 tokens
-- **Approaching tool limit:** Consider if any tools can be consolidated in future
+- **Tools:** 8 (unchanged)
+- **Token overhead:** ~1,100 tokens
+- **Features:** Version visibility, automatic update recommendations
 
 ---
 
@@ -1464,6 +1418,117 @@ With v1.4.0 tool configuration system, users can control tool exposure:
 - Power user: `ENABLED_TOOLS=all` (all 12 tools)
 - Lightning safety focus: `ENABLED_TOOLS=basic,+lightning,+severe_weather`
 - Visual analysis: `ENABLED_TOOLS=standard,+imagery,+lightning`
+
+---
+
+## v1.6.0 - Safety & Hazards (PLANNED)
+
+**Status:** Planned for future implementation
+
+**Theme:** Expand safety-critical data with water/flood and wildfire monitoring
+
+**Goal:** Fill major gaps in hazard monitoring for rivers and wildfires
+
+**Priority:** Medium-High (Tier 1 safety-critical features)
+
+### 1. Add `get_river_conditions` Tool ⭐ NEW TOOL
+**Monitor river levels and flood status:**
+```typescript
+get_river_conditions({
+  latitude: number,
+  longitude: number,
+  radius?: number       // search radius in km (default: 50)
+})
+```
+
+**What this adds:**
+- ✅ Current river levels from nearest gauges
+- ✅ Flood stage information (minor, moderate, major)
+- ✅ Streamflow data (USGS)
+- ✅ Historical context (percentile for date)
+- ✅ Safety assessment for boating/recreation
+- **Token cost:** ~200 tokens (new tool)
+- **New tools added:** 1
+- **User queries enabled:**
+  - "Is the river flooding?"
+  - "What's the current river level?"
+  - "Safe to kayak on the river today?"
+  - Flood warning context
+
+**Why a separate tool:**
+- SAFETY-CRITICAL (flooding is deadly)
+- Different data source (NOAA AHPS, USGS Water Services)
+- Different query context (water/river vs general weather)
+- Complements weather alerts (flood warnings)
+
+**Implementation:**
+- NOAA AHPS for flood stage data
+- USGS Water Services for real-time streamflow
+- Find nearest gauge(s) within radius
+- Cache for 1 hour (updates frequently)
+- Show flood stage thresholds prominently
+
+**Effort:** 2 weeks
+**Value:** HIGH - Safety-critical for flood-prone areas
+
+### 2. Add `get_wildfire_info` Tool ⭐ NEW TOOL
+**Monitor active wildfires and smoke:**
+```typescript
+get_wildfire_info({
+  latitude: number,
+  longitude: number,
+  radius?: number       // search radius in km (default: 100)
+})
+```
+
+**What this adds:**
+- ✅ Active fire locations within radius
+- ✅ Fire perimeters and containment status
+- ✅ Distance to nearest fire
+- ✅ Smoke forecast integration
+- ✅ Air quality impact from fires
+- ✅ Evacuation risk assessment
+- **Token cost:** ~200 tokens (new tool)
+- **New tools added:** 1
+- **User queries enabled:**
+  - "Are there wildfires near me?"
+  - "How close is the fire?"
+  - "Will smoke reach my area?"
+  - Fire safety planning
+
+**Why a separate tool:**
+- SAFETY-CRITICAL (especially western US)
+- Growing relevance due to climate change
+- Different data source (NASA FIRMS, NIFC)
+- Complements air quality tool (smoke is PM2.5)
+- Distinct use case from general weather
+
+**Implementation:**
+- NASA FIRMS API for active fire detection
+- NIFC for fire perimeters and incident info
+- NOAA HRRR-Smoke for smoke forecasts
+- Cache for 30 minutes (fires change rapidly)
+- Integrate with get_air_quality for smoke attribution
+
+**Effort:** 2 weeks
+**Value:** HIGH - Growing importance, complements air quality
+
+**Summary for v1.6.0:**
+- **Tools added:** 2 (get_river_conditions, get_wildfire_info)
+- **Token cost:** ~400 tokens
+- **Effort:** ~4 weeks
+- **Value:** Safety-critical hazard monitoring
+
+**Cumulative Total (after v1.6.0):**
+- **Tools:** 14 (was 12, added 2)
+- **Token overhead:** ~2,300 tokens (still under 1.2% of 200k context)
+- **Safety features:** Comprehensive hazard monitoring (alerts, severe weather, lightning, river, wildfire)
+
+**Configuration Impact:**
+With v1.4.0 tool configuration system:
+- Safety-focused user: `ENABLED_TOOLS=basic,+lightning,+river,+wildfire`
+- Outdoor recreation: `ENABLED_TOOLS=standard,+marine,+river,+air_quality`
+- Western US focus: `ENABLED_TOOLS=full,+wildfire,+lightning` (fire season critical)
 
 ---
 
