@@ -18,6 +18,7 @@ import { NOAAService } from './services/noaa.js';
 import { OpenMeteoService } from './services/openmeteo.js';
 import { NCEIService } from './services/ncei.js';
 import { CacheConfig } from './config/cache.js';
+import { toolConfig } from './config/tools.js';
 import { logger } from './utils/logger.js';
 import { formatErrorForUser } from './errors/ApiError.js';
 import { handleGetForecast } from './handlers/forecastHandler.js';
@@ -82,258 +83,280 @@ const server = new Server(
 );
 
 /**
+ * Tool definitions - each tool defined separately for conditional registration
+ */
+const TOOL_DEFINITIONS = {
+  get_forecast: {
+    name: 'get_forecast' as const,
+    description: 'Get future weather forecast for a location (global coverage). Use this for upcoming weather predictions (e.g., "tomorrow", "this week", "next 7 days", "hourly forecast"). Returns forecast data including temperature, precipitation, wind, conditions, and sunrise/sunset times. Supports both daily and hourly granularity. Automatically selects best data source: NOAA for US locations (more detailed), Open-Meteo for international locations. For current weather, use get_current_conditions. For past weather, use get_historical_weather. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        days: {
+          type: 'number' as const,
+          description: 'Number of days to include in forecast (1-16 for global, 1-7 for US NOAA, default: 7)',
+          minimum: 1,
+          maximum: 16,
+          default: 7
+        },
+        granularity: {
+          type: 'string' as const,
+          description: 'Forecast granularity: "daily" for day/night periods or "hourly" for hour-by-hour detail (default: "daily")',
+          enum: ['daily', 'hourly'],
+          default: 'daily'
+        },
+        include_precipitation_probability: {
+          type: 'boolean' as const,
+          description: 'Include precipitation probability in the forecast output (default: true)',
+          default: true
+        },
+        include_severe_weather: {
+          type: 'boolean' as const,
+          description: 'Include severe weather probabilities such as thunderstorm chance, wind gust probabilities, and tropical storm/hurricane risks (default: false, US/NOAA only)',
+          default: false
+        },
+        include_normals: {
+          type: 'boolean' as const,
+          description: 'Include climate normals (30-year averages) for comparison with forecasted temperatures (default: false, daily forecasts only). Shows normal high/low and departure from normal for the first forecast day.',
+          default: false
+        },
+        source: {
+          type: 'string' as const,
+          description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), or "openmeteo" (global)',
+          enum: ['auto', 'noaa', 'openmeteo'],
+          default: 'auto'
+        }
+      },
+      required: ['latitude', 'longitude']
+    }
+  },
+
+  get_current_conditions: {
+    name: 'get_current_conditions' as const,
+    description: 'Get the most recent weather observation for a location (US only). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns the latest observation from the nearest weather station. Optionally includes fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) when requested. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        include_fire_weather: {
+          type: 'boolean' as const,
+          description: 'Include fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) in the response (default: false, US only)',
+          default: false
+        },
+        include_normals: {
+          type: 'boolean' as const,
+          description: 'Include climate normals (30-year averages) for comparison with current conditions (default: false). Shows normal high/low temperatures and precipitation, with departure from normal.',
+          default: false
+        }
+      },
+      required: ['latitude', 'longitude']
+    }
+  },
+
+  get_alerts: {
+    name: 'get_alerts' as const,
+    description: 'Get active weather alerts, watches, warnings, and advisories for a location (US only). Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        active_only: {
+          type: 'boolean' as const,
+          description: 'Whether to show only active alerts (default: true)',
+          default: true
+        }
+      },
+      required: ['latitude', 'longitude']
+    }
+  },
+
+  get_historical_weather: {
+    name: 'get_historical_weather' as const,
+    description: 'Get historical weather data for a specific date range in the past. Use this when the user asks about weather on specific past dates (e.g., "yesterday", "last week", "November 4, 2024", "30 years ago"). Automatically uses NOAA API for recent dates (last 7 days, US only) or Open-Meteo API for older dates (worldwide, back to 1940). Do NOT use for current conditions - use get_current_conditions instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        start_date: {
+          type: 'string' as const,
+          description: 'Start date in ISO format (YYYY-MM-DD or ISO 8601 datetime)',
+        },
+        end_date: {
+          type: 'string' as const,
+          description: 'End date in ISO format (YYYY-MM-DD or ISO 8601 datetime)',
+        },
+        limit: {
+          type: 'number' as const,
+          description: 'Maximum number of observations to return (default: 168 for one week of hourly data)',
+          minimum: 1,
+          maximum: 500,
+          default: 168
+        }
+      },
+      required: ['latitude', 'longitude', 'start_date', 'end_date']
+    }
+  },
+
+  check_service_status: {
+    name: 'check_service_status' as const,
+    description: 'Check the operational status of the NOAA and Open-Meteo weather APIs. Use this when experiencing errors or to proactively verify service availability before making weather data requests. Returns current status, helpful messages, and links to official status pages.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+      required: []
+    }
+  },
+
+  search_location: {
+    name: 'search_location' as const,
+    description: 'Search for locations by name to get coordinates for weather queries. Use this when the user provides a location name instead of coordinates (e.g., "Paris", "New York", "Tokyo", "San Francisco, CA"). Returns location matches with coordinates, timezone, elevation, and other metadata. Enables natural language location queries like "What\'s the weather in Paris?" by converting location names to coordinates.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        query: {
+          type: 'string' as const,
+          description: 'Location name to search for (e.g., "Paris", "New York, NY", "Tokyo")'
+        },
+        limit: {
+          type: 'number' as const,
+          description: 'Maximum number of results to return (1-100, default: 5)',
+          minimum: 1,
+          maximum: 100,
+          default: 5
+        }
+      },
+      required: ['query']
+    }
+  },
+
+  get_air_quality: {
+    name: 'get_air_quality' as const,
+    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", or health-related environmental conditions. Returns current conditions and optional hourly forecast. Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        forecast: {
+          type: 'boolean' as const,
+          description: 'Include hourly air quality forecast for next 5 days (default: false, shows current only)',
+          default: false
+        }
+      },
+      required: ['latitude', 'longitude']
+    }
+  },
+
+  get_marine_conditions: {
+    name: 'get_marine_conditions' as const,
+    description: 'Get marine conditions including wave height, swell, ocean currents, and sea state for a location (global coverage). Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Returns current conditions and optional daily/hourly forecast. Includes significant wave height, wind waves, swell, wave period, and ocean currents. Shows safety assessment for maritime activities. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        forecast: {
+          type: 'boolean' as const,
+          description: 'Include marine forecast for next 5 days (default: false, shows current only)',
+          default: false
+        }
+      },
+      required: ['latitude', 'longitude']
+    }
+  }
+};
+
+/**
  * Handler for listing available tools
+ * Only returns tools that are enabled in the configuration
  */
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: 'get_forecast',
-        description: 'Get future weather forecast for a location (global coverage). Use this for upcoming weather predictions (e.g., "tomorrow", "this week", "next 7 days", "hourly forecast"). Returns forecast data including temperature, precipitation, wind, conditions, and sunrise/sunset times. Supports both daily and hourly granularity. Automatically selects best data source: NOAA for US locations (more detailed), Open-Meteo for international locations. For current weather, use get_current_conditions. For past weather, use get_historical_weather. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            latitude: {
-              type: 'number',
-              description: 'Latitude of the location (-90 to 90)',
-              minimum: -90,
-              maximum: 90
-            },
-            longitude: {
-              type: 'number',
-              description: 'Longitude of the location (-180 to 180)',
-              minimum: -180,
-              maximum: 180
-            },
-            days: {
-              type: 'number',
-              description: 'Number of days to include in forecast (1-16 for global, 1-7 for US NOAA, default: 7)',
-              minimum: 1,
-              maximum: 16,
-              default: 7
-            },
-            granularity: {
-              type: 'string',
-              description: 'Forecast granularity: "daily" for day/night periods or "hourly" for hour-by-hour detail (default: "daily")',
-              enum: ['daily', 'hourly'],
-              default: 'daily'
-            },
-            include_precipitation_probability: {
-              type: 'boolean',
-              description: 'Include precipitation probability in the forecast output (default: true)',
-              default: true
-            },
-            include_severe_weather: {
-              type: 'boolean',
-              description: 'Include severe weather probabilities such as thunderstorm chance, wind gust probabilities, and tropical storm/hurricane risks (default: false, US/NOAA only)',
-              default: false
-            },
-            include_normals: {
-              type: 'boolean',
-              description: 'Include climate normals (30-year averages) for comparison with forecasted temperatures (default: false, daily forecasts only). Shows normal high/low and departure from normal for the first forecast day.',
-              default: false
-            },
-            source: {
-              type: 'string',
-              description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), or "openmeteo" (global)',
-              enum: ['auto', 'noaa', 'openmeteo'],
-              default: 'auto'
-            }
-          },
-          required: ['latitude', 'longitude']
-        }
-      },
-      {
-        name: 'get_current_conditions',
-        description: 'Get the most recent weather observation for a location (US only). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns the latest observation from the nearest weather station. Optionally includes fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) when requested. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            latitude: {
-              type: 'number',
-              description: 'Latitude of the location (-90 to 90)',
-              minimum: -90,
-              maximum: 90
-            },
-            longitude: {
-              type: 'number',
-              description: 'Longitude of the location (-180 to 180)',
-              minimum: -180,
-              maximum: 180
-            },
-            include_fire_weather: {
-              type: 'boolean',
-              description: 'Include fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) in the response (default: false, US only)',
-              default: false
-            },
-            include_normals: {
-              type: 'boolean',
-              description: 'Include climate normals (30-year averages) for comparison with current conditions (default: false). Shows normal high/low temperatures and precipitation, with departure from normal.',
-              default: false
-            }
-          },
-          required: ['latitude', 'longitude']
-        }
-      },
-      {
-        name: 'get_alerts',
-        description: 'Get active weather alerts, watches, warnings, and advisories for a location (US only). Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            latitude: {
-              type: 'number',
-              description: 'Latitude of the location (-90 to 90)',
-              minimum: -90,
-              maximum: 90
-            },
-            longitude: {
-              type: 'number',
-              description: 'Longitude of the location (-180 to 180)',
-              minimum: -180,
-              maximum: 180
-            },
-            active_only: {
-              type: 'boolean',
-              description: 'Whether to show only active alerts (default: true)',
-              default: true
-            }
-          },
-          required: ['latitude', 'longitude']
-        }
-      },
-      {
-        name: 'get_historical_weather',
-        description: 'Get historical weather data for a specific date range in the past. Use this when the user asks about weather on specific past dates (e.g., "yesterday", "last week", "November 4, 2024", "30 years ago"). Automatically uses NOAA API for recent dates (last 7 days, US only) or Open-Meteo API for older dates (worldwide, back to 1940). Do NOT use for current conditions - use get_current_conditions instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            latitude: {
-              type: 'number',
-              description: 'Latitude of the location (-90 to 90)',
-              minimum: -90,
-              maximum: 90
-            },
-            longitude: {
-              type: 'number',
-              description: 'Longitude of the location (-180 to 180)',
-              minimum: -180,
-              maximum: 180
-            },
-            start_date: {
-              type: 'string',
-              description: 'Start date in ISO format (YYYY-MM-DD or ISO 8601 datetime)',
-            },
-            end_date: {
-              type: 'string',
-              description: 'End date in ISO format (YYYY-MM-DD or ISO 8601 datetime)',
-            },
-            limit: {
-              type: 'number',
-              description: 'Maximum number of observations to return (default: 168 for one week of hourly data)',
-              minimum: 1,
-              maximum: 500,
-              default: 168
-            }
-          },
-          required: ['latitude', 'longitude', 'start_date', 'end_date']
-        }
-      },
-      {
-        name: 'check_service_status',
-        description: 'Check the operational status of the NOAA and Open-Meteo weather APIs. Use this when experiencing errors or to proactively verify service availability before making weather data requests. Returns current status, helpful messages, and links to official status pages.',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-          required: []
-        }
-      },
-      {
-        name: 'search_location',
-        description: 'Search for locations by name to get coordinates for weather queries. Use this when the user provides a location name instead of coordinates (e.g., "Paris", "New York", "Tokyo", "San Francisco, CA"). Returns location matches with coordinates, timezone, elevation, and other metadata. Enables natural language location queries like "What\'s the weather in Paris?" by converting location names to coordinates.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: {
-              type: 'string',
-              description: 'Location name to search for (e.g., "Paris", "New York, NY", "Tokyo")'
-            },
-            limit: {
-              type: 'number',
-              description: 'Maximum number of results to return (1-100, default: 5)',
-              minimum: 1,
-              maximum: 100,
-              default: 5
-            }
-          },
-          required: ['query']
-        }
-      },
-      {
-        name: 'get_air_quality',
-        description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", or health-related environmental conditions. Returns current conditions and optional hourly forecast. Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            latitude: {
-              type: 'number',
-              description: 'Latitude of the location (-90 to 90)',
-              minimum: -90,
-              maximum: 90
-            },
-            longitude: {
-              type: 'number',
-              description: 'Longitude of the location (-180 to 180)',
-              minimum: -180,
-              maximum: 180
-            },
-            forecast: {
-              type: 'boolean',
-              description: 'Include hourly air quality forecast for next 5 days (default: false, shows current only)',
-              default: false
-            }
-          },
-          required: ['latitude', 'longitude']
-        }
-      },
-      {
-        name: 'get_marine_conditions',
-        description: 'Get marine conditions including wave height, swell, ocean currents, and sea state for a location (global coverage). Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Returns current conditions and optional daily/hourly forecast. Includes significant wave height, wind waves, swell, wave period, and ocean currents. Shows safety assessment for maritime activities. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            latitude: {
-              type: 'number',
-              description: 'Latitude of the location (-90 to 90)',
-              minimum: -90,
-              maximum: 90
-            },
-            longitude: {
-              type: 'number',
-              description: 'Longitude of the location (-180 to 180)',
-              minimum: -180,
-              maximum: 180
-            },
-            forecast: {
-              type: 'boolean',
-              description: 'Include marine forecast for next 5 days (default: false, shows current only)',
-              default: false
-            }
-          },
-          required: ['latitude', 'longitude']
-        }
-      }
-    ]
-  };
+  const enabledTools = toolConfig.getEnabledTools();
+  const tools = enabledTools
+    .map(toolName => TOOL_DEFINITIONS[toolName])
+    .filter(Boolean); // Filter out any undefined tools
+
+  return { tools };
 });
 
 /**
  * Handler for tool execution
+ * Validates that tools are enabled before execution
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
+    // Check if tool is enabled
+    if (!toolConfig.isEnabled(name as any)) {
+      throw new Error(`Tool '${name}' is not enabled. Please check your ENABLED_TOOLS configuration.`);
+    }
+
     switch (name) {
       case 'get_forecast':
         return await handleGetForecast(args, noaaService, openMeteoService, nceiService);
@@ -419,6 +442,8 @@ async function main() {
       version: SERVER_VERSION,
       cacheEnabled: CacheConfig.enabled,
       logLevel: process.env.LOG_LEVEL || 'INFO',
+      enabledTools: toolConfig.getEnabledTools().length,
+      toolList: toolConfig.getEnabledTools().join(', ')
     });
 
     // Inform users about version and upgrade options

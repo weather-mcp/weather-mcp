@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-11-08
+
+### Added
+
+#### Tool Configuration System - Reduce Context Overhead & Customize Functionality
+- **NEW: Configurable Tool Loading** - Control which MCP tools are exposed via `ENABLED_TOOLS` environment variable
+  - **4 Presets** for easy configuration:
+    - `basic` (default): Essential 5 tools - forecast, current_conditions, alerts, search_location, check_service_status
+    - `standard`: Basic + historical_weather (6 tools)
+    - `full`: Standard + air_quality (7 tools)
+    - `all`: All 8 tools including marine_conditions
+  - **Flexible Syntax** for fine-grained control:
+    - Use presets: `ENABLED_TOOLS=full`
+    - Select specific tools: `ENABLED_TOOLS=forecast,current,alerts`
+    - Add to presets: `ENABLED_TOOLS=basic,+historical,+air_quality`
+    - Remove from presets: `ENABLED_TOOLS=all,-marine`
+    - Complex combinations: `ENABLED_TOOLS=standard,+air_quality,-alerts`
+  - **Tool Aliases** - Short names for convenience:
+    - `forecast`, `current`, `conditions`, `alerts`, `warnings`
+    - `historical`, `history`, `status`, `location`, `search`
+    - `air_quality`, `aqi`, `marine`, `ocean`, `waves`
+  - **Smart Defaults**: Only `basic` tools enabled by default (5 of 8 tools)
+  - **Runtime Validation**: Prevents disabled tools from being called
+  - **Startup Logging**: Shows which tools are enabled on server start
+
+### Technical Changes
+- New configuration module: `src/config/tools.ts`
+  - `ToolConfig` class with singleton pattern
+  - `parseEnabledTools()`: Parses complex configuration syntax
+  - `resolveToolName()`: Handles tool aliases and full names
+  - `isEnabled()`: Check if specific tool is enabled
+  - `getEnabledTools()`: Get list of all enabled tools
+- Updated `src/index.ts`:
+  - Tool definitions moved to `TOOL_DEFINITIONS` constant
+  - `ListToolsRequestSchema` handler filters by enabled tools
+  - `CallToolRequestSchema` handler validates tool is enabled before execution
+  - Enhanced startup logging with enabled tool count and list
+- Environment variable: `ENABLED_TOOLS` (optional, defaults to `basic`)
+
+### Testing
+- **27 new unit tests** added (749 total, 100% pass rate):
+  - Tool configuration tests: 27 tests (`tests/unit/tool-config.test.ts`)
+    - Preset parsing (basic, standard, full, all)
+    - Individual tool selection
+    - Addition syntax (+tool)
+    - Removal syntax (-tool)
+    - Combination syntax (presets + additions + removals)
+    - Alias resolution
+    - Edge cases (whitespace, invalid names, duplicates, case insensitivity)
+    - Static method tests (preset/alias definitions)
+
+### Documentation
+- Updated README.md with "Tool Selection" configuration section
+- Updated .env.example with comprehensive tool configuration examples
+- All configuration examples and benefits documented
+
+### Benefits
+- ✅ **Reduced Context Overhead**: Load only needed tools (basic = 5 tools vs all = 8 tools)
+- ✅ **Better Security**: Only expose necessary functionality
+- ✅ **Easy Customization**: Mix and match with flexible syntax
+- ✅ **Backwards Compatible**: Defaults to `basic` preset if not configured
+- ✅ **Zero Breaking Changes**: Existing deployments continue to work
+- ✅ **Minimal Token Impact**: Tool filtering happens at registration, not per-request
+
+### Use Cases
+- **Typical Weather User**: `ENABLED_TOOLS=basic` (5 tools, minimal overhead)
+- **Power User**: `ENABLED_TOOLS=all` (all 8 tools, maximum functionality)
+- **Specific Needs**: `ENABLED_TOOLS=forecast,current,air_quality` (custom selection)
+- **Air Quality Focus**: `ENABLED_TOOLS=basic,+air_quality` (core + AQI monitoring)
+- **No Marine Data**: `ENABLED_TOOLS=all,-marine` (everything except ocean conditions)
+
 ## [1.3.0] - 2025-11-07
 
 ### Enhanced
@@ -582,7 +653,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/dgahagan/weather-mcp/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/dgahagan/weather-mcp/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/dgahagan/weather-mcp/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/dgahagan/weather-mcp/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/dgahagan/weather-mcp/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/dgahagan/weather-mcp/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/dgahagan/weather-mcp/compare/v1.0.1...v1.1.0

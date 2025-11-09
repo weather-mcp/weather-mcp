@@ -124,6 +124,45 @@ The cache automatically stores and retrieves weather data with intelligent expir
 
 ### Configuration
 
+#### Tool Selection (NEW in v1.4.0)
+
+Control which MCP tools are exposed to reduce context overhead and customize functionality. By default, only **basic** tools are enabled.
+
+**Available Presets:**
+- `basic` (default): Essential weather tools - forecast, current_conditions, alerts, search_location, check_service_status
+- `standard`: Basic + historical_weather
+- `full`: Standard + air_quality
+- `all`: All available tools including marine_conditions
+
+**Configuration Examples:**
+
+```bash
+# Use a preset
+export ENABLED_TOOLS=full
+
+# Select specific tools
+export ENABLED_TOOLS=forecast,current,alerts,air_quality
+
+# Add tools to a preset
+export ENABLED_TOOLS=basic,+historical,+air_quality
+
+# Remove tools from a preset
+export ENABLED_TOOLS=all,-marine
+
+# Complex combinations
+export ENABLED_TOOLS=standard,+air_quality,-alerts
+```
+
+**Tool Aliases:**
+Short names are supported: `forecast`, `current`, `conditions`, `alerts`, `warnings`, `historical`, `history`, `status`, `location`, `search`, `air_quality`, `aqi`, `marine`, `ocean`, `waves`
+
+**Benefits:**
+- **Reduced Context**: Load only needed tools to reduce initial MCP context
+- **Better Security**: Only expose necessary functionality
+- **Customization**: Tailor the server to your specific use case
+
+#### Cache Configuration
+
 Caching is **enabled by default** with sensible settings. To customize:
 
 ```bash

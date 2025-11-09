@@ -977,11 +977,129 @@ When implementing features from this roadmap:
 
 ---
 
-*Last Updated: 2025-11-07*
-*Current Version: v1.1.0 (Great Lakes & Coastal Marine Enhancement)* ✅
-*Previous: v1.0.0 (Production Release)* ✅
-*Next Target: v1.2.0 - Context & Intelligence (Tier 1 enhancements from FUTURE_ENHANCEMENTS.md)*
+*Last Updated: 2025-11-08*
+*Current Version: v1.4.0 (Tool Configuration System)* ✅
+*Previous: v1.3.0 (Version Management & Updates)* ✅
+*Next Target: TBD - Potential features in FUTURE_ENHANCEMENTS.md*
 *Design Philosophy: Lean, efficient, user-focused*
+
+---
+
+## v1.4.0 - Tool Configuration System ✅ COMPLETE
+
+**Status:** Implemented and tested on 2025-11-08
+
+**Theme:** Configurable tool loading to reduce context overhead and enable customization
+
+**Goal:** Allow users to control which MCP tools are exposed based on their needs
+
+**Achievement:** Full tool configuration system with presets and flexible syntax
+
+### Background
+
+**Context Overhead Concern:**
+- As the Weather MCP Server expanded to 8 tools, the initial MCP context load increased
+- Not all users need all tools (e.g., many don't need marine conditions or historical data)
+- Users wanted ability to reduce context size for faster initialization
+- Security-conscious users wanted to limit exposed functionality
+
+**User Customization Need:**
+- Different users have different weather data requirements
+- Power users want everything; typical users want core forecasts only
+- Some users focus on air quality, others never use it
+- One-size-fits-all approach wasn't optimal
+
+### 1. Tool Configuration System (NO new tools)
+
+**Add environment variable for tool selection:**
+
+```bash
+# Use presets
+ENABLED_TOOLS=basic           # 5 core tools (default)
+ENABLED_TOOLS=standard        # Basic + historical
+ENABLED_TOOLS=full            # Standard + air quality
+ENABLED_TOOLS=all             # All 8 tools
+
+# Select specific tools
+ENABLED_TOOLS=forecast,current,alerts
+
+# Add to presets
+ENABLED_TOOLS=basic,+historical,+air_quality
+
+# Remove from presets
+ENABLED_TOOLS=all,-marine
+
+# Complex combinations
+ENABLED_TOOLS=standard,+air_quality,-alerts
+```
+
+**What this adds:**
+- ✅ 4 convenient presets for common configurations
+- ✅ Flexible syntax supporting presets, additions, removals, and combinations
+- ✅ Tool aliases for shorter configuration (e.g., `forecast` instead of `get_forecast`)
+- ✅ Default to `basic` preset (5 of 8 tools) for minimal overhead
+- ✅ Runtime validation prevents calling disabled tools
+- ✅ Startup logging shows which tools are enabled
+- **Token cost:** ~0 tokens (tools filtered at registration, not in definitions)
+- **New tools added:** 0
+- **User control enabled:**
+  - Reduce context for faster loading
+  - Customize exposed functionality
+  - Security: only enable needed tools
+  - Fine-grained control over server capabilities
+
+**Implementation:**
+- New config module: `src/config/tools.ts`
+  - `ToolConfig` singleton class
+  - `parseEnabledTools()` with complex syntax parsing
+  - Tool alias resolution
+  - Preset management (basic, standard, full, all)
+- Updated `src/index.ts`:
+  - Tool definitions in `TOOL_DEFINITIONS` constant
+  - `ListToolsRequestSchema` filters by enabled tools
+  - `CallToolRequestSchema` validates tool is enabled
+  - Enhanced startup logging
+- Environment variable: `ENABLED_TOOLS` (optional)
+
+**Effort:** 1 day
+**Value:** HIGH - Addresses context overhead and enables customization
+
+### 2. Comprehensive Documentation
+
+**Updated documentation across all files:**
+- ✅ README.md: New "Tool Selection" configuration section
+- ✅ .env.example: Comprehensive configuration examples with all presets and syntax
+- ✅ Tool aliases documented
+- ✅ Benefits and use cases explained
+
+**Summary for v1.4.0:** ✅ COMPLETE
+- **Tools added:** 0 (configuration enhancement only) ✅
+- **Tools enhanced:** All 8 tools now configurable ✅
+- **Token cost:** ~0 tokens (filtering at registration) ✅
+- **Effort:** 1 day as estimated ✅
+- **Value:** HIGH for users wanting minimal overhead or customization ✅
+- **Testing:** All 749 tests passing including 27 new config tests ✅
+
+**Benefits:**
+- ✅ Reduced context overhead for typical users (5 tools vs 8)
+- ✅ Better security posture (only expose what's needed)
+- ✅ User customization and control
+- ✅ Zero breaking changes (backwards compatible)
+- ✅ Maintains lean design philosophy
+
+**Implementation Details:**
+- ✅ Tool configuration singleton with preset management
+- ✅ Complex syntax parser supporting presets, additions, removals
+- ✅ 11 tool aliases for convenient configuration
+- ✅ Runtime validation with clear error messages
+- ✅ Comprehensive test coverage: 27 unit tests
+- ✅ All 749 tests passing
+
+**Cumulative Total (after v1.4.0):**
+- **Tools:** 8 (unchanged, but now configurable)
+- **Default exposed:** 5 tools (basic preset)
+- **Token overhead:** Reduced for typical users (~500-600 tokens vs ~1,000 for all tools)
+- **Customization:** Full user control over enabled tools
 
 ---
 
@@ -1194,6 +1312,158 @@ get_wildfire_info({
 - **Tools:** 10 (was 8, added 2)
 - **Token overhead:** ~1,500 tokens
 - **Approaching tool limit:** Consider if any tools can be consolidated in future
+
+---
+
+## v1.5.0 - Visualization & Lightning Safety (PLANNED)
+
+**Status:** Planned for future implementation
+
+**Theme:** Weather imagery visualization and real-time lightning monitoring
+
+**Goal:** Add visual weather data (radar/satellite) and lightning strike detection
+
+**Priority:** Medium (High user value, complements existing tools)
+
+### 1. Add `get_weather_imagery` Tool ⭐ NEW TOOL
+**Access radar, satellite, and weather maps:**
+```typescript
+get_weather_imagery({
+  latitude: number,
+  longitude: number,
+  type: 'radar' | 'satellite' | 'precipitation',  // imagery type
+  animated?: boolean,     // static vs animated (default: false)
+  layers?: string[]       // optional layers: 'radar', 'clouds', 'snow', etc.
+})
+```
+
+**What this adds:**
+- ✅ NOAA radar imagery (CONUS, Alaska, Hawaii, Guam)
+- ✅ NOAA satellite imagery (GOES-16/17 visible, infrared, water vapor)
+- ✅ Precipitation radar from RainViewer API (free, global)
+- ✅ Animated radar loops (last 2 hours)
+- ✅ Cloud cover imagery
+- ✅ Image URLs + metadata (timestamp, coverage area, resolution)
+- **Token cost:** ~200 tokens (new tool)
+- **New tools added:** 1
+- **User queries enabled:**
+  - "Show me the current radar"
+  - "What does the satellite image show?"
+  - "Is there precipitation nearby on radar?"
+  - "Show animated radar for the last hour"
+
+**Why a separate tool:**
+- Fundamentally different data type (imagery URLs vs text data)
+- Different use case (visual analysis vs numerical data)
+- Different caching strategy (images can be cached longer)
+- Complements forecast and alerts with visual confirmation
+
+**Implementation:**
+- **Free Data Sources:**
+  - NOAA Radar: `https://opengeo.ncep.noaa.gov/geoserver/www/`
+  - NOAA Satellite: `https://cdn.star.nesdis.noaa.gov/GOES16/`
+  - RainViewer API: `https://api.rainviewer.com/` (global precipitation radar)
+- Return image URLs (not raw image data to minimize bandwidth)
+- AI can describe what imagery shows
+- Cache image URLs for 5-10 minutes
+- Support both US (NOAA) and global (RainViewer) coverage
+
+**Effort:** 1-2 weeks
+**Value:** HIGH - Visual confirmation of weather conditions
+
+### 2. Add `get_lightning_activity` Tool ⭐ NEW TOOL
+**Monitor real-time lightning strikes:**
+```typescript
+get_lightning_activity({
+  latitude: number,
+  longitude: number,
+  radius?: number,        // search radius in km (default: 100)
+  time_window?: number    // minutes of history (default: 60)
+})
+```
+
+**What this adds:**
+- ✅ Real-time lightning strike locations (last 60 minutes)
+- ✅ Strike count and density
+- ✅ Distance to nearest strike
+- ✅ Strike polarity (cloud-to-ground vs intra-cloud)
+- ✅ Strike intensity/current
+- ✅ Thunderstorm tracking and movement
+- ✅ Safety assessment (risk level based on proximity)
+- **Token cost:** ~200 tokens (new tool)
+- **New tools added:** 1
+- **User queries enabled:**
+  - "Are there lightning strikes nearby?"
+  - "How close is the lightning?"
+  - "Is it safe to be outside?" (lightning risk)
+  - "Show recent lightning activity"
+
+**Why a separate tool:**
+- SAFETY-CRITICAL (lightning kills ~20 people/year in US)
+- Real-time data (updates every few minutes)
+- Different data source (lightning detection networks)
+- Complements alerts and severe weather tools
+- Growing importance with climate change (more frequent storms)
+
+**Implementation Options:**
+
+**Option 1: Free Data (Blitzortung.org)**
+- Global lightning detection network (community-operated)
+- Free API access: `https://data.blitzortung.org/`
+- Real-time strike data with ~5-10 minute delay
+- Good coverage in North America, Europe
+- Limited coverage in some regions
+- No API key required
+
+**Option 2: Paid APIs (Premium Quality)**
+- **WeatherBug Spark API**: Commercial lightning data, very accurate
+- **Earth Networks**: Total Lightning Network (cloud-to-cloud + cloud-to-ground)
+- Requires API key and subscription
+- Better accuracy and coverage
+- Enterprise-grade reliability
+
+**Recommended Approach:**
+- Start with free Blitzortung.org API (no cost, good coverage)
+- Add optional paid API support via environment variable
+- Cache strike data for 2-5 minutes
+- Show safety warnings prominently when strikes detected within 10km
+
+**Effort:**
+- Free API: 1-2 weeks
+- Paid API integration: 3-5 days (if user has API key)
+
+**Value:** HIGH - Safety-critical, complements severe weather monitoring
+
+### Alternative: Enhance Existing Tools Instead?
+
+**Could lightning be added to `get_forecast` with `include_severe_weather`?**
+- ❌ No - Forecast lightning activity levels (1-5 scale) already exists
+- ❌ This tool provides REAL-TIME strike data, not forecasts
+- ❌ Different data source (lightning detection networks vs NOAA gridpoint)
+- ✅ New tool justified for real-time safety-critical data
+
+**Could imagery be part of `get_current_conditions`?**
+- ❌ No - Fundamentally different data type (URLs vs text)
+- ❌ Different use case (visual analysis vs numerical readings)
+- ✅ New tool justified for imagery access
+
+**Summary for v1.5.0:**
+- **Tools added:** 2 (get_weather_imagery, get_lightning_activity)
+- **Token cost:** ~400 tokens
+- **Effort:** ~2-3 weeks (using free APIs)
+- **Value:** Visual weather analysis + real-time lightning safety
+
+**Cumulative Total (after v1.5.0):**
+- **Tools:** 12 (was 10, added 2)
+- **Token overhead:** ~1,900 tokens (still under 1% of 200k context)
+- **New capabilities:** Weather visualization + real-time lightning monitoring
+
+**Configuration Impact:**
+With v1.4.0 tool configuration system, users can control tool exposure:
+- Typical user: Keep `ENABLED_TOOLS=basic` (5 tools, minimal overhead)
+- Power user: `ENABLED_TOOLS=all` (all 12 tools)
+- Lightning safety focus: `ENABLED_TOOLS=basic,+lightning,+severe_weather`
+- Visual analysis: `ENABLED_TOOLS=standard,+imagery,+lightning`
 
 ---
 
