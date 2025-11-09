@@ -7,6 +7,150 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2025-11-09
+
+### Added
+
+#### Weather Visualization & Lightning Safety - Visual Analysis and Real-Time Strike Monitoring
+- **NEW: `get_weather_imagery` Tool** - Access weather radar and precipitation maps
+  - **Precipitation Radar** from RainViewer API (free, global coverage)
+    - Static radar images showing current precipitation
+    - Animated radar loops (up to 2 hours of history)
+    - Tile URLs for efficient rendering
+    - Automatic coordinate-to-tile calculation
+    - Timestamp metadata for each frame
+  - **Global Coverage** - Works anywhere in the world
+  - **15-Minute Cache** for radar data to reduce API load
+  - **Graceful Degradation** when imagery unavailable
+  - **Future-Ready**: Satellite imagery deferred to future release
+  - **User Queries**:
+    - "Show me the current radar"
+    - "Is there precipitation nearby on radar?"
+    - "Show animated radar for the last hour"
+
+- **NEW: `get_lightning_activity` Tool** - Real-time lightning strike detection and safety assessment
+  - **Real-Time Strike Detection** from Blitzortung.org (free, no API key required)
+    - Lightning strikes within customizable radius (default: 100km)
+    - Time window for historical strikes (default: 60 minutes)
+    - Distance calculation using Haversine formula
+    - Strike polarity (cloud-to-ground vs intra-cloud)
+    - Strike amplitude in kiloamperes (kA)
+  - **4-Level Safety Assessment** - Critical for outdoor safety
+    - **Safe** (>50km): No immediate lightning threat
+    - **Elevated** (16-50km): Monitor conditions, plan indoor access
+    - **High** (8-16km): Seek shelter immediately
+    - **Extreme** (<8km): Active thunderstorm, dangerous conditions
+  - **Comprehensive Statistics**:
+    - Total strikes and strike density (per sq km)
+    - Strikes per minute rate
+    - Nearest strike distance
+    - Average distance of all strikes
+    - Cloud-to-ground vs intra-cloud classification
+  - **Safety Recommendations** - Context-aware guidance based on proximity
+  - **Geographic Region Detection** - Optimizes API endpoints for best coverage
+  - **5-Minute Cache** for strike data
+  - **Graceful Degradation** - Returns empty array if API unavailable
+  - **User Queries**:
+    - "Are there lightning strikes nearby?"
+    - "How close is the lightning?"
+    - "Is it safe to be outside?" (lightning risk assessment)
+    - "Show recent lightning activity"
+
+### Technical Changes
+- **New Type Definitions**:
+  - `src/types/imagery.ts` - Weather imagery types
+    - `ImageryType`: 'radar' | 'satellite' | 'precipitation'
+    - `WeatherImageryParams`, `WeatherImageryResponse`
+    - `ImageFrame`, `RainViewerResponse`
+  - `src/types/lightning.ts` - Lightning strike types
+    - `LightningSafetyLevel`: 'safe' | 'elevated' | 'high' | 'extreme'
+    - `LightningStrike`, `LightningStatistics`, `LightningSafety`
+    - `LightningActivityResponse`
+
+- **New Service Clients**:
+  - `src/services/rainviewer.ts` - RainViewer API client
+    - `getRadarData()`: Fetch available radar timestamps
+    - `getPrecipitationRadar()`: Get radar imagery for location
+    - `buildCoordinateTileUrl()`: Calculate tile URLs from coordinates
+    - Tile coordinate conversion (lat/lon to tile x/y/z)
+  - `src/services/blitzortung.ts` - Blitzortung.org API client
+    - `getLightningStrikes()`: Fetch recent strikes in radius
+    - `calculateDistance()`: Haversine distance calculation
+    - `parseStrikes()`: Parse and filter strike data
+    - `determineRegion()`: Geographic region detection
+    - `generateMockData()`: Development/fallback data
+
+- **New Handlers**:
+  - `src/handlers/weatherImageryHandler.ts`
+    - `getWeatherImagery()`: Validates and processes imagery requests
+    - `formatWeatherImageryResponse()`: Formats imagery data for MCP response
+    - Validation for imagery type, animated flag, coordinates
+  - `src/handlers/lightningHandler.ts`
+    - `getLightningActivity()`: Processes lightning activity requests
+    - `assessSafety()`: Calculates safety level from strike distances
+    - `calculateStatistics()`: Computes comprehensive strike statistics
+    - `formatLightningActivityResponse()`: Formats for MCP response
+
+- **Tool Configuration Updates**:
+  - Added `get_weather_imagery` and `get_lightning_activity` to `ToolName` type
+  - Both tools added to 'all' preset (now 10 tools total)
+  - New aliases: 'imagery', 'radar', 'satellite', 'lightning', 'strikes', 'thunderstorm'
+  - Basic preset unchanged (5 tools) - minimal impact on typical users
+
+- **Error Handling**:
+  - Extended `ApiError` service types to include 'RainViewer'
+  - Updated help link logic for RainViewer service
+
+### Testing
+- **15 new integration tests** added (764 total):
+  - Weather imagery tests (7 tests) - `tests/integration/visualization-lightning.test.ts`
+    - Precipitation radar retrieval (New York, London, Tokyo)
+    - Animated vs static radar
+    - Radar type alias handling
+    - Validation (invalid type, coordinates, satellite not implemented)
+  - Lightning activity tests (8 tests) - `tests/integration/visualization-lightning.test.ts`
+    - Lightning detection (Miami, New York, London, Tokyo, Sydney, Austin)
+    - Default and custom search parameters
+    - Safety assessment and statistics calculation
+    - Strike details validation
+    - Validation (invalid radius, time window, coordinates)
+- **Updated unit tests**:
+  - Tool configuration tests updated for 10 tools (was 8)
+  - All 764 tests passing with 100% pass rate
+
+### Documentation
+- Updated ROADMAP.md to mark v1.5.0 as complete
+- Updated FUTURE_ENHANCEMENTS.md:
+  - Section 8.1 (Real-Time Lightning Data) marked as implemented
+  - Section 12.1 (Radar & Satellite Image URLs) marked as partially implemented
+- Tool inventory now shows 10 total tools
+
+### Configuration Impact
+With v1.4.0 tool configuration system, users have full control:
+- **Typical user**: `ENABLED_TOOLS=basic` (5 tools, no change)
+- **Power user**: `ENABLED_TOOLS=all` (all 10 tools including imagery and lightning)
+- **Lightning safety focus**: `ENABLED_TOOLS=basic,+lightning`
+- **Visual analysis**: `ENABLED_TOOLS=standard,+imagery,+lightning`
+- **Weather enthusiast**: `ENABLED_TOOLS=full,+imagery,+lightning`
+
+### Benefits
+- ✅ **Weather Visualization**: Visual confirmation of precipitation via radar imagery
+- ✅ **Lightning Safety**: Critical real-time safety information for outdoor activities
+- ✅ **Global Coverage**: Both tools work worldwide
+- ✅ **Free APIs**: No API keys or costs required (RainViewer, Blitzortung.org)
+- ✅ **Safety-Critical**: 4-level assessment helps users make informed decisions
+- ✅ **Minimal Overhead**: Both tools only in 'all' preset, doesn't affect basic users
+- ✅ **Zero Breaking Changes**: Existing configurations continue to work
+
+### Use Cases
+- **Outdoor Safety**: Check for nearby lightning before outdoor activities
+- **Weather Analysis**: Visual confirmation of approaching precipitation
+- **Emergency Planning**: Real-time lightning threat assessment
+- **Education**: Understand storm structure through radar and strike patterns
+- **Recreation**: Boaters, hikers, golfers can check safety conditions
+
+**Token Overhead**: ~400 tokens added (total: ~1,400 with all tools, ~600 with basic preset)
+
 ## [1.4.0] - 2025-11-08
 
 ### Added

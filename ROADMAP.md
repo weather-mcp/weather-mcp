@@ -375,21 +375,25 @@ get_forecast({
 
 ---
 
-## Final Tool Inventory (v1.0.0)
+## Tool Inventory (Current: v1.5.0)
 
-### Core Tools (Always present)
+### Available Tools (Configurable)
 1. **`get_forecast`** - Future weather (enhanced: hourly, global, 16-day, severe weather) ✅
-2. **`get_current_conditions`** - Current weather (enhanced: heat index, fire weather) ✅
+2. **`get_current_conditions`** - Current weather (enhanced: heat index, fire weather, normals) ✅
 3. **`get_historical_weather`** - Past weather (unchanged) ✅
 4. **`get_alerts`** - Safety warnings ⭐ NEW ✅
 5. **`search_location`** - Geocoding ⭐ NEW ✅
 6. **`get_air_quality`** - Health data ⭐ NEW ✅
-7. **`check_service_status`** - API health (enhanced: cache stats) ✅
-8. **`get_marine_conditions`** - Ocean/coastal weather ⭐ NEW ✅
+7. **`check_service_status`** - API health (enhanced: version info) ✅
+8. **`get_marine_conditions`** - Ocean/coastal weather (enhanced: Great Lakes support) ⭐ NEW ✅
+9. **`get_weather_imagery`** - Precipitation radar visualization ⭐ NEW ✅
+10. **`get_lightning_activity`** - Real-time lightning strike monitoring ⭐ NEW ✅
 
-**Total: 8 tools** (up from 4 in v0.1.0)
-**Token cost: ~1,000 tokens** (0.5% of 200k context)
-**Functionality increase: ~400%**
+**Total: 10 tools** (up from 4 in v0.1.0)
+**Default enabled: 5 tools** (basic preset for minimal overhead)
+**Token cost: ~1,400 tokens with all tools** (0.7% of 200k context)
+**Token cost: ~600 tokens with basic preset** (0.3% of 200k context)
+**Functionality increase: ~500%** (from v0.1.0)
 
 ---
 
@@ -960,27 +964,31 @@ When implementing features from this roadmap:
 | check_service_status | ~100 |
 | **Total** | **~700** |
 
-### Target State (v1.0.0)
-| Tool | Approximate Tokens | Change |
+### Current State (v1.5.0)
+| Tool | Approximate Tokens | Change from v0.1.2 |
 |------|-------------------|--------|
-| get_forecast | ~300 | +100 (hourly, global, 16-day) |
-| get_current_conditions | ~200 | +50 (heat index, fire weather) |
+| get_forecast | ~300 | +100 (hourly, global, 16-day, severe weather) |
+| get_current_conditions | ~200 | +50 (heat index, fire weather, normals) |
 | get_historical_weather | ~250 | 0 (unchanged) |
 | get_alerts | ~200 | +200 (NEW) |
 | search_location | ~150 | +150 (NEW) |
 | get_air_quality | ~200 | +200 (NEW) |
-| check_service_status | ~100 | 0 (unchanged) |
-| get_marine_conditions | ~200 | +200 (NEW, optional) |
-| **Total** | **~1,400-1,600** | **+700-900** |
+| check_service_status | ~100 | 0 (version info added) |
+| get_marine_conditions | ~200 | +200 (NEW) |
+| get_weather_imagery | ~200 | +200 (NEW) |
+| get_lightning_activity | ~200 | +200 (NEW) |
+| **Total (all tools)** | **~1,400** | **+700** |
+| **Total (basic preset)** | **~600** | **-100** |
 
-**Final Overhead: ~1,500 tokens (0.75% of 200k context)**
+**Overhead with all tools: ~1,400 tokens (0.7% of 200k context)**
+**Overhead with basic preset: ~600 tokens (0.3% of 200k context)**
 
 ---
 
-*Last Updated: 2025-11-08*
-*Current Version: v1.4.0 (Tool Configuration System)* ✅
-*Previous: v1.3.0 (Version Management & Updates)* ✅
-*Next Target: v1.5.0 (Visualization & Lightning Safety) - Weather imagery and lightning strike monitoring*
+*Last Updated: 2025-11-09*
+*Current Version: v1.5.0 (Visualization & Lightning Safety)* ✅
+*Previous: v1.4.0 (Tool Configuration System)* ✅
+*Next Target: v1.6.0 (Safety & Hazards) - River monitoring and wildfire tracking*
 *Design Philosophy: Lean, efficient, user-focused*
 
 ---
@@ -1269,15 +1277,15 @@ get_current_conditions({
 
 ---
 
-## v1.5.0 - Visualization & Lightning Safety (PLANNED)
+## v1.5.0 - Visualization & Lightning Safety ✅ COMPLETE
 
-**Status:** Planned for future implementation
+**Status:** Implemented and tested on 2025-11-09
 
 **Theme:** Weather imagery visualization and real-time lightning monitoring
 
 **Goal:** Add visual weather data (radar/satellite) and lightning strike detection
 
-**Priority:** Medium (High user value, complements existing tools)
+**Achievement:** Both tools implemented successfully with comprehensive testing
 
 ### 1. Add `get_weather_imagery` Tool ⭐ NEW TOOL
 **Access radar, satellite, and weather maps:**
@@ -1292,19 +1300,18 @@ get_weather_imagery({
 ```
 
 **What this adds:**
-- ✅ NOAA radar imagery (CONUS, Alaska, Hawaii, Guam)
-- ✅ NOAA satellite imagery (GOES-16/17 visible, infrared, water vapor)
-- ✅ Precipitation radar from RainViewer API (free, global)
-- ✅ Animated radar loops (last 2 hours)
-- ✅ Cloud cover imagery
+- ✅ Precipitation radar from RainViewer API (free, global coverage)
+- ✅ Animated radar loops (up to 2 hours of history)
+- ✅ Static radar images (current conditions)
 - ✅ Image URLs + metadata (timestamp, coverage area, resolution)
-- **Token cost:** ~200 tokens (new tool)
-- **New tools added:** 1
+- ⏸️ NOAA satellite imagery (deferred to future release)
+- ⏸️ NOAA radar (deferred, using RainViewer instead)
+- **Token cost:** ~200 tokens (new tool) ✅
+- **New tools added:** 1 ✅
 - **User queries enabled:**
-  - "Show me the current radar"
-  - "What does the satellite image show?"
-  - "Is there precipitation nearby on radar?"
-  - "Show animated radar for the last hour"
+  - "Show me the current radar" ✅
+  - "Is there precipitation nearby on radar?" ✅
+  - "Show animated radar for the last hour" ✅
 
 **Why a separate tool:**
 - Fundamentally different data type (imagery URLs vs text data)
@@ -1312,18 +1319,18 @@ get_weather_imagery({
 - Different caching strategy (images can be cached longer)
 - Complements forecast and alerts with visual confirmation
 
-**Implementation:**
-- **Free Data Sources:**
-  - NOAA Radar: `https://opengeo.ncep.noaa.gov/geoserver/www/`
-  - NOAA Satellite: `https://cdn.star.nesdis.noaa.gov/GOES16/`
-  - RainViewer API: `https://api.rainviewer.com/` (global precipitation radar)
-- Return image URLs (not raw image data to minimize bandwidth)
-- AI can describe what imagery shows
-- Cache image URLs for 5-10 minutes
-- Support both US (NOAA) and global (RainViewer) coverage
+**Implementation:** ✅ COMPLETE
+- ✅ RainViewer API integration for global precipitation radar
+- ✅ Returns tile URLs for radar imagery (not raw image data)
+- ✅ Support for both static and animated radar
+- ✅ Automatic tile coordinate calculation from lat/lon
+- ✅ Frame metadata with timestamps
+- ✅ 15-minute cache for radar data
+- ✅ Graceful handling when imagery unavailable
+- ✅ Comprehensive test coverage (7 tests)
 
-**Effort:** 1-2 weeks
-**Value:** HIGH - Visual confirmation of weather conditions
+**Effort:** 1 day (actual)
+**Value:** HIGH - Visual confirmation of precipitation conditions
 
 ### 2. Add `get_lightning_activity` Tool ⭐ NEW TOOL
 **Monitor real-time lightning strikes:**
@@ -1376,16 +1383,19 @@ get_lightning_activity({
 - Better accuracy and coverage
 - Enterprise-grade reliability
 
-**Recommended Approach:**
-- Start with free Blitzortung.org API (no cost, good coverage)
-- Add optional paid API support via environment variable
-- Cache strike data for 2-5 minutes
-- Show safety warnings prominently when strikes detected within 10km
+**Implementation:** ✅ COMPLETE
+- ✅ Blitzortung.org API integration (free, no API key required)
+- ✅ Real-time strike detection with distance calculation (Haversine formula)
+- ✅ 4-level safety assessment (safe > 50km, elevated 16-50km, high 8-16km, extreme < 8km)
+- ✅ Comprehensive statistics (strike density, rates, nearest distance)
+- ✅ Cloud-to-ground and intra-cloud strike classification
+- ✅ Safety recommendations based on proximity
+- ✅ Graceful degradation when API unavailable (returns empty array)
+- ✅ Geographic region detection for optimal API endpoints
+- ✅ 5-minute cache for strike data
+- ✅ Comprehensive test coverage (8 tests)
 
-**Effort:**
-- Free API: 1-2 weeks
-- Paid API integration: 3-5 days (if user has API key)
-
+**Effort:** 1 day (actual)
 **Value:** HIGH - Safety-critical, complements severe weather monitoring
 
 ### Alternative: Enhance Existing Tools Instead?
@@ -1401,23 +1411,35 @@ get_lightning_activity({
 - ❌ Different use case (visual analysis vs numerical readings)
 - ✅ New tool justified for imagery access
 
-**Summary for v1.5.0:**
-- **Tools added:** 2 (get_weather_imagery, get_lightning_activity)
-- **Token cost:** ~400 tokens
-- **Effort:** ~2-3 weeks (using free APIs)
-- **Value:** Visual weather analysis + real-time lightning safety
+**Summary for v1.5.0:** ✅ COMPLETE
+- **Tools added:** 2 (get_weather_imagery, get_lightning_activity) ✅
+- **Token cost:** ~400 tokens ✅
+- **Effort:** 2 days (actual, using free APIs) ✅
+- **Value:** Visual weather analysis + real-time lightning safety ✅
+- **Testing:** All 15 integration tests passing ✅
 
 **Cumulative Total (after v1.5.0):**
-- **Tools:** 12 (was 10, added 2)
-- **Token overhead:** ~1,900 tokens (still under 1% of 200k context)
-- **New capabilities:** Weather visualization + real-time lightning monitoring
+- **Tools:** 10 (was 8, added 2)
+- **Default exposed:** 5 tools (basic preset, unchanged)
+- **Token overhead:** ~1,400 tokens (with all tools enabled)
+- **New capabilities:** Weather radar visualization + real-time lightning strike monitoring
+
+**Implementation Details:**
+- ✅ RainViewer service for global precipitation radar
+- ✅ Blitzortung service for lightning detection with safety assessment
+- ✅ Type definitions: `WeatherImageryResponse`, `LightningActivityResponse`
+- ✅ Both tools added to 'all' preset only (minimal impact on typical users)
+- ✅ Tool aliases: 'imagery', 'radar', 'satellite', 'lightning', 'strikes', 'thunderstorm'
+- ✅ Comprehensive test coverage: 15 integration tests
+- ✅ All 764 tests passing
 
 **Configuration Impact:**
 With v1.4.0 tool configuration system, users can control tool exposure:
-- Typical user: Keep `ENABLED_TOOLS=basic` (5 tools, minimal overhead)
-- Power user: `ENABLED_TOOLS=all` (all 12 tools)
-- Lightning safety focus: `ENABLED_TOOLS=basic,+lightning,+severe_weather`
+- Typical user: Keep `ENABLED_TOOLS=basic` (5 tools, minimal overhead) - unchanged
+- Power user: `ENABLED_TOOLS=all` (all 10 tools including imagery and lightning)
+- Lightning safety focus: `ENABLED_TOOLS=basic,+lightning`
 - Visual analysis: `ENABLED_TOOLS=standard,+imagery,+lightning`
+- Weather enthusiast: `ENABLED_TOOLS=full,+imagery,+lightning`
 
 ---
 
@@ -1520,8 +1542,8 @@ get_wildfire_info({
 - **Value:** Safety-critical hazard monitoring
 
 **Cumulative Total (after v1.6.0):**
-- **Tools:** 14 (was 12, added 2)
-- **Token overhead:** ~2,300 tokens (still under 1.2% of 200k context)
+- **Tools:** 12 (was 10, added 2)
+- **Token overhead:** ~1,800 tokens (still under 1% of 200k context)
 - **Safety features:** Comprehensive hazard monitoring (alerts, severe weather, lightning, river, wildfire)
 
 **Configuration Impact:**

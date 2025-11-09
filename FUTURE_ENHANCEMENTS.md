@@ -18,16 +18,28 @@ This document catalogs potential future enhancements for the Weather MCP Server 
 **Tier 1 Features - MOVED TO ACTIVE ROADMAP:**
 The following high-value features have been moved from this research document to [ROADMAP.md](./ROADMAP.md) for active implementation:
 
-### v1.2.0 - Context & Intelligence (Planned)
-- ✅ **Climate Normals** → Moving to ROADMAP.md as `include_normals` parameter for get_forecast/get_current_conditions
-- ✅ **Snow Depth & Snowfall Details** → Moving to ROADMAP.md as output enhancement (extract from existing NOAA data)
-- ✅ **Timezone-Aware Time Display** → Moving to ROADMAP.md as output enhancement for all time displays
+### v1.2.0 - Context & Intelligence ✅ COMPLETE
+- ✅ **Climate Normals** → Implemented as `include_normals` parameter for get_forecast/get_current_conditions
+- ✅ **Snow Depth & Snowfall Details** → Implemented as output enhancement (extract from existing NOAA data)
+- ✅ **Timezone-Aware Time Display** → Implemented as output enhancement for all time displays
 
-### v1.3.0 - Safety & Hazards (Planned)
-- ✅ **River/Flood Data** → Moving to ROADMAP.md as new `get_river_conditions` tool
-- ✅ **Wildfire & Smoke Integration** → Moving to ROADMAP.md as new `get_wildfire_info` tool
+### v1.3.0 - Version Management & Updates ✅ COMPLETE
+- ✅ **Version Information** → Implemented in check_service_status and startup logging
+- ✅ **Automatic Update Recommendations** → Implemented via @latest tag
 
-**Status:** These features are now in active development planning. See [ROADMAP.md](./ROADMAP.md) for implementation details, effort estimates, and timelines.
+### v1.4.0 - Tool Configuration System ✅ COMPLETE
+- ✅ **Configurable Tool Loading** → Implemented with presets and flexible syntax
+- ✅ **Reduced Context Overhead** → Implemented with tool filtering
+
+### v1.5.0 - Visualization & Lightning Safety ✅ COMPLETE
+- ✅ **Weather Imagery (Section 12.1)** → Implemented as `get_weather_imagery` tool with RainViewer precipitation radar
+- ✅ **Real-Time Lightning Data (Section 8.1)** → Implemented as `get_lightning_activity` tool with Blitzortung.org
+
+### Future Considerations (v1.6.0+)
+- 📋 **River/Flood Data (Section 5.1)** → Planned for future version as `get_river_conditions` tool
+- 📋 **Wildfire & Smoke Integration (Section 7.1)** → Planned for future version as `get_wildfire_info` tool
+
+**Status:** v1.5.0 features are now complete. See [ROADMAP.md](./ROADMAP.md) for implementation details and future planning.
 
 **This Document's Purpose Going Forward:**
 This document will continue to serve as a research and ideation catalog for:
@@ -504,7 +516,7 @@ This document will continue to serve as a research and ideation catalog for:
 
 ### 8. Severe Weather & Lightning
 
-#### 8.1 Real-Time Lightning Data
+#### 8.1 Real-Time Lightning Data ✅ IMPLEMENTED IN v1.5.0
 **Description:** Recent lightning strikes (last 5-15 minutes), strike density, distance to nearest strike.
 
 **Use Cases:**
@@ -512,28 +524,25 @@ This document will continue to serve as a research and ideation catalog for:
 - Outdoor safety (stop outdoor activities)
 - Storm intensity assessment
 
-**Data Sources:**
-- **Problem:** Most lightning data is commercial (Earth Networks, Vaisala)
-- NOAA: Has lightning data but not real-time public API
-- Blitzortung.org: Free crowdsourced lightning network (may be an option)
+**Implementation Status:** ✅ **COMPLETE**
+- Implemented as `get_lightning_activity` tool
+- Uses Blitzortung.org free crowdsourced lightning network
+- Shows strikes within customizable radius (1-500 km) and time window (5-120 minutes)
+- 4-level safety assessment: safe/elevated/high/extreme
+- Strike details: distance, polarity, amplitude, timestamp
+- Critical safety recommendations based on proximity
 
-**Implementation:**
-- New tool: `get_lightning` (if free source found)
-- Show strikes within X km of location in last Y minutes
+**Data Source:** Blitzortung.org (free, community-operated global network)
 
-**Pros:**
-- ✅ SAFETY-CRITICAL (lightning kills ~20 people/year in US)
-- ✅ Real-time actionable data
-- ✅ Complements severe weather alerts
+**Results:**
+- ✅ SAFETY-CRITICAL tool successfully implemented
+- ✅ Real-time data with 5-15 minute delay
+- ✅ Global coverage via community network
+- ✅ Graceful degradation when API unavailable
+- ✅ Zero token overhead when not in enabled tools
 
-**Cons:**
-- ❌ **MAJOR ISSUE:** Lack of free, reliable real-time API
-- ⚠️ Commercial lightning networks are expensive
-- ⚠️ Crowdsourced data (Blitzortung) may have coverage gaps
-
-**Priority:** Low (unless free data source identified)
 **Token Cost:** ~200 tokens (new tool)
-**Recommendation:** Research Blitzortung.org API. If viable, consider for v1.3+.
+**Status:** Successfully implemented in v1.5.0, all tests passing
 
 ---
 
@@ -728,7 +737,7 @@ This document will continue to serve as a research and ideation catalog for:
 
 ### 12. Weather Radar & Imagery
 
-#### 12.1 Radar & Satellite Image URLs
+#### 12.1 Radar & Satellite Image URLs ✅ IMPLEMENTED IN v1.5.0
 **Description:** Provide URLs to current radar and satellite imagery.
 
 **Use Cases:**
@@ -736,27 +745,25 @@ This document will continue to serve as a research and ideation catalog for:
 - Visual weather understanding
 - Storm tracking
 
-**Data Sources:**
-- NOAA: Free radar imagery (weather.gov)
-- Various services provide radar image APIs
+**Implementation Status:** ✅ **COMPLETE** (Partially)
+- Implemented as `get_weather_imagery` tool
+- Precipitation radar via RainViewer API (global coverage)
+- Static or animated frames (past 2 hours)
+- Returns image URLs with timestamps for AI display
+- Satellite imagery marked as future enhancement
 
-**Implementation:**
-- Return URLs to relevant imagery
-- AI would need to describe images to user (or user views directly)
+**Data Source:** RainViewer (free, no API key required, global)
 
-**Pros:**
-- ✅ Visual data can be very useful
-- ✅ Free imagery available from NOAA
+**Results:**
+- ✅ Global precipitation radar successfully implemented
+- ✅ Animated radar loops (past 2 hours of data)
+- ✅ Coordinate-based tile generation for location-specific imagery
+- ✅ AI can reference imagery URLs in responses
+- ✅ Zero token overhead when not in enabled tools
+- 📋 NOAA radar and satellite imagery deferred to future version
 
-**Cons:**
-- ⚠️ AI assistants can't directly interpret images well (yet)
-- ⚠️ Requires user to view images externally
-- ⚠️ Limited value for text-based AI interactions
-- ⚠️ Radar URLs can be complex to construct
-
-**Priority:** Low
-**Token Cost:** ~150 tokens (new tool)
-**Recommendation:** Skip for now. Future consideration if AI vision capabilities improve.
+**Token Cost:** ~200 tokens (new tool)
+**Status:** Precipitation radar implemented in v1.5.0, satellite imagery planned for future enhancement
 
 ---
 

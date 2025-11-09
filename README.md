@@ -91,6 +91,23 @@ An MCP (Model Context Protocol) server that provides **global weather data** to 
   - Safety assessment for maritime activities (sailing, boating, surfing)
   - Wave interpretation guide based on Douglas Sea Scale
   - Important: Data has limited coastal accuracy - NOT for navigation
+- **Weather Imagery**: Visual weather radar and precipitation maps (NEW in v1.5.0)
+  - Global precipitation radar from RainViewer API
+  - Static radar images showing current precipitation
+  - Animated radar loops (up to 2 hours of history)
+  - Tile URLs for efficient rendering
+  - Automatic coordinate-to-tile calculation
+  - Visual confirmation of approaching weather
+  - Free, no API key required
+- **Lightning Activity**: Real-time lightning strike detection and safety monitoring (NEW in v1.5.0)
+  - Real-time strike detection from Blitzortung.org network
+  - Strikes within customizable radius (default: 100km)
+  - 4-level safety assessment (Safe, Elevated, High, Extreme)
+  - Distance to nearest strike with comprehensive statistics
+  - Strike polarity and amplitude information
+  - Safety recommendations based on proximity
+  - Critical for outdoor activity safety planning
+  - Free, no API key required
 - **Service Status Checking**: Proactively verify API availability with health checks
 - **Enhanced Error Handling**: Detailed, actionable error messages with status page links
 - **Intelligent Caching**: Built-in in-memory cache reduces API calls and improves performance
@@ -112,6 +129,8 @@ The cache automatically stores and retrieves weather data with intelligent expir
 
 - **Location Searches**: Cached for 30 days (locations don't move)
 - **Climate Normals**: Cached indefinitely (30-year averages are static) - NEW in v1.2.0
+- **Weather Imagery**: Cached for 15 minutes (radar updates frequently) - NEW in v1.5.0
+- **Lightning Strikes**: Cached for 5 minutes (real-time safety data) - NEW in v1.5.0
 - **Marine Conditions**: Cached for 1 hour (marine data updates hourly) - NEW in v0.6.0
 - **Air Quality Data**: Cached for 1 hour (air quality updates hourly) - v0.5.0
 - **Fire Weather Data**: Cached for 2 hours (gridpoint data updates ~hourly) - v0.5.0
@@ -129,10 +148,10 @@ The cache automatically stores and retrieves weather data with intelligent expir
 Control which MCP tools are exposed to reduce context overhead and customize functionality. By default, only **basic** tools are enabled.
 
 **Available Presets:**
-- `basic` (default): Essential weather tools - forecast, current_conditions, alerts, search_location, check_service_status
-- `standard`: Basic + historical_weather
-- `full`: Standard + air_quality
-- `all`: All available tools including marine_conditions
+- `basic` (default): Essential weather tools (5 tools) - forecast, current_conditions, alerts, search_location, check_service_status
+- `standard`: Basic + historical_weather (6 tools)
+- `full`: Standard + air_quality (7 tools)
+- `all`: All available tools (10 tools) - includes marine_conditions, weather_imagery, lightning_activity
 
 **Configuration Examples:**
 
@@ -154,7 +173,7 @@ export ENABLED_TOOLS=standard,+air_quality,-alerts
 ```
 
 **Tool Aliases:**
-Short names are supported: `forecast`, `current`, `conditions`, `alerts`, `warnings`, `historical`, `history`, `status`, `location`, `search`, `air_quality`, `aqi`, `marine`, `ocean`, `waves`
+Short names are supported: `forecast`, `current`, `conditions`, `alerts`, `warnings`, `historical`, `history`, `status`, `location`, `search`, `air_quality`, `aqi`, `marine`, `ocean`, `waves`, `imagery`, `radar`, `satellite`, `lightning`, `strikes`, `thunderstorm`
 
 **Benefits:**
 - **Reduced Context**: Load only needed tools to reduce initial MCP context
@@ -619,6 +638,77 @@ Provides comprehensive marine weather data with intelligent dual-source support:
 - Safety assessment for maritime activities
 - Wave period for planning and safety
 - Optional 5-day forecast with daily summaries
+
+### 9. get_weather_imagery (NEW in v1.5.0)
+Get weather radar and precipitation imagery for visual weather analysis.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `type` (required): Imagery type - "precipitation", "radar", or "satellite" (Note: satellite not yet implemented)
+- `animated` (optional): Return animated loop vs static image (default: false)
+- `layers` (optional): Additional map layers (reserved for future use)
+
+**Description:**
+Provides access to weather radar and precipitation imagery from RainViewer API with global coverage. Returns tile URLs for efficient rendering of current precipitation or animated radar loops showing up to 2 hours of history. Perfect for visual confirmation of approaching weather systems.
+
+**Examples:**
+```
+"Show me the current radar for New York"
+"Get animated precipitation radar for London for the last 2 hours"
+"Is there any precipitation showing on radar near me?"
+```
+
+**Returns:**
+- Precipitation radar imagery (static or animated)
+- Tile URLs for efficient rendering
+- Frame timestamps for animated sequences
+- Coverage area and resolution information
+- Automatic coordinate-to-tile calculation
+- Up to 2 hours of historical radar frames when animated
+
+**Note:** Satellite imagery is planned for a future release. Precipitation radar provides global coverage via the free RainViewer API.
+
+### 10. get_lightning_activity (NEW in v1.5.0)
+Get real-time lightning strike detection and safety assessment for outdoor activity planning.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `radius` (optional): Search radius in kilometers (1-500, default: 100)
+- `timeWindow` (optional): Historical time window in minutes (1-180, default: 60)
+
+**Description:**
+Provides real-time lightning strike detection from the Blitzortung.org global lightning detection network. Includes comprehensive safety assessment with 4 risk levels based on strike proximity. Critical for outdoor safety planning including boating, hiking, golfing, and other outdoor activities.
+
+**Examples:**
+```
+"Are there any lightning strikes near Miami?"
+"Check for lightning activity within 50km"
+"Is it safe to be outside based on lightning?"
+"Show me recent lightning strikes in the last hour"
+```
+
+**Returns:**
+- Real-time lightning strikes within specified radius
+- 4-level safety assessment:
+  - **Safe** (>50km): No immediate lightning threat
+  - **Elevated** (16-50km): Monitor conditions, plan indoor access
+  - **High** (8-16km): Seek shelter immediately
+  - **Extreme** (<8km): Active thunderstorm, dangerous conditions
+- Comprehensive statistics:
+  - Total strikes and strike density (per sq km)
+  - Strikes per minute rate
+  - Distance to nearest strike
+  - Average distance of all strikes
+- Strike details:
+  - Polarity (cloud-to-ground vs intra-cloud)
+  - Amplitude in kiloamperes (kA)
+  - Precise timestamp and location
+- Safety recommendations based on proximity
+- Geographic region-optimized data retrieval
+
+**Note:** Data provided by Blitzortung.org, a free community-operated lightning detection network. May have regional coverage variations.
 
 ## Error Handling & Service Status
 
