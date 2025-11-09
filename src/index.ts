@@ -17,6 +17,7 @@ import {
 import { NOAAService } from './services/noaa.js';
 import { OpenMeteoService } from './services/openmeteo.js';
 import { NCEIService } from './services/ncei.js';
+import { NIFCService } from './services/nifc.js';
 import { CacheConfig } from './config/cache.js';
 import { toolConfig } from './config/tools.js';
 import { logger } from './utils/logger.js';
@@ -32,6 +33,7 @@ import { handleGetMarineConditions } from './handlers/marineConditionsHandler.js
 import { getWeatherImagery, formatWeatherImageryResponse } from './handlers/weatherImageryHandler.js';
 import { getLightningActivity, formatLightningActivityResponse } from './handlers/lightningHandler.js';
 import { handleGetRiverConditions } from './handlers/riverConditionsHandler.js';
+import { handleGetWildfireInfo } from './handlers/wildfireHandler.js';
 
 /**
  * Server information
@@ -69,6 +71,12 @@ const openMeteoService = new OpenMeteoService();
  * Falls back to Open-Meteo computed normals if not configured
  */
 const nceiService = new NCEIService();
+
+/**
+ * Initialize the NIFC service for wildfire data
+ * No API key required - uses public ArcGIS REST API
+ */
+const nifcService = new NIFCService();
 
 /**
  * Create MCP server instance
@@ -439,6 +447,36 @@ const TOOL_DEFINITIONS = {
       },
       required: ['latitude', 'longitude']
     }
+  },
+
+  get_wildfire_info: {
+    name: 'get_wildfire_info' as const,
+    description: 'Monitor active wildfires and fire perimeters for a location (US focus). Use this when asked about "wildfires nearby", "fire danger", "active fires", "wildfire smoke", "fire perimeters", or "evacuation risk". Returns active wildfire information within specified radius including fire name, size, containment percentage, distance from location, and safety assessment. Provides critical evacuation awareness and air quality impact information. SAFETY-CRITICAL tool for wildfire-prone areas.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        radius: {
+          type: 'number' as const,
+          description: 'Search radius in kilometers (1-500, default: 100)',
+          minimum: 1,
+          maximum: 500,
+          default: 100
+        }
+      },
+      required: ['latitude', 'longitude']
+    }
   }
 };
 
@@ -521,6 +559,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_river_conditions':
         return await handleGetRiverConditions(args, noaaService);
+
+      case 'get_wildfire_info':
+        return await handleGetWildfireInfo(args, nifcService);
 
       default:
         throw new Error(`Unknown tool: ${name}`);
