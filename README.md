@@ -108,6 +108,22 @@ An MCP (Model Context Protocol) server that provides **global weather data** to 
   - Safety recommendations based on proximity
   - Critical for outdoor activity safety planning
   - Free, no API key required
+- **River Conditions**: Monitor river levels and flood status for safety and recreation (NEW in v1.6.0)
+  - Current water levels from NOAA and USGS gauges
+  - Flood stage thresholds (action, minor, moderate, major)
+  - Streamflow data in cubic feet per second
+  - Distance-based gauge filtering within customizable radius
+  - Safety assessment for boating and recreation
+  - Historical flood crest data when available
+  - US coverage via NOAA NWPS and USGS Water Services
+- **Wildfire Information**: Track active wildfires and fire perimeters (NEW in v1.6.0)
+  - Active wildfire locations and prescribed burns
+  - Fire size, containment status, and discovery date
+  - Distance-based proximity filtering
+  - 4-level safety assessment (Extreme Danger, High Alert, Caution, Awareness)
+  - Evacuation recommendations based on proximity
+  - Detailed fire attributes (type, location, status)
+  - Data from NIFC WFIGS (National Interagency Fire Center)
 - **Service Status Checking**: Proactively verify API availability with health checks
 - **Enhanced Error Handling**: Detailed, actionable error messages with status page links
 - **Intelligent Caching**: Built-in in-memory cache reduces API calls and improves performance
@@ -131,6 +147,8 @@ The cache automatically stores and retrieves weather data with intelligent expir
 - **Climate Normals**: Cached indefinitely (30-year averages are static) - NEW in v1.2.0
 - **Weather Imagery**: Cached for 15 minutes (radar updates frequently) - NEW in v1.5.0
 - **Lightning Strikes**: Cached for 5 minutes (real-time safety data) - NEW in v1.5.0
+- **River Conditions**: Cached for 1 hour (gauge data updates frequently) - NEW in v1.6.0
+- **Wildfire Information**: Cached for 30 minutes (fire data changes rapidly) - NEW in v1.6.0
 - **Marine Conditions**: Cached for 1 hour (marine data updates hourly) - NEW in v0.6.0
 - **Air Quality Data**: Cached for 1 hour (air quality updates hourly) - v0.5.0
 - **Fire Weather Data**: Cached for 2 hours (gridpoint data updates ~hourly) - v0.5.0
@@ -709,6 +727,73 @@ Provides real-time lightning strike detection from the Blitzortung.org global li
 - Geographic region-optimized data retrieval
 
 **Note:** Data provided by Blitzortung.org, a free community-operated lightning detection network. May have regional coverage variations.
+
+### 11. get_river_conditions (NEW in v1.6.0)
+Monitor river levels and flood status using NOAA and USGS data sources.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `radius` (optional): Search radius in kilometers (1-500, default: 50)
+
+**Description:**
+Provides comprehensive river and streamflow monitoring for flood safety and recreation planning. Automatically finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Uses NOAA National Water Prediction Service (NWPS) for gauge locations and USGS Water Services for real-time streamflow data.
+
+**Examples:**
+```
+"What are the river conditions near St. Louis?" (latitude: 38.6270, longitude: -90.1994)
+"Check for flooding on the Mississippi River"
+"Is the river level safe for kayaking?"
+"Show me nearby river gauge readings"
+```
+
+**Returns:**
+- Nearest river gauges with current water levels
+- Flood stage thresholds (action, minor, moderate, major)
+- Current flood status and forecast
+- Streamflow data (cubic feet per second)
+- Distance to each gauge from query location
+- River and location names
+- Safety assessment for recreation
+- Historical context (flood crests if available)
+
+**Note:** US coverage only. Data provided by NOAA National Water Prediction Service and USGS Water Services.
+
+### 12. get_wildfire_info (NEW in v1.6.0)
+Monitor active wildfires and fire perimeters for safety and evacuation planning.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `radius` (optional): Search radius in kilometers (1-500, default: 100)
+
+**Description:**
+Provides critical wildfire monitoring and safety information using NIFC (National Interagency Fire Center) data. Reports active wildfires and prescribed burns within the specified radius, including fire size, containment status, and proximity-based safety assessments. Essential for residents in fire-prone regions and outdoor activity planning.
+
+**Examples:**
+```
+"Are there any wildfires near Los Angeles?" (latitude: 34.0522, longitude: -118.2437)
+"Check for active fires in Colorado"
+"How close is the nearest wildfire?"
+"Show me fire perimeters and containment status"
+```
+
+**Returns:**
+- Active wildfire locations within search radius
+- Fire size in acres and hectares
+- Containment percentage with visual indicator
+- Distance from query location to each fire
+- Discovery date and days active
+- Fire type (Wildfire vs Prescribed Fire)
+- Location details (state, county, city)
+- 4-level safety assessment:
+  - **EXTREME DANGER** (<5km): Evacuate if advised
+  - **HIGH ALERT** (5-25km): Prepare for evacuation
+  - **CAUTION** (25-50km): Monitor conditions
+  - **AWARENESS** (>50km): Stay informed
+- Evacuation recommendations and safety guidance
+
+**Note:** Data from NIFC WFIGS (Wildland Fire Interagency Geospatial Services). Always consult official sources for evacuation orders at https://inciweb.nwcg.gov/
 
 ## Error Handling & Service Status
 

@@ -7,6 +7,152 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2025-11-09
+
+### Added
+
+#### Safety & Hazards - River Monitoring and Wildfire Tracking
+- **NEW: `get_river_conditions` Tool** - Monitor river levels and flood status for safety and recreation
+  - **Current Water Levels** from nearest NOAA and USGS gauges
+    - Automatic gauge discovery within customizable radius (default: 50km)
+    - Distance calculation to each gauge using Haversine formula
+    - River and location names for context
+  - **Flood Stage Information** - Critical safety data
+    - Action, minor, moderate, and major flood thresholds
+    - Current flood status with color-coded warnings
+    - Forecast conditions when available
+  - **Streamflow Data** from USGS Water Services
+    - Real-time discharge in cubic feet per second (CFS)
+    - Flow rate trends and comparisons
+  - **Historical Context**
+    - Historic flood crests when available
+    - Recent crest data for context
+  - **Safety Assessment** for recreational activities
+    - Boating and kayaking safety guidance
+    - Flood warnings and evacuation context
+  - **US Coverage** via NOAA NWPS and USGS APIs
+  - **1-Hour Cache** for gauge data
+  - **User Queries**:
+    - "What are the river conditions near me?"
+    - "Is the river flooding?"
+    - "Safe to kayak on the river today?"
+    - "Check Mississippi River levels"
+
+- **NEW: `get_wildfire_info` Tool** - Monitor active wildfires and fire perimeters for safety planning
+  - **Active Fire Detection** from NIFC WFIGS
+    - Wildfire locations and prescribed burns
+    - Automatic filtering within customizable radius (default: 100km)
+    - Distance-based sorting (nearest fires first)
+  - **Fire Attributes**:
+    - Fire size in acres and hectares
+    - Containment percentage with visual progress bar
+    - Discovery date and days active
+    - Fire type classification (Wildfire vs Prescribed Fire)
+    - Location details (state, county, city)
+    - Coordinates of fire origin
+  - **4-Level Safety Assessment** - Proximity-based warnings
+    - **EXTREME DANGER** (<5km): Evacuate immediately if advised
+    - **HIGH ALERT** (5-25km): Prepare for possible evacuation
+    - **CAUTION** (25-50km): Monitor conditions, air quality impacts
+    - **AWARENESS** (>50km): Stay informed about fire progression
+  - **Comprehensive Fire Details** - Up to 5 nearest fires displayed
+    - Detailed statistics for each fire
+    - Visual containment indicators
+    - State/county/city location information
+  - **Safety Recommendations** based on distance to nearest wildfire
+  - **30-Minute Cache** for fire data (updates frequently)
+  - **Data Source**: NIFC WFIGS (Wildland Fire Interagency Geospatial Services)
+  - **User Queries**:
+    - "Are there wildfires near Los Angeles?"
+    - "Check for active fires in Colorado"
+    - "How close is the nearest wildfire?"
+    - "Show me fire containment status"
+
+### Technical Changes
+- **New Type Definitions**:
+  - Extended `src/types/noaa.ts` with NWPS river gauge types
+    - `NWPSGauge`, `GaugeStatus`, `FloodCategories`
+    - `HistoricCrest`, `USGSIVResponse`, `USGSSite`
+  - Created `src/types/wildfire.ts` for NIFC ArcGIS data
+    - `FirePerimeterAttributes`, `FirePerimeterFeature`
+    - `NIFCQueryResponse`, `WildfireInfo`
+
+- **New Service Clients**:
+  - Enhanced `src/services/noaa.ts` with NWPS and USGS clients
+    - `nwpsClient`: NOAA National Water Prediction Service
+    - `usgsClient`: USGS Water Services API
+    - `getNWPSGauge()`: Fetch individual gauge data
+    - `getAllNWPSGauges()`: Fetch all available gauges
+    - `getUSGSStreamflow()`: Real-time streamflow by bounding box
+  - Created `src/services/nifc.ts` - NIFC ArcGIS REST API client
+    - `queryFirePerimeters()`: Bounding box fire queries
+    - `checkServiceStatus()`: NIFC service health check
+    - ArcGIS Feature Server integration
+    - 30-minute cache for fire perimeter data
+
+- **New Utility**:
+  - Created `src/utils/distance.ts`
+    - `calculateDistance()`: Haversine formula for lat/lon distances
+    - Used by both river and wildfire tools for proximity filtering
+
+- **New Handlers**:
+  - `src/handlers/riverConditionsHandler.ts`
+    - Validates coordinates and radius parameters
+    - Fetches all NWPS gauges and filters by distance
+    - Queries USGS for streamflow data
+    - Formats comprehensive river condition reports
+  - `src/handlers/wildfireHandler.ts`
+    - Converts center point + radius to bounding box
+    - Queries NIFC for fire perimeters
+    - Filters by actual distance and sorts by proximity
+    - Provides 4-level safety assessment
+    - Distinguishes wildfires from prescribed burns
+
+- **Tool Configuration Updates**:
+  - Added `get_river_conditions` and `get_wildfire_info` to `ToolName` type
+  - Both tools added to 'all' preset (now 12 tools total)
+  - New aliases: 'river', 'rivers', 'flood', 'streamflow', 'wildfire', 'wildfires', 'fire', 'fires', 'smoke'
+  - Basic preset unchanged (5 tools) - minimal impact on typical users
+
+- **Caching Strategy**:
+  - River conditions: 1-hour TTL (gauge data updates frequently)
+  - Wildfire information: 30-minute TTL (fire data changes rapidly)
+
+### Testing
+- **NEW**: `tests/integration/safety-hazards.test.ts` (17 comprehensive tests)
+  - River Conditions: 7 tests covering gauge queries, validation, error handling
+    - St. Louis, MO (Mississippi River) gauge discovery
+    - Houston, TX multi-river area testing
+    - Nevada desert (no gauges) edge case
+    - Radius parameter validation and clamping
+    - Coordinate validation
+  - Wildfire Information: 10 tests covering fire detection, safety assessment, validation
+    - Los Angeles (high fire risk area) wildfire queries
+    - Denver, CO fire detection
+    - Boston (low fire risk) edge case
+    - Radius parameter validation and clamping
+    - Coordinate validation
+    - Safety assessment verification
+  - NIFC service health checks
+
+### Documentation
+- Updated README.md with v1.6.0 features
+  - Added tools 11 and 12 to Available Tools section
+  - Updated Features section with river and wildfire monitoring
+  - Added cache strategy for new tools
+- Updated ROADMAP.md
+  - Marked v1.6.0 as COMPLETE
+  - Updated tool inventory and cumulative totals
+
+### Implementation Notes
+- **NOAA NWPS API**: Temporarily unavailable during initial testing (service downtime)
+  - Error handling confirmed working correctly
+  - Graceful degradation with user-friendly messages
+  - Tests will be re-run when API is back online
+- **NIFC WFIGS API**: Operational and tested successfully
+  - Detected real "La Plata" wildfire in Colorado during testing
+  - 133 acres, 92% contained, discovered August 17, 2025
+
 ## [1.5.0] - 2025-11-09
 
 ### Added

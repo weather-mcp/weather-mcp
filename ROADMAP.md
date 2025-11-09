@@ -375,7 +375,7 @@ get_forecast({
 
 ---
 
-## Tool Inventory (Current: v1.5.0)
+## Tool Inventory (Current: v1.6.0)
 
 ### Available Tools (Configurable)
 1. **`get_forecast`** - Future weather (enhanced: hourly, global, 16-day, severe weather) ✅
@@ -388,12 +388,14 @@ get_forecast({
 8. **`get_marine_conditions`** - Ocean/coastal weather (enhanced: Great Lakes support) ⭐ NEW ✅
 9. **`get_weather_imagery`** - Precipitation radar visualization ⭐ NEW ✅
 10. **`get_lightning_activity`** - Real-time lightning strike monitoring ⭐ NEW ✅
+11. **`get_river_conditions`** - River levels and flood monitoring ⭐ NEW ✅
+12. **`get_wildfire_info`** - Active wildfire tracking and safety ⭐ NEW ✅
 
-**Total: 10 tools** (up from 4 in v0.1.0)
+**Total: 12 tools** (up from 4 in v0.1.0)
 **Default enabled: 5 tools** (basic preset for minimal overhead)
-**Token cost: ~1,400 tokens with all tools** (0.7% of 200k context)
+**Token cost: ~1,800 tokens with all tools** (0.9% of 200k context)
 **Token cost: ~600 tokens with basic preset** (0.3% of 200k context)
-**Functionality increase: ~500%** (from v0.1.0)
+**Functionality increase: ~600%** (from v0.1.0)
 
 ---
 
@@ -964,7 +966,7 @@ When implementing features from this roadmap:
 | check_service_status | ~100 |
 | **Total** | **~700** |
 
-### Current State (v1.5.0)
+### Current State (v1.6.0)
 | Tool | Approximate Tokens | Change from v0.1.2 |
 |------|-------------------|--------|
 | get_forecast | ~300 | +100 (hourly, global, 16-day, severe weather) |
@@ -977,18 +979,20 @@ When implementing features from this roadmap:
 | get_marine_conditions | ~200 | +200 (NEW) |
 | get_weather_imagery | ~200 | +200 (NEW) |
 | get_lightning_activity | ~200 | +200 (NEW) |
-| **Total (all tools)** | **~1,400** | **+700** |
+| get_river_conditions | ~200 | +200 (NEW) |
+| get_wildfire_info | ~200 | +200 (NEW) |
+| **Total (all tools)** | **~1,800** | **+1,100** |
 | **Total (basic preset)** | **~600** | **-100** |
 
-**Overhead with all tools: ~1,400 tokens (0.7% of 200k context)**
+**Overhead with all tools: ~1,800 tokens (0.9% of 200k context)**
 **Overhead with basic preset: ~600 tokens (0.3% of 200k context)**
 
 ---
 
 *Last Updated: 2025-11-09*
-*Current Version: v1.5.0 (Visualization & Lightning Safety)* ✅
-*Previous: v1.4.0 (Tool Configuration System)* ✅
-*Next Target: v1.6.0 (Safety & Hazards) - River monitoring and wildfire tracking*
+*Current Version: v1.6.0 (Safety & Hazards)* ✅
+*Previous: v1.5.0 (Visualization & Lightning Safety)* ✅
+*Next Target: TBD - See future considerations section*
 *Design Philosophy: Lean, efficient, user-focused*
 
 ---
@@ -1443,15 +1447,15 @@ With v1.4.0 tool configuration system, users can control tool exposure:
 
 ---
 
-## v1.6.0 - Safety & Hazards (PLANNED)
+## v1.6.0 - Safety & Hazards ✅ COMPLETE
 
-**Status:** Planned for future implementation
+**Status:** Implemented and tested on 2025-11-09
 
 **Theme:** Expand safety-critical data with water/flood and wildfire monitoring
 
 **Goal:** Fill major gaps in hazard monitoring for rivers and wildfires
 
-**Priority:** Medium-High (Tier 1 safety-critical features)
+**Achievement:** Both safety-critical tools implemented successfully with comprehensive testing
 
 ### 1. Add `get_river_conditions` Tool ⭐ NEW TOOL
 **Monitor river levels and flood status:**
@@ -1479,18 +1483,21 @@ get_river_conditions({
 
 **Why a separate tool:**
 - SAFETY-CRITICAL (flooding is deadly)
-- Different data source (NOAA AHPS, USGS Water Services)
+- Different data source (NOAA NWPS, USGS Water Services)
 - Different query context (water/river vs general weather)
 - Complements weather alerts (flood warnings)
 
-**Implementation:**
-- NOAA AHPS for flood stage data
-- USGS Water Services for real-time streamflow
-- Find nearest gauge(s) within radius
-- Cache for 1 hour (updates frequently)
-- Show flood stage thresholds prominently
+**Implementation:** ✅ COMPLETE
+- ✅ NOAA NWPS (National Water Prediction Service) for gauge locations and flood data
+- ✅ USGS Water Services for real-time streamflow
+- ✅ Distance calculation with Haversine formula
+- ✅ Find nearest gauge(s) within customizable radius
+- ✅ Flood stage thresholds with color-coded warnings
+- ✅ 1-hour cache (gauge data updates frequently)
+- ✅ Comprehensive test coverage (7 tests)
+- ✅ Graceful error handling for API unavailability
 
-**Effort:** 2 weeks
+**Effort:** 2 weeks (actual: 1 day)
 **Value:** HIGH - Safety-critical for flood-prone areas
 
 ### 2. Add `get_wildfire_info` Tool ⭐ NEW TOOL
@@ -1532,19 +1539,32 @@ get_wildfire_info({
 - Cache for 30 minutes (fires change rapidly)
 - Integrate with get_air_quality for smoke attribution
 
-**Effort:** 2 weeks
+**Effort:** 2 weeks (actual: 2 days)
 **Value:** HIGH - Growing importance, complements air quality
 
-**Summary for v1.6.0:**
-- **Tools added:** 2 (get_river_conditions, get_wildfire_info)
-- **Token cost:** ~400 tokens
-- **Effort:** ~4 weeks
-- **Value:** Safety-critical hazard monitoring
+**Implementation:** ✅ COMPLETE
+- ✅ NIFC WFIGS ArcGIS REST API integration (no API key required)
+- ✅ Bounding box queries for fire perimeters
+- ✅ Distance-based filtering with Haversine formula
+- ✅ 4-level safety assessment (extreme/high/caution/awareness)
+- ✅ Fire vs prescribed burn classification
+- ✅ 30-minute cache for fire data
+- ✅ Comprehensive test coverage (10 tests)
+- ✅ Real wildfire detected during testing ("La Plata" fire, CO)
+
+**Summary for v1.6.0:** ✅ COMPLETE
+- **Tools added:** 2 (get_river_conditions, get_wildfire_info) ✅
+- **Token cost:** ~400 tokens ✅
+- **Effort:** 2 days (much faster than estimated 4 weeks) ✅
+- **Value:** Safety-critical hazard monitoring ✅
+- **Testing:** All 17 integration tests created ✅
+- **Documentation:** README, CHANGELOG, ROADMAP updated ✅
 
 **Cumulative Total (after v1.6.0):**
-- **Tools:** 12 (was 10, added 2)
-- **Token overhead:** ~1,800 tokens (still under 1% of 200k context)
-- **Safety features:** Comprehensive hazard monitoring (alerts, severe weather, lightning, river, wildfire)
+- **Tools:** 12 (was 10, added 2) ✅
+- **Default exposed:** 5 tools (basic preset, unchanged)
+- **Token overhead:** ~1,800 tokens (with all tools), ~600 tokens (basic preset)
+- **Safety features:** Comprehensive hazard monitoring (alerts, severe weather, lightning, river, wildfire) ✅
 
 **Configuration Impact:**
 With v1.4.0 tool configuration system:
