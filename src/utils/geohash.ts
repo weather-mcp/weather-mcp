@@ -28,10 +28,10 @@ export function calculateBoundingBox(lat: number, lon: number, radiusKm: number)
   const lonDelta = latDelta / Math.cos((lat * Math.PI) / 180);
 
   return {
-    minLat: lat - latDelta,
-    minLon: lon - lonDelta,
-    maxLat: lat + latDelta,
-    maxLon: lon + lonDelta
+    minLat: Math.max(-90, lat - latDelta),
+    minLon: Math.max(-180, lon - lonDelta),
+    maxLat: Math.min(90, lat + latDelta),
+    maxLon: Math.min(180, lon + lonDelta)
   };
 }
 
@@ -79,6 +79,7 @@ export function computeGeohashTiles(
   const bbox = calculateBoundingBox(lat, lon, radiusKm);
   const tiles = new Set<string>();
   const queue: string[] = [];
+  const MAX_TILES = 10000; // Safety limit to prevent memory exhaustion
 
   // Start with the center point's geohash
   const centerHash = geohash.encode(lat, lon, precision);
@@ -93,6 +94,11 @@ export function computeGeohashTiles(
     for (const neighbor of neighbors) {
       if (tiles.has(neighbor)) {
         continue; // Already visited
+      }
+
+      // Safety check: prevent unbounded growth
+      if (tiles.size >= MAX_TILES) {
+        return tiles;
       }
 
       // Decode neighbor to check if it's within bounding box
