@@ -22,7 +22,11 @@ export type ToolName =
   | 'check_service_status'
   | 'search_location'
   | 'get_air_quality'
-  | 'get_marine_conditions';
+  | 'get_marine_conditions'
+  | 'get_weather_imagery'
+  | 'get_lightning_activity'
+  | 'get_river_conditions'
+  | 'get_wildfire_info';
 
 /**
  * Tool presets for easy configuration
@@ -67,7 +71,11 @@ const TOOL_PRESETS: Record<string, ToolName[]> = {
     'check_service_status',
     'search_location',
     'get_air_quality',
-    'get_marine_conditions'
+    'get_marine_conditions',
+    'get_weather_imagery',
+    'get_lightning_activity',
+    'get_river_conditions',
+    'get_wildfire_info'
   ]
 };
 
@@ -89,7 +97,22 @@ const TOOL_ALIASES: Record<string, ToolName> = {
   'aqi': 'get_air_quality',
   'marine': 'get_marine_conditions',
   'ocean': 'get_marine_conditions',
-  'waves': 'get_marine_conditions'
+  'waves': 'get_marine_conditions',
+  'imagery': 'get_weather_imagery',
+  'radar': 'get_weather_imagery',
+  'satellite': 'get_weather_imagery',
+  'lightning': 'get_lightning_activity',
+  'strikes': 'get_lightning_activity',
+  'thunderstorm': 'get_lightning_activity',
+  'river': 'get_river_conditions',
+  'rivers': 'get_river_conditions',
+  'flood': 'get_river_conditions',
+  'streamflow': 'get_river_conditions',
+  'wildfire': 'get_wildfire_info',
+  'wildfires': 'get_wildfire_info',
+  'fire': 'get_wildfire_info',
+  'fires': 'get_wildfire_info',
+  'smoke': 'get_wildfire_info'
 };
 
 /**
@@ -206,7 +229,11 @@ function isToolName(name: string): name is ToolName {
     'check_service_status',
     'search_location',
     'get_air_quality',
-    'get_marine_conditions'
+    'get_marine_conditions',
+    'get_weather_imagery',
+    'get_lightning_activity',
+    'get_river_conditions',
+    'get_wildfire_info'
   ];
   return validTools.includes(name as ToolName);
 }

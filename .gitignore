@@ -42,3 +42,6 @@ mcp-publisher
 
 # Local MCP configuration
 .mcp.json
+
+# Temporary test files
+temp/

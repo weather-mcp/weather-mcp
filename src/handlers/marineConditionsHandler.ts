@@ -20,7 +20,7 @@ import {
 } from '../utils/marine.js';
 import { shouldUseNOAAMarine } from '../utils/geography.js';
 import type { OpenMeteoMarineResponse } from '../types/openmeteo.js';
-import { logger } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 
 interface MarineConditionsArgs {
@@ -63,9 +63,11 @@ export async function handleGetMarineConditions(
   if (regionDetection.useNOAA) {
     // Try NOAA first for Great Lakes and coastal bays
     try {
+      // Redact coordinates for logging to protect user privacy
+      const redacted = redactCoordinatesForLogging(latitude, longitude);
       logger.info('Attempting NOAA marine data', {
-        latitude,
-        longitude,
+        latitude: redacted.lat,
+        longitude: redacted.lon,
         region: regionDetection.region,
         source: regionDetection.source
       });
@@ -93,16 +95,18 @@ export async function handleGetMarineConditions(
           ]
         };
       } else {
+        const redacted2 = redactCoordinatesForLogging(latitude, longitude);
         logger.info('NOAA gridpoint has no marine data, falling back to Open-Meteo', {
-          latitude,
-          longitude
+          latitude: redacted2.lat,
+          longitude: redacted2.lon
         });
       }
     } catch (error) {
       // NOAA failed, fall back to Open-Meteo
+      const redacted3 = redactCoordinatesForLogging(latitude, longitude);
       logger.warn('NOAA marine data failed, falling back to Open-Meteo', {
-        latitude,
-        longitude,
+        latitude: redacted3.lat,
+        longitude: redacted3.lon,
         error: (error as Error).message
       });
     }

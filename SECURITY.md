@@ -6,6 +6,9 @@ We release patches for security vulnerabilities for the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 1.6.x   | :white_check_mark: |
+| 1.5.x   | :white_check_mark: |
+| 1.4.x   | :white_check_mark: |
 | 1.3.x   | :white_check_mark: |
 | 1.2.x   | :white_check_mark: |
 | 1.1.x   | :white_check_mark: |
@@ -150,7 +153,14 @@ This MCP server uses public weather APIs (NOAA and Open-Meteo) that do not requi
 
 ## Security Audit History
 
-- **2025-11-06**: Comprehensive security audit completed (See SECURITY_AUDIT.md)
+- **2025-11-10**: Comprehensive security audit for v1.6.0 release (See SECURITY_AUDIT.md)
+  - Overall Security Posture: **A- (Excellent, 93/100)**
+  - Risk Level: **LOW**
+  - Zero critical or high-severity vulnerabilities
+  - 1,042 tests passing with 100% pass rate
+  - Code Quality: A+ (97.5/100)
+
+- **2025-11-06**: Initial comprehensive security audit for v1.5.0
   - Overall Security Posture: **B+ (Good)**
   - Risk Level: **LOW**
   - Zero critical or high-severity vulnerabilities
@@ -179,5 +189,5 @@ If you have questions about this security policy, please open a GitHub issue wit
 
 ---
 
-**Last Updated**: November 6, 2025
+**Last Updated**: November 10, 2025
 **Next Security Review**: May 2026 (6 months) or upon major version release

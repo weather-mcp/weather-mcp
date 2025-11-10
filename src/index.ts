@@ -17,6 +17,7 @@ import {
 import { NOAAService } from './services/noaa.js';
 import { OpenMeteoService } from './services/openmeteo.js';
 import { NCEIService } from './services/ncei.js';
+import { NIFCService } from './services/nifc.js';
 import { CacheConfig } from './config/cache.js';
 import { toolConfig } from './config/tools.js';
 import { logger } from './utils/logger.js';
@@ -29,6 +30,10 @@ import { handleCheckServiceStatus } from './handlers/statusHandler.js';
 import { handleSearchLocation } from './handlers/locationHandler.js';
 import { handleGetAirQuality } from './handlers/airQualityHandler.js';
 import { handleGetMarineConditions } from './handlers/marineConditionsHandler.js';
+import { getWeatherImagery, formatWeatherImageryResponse } from './handlers/weatherImageryHandler.js';
+import { getLightningActivity, formatLightningActivityResponse } from './handlers/lightningHandler.js';
+import { handleGetRiverConditions } from './handlers/riverConditionsHandler.js';
+import { handleGetWildfireInfo } from './handlers/wildfireHandler.js';
 
 /**
  * Server information
@@ -66,6 +71,12 @@ const openMeteoService = new OpenMeteoService();
  * Falls back to Open-Meteo computed normals if not configured
  */
 const nceiService = new NCEIService();
+
+/**
+ * Initialize the NIFC service for wildfire data
+ * No API key required - uses public ArcGIS REST API
+ */
+const nifcService = new NIFCService();
 
 /**
  * Create MCP server instance
@@ -328,6 +339,144 @@ const TOOL_DEFINITIONS = {
       },
       required: ['latitude', 'longitude']
     }
+  },
+
+  get_weather_imagery: {
+    name: 'get_weather_imagery' as const,
+    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location (global coverage). Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization. Supports precipitation radar (global via RainViewer). Includes disclaimer about data delays and official forecast consultation. For numerical forecast data, use get_forecast instead.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        type: {
+          type: 'string' as const,
+          description: 'Type of imagery: "radar", "satellite", or "precipitation" (default: "precipitation")',
+          enum: ['radar', 'satellite', 'precipitation'],
+          default: 'precipitation'
+        },
+        animated: {
+          type: 'boolean' as const,
+          description: 'Return animated frames showing progression over time (default: false)',
+          default: false
+        },
+        layers: {
+          type: 'array' as const,
+          description: 'Optional layers to include in imagery (future enhancement)',
+          items: {
+            type: 'string' as const
+          }
+        }
+      },
+      required: ['latitude', 'longitude', 'type']
+    }
+  },
+
+  get_lightning_activity: {
+    name: 'get_lightning_activity' as const,
+    description: 'Get real-time lightning strike activity and safety assessment for a location (global coverage). Use this when asked about "lightning nearby", "lightning strikes", "thunderstorm activity", "is it safe from lightning", or "lightning danger". Returns recent strikes within specified radius and time window, including distance, polarity, intensity, and critical safety recommendations. Provides 4-level safety assessment (safe/elevated/high/extreme) based on proximity. SAFETY-CRITICAL tool for outdoor activities and severe weather monitoring.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        radius: {
+          type: 'number' as const,
+          description: 'Search radius in kilometers (1-500, default: 100)',
+          minimum: 1,
+          maximum: 500,
+          default: 100
+        },
+        timeWindow: {
+          type: 'number' as const,
+          description: 'Time window in minutes for historical strikes (5-120, default: 60)',
+          minimum: 5,
+          maximum: 120,
+          default: 60
+        }
+      },
+      required: ['latitude', 'longitude']
+    }
+  },
+
+  get_river_conditions: {
+    name: 'get_river_conditions' as const,
+    description: 'Monitor river levels and flood status for a location (US only). Use this when asked about "river flooding", "river level", "flood stage", "streamflow", "safe to kayak", or "river conditions". Returns current river gauge data within specified radius including river stage, flow rate, flood category levels (action/minor/moderate/major), and forecasted conditions. Provides safety assessment based on flood stages. SAFETY-CRITICAL tool for flood-prone areas and water recreation.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        radius: {
+          type: 'number' as const,
+          description: 'Search radius in kilometers (1-500, default: 50)',
+          minimum: 1,
+          maximum: 500,
+          default: 50
+        }
+      },
+      required: ['latitude', 'longitude']
+    }
+  },
+
+  get_wildfire_info: {
+    name: 'get_wildfire_info' as const,
+    description: 'Monitor active wildfires and fire perimeters for a location (US focus). Use this when asked about "wildfires nearby", "fire danger", "active fires", "wildfire smoke", "fire perimeters", or "evacuation risk". Returns active wildfire information within specified radius including fire name, size, containment percentage, distance from location, and safety assessment. Provides critical evacuation awareness and air quality impact information. SAFETY-CRITICAL tool for wildfire-prone areas.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90)',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180)',
+          minimum: -180,
+          maximum: 180
+        },
+        radius: {
+          type: 'number' as const,
+          description: 'Search radius in kilometers (1-500, default: 100)',
+          minimum: 1,
+          maximum: 500,
+          default: 100
+        }
+      },
+      required: ['latitude', 'longitude']
+    }
   }
 };
 
@@ -381,6 +530,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_marine_conditions':
         return await handleGetMarineConditions(args, noaaService, openMeteoService);
+
+      case 'get_weather_imagery': {
+        const result = await getWeatherImagery(args as any);
+        const formatted = formatWeatherImageryResponse(result);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: formatted
+            }
+          ]
+        };
+      }
+
+      case 'get_lightning_activity': {
+        const result = await getLightningActivity(args as any);
+        const formatted = formatLightningActivityResponse(result);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: formatted
+            }
+          ]
+        };
+      }
+
+      case 'get_river_conditions':
+        return await handleGetRiverConditions(args, noaaService);
+
+      case 'get_wildfire_info':
+        return await handleGetWildfireInfo(args, nifcService);
 
       default:
         throw new Error(`Unknown tool: ${name}`);

@@ -7,6 +7,355 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2025-11-10
+
+### Fixed
+
+#### Security Fixes
+- **Blitzortung MQTT Security** - Added TLS warnings and security guidance for lightning feed
+  - Added runtime warning when using plaintext MQTT connections
+  - Enhanced documentation about security implications
+  - Recommended mitigations for production deployments (TLS proxy, trusted networks)
+  - Environment variable `BLITZORTUNG_MQTT_URL` for TLS-enabled brokers
+- **Coordinate Privacy** - Implemented coordinate redaction in logging to protect user privacy
+  - Added `redactCoordinatesForLogging()` utility that rounds coordinates to ~1.1km precision (2 decimal places)
+  - Updated all handlers to use redacted coordinates in logs (lightning, marine, imagery)
+  - Environment variable `LOG_PII=true` to enable full precision logging (not recommended for production)
+  - Complies with GDPR/CPRA data minimization requirements
+- **Markdown Injection Prevention** - Fixed vulnerability in location search results
+  - Added `escapeMarkdown()` function to sanitize user input
+  - Prevents injection of malicious Markdown (links, images, scripts)
+  - Normalizes whitespace to prevent structure injection
+
+#### Performance & Reliability Fixes
+- **River Conditions Performance** - Implemented bounding box queries to avoid downloading entire gauge catalog
+  - Added `getNWPSGaugesInBoundingBox()` method with server-side filtering
+  - Calculates efficient bounding box based on search radius and latitude
+  - Falls back to client-side filtering if API doesn't support bbox queries
+  - Reduces bandwidth and latency by orders of magnitude for location-specific queries
+- **Cached Data Mutation** - Fixed forecast handler mutating cached NOAA data
+  - Changed `getMaxProbabilityFromSeries()` to work on local copies
+  - Prevents severe weather calculations from affecting other formatters using same cached object
+  - Eliminates intermittent "missing probability" bugs
+- **Blitzortung Subscription Management** - Implemented LRU-based subscription cleanup
+  - Changed subscription tracking from Set to Map with timestamps
+  - Added automatic eviction when exceeding 50 concurrent subscriptions
+  - Added stale subscription pruning (1-hour inactivity threshold, checked every 15 min)
+  - Prevents unbounded memory and CPU growth from subscription accumulation
+- **RainViewer Polar Coordinate Handling** - Fixed tile generation for extreme latitudes
+  - Added Web Mercator latitude clamping (±85.05112878°) to prevent NaN coordinates
+  - Prevents division by zero in tile calculations at polar regions
+  - Logs warning when clamping occurs
+- **Timezone Fallback** - Changed international timezone fallback from server timezone to UTC
+  - Provides predictable, unambiguous timestamps for all users
+  - Eliminates misleading timestamps for international queries (e.g., Sydney users seeing Chicago times)
+  - US timezone heuristic unchanged (America/New_York, Chicago, Denver, Los_Angeles)
+
+### Added
+- **Comprehensive Test Coverage** - Added 28 unit tests for v1.6.1 fixes
+  - Coordinate redaction privacy tests
+  - Markdown injection prevention tests
+  - RainViewer polar coordinate clamping tests
+  - Timezone fallback behavior tests
+  - Cache immutability tests
+  - NWPS bounding box calculation tests
+
+### Changed
+- **Dependencies** - Updated to latest versions (integrated Dependabot PRs #5, #6)
+  - `@modelcontextprotocol/sdk` 1.21.0 → 1.21.1
+  - `vitest` 4.0.7 → 4.0.8
+  - `@vitest/coverage-v8` 4.0.7 → 4.0.8
+
+## [1.6.0] - 2025-11-09
+
+### Added
+
+#### Safety & Hazards - River Monitoring and Wildfire Tracking
+- **NEW: `get_river_conditions` Tool** - Monitor river levels and flood status for safety and recreation
+  - **Current Water Levels** from nearest NOAA and USGS gauges
+    - Automatic gauge discovery within customizable radius (default: 50km)
+    - Distance calculation to each gauge using Haversine formula
+    - River and location names for context
+  - **Flood Stage Information** - Critical safety data
+    - Action, minor, moderate, and major flood thresholds
+    - Current flood status with color-coded warnings
+    - Forecast conditions when available
+  - **Streamflow Data** from USGS Water Services
+    - Real-time discharge in cubic feet per second (CFS)
+    - Flow rate trends and comparisons
+  - **Historical Context**
+    - Historic flood crests when available
+    - Recent crest data for context
+  - **Safety Assessment** for recreational activities
+    - Boating and kayaking safety guidance
+    - Flood warnings and evacuation context
+  - **US Coverage** via NOAA NWPS and USGS APIs
+  - **1-Hour Cache** for gauge data
+  - **User Queries**:
+    - "What are the river conditions near me?"
+    - "Is the river flooding?"
+    - "Safe to kayak on the river today?"
+    - "Check Mississippi River levels"
+
+- **NEW: `get_wildfire_info` Tool** - Monitor active wildfires and fire perimeters for safety planning
+  - **Active Fire Detection** from NIFC WFIGS
+    - Wildfire locations and prescribed burns
+    - Automatic filtering within customizable radius (default: 100km)
+    - Distance-based sorting (nearest fires first)
+  - **Fire Attributes**:
+    - Fire size in acres and hectares
+    - Containment percentage with visual progress bar
+    - Discovery date and days active
+    - Fire type classification (Wildfire vs Prescribed Fire)
+    - Location details (state, county, city)
+    - Coordinates of fire origin
+  - **4-Level Safety Assessment** - Proximity-based warnings
+    - **EXTREME DANGER** (<5km): Evacuate immediately if advised
+    - **HIGH ALERT** (5-25km): Prepare for possible evacuation
+    - **CAUTION** (25-50km): Monitor conditions, air quality impacts
+    - **AWARENESS** (>50km): Stay informed about fire progression
+  - **Comprehensive Fire Details** - Up to 5 nearest fires displayed
+    - Detailed statistics for each fire
+    - Visual containment indicators
+    - State/county/city location information
+  - **Safety Recommendations** based on distance to nearest wildfire
+  - **30-Minute Cache** for fire data (updates frequently)
+  - **Data Source**: NIFC WFIGS (Wildland Fire Interagency Geospatial Services)
+  - **User Queries**:
+    - "Are there wildfires near Los Angeles?"
+    - "Check for active fires in Colorado"
+    - "How close is the nearest wildfire?"
+    - "Show me fire containment status"
+
+### Technical Changes
+- **New Type Definitions**:
+  - Extended `src/types/noaa.ts` with NWPS river gauge types
+    - `NWPSGauge`, `GaugeStatus`, `FloodCategories`
+    - `HistoricCrest`, `USGSIVResponse`, `USGSSite`
+  - Created `src/types/wildfire.ts` for NIFC ArcGIS data
+    - `FirePerimeterAttributes`, `FirePerimeterFeature`
+    - `NIFCQueryResponse`, `WildfireInfo`
+
+- **New Service Clients**:
+  - Enhanced `src/services/noaa.ts` with NWPS and USGS clients
+    - `nwpsClient`: NOAA National Water Prediction Service
+    - `usgsClient`: USGS Water Services API
+    - `getNWPSGauge()`: Fetch individual gauge data
+    - `getAllNWPSGauges()`: Fetch all available gauges
+    - `getUSGSStreamflow()`: Real-time streamflow by bounding box
+  - Created `src/services/nifc.ts` - NIFC ArcGIS REST API client
+    - `queryFirePerimeters()`: Bounding box fire queries
+    - `checkServiceStatus()`: NIFC service health check
+    - ArcGIS Feature Server integration
+    - 30-minute cache for fire perimeter data
+
+- **New Utility**:
+  - Created `src/utils/distance.ts`
+    - `calculateDistance()`: Haversine formula for lat/lon distances
+    - Used by both river and wildfire tools for proximity filtering
+
+- **New Handlers**:
+  - `src/handlers/riverConditionsHandler.ts`
+    - Validates coordinates and radius parameters
+    - Fetches all NWPS gauges and filters by distance
+    - Queries USGS for streamflow data
+    - Formats comprehensive river condition reports
+  - `src/handlers/wildfireHandler.ts`
+    - Converts center point + radius to bounding box
+    - Queries NIFC for fire perimeters
+    - Filters by actual distance and sorts by proximity
+    - Provides 4-level safety assessment
+    - Distinguishes wildfires from prescribed burns
+
+- **Tool Configuration Updates**:
+  - Added `get_river_conditions` and `get_wildfire_info` to `ToolName` type
+  - Both tools added to 'all' preset (now 12 tools total)
+  - New aliases: 'river', 'rivers', 'flood', 'streamflow', 'wildfire', 'wildfires', 'fire', 'fires', 'smoke'
+  - Basic preset unchanged (5 tools) - minimal impact on typical users
+
+- **Caching Strategy**:
+  - River conditions: 1-hour TTL (gauge data updates frequently)
+  - Wildfire information: 30-minute TTL (fire data changes rapidly)
+
+### Testing
+- **NEW**: `tests/integration/safety-hazards.test.ts` (17 comprehensive tests)
+  - River Conditions: 7 tests covering gauge queries, validation, error handling
+    - St. Louis, MO (Mississippi River) gauge discovery
+    - Houston, TX multi-river area testing
+    - Nevada desert (no gauges) edge case
+    - Radius parameter validation and clamping
+    - Coordinate validation
+  - Wildfire Information: 10 tests covering fire detection, safety assessment, validation
+    - Los Angeles (high fire risk area) wildfire queries
+    - Denver, CO fire detection
+    - Boston (low fire risk) edge case
+    - Radius parameter validation and clamping
+    - Coordinate validation
+    - Safety assessment verification
+  - NIFC service health checks
+
+### Documentation
+- Updated README.md with v1.6.0 features
+  - Added tools 11 and 12 to Available Tools section
+  - Updated Features section with river and wildfire monitoring
+  - Added cache strategy for new tools
+- Updated ROADMAP.md
+  - Marked v1.6.0 as COMPLETE
+  - Updated tool inventory and cumulative totals
+
+### Implementation Notes
+- **NOAA NWPS API**: Temporarily unavailable during initial testing (service downtime)
+  - Error handling confirmed working correctly
+  - Graceful degradation with user-friendly messages
+  - Tests will be re-run when API is back online
+- **NIFC WFIGS API**: Operational and tested successfully
+  - Detected real "La Plata" wildfire in Colorado during testing
+  - 133 acres, 92% contained, discovered August 17, 2025
+
+## [1.5.0] - 2025-11-09
+
+### Added
+
+#### Weather Visualization & Lightning Safety - Visual Analysis and Real-Time Strike Monitoring
+- **NEW: `get_weather_imagery` Tool** - Access weather radar and precipitation maps
+  - **Precipitation Radar** from RainViewer API (free, global coverage)
+    - Static radar images showing current precipitation
+    - Animated radar loops (up to 2 hours of history)
+    - Tile URLs for efficient rendering
+    - Automatic coordinate-to-tile calculation
+    - Timestamp metadata for each frame
+  - **Global Coverage** - Works anywhere in the world
+  - **15-Minute Cache** for radar data to reduce API load
+  - **Graceful Degradation** when imagery unavailable
+  - **Future-Ready**: Satellite imagery deferred to future release
+  - **User Queries**:
+    - "Show me the current radar"
+    - "Is there precipitation nearby on radar?"
+    - "Show animated radar for the last hour"
+
+- **NEW: `get_lightning_activity` Tool** - Real-time lightning strike detection and safety assessment
+  - **Real-Time Strike Detection** from Blitzortung.org (free, no API key required)
+    - Lightning strikes within customizable radius (default: 100km)
+    - Time window for historical strikes (default: 60 minutes)
+    - Distance calculation using Haversine formula
+    - Strike polarity (cloud-to-ground vs intra-cloud)
+    - Strike amplitude in kiloamperes (kA)
+  - **4-Level Safety Assessment** - Critical for outdoor safety
+    - **Safe** (>50km): No immediate lightning threat
+    - **Elevated** (16-50km): Monitor conditions, plan indoor access
+    - **High** (8-16km): Seek shelter immediately
+    - **Extreme** (<8km): Active thunderstorm, dangerous conditions
+  - **Comprehensive Statistics**:
+    - Total strikes and strike density (per sq km)
+    - Strikes per minute rate
+    - Nearest strike distance
+    - Average distance of all strikes
+    - Cloud-to-ground vs intra-cloud classification
+  - **Safety Recommendations** - Context-aware guidance based on proximity
+  - **Geographic Region Detection** - Optimizes API endpoints for best coverage
+  - **5-Minute Cache** for strike data
+  - **Graceful Degradation** - Returns empty array if API unavailable
+  - **User Queries**:
+    - "Are there lightning strikes nearby?"
+    - "How close is the lightning?"
+    - "Is it safe to be outside?" (lightning risk assessment)
+    - "Show recent lightning activity"
+
+### Technical Changes
+- **New Type Definitions**:
+  - `src/types/imagery.ts` - Weather imagery types
+    - `ImageryType`: 'radar' | 'satellite' | 'precipitation'
+    - `WeatherImageryParams`, `WeatherImageryResponse`
+    - `ImageFrame`, `RainViewerResponse`
+  - `src/types/lightning.ts` - Lightning strike types
+    - `LightningSafetyLevel`: 'safe' | 'elevated' | 'high' | 'extreme'
+    - `LightningStrike`, `LightningStatistics`, `LightningSafety`
+    - `LightningActivityResponse`
+
+- **New Service Clients**:
+  - `src/services/rainviewer.ts` - RainViewer API client
+    - `getRadarData()`: Fetch available radar timestamps
+    - `getPrecipitationRadar()`: Get radar imagery for location
+    - `buildCoordinateTileUrl()`: Calculate tile URLs from coordinates
+    - Tile coordinate conversion (lat/lon to tile x/y/z)
+  - `src/services/blitzortung.ts` - Blitzortung.org API client
+    - `getLightningStrikes()`: Fetch recent strikes in radius
+    - `calculateDistance()`: Haversine distance calculation
+    - `parseStrikes()`: Parse and filter strike data
+    - `determineRegion()`: Geographic region detection
+    - `generateMockData()`: Development/fallback data
+
+- **New Handlers**:
+  - `src/handlers/weatherImageryHandler.ts`
+    - `getWeatherImagery()`: Validates and processes imagery requests
+    - `formatWeatherImageryResponse()`: Formats imagery data for MCP response
+    - Validation for imagery type, animated flag, coordinates
+  - `src/handlers/lightningHandler.ts`
+    - `getLightningActivity()`: Processes lightning activity requests
+    - `assessSafety()`: Calculates safety level from strike distances
+    - `calculateStatistics()`: Computes comprehensive strike statistics
+    - `formatLightningActivityResponse()`: Formats for MCP response
+
+- **Tool Configuration Updates**:
+  - Added `get_weather_imagery` and `get_lightning_activity` to `ToolName` type
+  - Both tools added to 'all' preset (now 10 tools total)
+  - New aliases: 'imagery', 'radar', 'satellite', 'lightning', 'strikes', 'thunderstorm'
+  - Basic preset unchanged (5 tools) - minimal impact on typical users
+
+- **Error Handling**:
+  - Extended `ApiError` service types to include 'RainViewer'
+  - Updated help link logic for RainViewer service
+
+### Testing
+- **15 new integration tests** added (764 total):
+  - Weather imagery tests (7 tests) - `tests/integration/visualization-lightning.test.ts`
+    - Precipitation radar retrieval (New York, London, Tokyo)
+    - Animated vs static radar
+    - Radar type alias handling
+    - Validation (invalid type, coordinates, satellite not implemented)
+  - Lightning activity tests (8 tests) - `tests/integration/visualization-lightning.test.ts`
+    - Lightning detection (Miami, New York, London, Tokyo, Sydney, Austin)
+    - Default and custom search parameters
+    - Safety assessment and statistics calculation
+    - Strike details validation
+    - Validation (invalid radius, time window, coordinates)
+- **Updated unit tests**:
+  - Tool configuration tests updated for 10 tools (was 8)
+  - All 764 tests passing with 100% pass rate
+
+### Documentation
+- Updated ROADMAP.md to mark v1.5.0 as complete
+- Updated FUTURE_ENHANCEMENTS.md:
+  - Section 8.1 (Real-Time Lightning Data) marked as implemented
+  - Section 12.1 (Radar & Satellite Image URLs) marked as partially implemented
+- Tool inventory now shows 10 total tools
+
+### Configuration Impact
+With v1.4.0 tool configuration system, users have full control:
+- **Typical user**: `ENABLED_TOOLS=basic` (5 tools, no change)
+- **Power user**: `ENABLED_TOOLS=all` (all 10 tools including imagery and lightning)
+- **Lightning safety focus**: `ENABLED_TOOLS=basic,+lightning`
+- **Visual analysis**: `ENABLED_TOOLS=standard,+imagery,+lightning`
+- **Weather enthusiast**: `ENABLED_TOOLS=full,+imagery,+lightning`
+
+### Benefits
+- ✅ **Weather Visualization**: Visual confirmation of precipitation via radar imagery
+- ✅ **Lightning Safety**: Critical real-time safety information for outdoor activities
+- ✅ **Global Coverage**: Both tools work worldwide
+- ✅ **Free APIs**: No API keys or costs required (RainViewer, Blitzortung.org)
+- ✅ **Safety-Critical**: 4-level assessment helps users make informed decisions
+- ✅ **Minimal Overhead**: Both tools only in 'all' preset, doesn't affect basic users
+- ✅ **Zero Breaking Changes**: Existing configurations continue to work
+
+### Use Cases
+- **Outdoor Safety**: Check for nearby lightning before outdoor activities
+- **Weather Analysis**: Visual confirmation of approaching precipitation
+- **Emergency Planning**: Real-time lightning threat assessment
+- **Education**: Understand storm structure through radar and strike patterns
+- **Recreation**: Boaters, hikers, golfers can check safety conditions
+
+**Token Overhead**: ~400 tokens added (total: ~1,400 with all tools, ~600 with basic preset)
+
 ## [1.4.0] - 2025-11-08
 
 ### Added

@@ -91,6 +91,39 @@ An MCP (Model Context Protocol) server that provides **global weather data** to 
   - Safety assessment for maritime activities (sailing, boating, surfing)
   - Wave interpretation guide based on Douglas Sea Scale
   - Important: Data has limited coastal accuracy - NOT for navigation
+- **Weather Imagery**: Visual weather radar and precipitation maps (NEW in v1.5.0)
+  - Global precipitation radar from RainViewer API
+  - Static radar images showing current precipitation
+  - Animated radar loops (up to 2 hours of history)
+  - Tile URLs for efficient rendering
+  - Automatic coordinate-to-tile calculation
+  - Visual confirmation of approaching weather
+  - Free, no API key required
+- **Lightning Activity**: Real-time lightning strike detection and safety monitoring (NEW in v1.5.0)
+  - Real-time strike detection from Blitzortung.org network
+  - Strikes within customizable radius (default: 100km)
+  - 4-level safety assessment (Safe, Elevated, High, Extreme)
+  - Distance to nearest strike with comprehensive statistics
+  - Strike polarity and amplitude information
+  - Safety recommendations based on proximity
+  - Critical for outdoor activity safety planning
+  - Free, no API key required
+- **River Conditions**: Monitor river levels and flood status for safety and recreation (NEW in v1.6.0)
+  - Current water levels from NOAA and USGS gauges
+  - Flood stage thresholds (action, minor, moderate, major)
+  - Streamflow data in cubic feet per second
+  - Distance-based gauge filtering within customizable radius
+  - Safety assessment for boating and recreation
+  - Historical flood crest data when available
+  - US coverage via NOAA NWPS and USGS Water Services
+- **Wildfire Information**: Track active wildfires and fire perimeters (NEW in v1.6.0)
+  - Active wildfire locations and prescribed burns
+  - Fire size, containment status, and discovery date
+  - Distance-based proximity filtering
+  - 4-level safety assessment (Extreme Danger, High Alert, Caution, Awareness)
+  - Evacuation recommendations based on proximity
+  - Detailed fire attributes (type, location, status)
+  - Data from NIFC WFIGS (National Interagency Fire Center)
 - **Service Status Checking**: Proactively verify API availability with health checks
 - **Enhanced Error Handling**: Detailed, actionable error messages with status page links
 - **Intelligent Caching**: Built-in in-memory cache reduces API calls and improves performance
@@ -112,6 +145,10 @@ The cache automatically stores and retrieves weather data with intelligent expir
 
 - **Location Searches**: Cached for 30 days (locations don't move)
 - **Climate Normals**: Cached indefinitely (30-year averages are static) - NEW in v1.2.0
+- **Weather Imagery**: Cached for 15 minutes (radar updates frequently) - NEW in v1.5.0
+- **Lightning Strikes**: Cached for 5 minutes (real-time safety data) - NEW in v1.5.0
+- **River Conditions**: Cached for 1 hour (gauge data updates frequently) - NEW in v1.6.0
+- **Wildfire Information**: Cached for 30 minutes (fire data changes rapidly) - NEW in v1.6.0
 - **Marine Conditions**: Cached for 1 hour (marine data updates hourly) - NEW in v0.6.0
 - **Air Quality Data**: Cached for 1 hour (air quality updates hourly) - v0.5.0
 - **Fire Weather Data**: Cached for 2 hours (gridpoint data updates ~hourly) - v0.5.0
@@ -129,10 +166,10 @@ The cache automatically stores and retrieves weather data with intelligent expir
 Control which MCP tools are exposed to reduce context overhead and customize functionality. By default, only **basic** tools are enabled.
 
 **Available Presets:**
-- `basic` (default): Essential weather tools - forecast, current_conditions, alerts, search_location, check_service_status
-- `standard`: Basic + historical_weather
-- `full`: Standard + air_quality
-- `all`: All available tools including marine_conditions
+- `basic` (default): Essential weather tools (5 tools) - forecast, current_conditions, alerts, search_location, check_service_status
+- `standard`: Basic + historical_weather (6 tools)
+- `full`: Standard + air_quality (7 tools)
+- `all`: All available tools (12 tools) - includes marine_conditions, weather_imagery, lightning_activity, river_conditions, wildfire_info
 
 **Configuration Examples:**
 
@@ -154,7 +191,7 @@ export ENABLED_TOOLS=standard,+air_quality,-alerts
 ```
 
 **Tool Aliases:**
-Short names are supported: `forecast`, `current`, `conditions`, `alerts`, `warnings`, `historical`, `history`, `status`, `location`, `search`, `air_quality`, `aqi`, `marine`, `ocean`, `waves`
+Short names are supported: `forecast`, `current`, `conditions`, `alerts`, `warnings`, `historical`, `history`, `status`, `location`, `search`, `air_quality`, `aqi`, `marine`, `ocean`, `waves`, `imagery`, `radar`, `satellite`, `lightning`, `strikes`, `thunderstorm`
 
 **Benefits:**
 - **Reduced Context**: Load only needed tools to reduce initial MCP context
@@ -620,6 +657,144 @@ Provides comprehensive marine weather data with intelligent dual-source support:
 - Wave period for planning and safety
 - Optional 5-day forecast with daily summaries
 
+### 9. get_weather_imagery (NEW in v1.5.0)
+Get weather radar and precipitation imagery for visual weather analysis.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `type` (required): Imagery type - "precipitation", "radar", or "satellite" (Note: satellite not yet implemented)
+- `animated` (optional): Return animated loop vs static image (default: false)
+- `layers` (optional): Additional map layers (reserved for future use)
+
+**Description:**
+Provides access to weather radar and precipitation imagery from RainViewer API with global coverage. Returns tile URLs for efficient rendering of current precipitation or animated radar loops showing up to 2 hours of history. Perfect for visual confirmation of approaching weather systems.
+
+**Examples:**
+```
+"Show me the current radar for New York"
+"Get animated precipitation radar for London for the last 2 hours"
+"Is there any precipitation showing on radar near me?"
+```
+
+**Returns:**
+- Precipitation radar imagery (static or animated)
+- Tile URLs for efficient rendering
+- Frame timestamps for animated sequences
+- Coverage area and resolution information
+- Automatic coordinate-to-tile calculation
+- Up to 2 hours of historical radar frames when animated
+
+**Note:** Satellite imagery is planned for a future release. Precipitation radar provides global coverage via the free RainViewer API.
+
+### 10. get_lightning_activity (NEW in v1.5.0)
+Get real-time lightning strike detection and safety assessment for outdoor activity planning.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `radius` (optional): Search radius in kilometers (1-500, default: 100)
+- `timeWindow` (optional): Historical time window in minutes (1-180, default: 60)
+
+**Description:**
+Provides real-time lightning strike detection from the Blitzortung.org global lightning detection network. Includes comprehensive safety assessment with 4 risk levels based on strike proximity. Critical for outdoor safety planning including boating, hiking, golfing, and other outdoor activities.
+
+**Examples:**
+```
+"Are there any lightning strikes near Miami?"
+"Check for lightning activity within 50km"
+"Is it safe to be outside based on lightning?"
+"Show me recent lightning strikes in the last hour"
+```
+
+**Returns:**
+- Real-time lightning strikes within specified radius
+- 4-level safety assessment:
+  - **Safe** (>50km): No immediate lightning threat
+  - **Elevated** (16-50km): Monitor conditions, plan indoor access
+  - **High** (8-16km): Seek shelter immediately
+  - **Extreme** (<8km): Active thunderstorm, dangerous conditions
+- Comprehensive statistics:
+  - Total strikes and strike density (per sq km)
+  - Strikes per minute rate
+  - Distance to nearest strike
+  - Average distance of all strikes
+- Strike details:
+  - Polarity (cloud-to-ground vs intra-cloud)
+  - Amplitude in kiloamperes (kA)
+  - Precise timestamp and location
+- Safety recommendations based on proximity
+- Geographic region-optimized data retrieval
+
+**Note:** Data provided by Blitzortung.org, a free community-operated lightning detection network. May have regional coverage variations.
+
+### 11. get_river_conditions (NEW in v1.6.0)
+Monitor river levels and flood status using NOAA and USGS data sources.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `radius` (optional): Search radius in kilometers (1-500, default: 50)
+
+**Description:**
+Provides comprehensive river and streamflow monitoring for flood safety and recreation planning. Automatically finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Uses NOAA National Water Prediction Service (NWPS) for gauge locations and USGS Water Services for real-time streamflow data.
+
+**Examples:**
+```
+"What are the river conditions near St. Louis?" (latitude: 38.6270, longitude: -90.1994)
+"Check for flooding on the Mississippi River"
+"Is the river level safe for kayaking?"
+"Show me nearby river gauge readings"
+```
+
+**Returns:**
+- Nearest river gauges with current water levels
+- Flood stage thresholds (action, minor, moderate, major)
+- Current flood status and forecast
+- Streamflow data (cubic feet per second)
+- Distance to each gauge from query location
+- River and location names
+- Safety assessment for recreation
+- Historical context (flood crests if available)
+
+**Note:** US coverage only. Data provided by NOAA National Water Prediction Service and USGS Water Services.
+
+### 12. get_wildfire_info (NEW in v1.6.0)
+Monitor active wildfires and fire perimeters for safety and evacuation planning.
+
+**Parameters:**
+- `latitude` (required): Latitude coordinate (-90 to 90)
+- `longitude` (required): Longitude coordinate (-180 to 180)
+- `radius` (optional): Search radius in kilometers (1-500, default: 100)
+
+**Description:**
+Provides critical wildfire monitoring and safety information using NIFC (National Interagency Fire Center) data. Reports active wildfires and prescribed burns within the specified radius, including fire size, containment status, and proximity-based safety assessments. Essential for residents in fire-prone regions and outdoor activity planning.
+
+**Examples:**
+```
+"Are there any wildfires near Los Angeles?" (latitude: 34.0522, longitude: -118.2437)
+"Check for active fires in Colorado"
+"How close is the nearest wildfire?"
+"Show me fire perimeters and containment status"
+```
+
+**Returns:**
+- Active wildfire locations within search radius
+- Fire size in acres and hectares
+- Containment percentage with visual indicator
+- Distance from query location to each fire
+- Discovery date and days active
+- Fire type (Wildfire vs Prescribed Fire)
+- Location details (state, county, city)
+- 4-level safety assessment:
+  - **EXTREME DANGER** (<5km): Evacuate if advised
+  - **HIGH ALERT** (5-25km): Prepare for evacuation
+  - **CAUTION** (25-50km): Monitor conditions
+  - **AWARENESS** (>50km): Stay informed
+- Evacuation recommendations and safety guidance
+
+**Note:** Data from NIFC WFIGS (Wildland Fire Interagency Geospatial Services). Always consult official sources for evacuation orders at https://inciweb.nwcg.gov/
+
 ## Error Handling & Service Status
 
 ### Enhanced Error Messages
@@ -694,7 +869,7 @@ Use the `check_service_status` tool to proactively verify API availability:
 
 ### Automated Test Suite
 
-This project includes a comprehensive test suite with 722 automated tests:
+This project includes a comprehensive test suite with 1,042 automated tests:
 
 ```bash
 # Run all tests
@@ -711,14 +886,14 @@ npm run test:ui
 ```
 
 **Test Coverage:**
-- **722 tests** across unit and integration test suites (29 new tests in v1.2.1)
-- **100% coverage** on critical utilities (cache, validation, units, errors, normals, snow, timezone)
-- **54% overall coverage** with focus on reliability and security
-- All tests execute in ~1 second
+- **1,042 tests** across unit and integration test suites (111 new tests in v1.6.0)
+- **100% coverage** on critical utilities (cache, validation, units, errors, normals, snow, timezone, distance, geohash, security)
+- **100% pass rate** with comprehensive security and boundary validation
+- All tests execute in ~2 seconds
 
 **Test Categories:**
-- **Unit Tests** (427 tests) - Cache, validation, units, errors, config, retry logic, normals, snow, timezone
-- **Integration Tests** (19 tests) - Error recovery scenarios, service status checks
+- **Unit Tests** (965 tests) - Cache, validation, units, errors, config, retry logic, normals, snow, timezone, distance, security, geohash
+- **Integration Tests** (77 tests) - Error recovery, service status checks, safety & hazards features
 
 ### Quick API Connectivity Test
 

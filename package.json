@@ -1,6 +1,6 @@
 {
   "name": "@dangahagan/weather-mcp",
-  "version": "1.4.0",
+  "version": "1.6.1",
   "description": "MCP (Model Context Protocol) server providing weather data from NOAA and Open-Meteo APIs. Supports forecasts, current conditions, and historical weather data (1940-present) with no API keys required.",
   "mcpName": "io.github.dgahagan/weather-mcp",
   "main": "dist/index.js",
@@ -55,17 +55,21 @@
     "url": "https://github.com/dgahagan/weather-mcp/issues"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.21.0",
+    "@modelcontextprotocol/sdk": "^1.21.1",
     "axios": "^1.13.1",
     "dotenv": "^17.2.3",
-    "luxon": "^3.7.2"
+    "luxon": "^3.7.2",
+    "mqtt": "^5.14.1",
+    "ngeohash": "^0.6.3"
   },
   "devDependencies": {
     "@types/luxon": "^3.7.1",
+    "@types/mqtt": "^0.0.34",
+    "@types/ngeohash": "^0.6.8",
     "@types/node": "^24.10.0",
-    "@vitest/coverage-v8": "^4.0.7",
+    "@vitest/coverage-v8": "^4.0.8",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.7"
+    "vitest": "^4.0.8"
   }
 }

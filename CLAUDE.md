@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA and Open-Meteo APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, and severe weather alerts.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.3.0 (Production Ready)
+- **Version:** 1.6.1 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** @modelcontextprotocol/sdk v1.21.0
 
@@ -26,10 +26,14 @@ src/
 │   ├── statusHandler.ts
 │   ├── locationHandler.ts
 │   ├── airQualityHandler.ts
-│   └── marineConditionsHandler.ts
+│   ├── marineConditionsHandler.ts
+│   ├── riverConditionsHandler.ts
+│   └── wildfireHandler.ts
 ├── services/                # External API clients
 │   ├── noaa.ts             # NOAA Weather API client
-│   └── openmeteo.ts        # Open-Meteo API client
+│   ├── openmeteo.ts        # Open-Meteo API client
+│   ├── nifc.ts             # NIFC wildfire API client
+│   └── usgs.ts             # USGS water services client
 ├── types/                   # TypeScript type definitions
 │   ├── noaa.ts
 │   └── openmeteo.ts
@@ -40,7 +44,9 @@ src/
 │   ├── logger.ts           # Structured logging
 │   ├── airQuality.ts       # AQI calculations
 │   ├── marine.ts           # Wave/ocean utilities
-│   └── fireWeather.ts      # Fire weather indices
+│   ├── fireWeather.ts      # Fire weather indices
+│   ├── distance.ts         # Haversine distance calculations
+│   └── geohash.ts          # Geohash encoding/decoding
 ├── config/                  # Configuration
 │   ├── cache.ts            # Cache TTL settings
 │   └── displayThresholds.ts # Display logic constants
@@ -56,16 +62,20 @@ src/
 4. **Caching Strategy:** LRU cache with TTL based on data volatility (see `src/config/cache.ts`)
 5. **Error Hierarchy:** Custom error classes for different failure scenarios
 
-## Key Features (8 MCP Tools)
+## Key Features (12 MCP Tools)
 
 1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location)
 2. **get_current_conditions** - Current weather + fire weather indices (NOAA, US only)
 3. **get_alerts** - Weather alerts/warnings (NOAA, US only)
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo, global)
-5. **check_service_status** - API health check (both services)
+5. **check_service_status** - API health check (all services)
 6. **search_location** - Location search/geocoding (Open-Meteo)
 7. **get_air_quality** - Air quality index + pollutants (Open-Meteo, global)
 8. **get_marine_conditions** - Wave height, swell, currents (Open-Meteo, global)
+9. **get_weather_imagery** - Weather radar/precipitation imagery (RainViewer, global)
+10. **get_lightning_activity** - Real-time lightning detection (Blitzortung.org, global)
+11. **get_river_conditions** - River levels and flood monitoring (NOAA/USGS, US only)
+12. **get_wildfire_info** - Active wildfire tracking (NIFC, US only)
 
 ## Development Guidelines
 
@@ -137,9 +147,13 @@ tests/
 │   ├── retry-logic.test.ts # Backoff algorithms
 │   ├── security.test.ts    # Security validation
 │   ├── bounds-checking.test.ts  # Array bounds
-│   └── alert-sorting.test.ts    # Performance optimizations
-└── integration/             # Integration tests (API mocks)
-    └── error-recovery.test.ts
+│   ├── alert-sorting.test.ts    # Performance optimizations
+│   ├── distance.test.ts    # Haversine distance calculations
+│   ├── security-v1.6.test.ts    # v1.6.0 security boundaries
+│   └── geohash-neighbors.test.ts # Geohash neighbor API
+└── integration/             # Integration tests (with API calls)
+    ├── error-recovery.test.ts
+    └── safety-hazards.test.ts   # River and wildfire features
 ```
 
 ### Testing Requirements
@@ -369,11 +383,11 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.3.0
+- **Version:** 1.6.1
 - **Status:** Production Ready ✅
-- **Security Rating:** A+ (Excellent)
-- **Test Coverage:** 722 tests, 100% pass rate
-- **Code Quality:** A+ (97/100)
+- **Security Rating:** A- (Excellent, 93/100)
+- **Test Coverage:** 1,042 tests, 100% pass rate
+- **Code Quality:** A+ (Excellent, 97.5/100)
 
 ## Useful References
 
@@ -395,6 +409,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2025-11-07 (v1.3.0 release)
+**Last Updated:** 2025-11-10 (v1.6.1 release)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.

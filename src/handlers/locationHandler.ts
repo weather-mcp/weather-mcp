@@ -10,6 +10,32 @@ interface LocationArgs {
   limit?: number;
 }
 
+/**
+ * Escape user input for safe embedding in Markdown
+ * Prevents Markdown injection attacks (e.g., embedded links, images, code blocks)
+ * @param text - User-provided text to escape
+ * @returns Escaped text safe for Markdown rendering
+ */
+function escapeMarkdown(text: string): string {
+  // Escape Markdown special characters and normalize whitespace
+  return text
+    .replace(/\\/g, '\\\\')    // Backslash (must be first)
+    .replace(/\*/g, '\\*')      // Asterisk (bold/italic)
+    .replace(/_/g, '\\_')       // Underscore (bold/italic)
+    .replace(/\[/g, '\\[')      // Left bracket (links)
+    .replace(/\]/g, '\\]')      // Right bracket (links)
+    .replace(/\(/g, '\\(')      // Left paren (links)
+    .replace(/\)/g, '\\)')      // Right paren (links)
+    .replace(/</g, '&lt;')      // Less than (HTML/autolinks)
+    .replace(/>/g, '&gt;')      // Greater than (HTML/autolinks)
+    .replace(/`/g, '\\`')       // Backtick (code)
+    .replace(/~/g, '\\~')       // Tilde (strikethrough)
+    .replace(/#/g, '\\#')       // Hash (headers)
+    .replace(/!/g, '\\!')       // Exclamation (images)
+    .replace(/\n/g, ' ')        // Newlines -> spaces (prevent structure injection)
+    .replace(/\r/g, '');        // Remove carriage returns
+}
+
 export async function handleSearchLocation(
   args: unknown,
   openMeteoService: OpenMeteoService
@@ -40,7 +66,8 @@ export async function handleSearchLocation(
 
   // Format the results for display
   let output = `# Location Search Results\n\n`;
-  output += `**Query:** "${query}"\n`;
+  // Escape user query to prevent Markdown injection
+  output += `**Query:** "${escapeMarkdown(query)}"\n`;
   output += `**Found:** ${response.results.length} location${response.results.length > 1 ? 's' : ''}\n\n`;
   output += `---\n\n`;
 

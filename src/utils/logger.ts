@@ -158,3 +158,31 @@ function createDefaultLogger(): Logger {
 
 // Export singleton instance
 export const logger = createDefaultLogger();
+
+/**
+ * Round coordinates for logging to protect user privacy
+ * Reduces precision to ~1.1km accuracy (2 decimal places)
+ * Set LOG_PII=true environment variable to log full precision (not recommended for production)
+ *
+ * Privacy rationale: Precise coordinates can reveal sensitive locations (homes, workplaces).
+ * Rounded coordinates provide sufficient context for debugging while protecting user privacy.
+ *
+ * @param latitude - Original latitude
+ * @param longitude - Original longitude
+ * @returns Rounded coordinates object
+ */
+export function redactCoordinatesForLogging(latitude: number, longitude: number): { lat: number; lon: number } {
+  // Check if PII logging is explicitly enabled (not recommended)
+  const logPII = process.env.LOG_PII === 'true';
+
+  if (logPII) {
+    return { lat: latitude, lon: longitude };
+  }
+
+  // Round to 2 decimal places (~1.1km precision at equator)
+  // This balances GDPR/CPRA data minimization with operational observability
+  return {
+    lat: Math.round(latitude * 100) / 100,
+    lon: Math.round(longitude * 100) / 100
+  };
+}

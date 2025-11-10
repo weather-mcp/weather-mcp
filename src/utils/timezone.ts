@@ -120,8 +120,8 @@ export function getTimezoneAbbreviation(timezone: string, datetime?: Date): stri
  */
 export function guessTimezoneFromCoords(latitude: number, longitude: number): string {
   // This is a simplified heuristic - in practice, APIs usually provide timezone
-  // We use Intl.DateTimeFormat to guess based on system locale, but prefer
-  // to use timezone data from API responses when available
+  // For production use, consider integrating a proper coordinate-to-timezone library
+  // like tz-lookup or @photostructure/tz-lookup for accurate global coverage
 
   // Map to common US timezones for North America based on longitude
   if (latitude >= 24 && latitude <= 50 && longitude >= -125 && longitude <= -66) {
@@ -131,12 +131,11 @@ export function guessTimezoneFromCoords(latitude: number, longitude: number): st
     if (longitude >= -125) return 'America/Los_Angeles';
   }
 
-  // For other regions, try to use Intl to guess
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return 'UTC';
-  }
+  // For international locations, default to UTC instead of server timezone
+  // This provides predictable, unambiguous timestamps for all users
+  // Note: The previous fallback to Intl.DateTimeFormat().resolvedOptions().timeZone
+  // would return the server's local timezone, which is misleading for international queries
+  return 'UTC';
 }
 
 /**

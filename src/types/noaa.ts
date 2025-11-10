@@ -389,3 +389,186 @@ export interface GridpointProperties extends GridpointFireWeather, GridpointSeve
 }
 
 export type GridpointResponse = NOAAResponse<GridpointProperties>;
+
+/**
+ * NWPS (National Water Prediction Service) River Gauge Types
+ */
+
+/**
+ * Flood category levels in feet for a river gauge
+ */
+export interface FloodCategories {
+  action: number; // Action stage in feet
+  minor: number; // Minor flood stage in feet
+  moderate: number; // Moderate flood stage in feet
+  major: number; // Major flood stage in feet
+}
+
+/**
+ * Historical crest data for a river gauge
+ */
+export interface HistoricCrest {
+  value: number; // Stage in feet
+  flow?: number; // Flow in cfs (optional)
+  date: string; // ISO 8601 datetime
+  description?: string; // Impact description
+}
+
+/**
+ * Current status for a river gauge (observed or forecast)
+ */
+export interface GaugeStatus {
+  primary: number | null; // Stage in feet
+  secondary: number | null; // Flow in kcfs (thousand cubic feet per second)
+  floodCategory: 'major' | 'moderate' | 'minor' | 'action' | 'no flooding' | null;
+  validTime: string; // ISO 8601 datetime
+}
+
+/**
+ * River gauge metadata and current status from NWPS API
+ */
+export interface NWPSGauge {
+  lid: string; // NWSLI (5-character identifier)
+  usgsId?: string; // USGS site number (optional)
+  name: string; // Gauge name (e.g., "Mississippi River at St. Louis")
+  latitude: number;
+  longitude: number;
+  state: string;
+  county?: string;
+  timeZone: string; // IANA timezone (e.g., "America/Chicago")
+  wfo: string; // Weather Forecast Office
+  rfc: string; // River Forecast Center
+  status: {
+    observed?: GaugeStatus;
+    forecast?: GaugeStatus;
+  };
+  flood: {
+    categories: FloodCategories;
+    crests?: {
+      historic?: HistoricCrest[];
+      recent?: HistoricCrest[];
+    };
+  };
+  inService: boolean;
+  upstreamLid?: string;
+  downstreamLid?: string;
+}
+
+/**
+ * Stage/flow time series data point from NWPS stageflow endpoint
+ */
+export interface StageFlowDataPoint {
+  validTime: string; // ISO 8601 datetime
+  generatedTime: string; // ISO 8601 datetime
+  primary: number | null; // Stage in feet
+  secondary: number | null; // Flow in kcfs
+}
+
+/**
+ * Stage/flow time series response from NWPS
+ */
+export interface NWPSStageFlowResponse {
+  lid: string;
+  issued: string; // ISO 8601 datetime
+  timeZone: string;
+  primaryName: string; // "Stage"
+  primaryUnits: string; // "ft"
+  secondaryName: string; // "Flow"
+  secondaryUnits: string; // "kcfs"
+  data: StageFlowDataPoint[];
+}
+
+/**
+ * USGS Water Services API Types
+ */
+
+/**
+ * USGS site information
+ */
+export interface USGSSite {
+  siteName: string;
+  siteCode: string; // Site number
+  network: string; // "USGS"
+  geoLocation: {
+    geogLocation: {
+      latitude: number;
+      longitude: number;
+      srs: string; // "EPSG:4326"
+    };
+    localSiteXY?: unknown[];
+  };
+  timeZoneInfo: {
+    defaultTimeZone: {
+      zoneOffset: string; // "-08:00"
+      zoneAbbreviation: string; // "PST"
+    };
+    daylightSavingsTimeZone?: {
+      zoneOffset: string;
+      zoneAbbreviation: string;
+    };
+  };
+  siteProperty?: Array<{
+    name: string;
+    value: string;
+  }>;
+}
+
+/**
+ * USGS variable definition (e.g., streamflow parameter 00060)
+ */
+export interface USGSVariable {
+  variableCode: string; // "00060" for streamflow
+  variableName: string; // "Streamflow, ft³/s"
+  variableDescription: string;
+  unit: {
+    unitCode: string; // "ft3/s"
+  };
+  noDataValue: number; // -999999.0
+}
+
+/**
+ * USGS time series value (observation)
+ */
+export interface USGSValue {
+  value: string; // Numeric value as string
+  qualifiers: string[]; // ["P"] for provisional, ["A"] for approved
+  dateTime: string; // ISO 8601 datetime with timezone
+}
+
+/**
+ * USGS time series data
+ */
+export interface USGSTimeSeries {
+  sourceInfo: USGSSite;
+  variable: USGSVariable;
+  values: Array<{
+    value: USGSValue[];
+    method: string[];
+  }>;
+}
+
+/**
+ * USGS Instantaneous Values (IV) response
+ */
+export interface USGSIVResponse {
+  name: string;
+  declaredType: string;
+  scope: string;
+  value: {
+    queryInfo: {
+      queryURL: string;
+      criteria: {
+        locationParam: string;
+        variableParam: string;
+      };
+      note: Array<{
+        value: string;
+        title: string;
+      }>;
+    };
+    timeSeries: USGSTimeSeries[];
+  };
+  nil: boolean;
+  globalScope: boolean;
+  typeSubstituted: boolean;
+}

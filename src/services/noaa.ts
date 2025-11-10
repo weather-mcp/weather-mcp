@@ -10,7 +10,10 @@ import type {
   ObservationCollectionResponse,
   StationCollectionResponse,
   AlertCollectionResponse,
-  NOAAErrorResponse
+  NOAAErrorResponse,
+  NWPSGauge,
+  NWPSStageFlowResponse,
+  USGSIVResponse
 } from '../types/noaa.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
@@ -27,12 +30,16 @@ import {
 export interface NOAAServiceConfig {
   userAgent?: string;
   baseURL?: string;
+  nwpsBaseURL?: string;
+  usgsBaseURL?: string;
   timeout?: number;
   maxRetries?: number;
 }
 
 export class NOAAService {
   private client: AxiosInstance;
+  private nwpsClient: AxiosInstance; // For NOAA water/river data
+  private usgsClient: AxiosInstance; // For USGS streamflow data
   private maxRetries: number;
   private cache: Cache;
 
@@ -40,6 +47,8 @@ export class NOAAService {
     const {
       userAgent = '(weather-mcp, contact@example.com)',
       baseURL = 'https://api.weather.gov',
+      nwpsBaseURL = 'https://api.water.noaa.gov/nwps/v1',
+      usgsBaseURL = 'https://waterservices.usgs.gov',
       timeout = CacheConfig.apiTimeoutMs,
       maxRetries = 3
     } = config;
@@ -47,6 +56,7 @@ export class NOAAService {
     this.maxRetries = maxRetries;
     this.cache = new Cache(CacheConfig.maxSize);
 
+    // Main NOAA Weather API client
     this.client = axios.create({
       baseURL,
       timeout,
@@ -56,8 +66,37 @@ export class NOAAService {
       }
     });
 
+    // NWPS (National Water Prediction Service) client for river gauges
+    this.nwpsClient = axios.create({
+      baseURL: nwpsBaseURL,
+      timeout,
+      headers: {
+        'User-Agent': userAgent,
+        'Accept': 'application/json'
+      }
+    });
+
+    // USGS Water Services client for streamflow data
+    this.usgsClient = axios.create({
+      baseURL: usgsBaseURL,
+      timeout,
+      headers: {
+        'User-Agent': userAgent
+      }
+    });
+
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
+      response => response,
+      error => this.handleError(error)
+    );
+
+    this.nwpsClient.interceptors.response.use(
+      response => response,
+      error => this.handleError(error)
+    );
+
+    this.usgsClient.interceptors.response.use(
       response => response,
       error => this.handleError(error)
     );
@@ -586,5 +625,260 @@ export class NOAAService {
       : `/alerts?point=${latitude.toFixed(4)},${longitude.toFixed(4)}`;
 
     return this.makeRequest<AlertCollectionResponse>(url);
+  }
+
+  /**
+   * NWPS (National Water Prediction Service) Methods for River Gauges
+   */
+
+  /**
+   * Get a specific river gauge by its NWSLI identifier
+   * @param lid 5-character NWSLI identifier (e.g., "LOLT2")
+   * @returns River gauge data with current conditions and flood stages
+   */
+  async getNWPSGauge(lid: string): Promise<NWPSGauge> {
+    // Check cache first (if enabled)
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('nwps-gauge', lid);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as NWPSGauge;
+      }
+
+      const response = await this.nwpsClient.get<NWPSGauge>(`/gauges/${lid}`);
+      const result = response.data;
+
+      // Cache for 1 hour (river conditions update hourly)
+      this.cache.set(cacheKey, result, 3600000);
+      return result;
+    }
+
+    const response = await this.nwpsClient.get<NWPSGauge>(`/gauges/${lid}`);
+    return response.data;
+  }
+
+  /**
+   * Get stage/flow time series data for a specific gauge
+   * @param lid 5-character NWSLI identifier
+   * @returns Time series of stage and flow data
+   */
+  async getNWPSStageFlow(lid: string): Promise<NWPSStageFlowResponse> {
+    // Check cache first (if enabled)
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('nwps-stageflow', lid);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as NWPSStageFlowResponse;
+      }
+
+      const response = await this.nwpsClient.get<NWPSStageFlowResponse>(`/gauges/${lid}/stageflow`);
+      const result = response.data;
+
+      // Cache for 30 minutes (frequently updated)
+      this.cache.set(cacheKey, result, 1800000);
+      return result;
+    }
+
+    const response = await this.nwpsClient.get<NWPSStageFlowResponse>(`/gauges/${lid}/stageflow`);
+    return response.data;
+  }
+
+  /**
+   * Get all NWPS gauges (warning: large response, should be filtered)
+   * Note: This endpoint returns all gauges across the US. Consider using
+   * geographic filtering or querying by specific gauge IDs instead.
+   * @returns Array of all river gauges
+   * @deprecated Use getNWPSGaugesInBoundingBox instead to avoid downloading entire catalog
+   */
+  async getAllNWPSGauges(): Promise<NWPSGauge[]> {
+    // Check cache first (if enabled) - cache for 24 hours (gauges rarely change)
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('nwps-all-gauges');
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as NWPSGauge[];
+      }
+
+      const response = await this.nwpsClient.get<NWPSGauge[]>('/gauges');
+      const result = response.data;
+
+      // Cache for 24 hours (gauge locations don't change often)
+      this.cache.set(cacheKey, result, 86400000);
+      return result;
+    }
+
+    const response = await this.nwpsClient.get<NWPSGauge[]>('/gauges');
+    return response.data;
+  }
+
+  /**
+   * Get NWPS river gauges within a bounding box
+   * More efficient than getAllNWPSGauges() for location-specific queries
+   * @param west Western longitude boundary
+   * @param south Southern latitude boundary
+   * @param east Eastern longitude boundary
+   * @param north Northern latitude boundary
+   * @returns Array of gauges within the bounding box
+   */
+  async getNWPSGaugesInBoundingBox(
+    west: number,
+    south: number,
+    east: number,
+    north: number
+  ): Promise<NWPSGauge[]> {
+    // Validate bounding box
+    validateLongitude(west);
+    validateLongitude(east);
+    validateLatitude(south);
+    validateLatitude(north);
+
+    if (west >= east) {
+      throw new Error('Invalid bounding box: west longitude must be less than east longitude');
+    }
+    if (south >= north) {
+      throw new Error('Invalid bounding box: south latitude must be less than north latitude');
+    }
+
+    // Check cache first (if enabled)
+    const bboxKey = `${west.toFixed(2)},${south.toFixed(2)},${east.toFixed(2)},${north.toFixed(2)}`;
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('nwps-gauges-bbox', bboxKey);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as NWPSGauge[];
+      }
+    }
+
+    // NWPS API supports bounding box queries via query parameters
+    const params = {
+      west: west.toString(),
+      south: south.toString(),
+      east: east.toString(),
+      north: north.toString()
+    };
+
+    try {
+      const response = await this.nwpsClient.get<NWPSGauge[]>('/gauges', { params });
+      const result = response.data;
+
+      // Cache for 24 hours
+      if (CacheConfig.enabled) {
+        const cacheKey = Cache.generateKey('nwps-gauges-bbox', bboxKey);
+        this.cache.set(cacheKey, result, 86400000);
+      }
+
+      return result;
+    } catch (error) {
+      // If bounding box query fails, fall back to client-side filtering
+      // This provides compatibility if the API doesn't support bbox queries
+      logger.warn('NWPS bounding box query failed, falling back to client-side filtering', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      const allGauges = await this.getAllNWPSGauges();
+      const filtered = allGauges.filter(gauge =>
+        gauge.longitude >= west &&
+        gauge.longitude <= east &&
+        gauge.latitude >= south &&
+        gauge.latitude <= north
+      );
+
+      // Cache the filtered result
+      if (CacheConfig.enabled) {
+        const cacheKey = Cache.generateKey('nwps-gauges-bbox', bboxKey);
+        this.cache.set(cacheKey, filtered, 86400000);
+      }
+
+      return filtered;
+    }
+  }
+
+  /**
+   * USGS Water Services Methods for Streamflow Data
+   */
+
+  /**
+   * Get real-time streamflow data for sites within a bounding box
+   * @param west Western longitude boundary
+   * @param south Southern latitude boundary
+   * @param east Eastern longitude boundary
+   * @param north Northern latitude boundary
+   * @returns USGS instantaneous values response with streamflow data
+   */
+  async getUSGSStreamflow(
+    west: number,
+    south: number,
+    east: number,
+    north: number
+  ): Promise<USGSIVResponse> {
+    // Validate bounding box
+    validateLongitude(west);
+    validateLongitude(east);
+    validateLatitude(south);
+    validateLatitude(north);
+
+    if (west >= east) {
+      throw new Error('Invalid bounding box: west longitude must be less than east longitude');
+    }
+    if (south >= north) {
+      throw new Error('Invalid bounding box: south latitude must be less than north latitude');
+    }
+
+    // USGS API limits: product of lat/lon range cannot exceed 25 degrees
+    const latRange = north - south;
+    const lonRange = east - west;
+    if (latRange * lonRange > 25) {
+      throw new Error('Bounding box too large: product of latitude and longitude ranges cannot exceed 25 degrees');
+    }
+
+    // Check cache first (if enabled)
+    const bboxKey = `${west},${south},${east},${north}`;
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('usgs-streamflow', bboxKey);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as USGSIVResponse;
+      }
+
+      const url = `/nwis/iv/?format=json&bBox=${bboxKey}&parameterCd=00060&siteStatus=active`;
+      const response = await this.usgsClient.get<USGSIVResponse>(url);
+      const result = response.data;
+
+      // Cache for 15 minutes (current data)
+      this.cache.set(cacheKey, result, 900000);
+      return result;
+    }
+
+    const url = `/nwis/iv/?format=json&bBox=${bboxKey}&parameterCd=00060&siteStatus=active`;
+    const response = await this.usgsClient.get<USGSIVResponse>(url);
+    return response.data;
+  }
+
+  /**
+   * Get real-time streamflow data for a specific USGS site
+   * @param siteNumber USGS site number (e.g., "01646500")
+   * @returns USGS instantaneous values response with streamflow data
+   */
+  async getUSGSStreamflowForSite(siteNumber: string): Promise<USGSIVResponse> {
+    // Check cache first (if enabled)
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('usgs-site-streamflow', siteNumber);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as USGSIVResponse;
+      }
+
+      const url = `/nwis/iv/?format=json&sites=${siteNumber}&parameterCd=00060&siteStatus=active`;
+      const response = await this.usgsClient.get<USGSIVResponse>(url);
+      const result = response.data;
+
+      // Cache for 15 minutes (current data)
+      this.cache.set(cacheKey, result, 900000);
+      return result;
+    }
+
+    const url = `/nwis/iv/?format=json&sites=${siteNumber}&parameterCd=00060&siteStatus=active`;
+    const response = await this.usgsClient.get<USGSIVResponse>(url);
+    return response.data;
   }
 }

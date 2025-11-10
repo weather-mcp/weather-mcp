@@ -61,21 +61,23 @@ function getMaxProbabilityFromSeries(series: GridpointDataSeries | undefined, ho
   }
 
   // Defense-in-depth: Add bounds checking to prevent resource exhaustion
+  // IMPORTANT: Work on a local copy to avoid mutating cached data
+  let valuesToProcess = series.values;
   if (series.values.length > maxEntries) {
     logger.warn('Gridpoint series exceeds max entries', {
       length: series.values.length,
       maxEntries,
       securityEvent: true
     });
-    // Slice to limit processing
-    series.values = series.values.slice(0, maxEntries);
+    // Create a local copy with limited entries - do not mutate the original
+    valuesToProcess = series.values.slice(0, maxEntries);
   }
 
   const now = new Date();
   const futureTime = new Date(now.getTime() + hours * 60 * 60 * 1000);
 
   let maxValue = 0;
-  for (const entry of series.values) {
+  for (const entry of valuesToProcess) {
     // Parse ISO 8601 interval (e.g., "2025-11-06T15:00:00+00:00/PT1H")
     const validTimeStart = new Date(entry.validTime.split('/')[0]);
 

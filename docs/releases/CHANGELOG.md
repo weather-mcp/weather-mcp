@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2025-11-10
+
+### Added
+
+#### 🌊 Safety & Hazards Monitoring
+
+- **River Conditions** - NEW `get_river_conditions` MCP tool for flood monitoring
+  - Monitor river levels and streamflow at NOAA/USGS gauges
+  - Real-time flood stage assessment (action, minor, moderate, major flooding)
+  - Search gauges by location with configurable radius (1-500 km, default 50 km)
+  - Displays up to 5 nearest gauges with distance sorting
+  - Data includes: current level, streamflow, flood stages, gauge status
+  - Timezone-aware timestamps
+  - 1-hour cache TTL
+  - Uses NOAA National Water Prediction Service (NWPS) + USGS Water Services APIs
+  - Coverage: United States only
+
+- **Wildfire Information** - NEW `get_wildfire_info` MCP tool for wildfire tracking
+  - Track active wildfires and prescribed burns
+  - Real-time fire perimeter data from NIFC (National Interagency Fire Center)
+  - Search fires by location with configurable radius (1-500 km, default 100 km)
+  - 4-level proximity-based safety assessment:
+    - ⚠️ EXTREME DANGER (< 5 km)
+    - 🟠 HIGH ALERT (< 25 km)
+    - 🟡 CAUTION (< 50 km)
+    - 🔵 AWARENESS (< 100 km)
+  - Fire details: name, type, size (acres), containment %, discovery date, incident URL
+  - Distinction between wildfires and prescribed burns
+  - Links to official incident management resources
+  - 30-minute cache TTL
+  - Uses NIFC ArcGIS REST API
+  - Coverage: United States only
+
+#### 🧪 Testing Enhancements
+
+- **111 new comprehensive tests** added for release quality assurance:
+  - `distance.test.ts`: 34 tests for Haversine distance calculations
+  - `security-v1.6.test.ts`: 44 tests for security boundaries and resource limits
+  - `geohash-neighbors.test.ts`: 33 tests for geohash neighbor API
+  - Integration tests for river conditions (7 tests)
+  - Integration tests for wildfire information (10 tests)
+- **Total test count: 1,042 tests** (100% pass rate)
+- Increased timeouts for NOAA API integration tests (30s → 60s)
+- Enhanced security boundary testing:
+  - MQTT buffer overflow protection (10,000 strike limit)
+  - Geohash tile calculation safety limit (10,000 max)
+  - Radius parameter clamping (1-500 km)
+  - Bounding box validation
+
+#### 📚 Code Quality & Documentation
+
+- **Code Review Report**: A+ grade (97.5/100) - Zero critical/high issues
+- **Security Audit Report**: A- grade (93/100) - Zero critical/high vulnerabilities
+- **Publishing Workflow Improvements**:
+  - Parallel execution support for code-reviewer and security-auditor agents
+  - Explicit agent report management (delete/recreate behavior)
+  - Detailed "Review and Fix Findings" workflow step
+  - Agent configuration enhancements for output requirements
+
+### Changed
+
+- Tool configuration tests updated for 12 total MCP tools (was 10)
+- Integration test robustness improved (less brittle assertions for changing NOAA data)
+- Documentation version check script passes with all docs in sync
+
+### Technical Details
+
+- **New Services**: NIFCService for wildfire data, enhanced NOAAService for river gauges
+- **New Utilities**: distance.ts for Haversine calculations
+- **New Type Definitions**: NIFC API response types, USGS API types
+- **API Integration**: NIFC ArcGIS REST API, NOAA NWPS API, USGS Water Services API
+- **Zero new runtime dependencies** (excellent supply chain hygiene)
+
 ## [0.4.0] - 2025-11-06
 
 ### Added
