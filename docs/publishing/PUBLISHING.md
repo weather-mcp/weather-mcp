@@ -6,7 +6,7 @@ This guide covers how to publish the Weather MCP Server to npm, create GitHub re
 
 For experienced users, here's the recommended publishing workflow:
 
-1. **Pre-release quality checks** → Run code-reviewer, security-auditor, and test-automator agents; fix all findings (see "Pre-Release Quality Automation")
+1. **Pre-release quality checks** → Run code-reviewer & security-auditor in parallel; review reports; fix all CRITICAL/HIGH findings; run test-automator (see "Pre-Release Quality Automation")
 2. **Pre-release documentation update** → Update all documentation for new version (see "Pre-Release Documentation Update")
 3. **Update versions** → Update `package.json` and `server.json` to new version
 4. **Commit & push** → Commit version updates to main branch
@@ -41,9 +41,11 @@ Before you begin:
 - [ ] README.md is up to date
 - [ ] CHANGELOG.md is updated with release notes
 - [ ] All changes committed to main branch
-- [ ] **Run code-reviewer agent** → Fix all CRITICAL/HIGH issues, commit fixes
-- [ ] **Run security-auditor agent** → Fix ALL security issues, commit fixes
-- [ ] **Run test-automator agent** → Enhance test coverage, commit improvements
+- [ ] **Run code-reviewer and security-auditor agents in parallel** → Generate reports
+- [ ] **Review generated reports** → `docs/development/CODE_REVIEW.md` and `SECURITY_AUDIT.md`
+- [ ] **Fix all CRITICAL/HIGH issues** → Address findings from both reports
+- [ ] **Commit fixes** → `git commit -m "fix/security: Address findings for vX.X.X"`
+- [ ] **Run test-automator agent** → Enhance test coverage based on fixes
 - [ ] Verification passed: build succeeds, all tests pass, no critical vulnerabilities
 - [ ] All pre-release fixes committed (see "Pre-Release Quality Automation" for details)
 
@@ -96,7 +98,14 @@ To avoid shipping releases with unreviewed code quality, security issues, or ina
 
 ### Agent Workflow
 
-Run these agents **in sequence** (each may inform the next):
+**Important:** Each agent will **completely replace** (not append to) its output file to ensure a clean, current assessment for the new release. This prevents confusion between old and new findings and provides a clear snapshot of the current version's status.
+
+**Parallel Execution:** Agents 1 (code-reviewer) and 2 (security-auditor) can be run **in parallel** for faster results, as they are independent of each other. Agent 3 (test-automator) should run after reviewing findings from agents 1 and 2.
+
+**Example parallel invocation in Claude Code:**
+```
+Please run the code-reviewer and security-auditor agents in parallel to assess the codebase for the v1.6.0 release.
+```
 
 #### 1. Code Quality Review
 
@@ -106,9 +115,15 @@ Run these agents **in sequence** (each may inform the next):
 - In Claude Code, type: "Run the code-reviewer agent"
 - Or: Use Task tool with `subagent_type="code-reviewer"`
 
-**Output:** `docs/development/CODE_REVIEW.md`
+**Output:** `docs/development/CODE_REVIEW.md` (will be completely replaced)
 
-**What to do:**
+**What the agent does:**
+1. Deletes existing `docs/development/CODE_REVIEW.md` if present
+2. Performs comprehensive code quality review of current codebase
+3. Generates fresh report with findings specific to this version
+4. Saves new report to `docs/development/CODE_REVIEW.md`
+
+**What you do:**
 1. Review the generated report for code quality issues
 2. **Fix all CRITICAL issues** (marked with severity ratings)
 3. **Strongly consider** fixing HIGH priority issues
@@ -123,14 +138,97 @@ Run these agents **in sequence** (each may inform the next):
 - In Claude Code, type: "Run the security-auditor agent"
 - Or: Use Task tool with `subagent_type="security-auditor"`
 
-**Output:** `docs/development/SECURITY_AUDIT.md`
+**Output:** `docs/development/SECURITY_AUDIT.md` (will be completely replaced)
 
-**What to do:**
+**What the agent does:**
+1. Deletes existing `docs/development/SECURITY_AUDIT.md` if present
+2. Performs comprehensive security audit of current codebase
+3. Generates fresh report with findings specific to this version
+4. Saves new report to `docs/development/SECURITY_AUDIT.md`
+
+**What you do:**
 1. Review security findings in the report
 2. **Fix ALL security vulnerabilities** (no exceptions for releases)
 3. Update dependencies if vulnerabilities found: `npm audit fix`
 4. If `npm audit` shows critical issues, resolve before proceeding
 5. Commit fixes: `git commit -m "security: Address security audit findings for vX.X.X release"`
+
+---
+
+### ⚠️ IMPORTANT: Review and Fix Findings Before Testing
+
+**Before proceeding to the test-automator agent**, you must review and address findings from the code review and security audit reports. This ensures that new tests validate corrected code, not broken code.
+
+#### Step-by-Step Fix Process
+
+1. **Open Both Reports:**
+   - `docs/development/CODE_REVIEW.md`
+   - `docs/development/SECURITY_AUDIT.md`
+
+2. **Prioritize Fixes:**
+   - **CRITICAL/HIGH:** Fix ALL of these (mandatory for release)
+   - **MEDIUM:** Fix within reason (recommended, use judgment)
+   - **LOW:** Optional (nice-to-have, can defer to future releases)
+
+3. **Track Your Progress:**
+   - Use the reports as your checklist
+   - Mark issues as completed in the report files (add ✅ or comments)
+   - Or create a separate tracking issue/checklist
+
+4. **Fix Issues Systematically:**
+   - Address one severity level at a time (CRITICAL → HIGH → MEDIUM → LOW)
+   - Test each fix as you go
+   - Run `npm run build` and `npm test` frequently to catch regressions
+
+5. **Commit Fixes:**
+   ```bash
+   # After fixing critical/high issues from code review
+   git add .
+   git commit -m "fix: Address code review findings for vX.X.X release
+
+   - Fixed issue #1 (CRITICAL): Description
+   - Fixed issue #2 (HIGH): Description
+   - Fixed issue #3 (HIGH): Description
+
+   See docs/development/CODE_REVIEW.md for details."
+
+   # After fixing critical/high security issues
+   git add .
+   git commit -m "security: Address security audit findings for vX.X.X release
+
+   - Fixed vulnerability #1 (CRITICAL): Description
+   - Fixed vulnerability #2 (HIGH): Description
+
+   See docs/development/SECURITY_AUDIT.md for details."
+   ```
+
+6. **Verify All Fixes:**
+   ```bash
+   npm run build  # Must succeed
+   npm test       # All tests must pass
+   npm audit      # Zero critical/high vulnerabilities
+   ```
+
+**Why This Order Matters:**
+- The test-automator will create tests for your **current** code state
+- If you fix issues **after** test creation, you may need to regenerate tests
+- Fixing first ensures tests validate the corrected implementation
+
+**Example Tracking in Reports:**
+
+You can mark completed fixes directly in the generated reports:
+
+```markdown
+### 1.1 Type Coercion Vulnerability ✅ COMPLETED (2025-11-09)
+**Severity:** CRITICAL
+**Status:** Fixed in commit abc123f
+
+[Original finding details...]
+```
+
+Once all CRITICAL and HIGH issues are addressed (and MEDIUM issues within reason), proceed to the test-automator.
+
+---
 
 #### 3. Test Suite Enhancement
 
