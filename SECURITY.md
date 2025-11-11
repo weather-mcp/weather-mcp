@@ -25,7 +25,7 @@ We take the security of the Weather MCP Server seriously. If you believe you hav
 
 Instead, please report them via one of the following methods:
 
-1. **GitHub Security Advisory** (Preferred): Use the [GitHub Security Advisory](https://github.com/dgahagan/weather-mcp/security/advisories/new) feature
+1. **GitHub Security Advisory** (Preferred): Use the [GitHub Security Advisory](https://github.com/weather-mcp/mcp-server/security/advisories/new) feature
 2. **Email**: Send an email to the project maintainer via GitHub profile contact information
 3. **GitHub Issues**: For non-critical security concerns, you may open a regular issue with the `security` label
 

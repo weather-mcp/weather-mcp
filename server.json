@@ -14,7 +14,7 @@
       }
     }
   ],
-  "homepage": "https://github.com/dgahagan/weather-mcp",
+  "homepage": "https://github.com/weather-mcp/mcp-server",
   "license": "MIT",
   "categories": [
     "data",

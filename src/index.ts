@@ -56,7 +56,7 @@ const SERVER_VERSION = packageJson.version;
  * Initialize the NOAA service
  */
 const noaaService = new NOAAService({
-  userAgent: `weather-mcp/${SERVER_VERSION} (https://github.com/dgahagan/weather-mcp)`
+  userAgent: `weather-mcp/${SERVER_VERSION} (https://github.com/weather-mcp/mcp-server)`
 });
 
 /**
@@ -630,8 +630,8 @@ async function main() {
     // Inform users about version and upgrade options
     logger.info('Version check', {
       installedVersion: SERVER_VERSION,
-      latestRelease: 'https://github.com/dgahagan/weather-mcp/releases/latest',
-      upgradeInstructions: 'https://github.com/dgahagan/weather-mcp#upgrading-to-latest-version',
+      latestRelease: 'https://github.com/weather-mcp/mcp-server/releases/latest',
+      upgradeInstructions: 'https://github.com/weather-mcp/mcp-server#upgrading-to-latest-version',
       autoUpdateTip: 'Use npx -y @dangahagan/weather-mcp@latest in MCP config for automatic updates'
     });
   } catch (error) {

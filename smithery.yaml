@@ -7,8 +7,8 @@ runtime: typescript
 name: Weather MCP Server
 description: MCP server providing weather data from NOAA and Open-Meteo APIs with no API keys required
 author: Dan Gahagan
-homepage: https://github.com/dgahagan/weather-mcp
-repository: https://github.com/dgahagan/weather-mcp
+homepage: https://github.com/weather-mcp/mcp-server
+repository: https://github.com/weather-mcp/mcp-server
 
 # Categories for discovery
 categories:

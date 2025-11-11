@@ -403,7 +403,7 @@ npm audit             # No critical vulnerabilities
 
 ## Getting Help
 
-- **Issues:** https://github.com/dgahagan/weather-mcp/issues
+- **Issues:** https://github.com/weather-mcp/mcp-server/issues
 - **Discussions:** Use GitHub Discussions for questions
 - **Security:** See SECURITY.md for vulnerability reporting
 
