@@ -129,7 +129,7 @@ Smithery is ideal for:
 
 1. **Visit:** https://smithery.ai/new
 2. **Click:** "Connect GitHub Repository"
-3. **Select:** dgahagan/weather-mcp
+3. **Select:** weather-mcp/weather-mcp
 4. **Grant** repository permissions
 5. Smithery will:
    - Detect `smithery.yaml`
@@ -296,6 +296,6 @@ Your server's discoverability will increase significantly!
 ## Files Added for Registry Submission
 
 - ✅ `server.json` - GitHub MCP Registry configuration
-- ✅ `smithery.yaml` - Smithery.ai configuration
+- ❌ `smithery.yaml` - Removed (not used for this project)
 - ✅ `package.json` - Already configured for npm
 - ✅ `README.md` - Comprehensive documentation
