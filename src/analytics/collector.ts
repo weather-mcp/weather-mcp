@@ -119,8 +119,8 @@ export class AnalyticsCollector {
         rawData.sequence_number = this.sequenceNumber;
       }
 
-      // Anonymize event based on configured level
-      const event = anonymizeEvent(rawData, this.config.level);
+      // Anonymize event based on configured level (pass salt for session hashing)
+      const event = anonymizeEvent(rawData, this.config.level, this.config.salt);
 
       // Add to buffer
       this.buffer.push(event);
@@ -135,6 +135,7 @@ export class AnalyticsCollector {
       });
 
       // Flush if buffer is full (with rate limiting)
+      // Flush asynchronously to avoid blocking tool requests
       if (this.buffer.length >= this.MAX_BUFFER_SIZE) {
         const timeSinceLastFlush = now - this.lastFlushTime;
         if (timeSinceLastFlush < this.MIN_FLUSH_INTERVAL_MS) {
@@ -145,7 +146,14 @@ export class AnalyticsCollector {
           });
           return; // Don't flush, will be picked up by timer
         }
-        await this.flush();
+        // Schedule flush asynchronously to not block the tool request
+        setImmediate(() => {
+          this.flush().catch((err) => {
+            logger.warn('Async analytics flush error', {
+              error: err instanceof Error ? err.message : 'Unknown error',
+            });
+          });
+        });
       }
     } catch (error) {
       // Fail silently - analytics should never break the application

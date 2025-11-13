@@ -7,7 +7,7 @@ import type { NIFCQueryResponse } from '../types/wildfire.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
-import { logger } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 
 export interface NIFCServiceConfig {
   baseURL?: string;
@@ -83,7 +83,12 @@ export class NIFCService {
       const cacheKey = Cache.generateKey('nifc-fire-perimeters', bboxKey);
       const cached = this.cache.get(cacheKey);
       if (cached) {
-        logger.info('NIFC cache hit', { bbox: bboxKey });
+        // Redact bounding box coordinates for privacy
+        const sw = redactCoordinatesForLogging(south, west);
+        const ne = redactCoordinatesForLogging(north, east);
+        logger.info('NIFC cache hit', {
+          bbox: `${sw.lon},${sw.lat},${ne.lon},${ne.lat}`
+        });
         return cached as NIFCQueryResponse;
       }
 
@@ -123,8 +128,11 @@ export class NIFCService {
 
       const url = `${this.featureServerUrl}/query?${params.toString()}`;
 
+      // Redact bounding box coordinates for privacy
+      const sw = redactCoordinatesForLogging(south, west);
+      const ne = redactCoordinatesForLogging(north, east);
       logger.info('Querying NIFC fire perimeters', {
-        bbox: `${west},${south},${east},${north}`,
+        bbox: `${sw.lon},${sw.lat},${ne.lon},${ne.lat}`,
         url: this.featureServerUrl
       });
 

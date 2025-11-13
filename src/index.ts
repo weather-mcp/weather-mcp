@@ -54,6 +54,35 @@ const SERVER_NAME = 'weather-mcp';
 const SERVER_VERSION = packageJson.version;
 
 /**
+ * Redact sensitive fields from tool arguments before logging
+ * Removes PII like coordinates, location names, addresses
+ */
+function redactSensitiveFields(args: unknown): unknown {
+  if (typeof args !== 'object' || args === null) {
+    return args;
+  }
+
+  const redacted: Record<string, unknown> = {};
+  const sensitiveFields = [
+    'latitude', 'longitude', 'lat', 'lon',
+    'location', 'city', 'state', 'address', 'query',
+    'zipcode', 'postalCode', 'place', 'coordinates'
+  ];
+
+  for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
+    if (sensitiveFields.includes(key)) {
+      redacted[key] = '[REDACTED]';
+    } else if (typeof value === 'object' && value !== null) {
+      redacted[key] = redactSensitiveFields(value);
+    } else {
+      redacted[key] = value;
+    }
+  }
+
+  return redacted;
+}
+
+/**
  * Initialize the NOAA service
  */
 const noaaService = new NOAAService({
@@ -590,10 +619,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
-    // Log the error with full details
+    // Redact sensitive fields from args before logging
+    const redactedArgs = args ? redactSensitiveFields(args) : undefined;
+
+    // Log the error with redacted details
     logger.error('Tool execution error', error as Error, {
       tool: name,
-      args: args ? JSON.stringify(args) : undefined,
+      args: redactedArgs ? JSON.stringify(redactedArgs) : undefined,
     });
     // Format error for user display (sanitized)
     const userMessage = formatErrorForUser(error as Error);

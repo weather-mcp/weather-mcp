@@ -33,7 +33,8 @@ interface RawEventData {
  */
 export function anonymizeEvent(
   rawData: RawEventData,
-  level: AnalyticsLevel
+  level: AnalyticsLevel,
+  salt?: string
 ): AnalyticsEvent {
   // Base event (minimal level) - always included
   const baseEvent = {
@@ -71,7 +72,7 @@ export function anonymizeEvent(
     ...standardEvent,
     analytics_level: 'detailed' as const,
     ...(rawData.parameters && { parameters: sanitizeParameters(rawData.parameters) }),
-    ...(rawData.session_id && { session_id: hashSessionId(rawData.session_id) }),
+    ...(rawData.session_id && { session_id: hashSessionId(rawData.session_id, salt) }),
     ...(rawData.sequence_number !== undefined && { sequence_number: rawData.sequence_number }),
   };
 

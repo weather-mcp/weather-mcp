@@ -21,7 +21,7 @@ import type {
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
-import { logger } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { computeNormalsFrom30YearData, getNormalsCacheKey } from '../utils/normals.js';
 import { getUserAgent } from '../utils/version.js';
 import {
@@ -1154,15 +1154,18 @@ export class OpenMeteoService {
 
     // Check cache first (normals don't change, so cache forever)
     const cacheKey = getNormalsCacheKey(latitude, longitude, month, day);
-    const cached = this.cache.get(cacheKey) as ClimateNormals | undefined;
-    if (cached) {
-      logger.info('Climate normals cache hit', { latitude, longitude, month, day });
-      return cached;
+    if (CacheConfig.enabled) {
+      const cached = this.cache.get(cacheKey) as ClimateNormals | undefined;
+      if (cached) {
+        const redacted = redactCoordinatesForLogging(latitude, longitude);
+        logger.info('Climate normals cache hit', { ...redacted, month, day });
+        return cached;
+      }
     }
 
+    const redacted = redactCoordinatesForLogging(latitude, longitude);
     logger.info('Computing climate normals from 30-year historical data', {
-      latitude,
-      longitude,
+      ...redacted,
       month,
       day
     });
@@ -1197,12 +1200,14 @@ export class OpenMeteoService {
       // Compute normals from 30-year data
       const normals = computeNormalsFrom30YearData(response, month, day);
 
-      // Cache indefinitely (normals don't change)
-      this.cache.set(cacheKey, normals, Infinity);
+      // Cache indefinitely (normals don't change) if caching is enabled
+      if (CacheConfig.enabled) {
+        this.cache.set(cacheKey, normals, Infinity);
+      }
 
+      const successRedacted = redactCoordinatesForLogging(latitude, longitude);
       logger.info('Climate normals computed successfully', {
-        latitude,
-        longitude,
+        ...successRedacted,
         month,
         day,
         tempHigh: normals.tempHigh,
