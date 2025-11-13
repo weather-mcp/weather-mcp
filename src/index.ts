@@ -34,6 +34,7 @@ import { getWeatherImagery, formatWeatherImageryResponse } from './handlers/weat
 import { getLightningActivity, formatLightningActivityResponse } from './handlers/lightningHandler.js';
 import { handleGetRiverConditions } from './handlers/riverConditionsHandler.js';
 import { handleGetWildfireInfo } from './handlers/wildfireHandler.js';
+import { withAnalytics } from './analytics/index.js';
 
 /**
  * Server information
@@ -508,60 +509,82 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     switch (name) {
       case 'get_forecast':
-        return await handleGetForecast(args, noaaService, openMeteoService, nceiService);
+        return await withAnalytics('get_forecast', async () =>
+          handleGetForecast(args, noaaService, openMeteoService, nceiService)
+        );
 
       case 'get_current_conditions':
-        return await handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService);
+        return await withAnalytics('get_current_conditions', async () =>
+          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService)
+        );
 
       case 'get_alerts':
-        return await handleGetAlerts(args, noaaService);
+        return await withAnalytics('get_alerts', async () =>
+          handleGetAlerts(args, noaaService)
+        );
 
       case 'get_historical_weather':
-        return await handleGetHistoricalWeather(args, noaaService, openMeteoService);
+        return await withAnalytics('get_historical_weather', async () =>
+          handleGetHistoricalWeather(args, noaaService, openMeteoService)
+        );
 
       case 'check_service_status':
-        return await handleCheckServiceStatus(noaaService, openMeteoService, SERVER_VERSION);
+        return await withAnalytics('check_service_status', async () =>
+          handleCheckServiceStatus(noaaService, openMeteoService, SERVER_VERSION)
+        );
 
       case 'search_location':
-        return await handleSearchLocation(args, openMeteoService);
+        return await withAnalytics('search_location', async () =>
+          handleSearchLocation(args, openMeteoService)
+        );
 
       case 'get_air_quality':
-        return await handleGetAirQuality(args, openMeteoService);
+        return await withAnalytics('get_air_quality', async () =>
+          handleGetAirQuality(args, openMeteoService)
+        );
 
       case 'get_marine_conditions':
-        return await handleGetMarineConditions(args, noaaService, openMeteoService);
+        return await withAnalytics('get_marine_conditions', async () =>
+          handleGetMarineConditions(args, noaaService, openMeteoService)
+        );
 
-      case 'get_weather_imagery': {
-        const result = await getWeatherImagery(args as any);
-        const formatted = formatWeatherImageryResponse(result);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: formatted
-            }
-          ]
-        };
-      }
+      case 'get_weather_imagery':
+        return await withAnalytics('get_weather_imagery', async () => {
+          const result = await getWeatherImagery(args as any);
+          const formatted = formatWeatherImageryResponse(result);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: formatted
+              }
+            ]
+          };
+        });
 
-      case 'get_lightning_activity': {
-        const result = await getLightningActivity(args as any);
-        const formatted = formatLightningActivityResponse(result);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: formatted
-            }
-          ]
-        };
-      }
+      case 'get_lightning_activity':
+        return await withAnalytics('get_lightning_activity', async () => {
+          const result = await getLightningActivity(args as any);
+          const formatted = formatLightningActivityResponse(result);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: formatted
+              }
+            ]
+          };
+        });
 
       case 'get_river_conditions':
-        return await handleGetRiverConditions(args, noaaService);
+        return await withAnalytics('get_river_conditions', async () =>
+          handleGetRiverConditions(args, noaaService)
+        );
 
       case 'get_wildfire_info':
-        return await handleGetWildfireInfo(args, nifcService);
+        return await withAnalytics('get_wildfire_info', async () =>
+          handleGetWildfireInfo(args, nifcService)
+        );
 
       default:
         throw new Error(`Unknown tool: ${name}`);
