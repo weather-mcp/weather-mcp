@@ -181,6 +181,65 @@ Build an MCP (Model Context Protocol) server that provides weather data from NOA
 - [ ] Add health check/status endpoint
 - [ ] Create CLI tool for testing server without MCP client
 
+### 6.3 Analytics & Observability (Optional)
+**Purpose**: Add optional, privacy-focused usage analytics to help improve the service
+
+**Documentation**:
+- [x] Create comprehensive security guide (MCP_ANALYTICS_SECURITY_GUIDE.md)
+
+**Analytics Server Implementation**:
+- [ ] Set up analytics database (PostgreSQL)
+  - API keys table with rate limiting
+  - Events table with indexes
+  - Rate limits table
+- [ ] Implement API key generation service
+- [ ] Build analytics server API
+  - POST /v1/events - Record usage events
+  - Middleware: API key validation
+  - Middleware: Rate limiting (global + per-key)
+  - Middleware: Payload validation (Zod schema)
+  - Request signing validation (optional, advanced)
+- [ ] Deploy analytics server with HTTPS
+- [ ] Create user dashboard for API key management
+- [ ] Set up monitoring and abuse detection
+
+**MCP Server Integration**:
+- [ ] Implement AnalyticsService class
+  - Fire-and-forget event tracking
+  - Graceful failure (never breaks functionality)
+  - Timeout handling (5 second max)
+  - Error categorization
+- [ ] Add analytics to tool handlers
+  - Track success/failure for each tool
+  - Categorize error types
+  - No PII collection (no coordinates, queries, etc.)
+- [ ] Update environment variable configuration
+  - Add ANALYTICS_API_KEY (optional)
+  - Add ANALYTICS_ENDPOINT (optional)
+- [ ] Update documentation
+  - Explain opt-in analytics in README
+  - Document what data is collected
+  - Privacy policy compliance
+  - Instructions to enable/disable
+
+**Security Requirements**:
+- [ ] User-provided API keys only (no embedded secrets)
+- [ ] Rate limiting: 1000 requests/day per free tier key
+- [ ] Global IP-based rate limiting: 100 requests/15 minutes
+- [ ] Request timestamp validation (within 60 seconds)
+- [ ] Payload schema validation (reject malformed data)
+- [ ] Automated abuse detection and key blocking
+- [ ] GDPR compliance (data export, deletion, retention policy)
+
+**Privacy Principles**:
+- ✅ Opt-in only (disabled by default)
+- ✅ No PII collected (no coordinates, location names, queries)
+- ✅ Minimal data: tool name, success/failure, error type, timestamp
+- ✅ Transparent documentation of what's collected
+- ✅ User can disable at any time
+
+**Reference**: See `MCP_ANALYTICS_SECURITY_GUIDE.md` for complete implementation details
+
 ## Technical Decisions & Notes
 
 ### Geocoding Strategy
