@@ -1,8 +1,9 @@
 /**
  * Handler for search_location tool
+ * Now uses Nominatim (OpenStreetMap) for better coverage of small towns and villages
  */
 
-import { OpenMeteoService } from '../services/openmeteo.js';
+import { NominatimService } from '../services/nominatim.js';
 import { DataNotFoundError } from '../errors/ApiError.js';
 
 interface LocationArgs {
@@ -38,7 +39,7 @@ function escapeMarkdown(text: string): string {
 
 export async function handleSearchLocation(
   args: unknown,
-  openMeteoService: OpenMeteoService
+  nominatimService: NominatimService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Validate input parameters
   const locationArgs = args as LocationArgs;
@@ -49,18 +50,19 @@ export async function handleSearchLocation(
 
   const query = locationArgs.query.trim();
   const limit = typeof locationArgs.limit === 'number' ?
-    Math.min(Math.max(1, locationArgs.limit), 100) : 5;
+    Math.min(Math.max(1, locationArgs.limit), 50) : 5; // Nominatim max is 50
 
-  // Search for locations
-  const response = await openMeteoService.searchLocation(query, limit);
+  // Search for locations using Nominatim (OpenStreetMap)
+  const response = await nominatimService.searchLocation(query, limit);
 
   if (!response.results || response.results.length === 0) {
     throw new DataNotFoundError(
-      'OpenMeteo',
+      'Nominatim',
       `No locations found matching "${query}". Try:\n` +
       `- Using a different spelling\n` +
       `- Being more specific (e.g., "Paris, France" instead of "Paris")\n` +
-      `- Using a nearby city or landmark`
+      `- Including country, state, or region name\n` +
+      `- Using alternative names for the location`
     );
   }
 
@@ -120,7 +122,8 @@ export async function handleSearchLocation(
   }
 
   output += `---\n`;
-  output += `*Data source: Open-Meteo Geocoding API*\n`;
+  output += `*Data source: Nominatim (OpenStreetMap) Geocoding API*\n`;
+  output += `*Coverage: Global, with excellent detail for small towns and villages*\n`;
 
   return {
     content: [

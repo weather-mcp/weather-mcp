@@ -16,6 +16,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { NOAAService } from './services/noaa.js';
 import { OpenMeteoService } from './services/openmeteo.js';
+import { NominatimService } from './services/nominatim.js';
 import { NCEIService } from './services/ncei.js';
 import { NIFCService } from './services/nifc.js';
 import { CacheConfig } from './config/cache.js';
@@ -94,6 +95,14 @@ const noaaService = new NOAAService({
  * No API key required - free for non-commercial use
  */
 const openMeteoService = new OpenMeteoService();
+
+/**
+ * Initialize the Nominatim service for geocoding
+ * No API key required - uses OpenStreetMap data
+ * Better coverage for small towns and villages than GeoNames
+ * Rate limited to 1 request/second as per OSM usage policy
+ */
+const nominatimService = new NominatimService();
 
 /**
  * Initialize the NCEI service for climate normals (optional)
@@ -295,7 +304,7 @@ const TOOL_DEFINITIONS = {
 
   search_location: {
     name: 'search_location' as const,
-    description: 'Search for locations by name to get coordinates for weather queries. Use this when the user provides a location name instead of coordinates (e.g., "Paris", "New York", "Tokyo", "San Francisco, CA"). Returns location matches with coordinates, timezone, elevation, and other metadata. Enables natural language location queries like "What\'s the weather in Paris?" by converting location names to coordinates.',
+    description: 'Search for locations by name to get coordinates for weather queries. Uses Nominatim (OpenStreetMap) for excellent coverage of cities, towns, villages, and hamlets worldwide. Use this when the user provides a location name instead of coordinates (e.g., "Paris", "New York", "Tokyo", "San Francisco, CA", "Small Village, County"). Returns location matches with coordinates, timezone, elevation, and other metadata. Enables natural language location queries like "What\'s the weather in Paris?" by converting location names to coordinates.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -564,7 +573,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'search_location':
         return await withAnalytics('search_location', async () =>
-          handleSearchLocation(args, openMeteoService)
+          handleSearchLocation(args, nominatimService)
         );
 
       case 'get_air_quality':
