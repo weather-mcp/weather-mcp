@@ -7,13 +7,14 @@ import { DateTime } from 'luxon';
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { NCEIService } from '../services/ncei.js';
+import { LocationStore } from '../services/locationStore.js';
 import type { GridpointProperties, GridpointDataSeries } from '../types/noaa.js';
 import {
-  validateCoordinates,
   validateForecastDays,
   validateGranularity,
   validateOptionalBoolean,
 } from '../utils/validation.js';
+import { resolveLocation } from '../utils/locationResolver.js';
 import { logger } from '../utils/logger.js';
 import {
   extractSnowfallForecast,
@@ -27,6 +28,7 @@ import { getClimateNormals, formatNormals, getDateComponents } from '../utils/no
 interface ForecastArgs {
   latitude?: number;
   longitude?: number;
+  location_name?: string;
   days?: number;
   granularity?: 'daily' | 'hourly';
   include_precipitation_probability?: boolean;
@@ -163,10 +165,11 @@ export async function handleGetForecast(
   args: unknown,
   noaaService: NOAAService,
   openMeteoService: OpenMeteoService,
+  locationStore: LocationStore,
   nceiService?: NCEIService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Validate input parameters with runtime checks
-  const { latitude, longitude } = validateCoordinates(args);
+  // Resolve location from either coordinates or saved location name
+  const { latitude, longitude } = resolveLocation(args as ForecastArgs, locationStore);
   const days = validateForecastDays(args);
   const granularity = validateGranularity((args as ForecastArgs)?.granularity);
   const include_precipitation_probability = validateOptionalBoolean(

@@ -19,6 +19,7 @@ import { OpenMeteoService } from './services/openmeteo.js';
 import { NominatimService } from './services/nominatim.js';
 import { NCEIService } from './services/ncei.js';
 import { NIFCService } from './services/nifc.js';
+import { LocationStore } from './services/locationStore.js';
 import { CacheConfig } from './config/cache.js';
 import { toolConfig } from './config/tools.js';
 import { logger } from './utils/logger.js';
@@ -35,6 +36,12 @@ import { getWeatherImagery, formatWeatherImageryResponse } from './handlers/weat
 import { getLightningActivity, formatLightningActivityResponse } from './handlers/lightningHandler.js';
 import { handleGetRiverConditions } from './handlers/riverConditionsHandler.js';
 import { handleGetWildfireInfo } from './handlers/wildfireHandler.js';
+import {
+  handleSaveLocation,
+  handleListSavedLocations,
+  handleGetSavedLocation,
+  handleRemoveSavedLocation
+} from './handlers/savedLocationsHandler.js';
 import { withAnalytics, analytics } from './analytics/index.js';
 
 /**
@@ -105,6 +112,13 @@ const openMeteoService = new OpenMeteoService();
 const nominatimService = new NominatimService();
 
 /**
+ * Initialize the LocationStore for managing saved/favorite locations
+ * Stores locations in ~/.weather-mcp/locations.json
+ * No configuration required
+ */
+const locationStore = new LocationStore();
+
+/**
  * Initialize the NCEI service for climate normals (optional)
  * Requires free API token from https://www.ncdc.noaa.gov/cdo-web/token
  * Falls back to Open-Meteo computed normals if not configured
@@ -138,21 +152,25 @@ const server = new Server(
 const TOOL_DEFINITIONS = {
   get_forecast: {
     name: 'get_forecast' as const,
-    description: 'Get future weather forecast for a location (global coverage). Use this for upcoming weather predictions (e.g., "tomorrow", "this week", "next 7 days", "hourly forecast"). Returns forecast data including temperature, precipitation, wind, conditions, and sunrise/sunset times. Supports both daily and hourly granularity. Automatically selects best data source: NOAA for US locations (more detailed), Open-Meteo for international locations. For current weather, use get_current_conditions. For past weather, use get_historical_weather. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get future weather forecast for a location (global coverage). Use this for upcoming weather predictions (e.g., "tomorrow", "this week", "next 7 days", "hourly forecast"). Returns forecast data including temperature, precipitation, wind, conditions, and sunrise/sunset times. Supports both daily and hourly granularity. Automatically selects best data source: NOAA for US locations (more detailed), Open-Meteo for international locations. For current weather, use get_current_conditions. For past weather, use get_historical_weather. Can use either coordinates OR a saved location name (e.g., location_name="home"). If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         latitude: {
           type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90)',
+          description: 'Latitude of the location (-90 to 90). Not required if location_name is provided.',
           minimum: -90,
           maximum: 90
         },
         longitude: {
           type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180)',
+          description: 'Longitude of the location (-180 to 180). Not required if location_name is provided.',
           minimum: -180,
           maximum: 180
+        },
+        location_name: {
+          type: 'string' as const,
+          description: 'Name of a saved location (e.g., "home", "cabin"). Use this instead of latitude/longitude to reference a saved location. List saved locations with list_saved_locations.'
         },
         days: {
           type: 'number' as const,
@@ -189,7 +207,7 @@ const TOOL_DEFINITIONS = {
           default: 'auto'
         }
       },
-      required: ['latitude', 'longitude']
+      required: []
     }
   },
 
@@ -516,6 +534,82 @@ const TOOL_DEFINITIONS = {
       },
       required: ['latitude', 'longitude']
     }
+  },
+
+  save_location: {
+    name: 'save_location' as const,
+    description: 'Save a location for easy reuse in weather queries. Use this when a user wants to save a frequently used location like "home", "work", "cabin", or "aunt lisa\'s house". Accepts either a location query (which will be geocoded automatically) or direct coordinates. Saved locations can be used with all weather tools by providing location_name instead of coordinates. Makes it easy to ask "What\'s the weather forecast at home?" without repeatedly providing coordinates.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        alias: {
+          type: 'string' as const,
+          description: 'Short name/alias for this location (e.g., "home", "work", "cabin"). Will be lowercased automatically. Max 50 characters.',
+          maxLength: 50
+        },
+        location_query: {
+          type: 'string' as const,
+          description: 'Location to geocode and save (e.g., "Seattle, WA", "Paris, France", "Lake Tahoe, CA"). Will be geocoded using Nominatim. Not required if latitude/longitude provided.'
+        },
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude if providing coordinates directly. Not required if location_query provided.',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude if providing coordinates directly. Not required if location_query provided.',
+          minimum: -180,
+          maximum: 180
+        },
+        name: {
+          type: 'string' as const,
+          description: 'Display name for the location (required when using latitude/longitude). E.g., "My Home in Seattle"'
+        }
+      },
+      required: ['alias']
+    }
+  },
+
+  list_saved_locations: {
+    name: 'list_saved_locations' as const,
+    description: 'List all saved locations. Use this when a user wants to see their saved locations or asks "what locations do I have saved?" or "show my saved places". Returns all saved locations with their aliases, names, coordinates, and other metadata. Helpful for reminding users what location names they can use with weather tools.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+      required: []
+    }
+  },
+
+  get_saved_location: {
+    name: 'get_saved_location' as const,
+    description: 'Get details for a specific saved location. Use this when a user wants to view information about a particular saved location, like "show me details for my home location" or "what are the coordinates for my cabin?".',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        alias: {
+          type: 'string' as const,
+          description: 'The alias/name of the saved location to retrieve (e.g., "home", "work")'
+        }
+      },
+      required: ['alias']
+    }
+  },
+
+  remove_saved_location: {
+    name: 'remove_saved_location' as const,
+    description: 'Remove a saved location. Use this when a user wants to delete a saved location, like "remove my work location" or "delete the cabin from saved locations".',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        alias: {
+          type: 'string' as const,
+          description: 'The alias/name of the saved location to remove (e.g., "home", "work")'
+        }
+      },
+      required: ['alias']
+    }
   }
 };
 
@@ -548,7 +642,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'get_forecast':
         return await withAnalytics('get_forecast', async () =>
-          handleGetForecast(args, noaaService, openMeteoService, nceiService)
+          handleGetForecast(args, noaaService, openMeteoService, locationStore, nceiService)
         );
 
       case 'get_current_conditions':
@@ -622,6 +716,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'get_wildfire_info':
         return await withAnalytics('get_wildfire_info', async () =>
           handleGetWildfireInfo(args, nifcService)
+        );
+
+      case 'save_location':
+        return await withAnalytics('save_location', async () =>
+          handleSaveLocation(args, locationStore, nominatimService)
+        );
+
+      case 'list_saved_locations':
+        return await withAnalytics('list_saved_locations', async () =>
+          handleListSavedLocations(locationStore)
+        );
+
+      case 'get_saved_location':
+        return await withAnalytics('get_saved_location', async () =>
+          handleGetSavedLocation(args, locationStore)
+        );
+
+      case 'remove_saved_location':
+        return await withAnalytics('remove_saved_location', async () =>
+          handleRemoveSavedLocation(args, locationStore)
         );
 
       default:
