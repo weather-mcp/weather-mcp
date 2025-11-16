@@ -33,6 +33,7 @@ An MCP (Model Context Protocol) server that provides **global weather data** to 
 - **Saved Locations**: Save and reuse favorite locations (NEW in v1.7.0)
   - Save frequently used locations with simple aliases ("home", "work", "cabin")
   - Use saved locations by name instead of coordinates in all weather tools
+  - Tag locations with activities ("boating", "hiking", "skiing") for contextual weather info
   - Automatic geocoding when saving (just provide location name)
   - Persistent storage in `~/.weather-mcp/locations.json`
   - Manage locations: save, list, view details, remove
@@ -255,6 +256,7 @@ The saved locations feature stores your favorite places (like "home", "work", "c
 
 **Features:**
 - No limit on number of saved locations
+- Tag locations with activities (e.g., "boating", "hiking") to help AI provide relevant weather info
 - Persistent across MCP server restarts
 - Portable - copy the file to migrate locations to another machine
 
@@ -854,6 +856,7 @@ Save a location with an alias for easy reuse in weather queries.
 - `latitude` (optional): Latitude if providing coordinates directly. Not required if location_query provided.
 - `longitude` (optional): Longitude if providing coordinates directly. Not required if location_query provided.
 - `name` (optional): Display name (required when using latitude/longitude directly)
+- `activities` (optional): Activities you do at this location (e.g., ["boating", "fishing"]). Helps AI provide relevant weather information. Each activity max 50 characters.
 
 **Description:**
 Saves a location to persistent storage (`~/.weather-mcp/locations.json`) for easy reuse. Accepts either a location query (which will be automatically geocoded using Nominatim/OpenStreetMap) or direct coordinates. Once saved, the location can be used in any weather tool by providing `location_name` instead of coordinates.
@@ -868,6 +871,12 @@ Saves a location to persistent storage (`~/.weather-mcp/locations.json`) for eas
 
 "Save coordinates 47.6062, -122.3321 as my office"
   → save_location(alias="office", latitude=47.6062, longitude=-122.3321, name="Seattle Office")
+
+"Save the lake house where we go boating and fishing"
+  → save_location(alias="lake_house", location_query="Lake Tahoe, CA", activities=["boating", "fishing"])
+
+"Save my favorite hiking spot"
+  → save_location(alias="trail", location_query="Mt. Rainier, WA", activities=["hiking", "camping", "photography"])
 ```
 
 **Returns:**

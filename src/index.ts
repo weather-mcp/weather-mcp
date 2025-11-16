@@ -574,6 +574,13 @@ const TOOL_DEFINITIONS = {
         name: {
           type: 'string' as const,
           description: 'Display name for the location (required when using latitude/longitude). E.g., "My Home in Seattle"'
+        },
+        activities: {
+          type: 'array' as const,
+          items: {
+            type: 'string' as const
+          },
+          description: 'Optional activities you do at this location (e.g., ["boating", "fishing"], ["hiking", "camping"]). Helps AI provide relevant weather information. Each activity max 50 characters.'
         }
       },
       required: ['alias']

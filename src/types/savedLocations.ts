@@ -20,6 +20,8 @@ export interface SavedLocation {
   admin1?: string;
   /** County or equivalent */
   admin2?: string;
+  /** Activities done at this location (e.g., ["boating", "fishing", "hiking"]) */
+  activities?: string[];
   /** When this location was saved */
   saved_at: string;
   /** When this location was last updated */

@@ -12,6 +12,7 @@ interface SaveLocationArgs {
   latitude?: number;
   longitude?: number;
   name?: string;
+  activities?: string[];
 }
 
 interface GetLocationArgs {
@@ -76,6 +77,35 @@ export async function handleSaveLocation(
   let admin1: string | undefined;
   let admin2: string | undefined;
 
+  // Validate activities if provided
+  let activities: string[] | undefined;
+  if (saveArgs.activities !== undefined) {
+    if (!Array.isArray(saveArgs.activities)) {
+      throw new Error('activities must be an array of strings');
+    }
+
+    // Validate each activity
+    const validatedActivities: string[] = [];
+    for (const activity of saveArgs.activities) {
+      if (typeof activity !== 'string') {
+        throw new Error('Each activity must be a string');
+      }
+      const trimmed = activity.trim();
+      if (trimmed.length === 0) {
+        continue; // Skip empty strings
+      }
+      if (trimmed.length > 50) {
+        throw new Error('Each activity must be 50 characters or less');
+      }
+      validatedActivities.push(trimmed.toLowerCase());
+    }
+
+    // Only set activities if there are valid ones
+    if (validatedActivities.length > 0) {
+      activities = validatedActivities;
+    }
+  }
+
   // Determine how to get coordinates
   if (saveArgs.location_query && typeof saveArgs.location_query === 'string') {
     // Geocode the query
@@ -132,7 +162,8 @@ export async function handleSaveLocation(
     timezone,
     country_code,
     admin1,
-    admin2
+    admin2,
+    activities
   });
 
   let output = `# ${isUpdate ? 'Updated' : 'Saved'} Location\n\n`;
@@ -152,6 +183,10 @@ export async function handleSaveLocation(
     output += `**Region:** ${escapeMarkdown(admin1)}\n`;
   }
 
+  if (activities && activities.length > 0) {
+    output += `**Activities:** ${activities.map(a => escapeMarkdown(a)).join(', ')}\n`;
+  }
+
   output += `\n`;
   output += `---\n\n`;
   output += `This location is now saved and can be used with any weather tool:\n\n`;
@@ -159,6 +194,11 @@ export async function handleSaveLocation(
   output += `- \`get_current_conditions(location_name="${alias}")\`\n`;
   output += `- \`get_alerts(location_name="${alias}")\`\n`;
   output += `- And all other weather tools\n\n`;
+
+  if (activities && activities.length > 0) {
+    output += `The activities you've tagged will help the AI provide relevant weather information.\n\n`;
+  }
+
   output += `*Storage location: ${locationStore.getStorePath()}*\n`;
 
   return {
@@ -218,6 +258,10 @@ export async function handleListSavedLocations(
 
     if (location.admin1) {
       output += `**Region:** ${escapeMarkdown(location.admin1)}\n`;
+    }
+
+    if (location.activities && location.activities.length > 0) {
+      output += `**Activities:** ${location.activities.map(a => escapeMarkdown(a)).join(', ')}\n`;
     }
 
     output += `**Saved:** ${new Date(location.saved_at).toLocaleDateString()}\n`;
@@ -293,6 +337,10 @@ export async function handleGetSavedLocation(
 
   if (location.admin2) {
     output += `**County:** ${escapeMarkdown(location.admin2)}\n`;
+  }
+
+  if (location.activities && location.activities.length > 0) {
+    output += `**Activities:** ${location.activities.map(a => escapeMarkdown(a)).join(', ')}\n`;
   }
 
   output += `**Saved:** ${new Date(location.saved_at).toLocaleString()}\n`;

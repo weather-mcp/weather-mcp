@@ -430,6 +430,7 @@ your_tool: {
     "timezone": "America/Los_Angeles",
     "country_code": "US",
     "admin1": "California",
+    "activities": ["boating", "fishing", "hiking"],
     "saved_at": "2025-01-15T11:00:00.000Z",
     "updated_at": "2025-01-15T11:00:00.000Z"
   }
@@ -444,6 +445,12 @@ your_tool: {
 - **Geocoding**: Uses Nominatim service (rate-limited to 1 req/sec)
 - **Error handling**: Helpful messages if location not found or invalid
 - **Thread-safe**: LocationStore uses synchronous file I/O with cache invalidation
+- **Activities (optional)**:
+  - Array of activity strings (e.g., ["boating", "fishing", "hiking"])
+  - Normalized to lowercase and trimmed
+  - Max 50 characters per activity
+  - Helps AI provide contextually relevant weather information
+  - Empty/whitespace-only activities are filtered out
 
 ### Currently Supported Tools
 
@@ -544,6 +551,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2025-11-16 (v1.7.0 release - saved locations + Nominatim geocoding)
+**Last Updated:** 2025-11-16 (v1.7.0 - saved locations with activities + Nominatim geocoding)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.
