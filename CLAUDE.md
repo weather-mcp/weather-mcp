@@ -451,6 +451,11 @@ your_tool: {
   - Max 50 characters per activity
   - Helps AI provide contextually relevant weather information
   - Empty/whitespace-only activities are filtered out
+- **Smart Updates**:
+  - If alias exists AND no location details provided, only update specified fields
+  - Allows updating name/activities without re-specifying coordinates
+  - Example: `save_location(alias="cabin", activities=["boating", "fishing"])` updates activities while preserving all location data
+  - New locations still require location_query or lat/long
 
 ### Currently Supported Tools
 

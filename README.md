@@ -861,6 +861,8 @@ Save a location with an alias for easy reuse in weather queries.
 **Description:**
 Saves a location to persistent storage (`~/.weather-mcp/locations.json`) for easy reuse. Accepts either a location query (which will be automatically geocoded using Nominatim/OpenStreetMap) or direct coordinates. Once saved, the location can be used in any weather tool by providing `location_name` instead of coordinates.
 
+**Smart Updates:** If the alias already exists and you only provide `name` and/or `activities` (without location details), it will update just those fields while preserving all coordinates and metadata. This makes it easy to add activities or rename locations without re-specifying the full address.
+
 **Examples:**
 ```
 "Save my home location in Seattle, WA"
@@ -877,6 +879,12 @@ Saves a location to persistent storage (`~/.weather-mcp/locations.json`) for eas
 
 "Save my favorite hiking spot"
   → save_location(alias="trail", location_query="Mt. Rainier, WA", activities=["hiking", "camping", "photography"])
+
+"Add more activities to the cabin" (smart update - no location needed)
+  → save_location(alias="cabin", activities=["boating", "fishing", "hiking", "swimming"])
+
+"Rename my campsite" (smart update - no location needed)
+  → save_location(alias="campsite", name="Yosemite Valley Campground")
 ```
 
 **Returns:**

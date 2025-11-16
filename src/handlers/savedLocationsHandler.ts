@@ -69,17 +69,11 @@ export async function handleSaveLocation(
     throw new Error('alias must be 50 characters or less');
   }
 
-  let latitude: number;
-  let longitude: number;
-  let name: string;
-  let timezone: string | undefined;
-  let country_code: string | undefined;
-  let admin1: string | undefined;
-  let admin2: string | undefined;
-
   // Validate activities if provided
   let activities: string[] | undefined;
+  let activitiesProvided = false;
   if (saveArgs.activities !== undefined) {
+    activitiesProvided = true;
     if (!Array.isArray(saveArgs.activities)) {
       throw new Error('activities must be an array of strings');
     }
@@ -104,10 +98,39 @@ export async function handleSaveLocation(
     if (validatedActivities.length > 0) {
       activities = validatedActivities;
     }
+    // If empty array provided, activities stays undefined but activitiesProvided is true
   }
 
-  // Determine how to get coordinates
-  if (saveArgs.location_query && typeof saveArgs.location_query === 'string') {
+  // Check for partial update mode (updating existing location without re-specifying coordinates)
+  const hasLocationDetails = saveArgs.location_query ||
+    (typeof saveArgs.latitude === 'number' && typeof saveArgs.longitude === 'number');
+  const existingLocation = locationStore.get(alias);
+  const isPartialUpdate = existingLocation && !hasLocationDetails;
+
+  let latitude: number;
+  let longitude: number;
+  let name: string;
+  let timezone: string | undefined;
+  let country_code: string | undefined;
+  let admin1: string | undefined;
+  let admin2: string | undefined;
+
+  if (isPartialUpdate) {
+    // Partial update: preserve existing location data, only update specified fields
+    latitude = existingLocation.latitude;
+    longitude = existingLocation.longitude;
+    name = saveArgs.name || existingLocation.name;
+    timezone = existingLocation.timezone;
+    country_code = existingLocation.country_code;
+    admin1 = existingLocation.admin1;
+    admin2 = existingLocation.admin2;
+
+    // If activities not provided, preserve existing ones
+    // If activities provided (even if empty array), use the new value (which may be undefined)
+    if (!activitiesProvided) {
+      activities = existingLocation.activities;
+    }
+  } else if (saveArgs.location_query && typeof saveArgs.location_query === 'string') {
     // Geocode the query
     const query = saveArgs.location_query.trim();
     const results = await nominatimService.searchLocation(query, 1);
@@ -166,7 +189,15 @@ export async function handleSaveLocation(
     activities
   });
 
-  let output = `# ${isUpdate ? 'Updated' : 'Saved'} Location\n\n`;
+  // Determine what type of operation this was
+  let operationType = 'Saved';
+  if (isPartialUpdate) {
+    operationType = 'Updated';
+  } else if (isUpdate) {
+    operationType = 'Updated';
+  }
+
+  let output = `# ${operationType} Location\n\n`;
   output += `**Alias:** \`${escapeMarkdown(alias)}\`\n`;
   output += `**Name:** ${escapeMarkdown(name)}\n`;
   output += `**Coordinates:** ${latitude.toFixed(4)}°, ${longitude.toFixed(4)}°\n`;

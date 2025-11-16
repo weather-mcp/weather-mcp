@@ -351,4 +351,173 @@ describe('Saved Locations - Activities Feature', () => {
       expect(savedLocation?.activities).toBeUndefined();
     });
   });
+
+  describe('Partial updates (smart updates)', () => {
+    it('should update only activities without re-specifying location', async () => {
+      // Initial save
+      await handleSaveLocation(
+        {
+          alias: 'campsite',
+          latitude: 37.8651,
+          longitude: -119.5383,
+          name: 'Yosemite Valley',
+          activities: ['camping']
+        },
+        locationStore,
+        nominatimService
+      );
+
+      // Partial update: just add more activities
+      await handleSaveLocation(
+        {
+          alias: 'campsite',
+          activities: ['camping', 'grilling', 'hiking', 'mountain biking']
+        },
+        locationStore,
+        nominatimService
+      );
+
+      const savedLocation = locationStore.get('campsite');
+      expect(savedLocation).toBeDefined();
+      expect(savedLocation?.name).toBe('Yosemite Valley');
+      expect(savedLocation?.latitude).toBe(37.8651);
+      expect(savedLocation?.longitude).toBe(-119.5383);
+      expect(savedLocation?.activities).toEqual(['camping', 'grilling', 'hiking', 'mountain biking']);
+    });
+
+    it('should update only name without re-specifying location', async () => {
+      // Initial save
+      await handleSaveLocation(
+        {
+          alias: 'beach',
+          latitude: 34.0,
+          longitude: -118.0,
+          name: 'Beach Spot',
+          activities: ['surfing']
+        },
+        locationStore,
+        nominatimService
+      );
+
+      // Partial update: just change name
+      await handleSaveLocation(
+        {
+          alias: 'beach',
+          name: 'Santa Monica Beach'
+        },
+        locationStore,
+        nominatimService
+      );
+
+      const savedLocation = locationStore.get('beach');
+      expect(savedLocation?.name).toBe('Santa Monica Beach');
+      expect(savedLocation?.latitude).toBe(34.0);
+      expect(savedLocation?.longitude).toBe(-118.0);
+      expect(savedLocation?.activities).toEqual(['surfing']);
+    });
+
+    it('should update both name and activities without re-specifying location', async () => {
+      // Initial save
+      await handleSaveLocation(
+        {
+          alias: 'park',
+          latitude: 40.0,
+          longitude: -105.0,
+          name: 'City Park',
+          activities: ['running']
+        },
+        locationStore,
+        nominatimService
+      );
+
+      // Partial update: change both name and activities
+      await handleSaveLocation(
+        {
+          alias: 'park',
+          name: 'Central Park',
+          activities: ['running', 'cycling', 'photography']
+        },
+        locationStore,
+        nominatimService
+      );
+
+      const savedLocation = locationStore.get('park');
+      expect(savedLocation?.name).toBe('Central Park');
+      expect(savedLocation?.latitude).toBe(40.0);
+      expect(savedLocation?.longitude).toBe(-105.0);
+      expect(savedLocation?.activities).toEqual(['running', 'cycling', 'photography']);
+    });
+
+    it('should preserve existing activities when updating only name', async () => {
+      // Initial save
+      await handleSaveLocation(
+        {
+          alias: 'lake',
+          latitude: 39.0968,
+          longitude: -120.0324,
+          name: 'Lake Location',
+          activities: ['boating', 'fishing']
+        },
+        locationStore,
+        nominatimService
+      );
+
+      // Partial update: only change name, don't specify activities
+      await handleSaveLocation(
+        {
+          alias: 'lake',
+          name: 'Lake Tahoe'
+        },
+        locationStore,
+        nominatimService
+      );
+
+      const savedLocation = locationStore.get('lake');
+      expect(savedLocation?.name).toBe('Lake Tahoe');
+      expect(savedLocation?.activities).toEqual(['boating', 'fishing']);
+    });
+
+    it('should require location details for new locations', async () => {
+      // Trying to create a new location without coordinates should fail
+      await expect(
+        handleSaveLocation(
+          {
+            alias: 'newspot',
+            activities: ['hiking']
+          },
+          locationStore,
+          nominatimService
+        )
+      ).rejects.toThrow('Either location_query OR (latitude + longitude + name) must be provided');
+    });
+
+    it('should remove activities when partial update has empty array', async () => {
+      // Initial save
+      await handleSaveLocation(
+        {
+          alias: 'trail',
+          latitude: 45.0,
+          longitude: -110.0,
+          name: 'Mountain Trail',
+          activities: ['hiking', 'backpacking']
+        },
+        locationStore,
+        nominatimService
+      );
+
+      // Partial update: remove all activities
+      await handleSaveLocation(
+        {
+          alias: 'trail',
+          activities: []
+        },
+        locationStore,
+        nominatimService
+      );
+
+      const savedLocation = locationStore.get('trail');
+      expect(savedLocation?.name).toBe('Mountain Trail');
+      expect(savedLocation?.activities).toBeUndefined();
+    });
+  });
 });
