@@ -244,6 +244,24 @@ You can also set environment variables directly in your MCP client configuration
 - Get a free token at: https://www.ncdc.noaa.gov/cdo-web/token
 - If NCEI token is configured but unavailable, the system automatically falls back to Open-Meteo
 
+#### Saved Locations (NEW in v1.7.0)
+
+The saved locations feature stores your favorite places (like "home", "work", "cabin") for easy reuse in weather queries. No configuration needed - it works automatically!
+
+**Storage Location:**
+- Data stored in: `~/.weather-mcp/locations.json`
+- Directory created automatically on first save
+- File is human-readable JSON (can be backed up or edited manually)
+
+**Features:**
+- No limit on number of saved locations
+- Persistent across MCP server restarts
+- Portable - copy the file to migrate locations to another machine
+
+**Learn More:**
+- See [save_location](#13-save_location-new-in-v170) for usage instructions
+- See [Using Saved Locations](#using-saved-locations-with-weather-tools) for examples
+
 ### Monitoring
 
 Use the `check_service_status` tool to view cache statistics including:

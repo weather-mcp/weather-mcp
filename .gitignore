@@ -15,6 +15,10 @@ dist/
 .env
 .env.local
 
+# User data (contains personal information)
+locations.json
+.weather-mcp/
+
 # IDE
 .vscode/
 .idea/
