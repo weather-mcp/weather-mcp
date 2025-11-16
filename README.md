@@ -929,7 +929,7 @@ npx tsx tests/test_noaa_api.ts
 
 ### Manual Testing with Claude Code
 
-See [TESTING_GUIDE.md](./docs/TESTING_GUIDE.md) for comprehensive manual testing instructions including:
+See [TESTING_GUIDE.md](./docs/testing/TESTING_GUIDE.md) for comprehensive manual testing instructions including:
 - Setup steps for MCP clients
 - Test cases for all tools
 - Error handling verification
@@ -1131,6 +1131,43 @@ To report a security vulnerability, please see our [Security Policy](./SECURITY.
 - Vulnerability reporting procedures
 - Response timeline commitments (48hr acknowledgment, 7-day assessment)
 - Security best practices for users and developers
+
+## Documentation
+
+📚 **[Complete Documentation Index](./docs/README.md)** - Comprehensive navigation guide to all project documentation
+
+### Quick Links
+
+**For Users:**
+- [Client Setup Guide](./docs/CLIENT_SETUP.md) - Setup instructions for 8 different MCP clients
+- [Testing Guide](./docs/testing/TESTING_GUIDE.md) - Manual testing procedures
+- [Error Handling](./docs/ERROR_HANDLING.md) - Enhanced error handling features
+
+**For Developers:**
+- [Contributing Guidelines](./CONTRIBUTING.md) - How to contribute
+- [Development Guide](./CLAUDE.md) - AI assistant development guide
+- [Code Review](./docs/development/CODE_REVIEW.md) - Code quality analysis
+- [Security Audit](./docs/development/SECURITY_AUDIT_V1.6.md) - Security assessment
+
+**Planning & Roadmap:**
+- [Implementation Plan](./docs/planning/IMPLEMENTATION_PLAN.md) - Project roadmap
+- [Future Enhancements](./docs/planning/FUTURE_ENHANCEMENTS.md) - Planned features
+- [Roadmap](./docs/planning/ROADMAP.md) - Long-term plans
+
+**Testing & Quality:**
+- [Test Suite](./docs/testing/TEST_SUITE_README.md) - Test overview
+- [Test Coverage](./docs/testing/TEST_COVERAGE_ANALYSIS_2025.md) - Latest coverage analysis
+- [Test Recommendations](./docs/testing/TEST_RECOMMENDATIONS.md) - Improvement suggestions
+
+**Analytics (Optional):**
+- [Analytics Plan](./docs/analytics/ANALYTICS_MCP_PLAN.md) - Privacy-first analytics
+- [Analytics Security](./docs/analytics/MCP_ANALYTICS_SECURITY_GUIDE.md) - Security implementation guide
+- [Local Analytics](./docs/analytics/LOCAL_ANALYTICS_GUIDE.md) - Setup guide
+
+**Technical Documentation:**
+- [NOAA API Research](./docs/NOAA_API_RESEARCH.md) - NOAA API integration details
+- [Historical Data Plan](./docs/HISTORICAL_DATA_PLAN.md) - Historical weather implementation
+- [MCP Best Practices](./docs/MCP_BEST_PRACTICES.md) - MCP protocol guidelines
 
 ## License
 
