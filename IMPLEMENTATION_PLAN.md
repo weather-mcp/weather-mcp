@@ -103,19 +103,98 @@ Build an MCP (Model Context Protocol) server that provides weather data from NOA
 - [x] Format historical data for AI consumption
 - [x] Handle data gaps and missing observations
 
-### 3.4 Tool: search_location (Helper) - DEFERRED
-**Purpose**: Convert location string to coordinates
+### 3.4 Tool: geocode_location (Helper) - PLANNED
+**Purpose**: Convert location string to coordinates using multi-service fallback strategy
 
-**Note**: This tool has been deferred. Users can use external geocoding services (Google Maps, etc.) to get coordinates, or AI assistants can look up coordinates for common locations. This keeps the MCP server focused on weather data.
+**Rationale**: Users often have difficulty looking up coordinates manually. A built-in geocoding tool with automatic fallback across multiple services provides better reliability and user experience.
 
 **Input Parameters**:
-- `location` (string): City, State or address
+- `location` (string): City, State, address, or place name
+  - Examples: "Seattle", "New York, NY", "Paris, France", "1600 Pennsylvania Ave, Washington DC"
 
-**Implementation**:
-- [ ] Define tool schema
-- [ ] Integrate geocoding service (NOAA, Census.gov, or similar)
-- [ ] Return lat/lon with location metadata
-- [ ] Handle ambiguous locations
+**Output**:
+- `latitude` (number): Latitude coordinate
+- `longitude` (number): Longitude coordinate
+- `display_name` (string): Formatted location name
+- `country` (string): Country name
+- `confidence` (string): "high", "medium", or "low"
+- `source` (string): Which service found the result ("census", "nominatim")
+
+**Multi-Service Fallback Strategy**:
+
+The geocoding service will try multiple providers in order, with automatic fallback:
+
+1. **Primary: Census.gov Geocoding API** (US locations)
+   - ✅ Free, no API key required
+   - ✅ Fast, reliable for US addresses
+   - ✅ Official government service
+   - ⚠️ US-only coverage
+   - Endpoint: `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress`
+   - Format preference: "City, State" or full address
+
+2. **Fallback: OpenStreetMap Nominatim** (Worldwide)
+   - ✅ Free, no API key required
+   - ✅ Worldwide coverage
+   - ✅ Good with natural language queries
+   - ⚠️ Rate limited: 1 request/second
+   - ⚠️ Requires User-Agent header
+   - Endpoint: `https://nominatim.openstreetmap.org/search`
+   - Format: Accepts various formats
+
+**Implementation Tasks**:
+- [ ] Create GeocodingService class (`src/services/geocoding.ts`)
+  - [ ] Implement Census.gov provider
+  - [ ] Implement Nominatim provider
+  - [ ] Add automatic fallback logic
+  - [ ] Implement rate limiting per service
+  - [ ] Add result caching (reduce redundant API calls)
+  - [ ] Add retry logic with exponential backoff
+  - [ ] Country/region detection (skip Census.gov for non-US)
+- [ ] Define tool schema for MCP
+- [ ] Implement geocode_location tool handler
+- [ ] Add type definitions (GeocodingResult, GeocodingProvider)
+- [ ] Handle ambiguous locations (return multiple results if needed)
+- [ ] Format results for AI consumption
+- [ ] Add comprehensive error handling with helpful suggestions
+
+**Smart Features**:
+- **Caching**: Cache successful geocoding results (avoid re-geocoding "New York" repeatedly)
+- **Rate Limiting**: Track requests per service, queue requests for Nominatim
+- **Confidence Scoring**: Return confidence level based on result quality
+- **Result Validation**: Verify coordinates are reasonable (lat: -90 to 90, lon: -180 to 180)
+- **Helpful Errors**: Suggest improvements when location not found
+
+**Example Usage Flow**:
+```
+User: "Get weather for Seattle"
+  ↓
+1. Try Census.gov for "Seattle"
+   → Found: Seattle, WA (47.6062, -122.3321) ✅
+  ↓
+Return coordinates to weather tools
+```
+
+```
+User: "Get weather for Paris"
+  ↓
+1. Try Census.gov for "Paris"
+   → Found: Paris, TX (US city) ⚠️
+  ↓
+2. Detect non-US intent, try Nominatim
+   → Found: Paris, France (48.8566, 2.3522) ✅
+  ↓
+Return coordinates to weather tools
+```
+
+**Error Handling**:
+```
+Location not found after all services tried:
+"Could not find coordinates for 'XYZ'. Try:
+- Adding state/country (e.g., 'Seattle, WA' or 'Paris, France')
+- Using full name (e.g., 'New York City' instead of 'NYC')
+- Checking spelling
+- Providing coordinates directly (latitude, longitude)"
+```
 
 ## Phase 4: Testing & Validation ✅ COMPLETED
 
@@ -169,11 +248,22 @@ Build an MCP (Model Context Protocol) server that provides weather data from NOA
 ## Phase 6: Enhancements (Optional)
 
 ### 6.1 Advanced Features
+
+**High Priority** (Addresses known user pain points):
+- [ ] **Implement geocode_location tool** (See Phase 3.4)
+  - Multi-service fallback (Census.gov → Nominatim)
+  - Automatic caching and rate limiting
+  - Solves coordinate lookup difficulty
+  - **Estimated time**: 6-8 hours
+
+**Medium Priority**:
 - [ ] Add weather alerts/warnings tool
 - [ ] Add radar/satellite data integration
 - [ ] Implement caching strategy for repeated queries
-- [ ] Add support for international locations (if NOAA supports)
 - [ ] Add weather comparison tool (compare multiple locations)
+
+**Low Priority**:
+- [ ] Add support for international locations in NOAA tools (limited - NOAA is US-only)
 
 ### 6.2 Developer Experience
 - [ ] Add development mode with hot reload
@@ -243,13 +333,40 @@ Build an MCP (Model Context Protocol) server that provides weather data from NOA
 ## Technical Decisions & Notes
 
 ### Geocoding Strategy
-**Options**:
-1. Use Census.gov Geocoding API (free, US-only)
-2. Use NOAA's built-in location search
-3. Require latitude/longitude input only
-4. Use external service (OpenStreetMap Nominatim)
+**Decision**: Implement multi-service fallback strategy
 
-**Recommendation**: Start with Census.gov for US locations, allow manual lat/lon as fallback
+**Services Used** (in priority order):
+1. **Census.gov Geocoding API** (Primary for US locations)
+   - Free, no API key required
+   - Fast and reliable for US addresses
+   - Official government service
+   - Best for: US cities, states, addresses
+
+2. **OpenStreetMap Nominatim** (Fallback for worldwide)
+   - Free, no API key required
+   - Worldwide coverage
+   - Good with natural language
+   - Best for: International locations, landmarks
+   - Rate limit: 1 request/second (must implement queuing)
+
+**Why Multi-Service Approach**:
+- **Reliability**: If one service is down, automatically fallback to another
+- **Coverage**: Census.gov handles US well, Nominatim handles international
+- **Better Results**: Try multiple services increases success rate
+- **Rate Limit Mitigation**: Spread load across services
+- **User Experience**: Transparent fallback - user doesn't need to know which service is used
+
+**Implementation Details**:
+- Automatic fallback (no user configuration needed)
+- Result caching to reduce API calls
+- Per-service rate limiting
+- Country detection to skip inappropriate services
+- Confidence scoring based on result quality
+
+**Alternative Considered and Rejected**:
+- ❌ NOAA's built-in location search: Limited/undocumented
+- ❌ Google Maps Geocoding API: Requires API key and billing
+- ❌ Manual coordinates only: Poor user experience
 
 ### Historical Data Limitations
 NOAA's observation API typically provides:
