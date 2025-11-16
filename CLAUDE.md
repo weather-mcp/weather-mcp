@@ -28,20 +28,26 @@ src/
 │   ├── airQualityHandler.ts
 │   ├── marineConditionsHandler.ts
 │   ├── riverConditionsHandler.ts
-│   └── wildfireHandler.ts
+│   ├── wildfireHandler.ts
+│   └── savedLocationsHandler.ts  # Saved locations management (v1.7.0)
 ├── services/                # External API clients
 │   ├── noaa.ts             # NOAA Weather API client
 │   ├── openmeteo.ts        # Open-Meteo API client
+│   ├── nominatim.ts        # Nominatim/OSM geocoding client (v1.7.0)
+│   ├── locationStore.ts    # Saved locations storage service (v1.7.0)
 │   ├── nifc.ts             # NIFC wildfire API client
 │   └── usgs.ts             # USGS water services client
 ├── types/                   # TypeScript type definitions
 │   ├── noaa.ts
-│   └── openmeteo.ts
+│   ├── openmeteo.ts
+│   ├── nominatim.ts        # Nominatim API types (v1.7.0)
+│   └── savedLocations.ts   # Saved locations types (v1.7.0)
 ├── utils/                   # Shared utilities
 │   ├── cache.ts            # LRU cache with TTL
 │   ├── validation.ts       # Input validation
 │   ├── units.ts            # Unit conversions
 │   ├── logger.ts           # Structured logging
+│   ├── locationResolver.ts # Location name/coordinate resolution (v1.7.0)
 │   ├── airQuality.ts       # AQI calculations
 │   ├── marine.ts           # Wave/ocean utilities
 │   ├── fireWeather.ts      # Fire weather indices
@@ -62,20 +68,24 @@ src/
 4. **Caching Strategy:** LRU cache with TTL based on data volatility (see `src/config/cache.ts`)
 5. **Error Hierarchy:** Custom error classes for different failure scenarios
 
-## Key Features (12 MCP Tools)
+## Key Features (16 MCP Tools)
 
-1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location)
+1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location) - Now supports saved locations via `location_name`
 2. **get_current_conditions** - Current weather + fire weather indices (NOAA, US only)
 3. **get_alerts** - Weather alerts/warnings (NOAA, US only)
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo, global)
 5. **check_service_status** - API health check (all services)
-6. **search_location** - Location search/geocoding (Open-Meteo)
+6. **search_location** - Location search/geocoding (Nominatim/OSM, better small town coverage)
 7. **get_air_quality** - Air quality index + pollutants (Open-Meteo, global)
 8. **get_marine_conditions** - Wave height, swell, currents (Open-Meteo, global)
 9. **get_weather_imagery** - Weather radar/precipitation imagery (RainViewer, global)
 10. **get_lightning_activity** - Real-time lightning detection (Blitzortung.org, global)
 11. **get_river_conditions** - River levels and flood monitoring (NOAA/USGS, US only)
 12. **get_wildfire_info** - Active wildfire tracking (NIFC, US only)
+13. **save_location** - Save frequently used locations with aliases (NEW in v1.7.0)
+14. **list_saved_locations** - View all saved locations (NEW in v1.7.0)
+15. **get_saved_location** - Get details for a saved location (NEW in v1.7.0)
+16. **remove_saved_location** - Delete a saved location (NEW in v1.7.0)
 
 ## Development Guidelines
 
@@ -322,6 +332,130 @@ Addresses <issue/doc reference>.
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
+## Saved Locations Feature (v1.7.0)
+
+### Overview
+
+The saved locations feature allows users to save frequently used locations with simple aliases (e.g., "home", "work", "cabin") and reference them by name instead of coordinates in weather tools.
+
+### Architecture
+
+**Components:**
+- `LocationStore` service - Manages persistent storage of locations in JSON file
+- `locationResolver` utility - Resolves `location_name` or coordinates to lat/long
+- `savedLocationsHandler` - Handlers for save/list/get/remove operations
+- Storage location: `~/.weather-mcp/locations.json`
+
+**Data Flow:**
+1. User saves location → `save_location` tool → Nominatim geocoding (if query provided) → LocationStore → JSON file
+2. User queries weather → `location_name` parameter → locationResolver → coordinates → weather API
+
+### Using Location Names in Tools
+
+To add `location_name` support to a weather tool:
+
+```typescript
+// 1. Add location_name to Args interface
+interface YourToolArgs {
+  latitude?: number;
+  longitude?: number;
+  location_name?: string;  // Add this
+  // ... other parameters
+}
+
+// 2. Import dependencies
+import { LocationStore } from '../services/locationStore.js';
+import { resolveLocation } from '../utils/locationResolver.js';
+
+// 3. Update function signature
+export async function handleYourTool(
+  args: unknown,
+  // ... other services
+  locationStore: LocationStore  // Add this
+): Promise<...> {
+  // 4. Resolve location
+  const { latitude, longitude } = resolveLocation(args as YourToolArgs, locationStore);
+
+  // 5. Use coordinates as normal
+  // ... rest of handler logic
+}
+
+// 6. Update tool registration in index.ts
+case 'your_tool':
+  return await withAnalytics('your_tool', async () =>
+    handleYourTool(args, otherServices, locationStore)  // Pass locationStore
+  );
+
+// 7. Update tool schema in index.ts
+your_tool: {
+  inputSchema: {
+    properties: {
+      latitude: {
+        description: 'Latitude. Not required if location_name provided.',
+        // ... other props
+      },
+      longitude: {
+        description: 'Longitude. Not required if location_name provided.',
+        // ... other props
+      },
+      location_name: {
+        type: 'string',
+        description: 'Name of saved location (e.g., "home"). Use instead of coordinates.'
+      }
+    },
+    required: []  // Change from ['latitude', 'longitude']
+  }
+}
+```
+
+### Storage Format
+
+`~/.weather-mcp/locations.json`:
+```json
+{
+  "home": {
+    "name": "Seattle, WA",
+    "latitude": 47.6062,
+    "longitude": -122.3321,
+    "timezone": "America/Los_Angeles",
+    "country_code": "US",
+    "admin1": "Washington",
+    "saved_at": "2025-01-15T10:30:00.000Z",
+    "updated_at": "2025-01-15T10:30:00.000Z"
+  },
+  "cabin": {
+    "name": "Lake Tahoe, CA",
+    "latitude": 39.0968,
+    "longitude": -120.0324,
+    "timezone": "America/Los_Angeles",
+    "country_code": "US",
+    "admin1": "California",
+    "saved_at": "2025-01-15T11:00:00.000Z",
+    "updated_at": "2025-01-15T11:00:00.000Z"
+  }
+}
+```
+
+### Implementation Notes
+
+- **Aliases are normalized**: Always lowercased and trimmed for consistency
+- **Max alias length**: 50 characters
+- **Validation**: Coordinates validated on save
+- **Geocoding**: Uses Nominatim service (rate-limited to 1 req/sec)
+- **Error handling**: Helpful messages if location not found or invalid
+- **Thread-safe**: LocationStore uses synchronous file I/O with cache invalidation
+
+### Currently Supported Tools
+
+- ✅ `get_forecast` - Full support for `location_name`
+
+**Coming Soon:**
+- `get_current_conditions`
+- `get_alerts`
+- `get_air_quality`
+- `get_marine_conditions`
+- All other weather tools
+
 ## Common Tasks
 
 ### Adding a New MCP Tool
@@ -383,8 +517,9 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.6.1
+- **Version:** 1.7.0
 - **Status:** Production Ready ✅
+- **New in v1.7.0:** Saved locations feature + improved geocoding (Nominatim/OSM)
 - **Security Rating:** A- (Excellent, 93/100)
 - **Test Coverage:** 1,042 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
@@ -409,6 +544,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2025-11-10 (v1.6.1 release)
+**Last Updated:** 2025-11-16 (v1.7.0 release - saved locations + Nominatim geocoding)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.
