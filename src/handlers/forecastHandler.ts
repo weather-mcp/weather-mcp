@@ -6,6 +6,7 @@
 import { DateTime } from 'luxon';
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
+import { NOMADSService } from '../services/nomads.js';
 import { NCEIService } from '../services/ncei.js';
 import { LocationStore } from '../services/locationStore.js';
 import type { GridpointProperties, GridpointDataSeries } from '../types/noaa.js';
@@ -34,7 +35,7 @@ interface ForecastArgs {
   include_precipitation_probability?: boolean;
   include_severe_weather?: boolean;
   include_normals?: boolean;
-  source?: 'auto' | 'noaa' | 'openmeteo';
+  source?: 'auto' | 'noaa' | 'openmeteo' | 'nomads';
 }
 
 /**
@@ -165,6 +166,7 @@ export async function handleGetForecast(
   args: unknown,
   noaaService: NOAAService,
   openMeteoService: OpenMeteoService,
+  nomadsService: NOMADSService,
   locationStore: LocationStore,
   nceiService?: NCEIService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
@@ -190,17 +192,7 @@ export async function handleGetForecast(
 
   // Get source preference or auto-detect
   const requestedSource = (args as ForecastArgs)?.source || 'auto';
-  let useNOAA: boolean;
-
-  if (requestedSource === 'auto') {
-    // Auto-detect based on location (US = NOAA, elsewhere = Open-Meteo)
-    useNOAA = isInUS(latitude, longitude);
-  } else {
-    useNOAA = requestedSource === 'noaa';
-  }
-
-  // Use NOAA for US locations or if explicitly requested
-  if (useNOAA) {
+  if (requestedSource === 'noaa') {
     return await formatNOAAForecast(
       noaaService,
       openMeteoService,
@@ -213,8 +205,9 @@ export async function handleGetForecast(
       include_severe_weather,
       include_normals
     );
-  } else {
-    // Use Open-Meteo for international locations
+  }
+
+  if (requestedSource === 'openmeteo') {
     return await formatOpenMeteoForecast(
       openMeteoService,
       nceiService,
@@ -226,6 +219,115 @@ export async function handleGetForecast(
       include_normals
     );
   }
+
+  if (requestedSource === 'nomads') {
+    return await formatNOMADSForecast(
+      nomadsService,
+      latitude,
+      longitude,
+      days
+    );
+  }
+
+  // Auto mode: prefer NOAA for US; for non-US daily forecasts try NOMADS first, then Open-Meteo fallback.
+  if (isInUS(latitude, longitude)) {
+    return await formatNOAAForecast(
+      noaaService,
+      openMeteoService,
+      nceiService,
+      latitude,
+      longitude,
+      days,
+      granularity,
+      include_precipitation_probability,
+      include_severe_weather,
+      include_normals
+    );
+  }
+
+  if (granularity === 'daily') {
+    try {
+      return await formatNOMADSForecast(
+        nomadsService,
+        latitude,
+        longitude,
+        days
+      );
+    } catch (error) {
+      logger.warn('NOMADS auto-selection failed, falling back to Open-Meteo', {
+        latitude,
+        longitude,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  return await formatOpenMeteoForecast(
+    openMeteoService,
+    nceiService,
+    latitude,
+    longitude,
+    days,
+    granularity,
+    include_precipitation_probability,
+    include_normals
+  );
+}
+
+async function formatNOMADSForecast(
+  nomadsService: NOMADSService,
+  latitude: number,
+  longitude: number,
+  days: number
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  const forecast = await nomadsService.getForecast(latitude, longitude, days);
+  const numDays = Math.min(forecast.daily.time.length, days);
+
+  let output = '# Weather Forecast (Daily)\n\n';
+  output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
+  output += `**Model:** ${forecast.model}\n`;
+  output += `**Model Run (UTC):** ${DateTime.fromISO(forecast.model_run).toUTC().toFormat('yyyy-LL-dd HH:mm')}Z\n`;
+  output += `**Timezone:** ${forecast.timezone}\n\n`;
+
+  for (let i = 0; i < numDays; i++) {
+    const dt = DateTime.fromISO(forecast.daily.time[i], { setZone: false }).setZone(forecast.timezone);
+    output += `## ${dt.toLocaleString({ weekday: 'long', month: 'long', day: 'numeric' })}\n`;
+
+    const high = forecast.daily.temperature_2m_max[i];
+    const low = forecast.daily.temperature_2m_min[i];
+    const precipChance = forecast.daily.precipitation_probability_max[i];
+    const precipSum = forecast.daily.precipitation_sum[i];
+    const windMax = forecast.daily.wind_speed_10m_max[i];
+    const humidity = forecast.daily.relative_humidity_2m_mean[i];
+
+    if (Number.isFinite(high) && Number.isFinite(low)) {
+      output += `**Temperature:** High ${Math.round(high)}°F / Low ${Math.round(low)}°F\n`;
+    }
+    output += `**Precipitation Chance:** ${Math.round(precipChance)}%\n`;
+    output += `**Precipitation:** ${precipSum.toFixed(2)} in\n`;
+
+    if (Number.isFinite(windMax)) {
+      output += `**Wind:** up to ${Math.round(windMax)} mph\n`;
+    }
+
+    if (Number.isFinite(humidity)) {
+      output += `**Humidity:** avg ${Math.round(humidity)}%\n`;
+    }
+
+    output += '\n';
+  }
+
+  output += '---\n';
+  output += '*Data source: NOMADS/NCEP GFS model run (global). Precipitation chance is derived from deterministic 6-hour model interval signals.*\n';
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: output
+      }
+    ]
+  };
 }
 
 /**

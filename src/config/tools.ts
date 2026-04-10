@@ -16,6 +16,8 @@
  */
 export type ToolName =
   | 'get_forecast'
+  | 'get_forecast_nomads'
+  | 'get_model_comparison_forecast'
   | 'get_current_conditions'
   | 'get_alerts'
   | 'get_historical_weather'
@@ -81,6 +83,8 @@ const TOOL_PRESETS: Record<string, ToolName[]> = {
   // All available tools
   all: [
     'get_forecast',
+    'get_forecast_nomads',
+    'get_model_comparison_forecast',
     'get_current_conditions',
     'get_alerts',
     'get_historical_weather',
@@ -104,6 +108,13 @@ const TOOL_PRESETS: Record<string, ToolName[]> = {
  */
 const TOOL_ALIASES: Record<string, ToolName> = {
   'forecast': 'get_forecast',
+  'nomads': 'get_forecast_nomads',
+  'gfs': 'get_forecast_nomads',
+  'model': 'get_forecast_nomads',
+  'forecast_nomads': 'get_forecast_nomads',
+  'compare': 'get_model_comparison_forecast',
+  'comparison': 'get_model_comparison_forecast',
+  'models': 'get_model_comparison_forecast',
   'current': 'get_current_conditions',
   'conditions': 'get_current_conditions',
   'alerts': 'get_alerts',
@@ -243,6 +254,8 @@ function resolveToolName(name: string): ToolName | undefined {
 function isToolName(name: string): name is ToolName {
   const validTools: ToolName[] = [
     'get_forecast',
+    'get_forecast_nomads',
+    'get_model_comparison_forecast',
     'get_current_conditions',
     'get_alerts',
     'get_historical_weather',

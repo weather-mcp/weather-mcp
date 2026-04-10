@@ -49,6 +49,7 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 - **[MCP_BEST_PRACTICES.md](./MCP_BEST_PRACTICES.md)** - Guide for service status communication
 
 ### 📁 Technical Documentation
+- **[APPLICATION_FLOW.md](./APPLICATION_FLOW.md)** - End-to-end runtime architecture and request lifecycle
 - **[NOAA_API_RESEARCH.md](./NOAA_API_RESEARCH.md)** - NOAA API research and integration details
 - **[HISTORICAL_DATA_PLAN.md](./HISTORICAL_DATA_PLAN.md)** - Historical weather data implementation plan
 - **[PROJECT_STATUS.md](./PROJECT_STATUS.md)** - Current project status
@@ -70,6 +71,7 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 
 ### For Contributors
 - [Contributing Guidelines](../CONTRIBUTING.md)
+- [Application Flow](./APPLICATION_FLOW.md)
 - [Code Review](./development/CODE_REVIEW.md)
 - [Security Policy](../SECURITY.md)
 - [Development Plan](./planning/IMPLEMENTATION_PLAN.md)

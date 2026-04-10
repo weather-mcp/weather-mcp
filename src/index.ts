@@ -19,6 +19,8 @@ import { OpenMeteoService } from './services/openmeteo.js';
 import { NominatimService } from './services/nominatim.js';
 import { NCEIService } from './services/ncei.js';
 import { NIFCService } from './services/nifc.js';
+import { NOMADSService } from './services/nomads.js';
+import { ModelComparisonService } from './services/modelComparison.js';
 import { GeocodingService } from './services/geocoding.js';
 import { LocationStore } from './services/locationStore.js';
 import { CacheConfig } from './config/cache.js';
@@ -43,6 +45,8 @@ import {
   handleGetSavedLocation,
   handleRemoveSavedLocation
 } from './handlers/savedLocationsHandler.js';
+import { handleGetNomadsForecast } from './handlers/nomadsForecastHandler.js';
+import { handleGetModelComparisonForecast } from './handlers/modelComparisonHandler.js';
 import { withAnalytics, analytics } from './analytics/index.js';
 
 /**
@@ -125,6 +129,20 @@ const locationStore = new LocationStore();
  * Falls back to Open-Meteo computed normals if not configured
  */
 const nceiService = new NCEIService();
+
+/**
+ * Initialize the NOMADS service for NCEP GFS model forecasts
+ * No API key required - uses public NOMADS filter endpoint
+ */
+const nomadsService = new NOMADSService({
+  userAgent: `weather-mcp/${SERVER_VERSION} (https://github.com/weather-mcp/weather-mcp)`
+});
+
+/**
+ * Initialize model comparison orchestration service
+ * Combines GFS, NAM, and ECMWF proxy guidance in one response
+ */
+const modelComparisonService = new ModelComparisonService(nomadsService, openMeteoService);
 
 /**
  * Initialize the NIFC service for wildfire data
@@ -210,9 +228,85 @@ const TOOL_DEFINITIONS = {
         },
         source: {
           type: 'string' as const,
-          description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), or "openmeteo" (global)',
-          enum: ['auto', 'noaa', 'openmeteo'],
+          description: 'Data source: "auto" (default), "noaa" (US only), "openmeteo" (global), or "nomads" (NCEP GFS model run, global)',
+          enum: ['auto', 'noaa', 'openmeteo', 'nomads'],
           default: 'auto'
+        }
+      },
+      required: []
+    }
+  },
+
+  get_forecast_nomads: {
+    name: 'get_forecast_nomads' as const,
+    description: 'Get a forecast from the latest NOMADS/NCEP GFS model run. Returns daily high/low temperatures, derived precipitation chance, precipitation totals, and extra wind/humidity context. Use this when users ask for model-run based output specifically from NCEP/NOMADS.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90). Not required if location_name is provided.',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180). Not required if location_name is provided.',
+          minimum: -180,
+          maximum: 180
+        },
+        location_name: {
+          type: 'string' as const,
+          description: 'Name of a saved location (e.g., "home", "cabin"). Use this instead of latitude/longitude.'
+        },
+        days: {
+          type: 'number' as const,
+          description: 'Number of days to include in forecast (1-10, default: 7)',
+          minimum: 1,
+          maximum: 10,
+          default: 7
+        }
+      },
+      required: []
+    }
+  },
+
+  get_model_comparison_forecast: {
+    name: 'get_model_comparison_forecast' as const,
+    description: 'Compare forecasts across multiple model sources in one response. Supports GFS (NOMADS), NAM (NOMADS, ~84h deterministic horizon), and ECMWF proxy guidance via Open-Meteo. For 7+ day requests, NAM values are shown through its horizon and then marked as N/A.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        latitude: {
+          type: 'number' as const,
+          description: 'Latitude of the location (-90 to 90). Not required if location_name is provided.',
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: 'number' as const,
+          description: 'Longitude of the location (-180 to 180). Not required if location_name is provided.',
+          minimum: -180,
+          maximum: 180
+        },
+        location_name: {
+          type: 'string' as const,
+          description: 'Name of a saved location (e.g., "home", "cabin"). Use this instead of latitude/longitude.'
+        },
+        days: {
+          type: 'number' as const,
+          description: 'Number of forecast days to compare (1-10, default: 7). NAM deterministic data is limited to about 84 hours.',
+          minimum: 1,
+          maximum: 10,
+          default: 7
+        },
+        models: {
+          type: 'array' as const,
+          description: 'Models to include. Defaults to ["gfs", "nam", "ecmwf_proxy"]. You may also pass "ecmwf" and it will map to "ecmwf_proxy".',
+          items: {
+            type: 'string' as const,
+            enum: ['gfs', 'nam', 'ecmwf_proxy', 'ecmwf']
+          }
         }
       },
       required: []
@@ -672,7 +766,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'get_forecast':
         return await withAnalytics('get_forecast', async () =>
-          handleGetForecast(args, noaaService, openMeteoService, locationStore, nceiService)
+          handleGetForecast(args, noaaService, openMeteoService, nomadsService, locationStore, nceiService)
+        );
+
+      case 'get_forecast_nomads':
+        return await withAnalytics('get_forecast_nomads', async () =>
+          handleGetNomadsForecast(args, nomadsService, locationStore)
+        );
+
+      case 'get_model_comparison_forecast':
+        return await withAnalytics('get_model_comparison_forecast', async () =>
+          handleGetModelComparisonForecast(args, modelComparisonService, locationStore)
         );
 
       case 'get_current_conditions':
