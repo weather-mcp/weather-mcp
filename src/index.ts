@@ -48,6 +48,8 @@ import {
 import { handleGetNomadsForecast } from './handlers/nomadsForecastHandler.js';
 import { handleGetModelComparisonForecast } from './handlers/modelComparisonHandler.js';
 import { withAnalytics, analytics } from './analytics/index.js';
+import { randomUUID } from 'crypto';
+import { logRequestLifecycle } from './utils/requestLogger.js';
 
 /**
  * Server information
@@ -756,6 +758,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
+  const requestId = randomUUID();
+  const requestStartMs = Date.now();
+
+  logRequestLifecycle({
+    timestamp: new Date().toISOString(),
+    requestId,
+    tool: name,
+    status: 'start'
+  });
+
+  const completeSuccess = <T>(result: T): T => {
+    logRequestLifecycle({
+      timestamp: new Date().toISOString(),
+      requestId,
+      tool: name,
+      status: 'success',
+      durationMs: Date.now() - requestStartMs
+    });
+
+    return result;
+  };
 
   try {
     // Check if tool is enabled
@@ -765,57 +788,57 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     switch (name) {
       case 'get_forecast':
-        return await withAnalytics('get_forecast', async () =>
+        return completeSuccess(await withAnalytics('get_forecast', async () =>
           handleGetForecast(args, noaaService, openMeteoService, nomadsService, locationStore, nceiService)
-        );
+        ));
 
       case 'get_forecast_nomads':
-        return await withAnalytics('get_forecast_nomads', async () =>
+        return completeSuccess(await withAnalytics('get_forecast_nomads', async () =>
           handleGetNomadsForecast(args, nomadsService, locationStore)
-        );
+        ));
 
       case 'get_model_comparison_forecast':
-        return await withAnalytics('get_model_comparison_forecast', async () =>
+        return completeSuccess(await withAnalytics('get_model_comparison_forecast', async () =>
           handleGetModelComparisonForecast(args, modelComparisonService, locationStore)
-        );
+        ));
 
       case 'get_current_conditions':
-        return await withAnalytics('get_current_conditions', async () =>
+        return completeSuccess(await withAnalytics('get_current_conditions', async () =>
           handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService)
-        );
+        ));
 
       case 'get_alerts':
-        return await withAnalytics('get_alerts', async () =>
+        return completeSuccess(await withAnalytics('get_alerts', async () =>
           handleGetAlerts(args, noaaService)
-        );
+        ));
 
       case 'get_historical_weather':
-        return await withAnalytics('get_historical_weather', async () =>
+        return completeSuccess(await withAnalytics('get_historical_weather', async () =>
           handleGetHistoricalWeather(args, noaaService, openMeteoService)
-        );
+        ));
 
       case 'check_service_status':
-        return await withAnalytics('check_service_status', async () =>
+        return completeSuccess(await withAnalytics('check_service_status', async () =>
           handleCheckServiceStatus(noaaService, openMeteoService, SERVER_VERSION)
-        );
+        ));
 
       case 'search_location':
-        return await withAnalytics('search_location', async () =>
+        return completeSuccess(await withAnalytics('search_location', async () =>
           handleSearchLocation(args, geocodingService)
-        );
+        ));
 
       case 'get_air_quality':
-        return await withAnalytics('get_air_quality', async () =>
+        return completeSuccess(await withAnalytics('get_air_quality', async () =>
           handleGetAirQuality(args, openMeteoService)
-        );
+        ));
 
       case 'get_marine_conditions':
-        return await withAnalytics('get_marine_conditions', async () =>
+        return completeSuccess(await withAnalytics('get_marine_conditions', async () =>
           handleGetMarineConditions(args, noaaService, openMeteoService)
-        );
+        ));
 
       case 'get_weather_imagery':
-        return await withAnalytics('get_weather_imagery', async () => {
+        return completeSuccess(await withAnalytics('get_weather_imagery', async () => {
           const result = await getWeatherImagery(args as any);
           const formatted = formatWeatherImageryResponse(result);
           return {
@@ -826,10 +849,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               }
             ]
           };
-        });
+        }));
 
       case 'get_lightning_activity':
-        return await withAnalytics('get_lightning_activity', async () => {
+        return completeSuccess(await withAnalytics('get_lightning_activity', async () => {
           const result = await getLightningActivity(args as any);
           const formatted = formatLightningActivityResponse(result);
           return {
@@ -840,42 +863,50 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               }
             ]
           };
-        });
+        }));
 
       case 'get_river_conditions':
-        return await withAnalytics('get_river_conditions', async () =>
+        return completeSuccess(await withAnalytics('get_river_conditions', async () =>
           handleGetRiverConditions(args, noaaService)
-        );
+        ));
 
       case 'get_wildfire_info':
-        return await withAnalytics('get_wildfire_info', async () =>
+        return completeSuccess(await withAnalytics('get_wildfire_info', async () =>
           handleGetWildfireInfo(args, nifcService)
-        );
+        ));
 
       case 'save_location':
-        return await withAnalytics('save_location', async () =>
+        return completeSuccess(await withAnalytics('save_location', async () =>
           handleSaveLocation(args, locationStore, nominatimService)
-        );
+        ));
 
       case 'list_saved_locations':
-        return await withAnalytics('list_saved_locations', async () =>
+        return completeSuccess(await withAnalytics('list_saved_locations', async () =>
           handleListSavedLocations(locationStore)
-        );
+        ));
 
       case 'get_saved_location':
-        return await withAnalytics('get_saved_location', async () =>
+        return completeSuccess(await withAnalytics('get_saved_location', async () =>
           handleGetSavedLocation(args, locationStore)
-        );
+        ));
 
       case 'remove_saved_location':
-        return await withAnalytics('remove_saved_location', async () =>
+        return completeSuccess(await withAnalytics('remove_saved_location', async () =>
           handleRemoveSavedLocation(args, locationStore)
-        );
+        ));
 
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
+    logRequestLifecycle({
+      timestamp: new Date().toISOString(),
+      requestId,
+      tool: name,
+      status: 'error',
+      durationMs: Date.now() - requestStartMs
+    });
+
     // Redact sensitive fields from args before logging
     const redactedArgs = args ? redactSensitiveFields(args) : undefined;
 
