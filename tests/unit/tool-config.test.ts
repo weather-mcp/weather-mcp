@@ -79,7 +79,7 @@ describe('Tool Configuration', () => {
       const toolConfig = await createToolConfig('basic');
 
       const enabled = toolConfig.getEnabledTools();
-      expect(enabled).toHaveLength(5);
+      expect(enabled).toHaveLength(9); // Updated for v1.7.0: added 4 saved-location tools
       expect(enabled).toContain('get_forecast');
       expect(enabled).toContain('get_current_conditions');
       expect(enabled).toContain('get_alerts');
@@ -91,7 +91,7 @@ describe('Tool Configuration', () => {
       const toolConfig = await createToolConfig('standard');
 
       const enabled = toolConfig.getEnabledTools();
-      expect(enabled).toHaveLength(6);
+      expect(enabled).toHaveLength(10); // Updated for v1.7.0: added 4 saved-location tools
       expect(enabled).toContain('get_forecast');
       expect(enabled).toContain('get_current_conditions');
       expect(enabled).toContain('get_alerts');
@@ -104,7 +104,7 @@ describe('Tool Configuration', () => {
       const toolConfig = await createToolConfig('full');
 
       const enabled = toolConfig.getEnabledTools();
-      expect(enabled).toHaveLength(7);
+      expect(enabled).toHaveLength(11); // Updated for v1.7.0: added 4 saved-location tools
       expect(enabled).toContain('get_forecast');
       expect(enabled).toContain('get_current_conditions');
       expect(enabled).toContain('get_alerts');
@@ -118,7 +118,7 @@ describe('Tool Configuration', () => {
       const toolConfig = await createToolConfig('all');
 
       const enabled = toolConfig.getEnabledTools();
-      expect(enabled).toHaveLength(12); // Updated for v1.6.0: added get_river_conditions and get_wildfire_info
+      expect(enabled).toHaveLength(16); // Updated for v1.7.0: added 4 saved-location tools
       expect(enabled).toContain('get_forecast');
       expect(enabled).toContain('get_current_conditions');
       expect(enabled).toContain('get_alerts');
@@ -207,7 +207,7 @@ describe('Tool Configuration', () => {
       const toolConfig = await createToolConfig('all,-get_marine_conditions');
 
       const enabled = toolConfig.getEnabledTools();
-      expect(enabled).toHaveLength(11); // Updated for v1.6.0: 12 total tools - 1 removed = 11
+      expect(enabled).toHaveLength(15); // Updated for v1.7.0: 16 total tools - 1 removed = 15
       expect(enabled).not.toContain('get_marine_conditions');
       expect(enabled).toContain('get_forecast');
       expect(enabled).toContain('get_air_quality');
