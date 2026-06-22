@@ -108,10 +108,12 @@ export async function handleGetRiverConditions(
 function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string): string {
   let output = `## ${gauge.name}\n\n`;
   output += `**Distance:** ${distance.toFixed(1)} km (${(distance * 0.621371).toFixed(1)} mi)\n`;
-  output += `**Location:** ${gauge.state}${gauge.county ? `, ${gauge.county} County` : ''}\n`;
+  output += `**Location:** ${gauge.state?.abbreviation ?? 'Unknown'}${gauge.county ? `, ${gauge.county} County` : ''}\n`;
   output += `**Coordinates:** ${gauge.latitude.toFixed(4)}, ${gauge.longitude.toFixed(4)}\n`;
   output += `**Gauge ID:** ${gauge.lid}${gauge.usgsId ? ` (USGS: ${gauge.usgsId})` : ''}\n`;
-  output += `**Status:** ${gauge.inService ? '✅ Active' : '❌ Out of Service'}\n\n`;
+  // inService is only present on the per-gauge detail endpoint; gauges returned
+  // by the bounding-box query are active by definition, so default to Active.
+  output += `**Status:** ${gauge.inService === false ? '❌ Out of Service' : '✅ Active'}\n\n`;
 
   // Current conditions
   if (gauge.status.observed) {
@@ -129,7 +131,7 @@ function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string
 
     // Flood category with emoji
     const floodEmoji = getFloodEmoji(obs.floodCategory);
-    const floodText = obs.floodCategory ? obs.floodCategory.toUpperCase() : 'NO FLOODING';
+    const floodText = obs.floodCategory ? obs.floodCategory.replace(/_/g, ' ').toUpperCase() : 'NO FLOODING';
     output += `**Flood Category:** ${floodEmoji} ${floodText}\n\n`;
   } else {
     output += `### Current Conditions\n`;
@@ -168,7 +170,7 @@ function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string
     }
 
     const forecastFloodEmoji = getFloodEmoji(forecast.floodCategory);
-    const forecastFloodText = forecast.floodCategory ? forecast.floodCategory.toUpperCase() : 'NO FLOODING';
+    const forecastFloodText = forecast.floodCategory ? forecast.floodCategory.replace(/_/g, ' ').toUpperCase() : 'NO FLOODING';
     output += `**Forecasted Category:** ${forecastFloodEmoji} ${forecastFloodText}\n\n`;
   }
 
@@ -198,10 +200,12 @@ function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string
  * Get emoji for flood category
  */
 function getFloodEmoji(category: string | null | undefined): string {
-  if (!category || category === 'no flooding') return '✅';
-  if (category === 'action') return '🟡';
-  if (category === 'minor') return '🟠';
-  if (category === 'moderate') return '🔴';
-  if (category === 'major') return '🔴🔴';
+  // NWPS uses underscore-delimited categories (e.g. "no_flooding", "not_defined")
+  const normalized = category?.replace(/_/g, ' ');
+  if (!normalized || normalized === 'no flooding' || normalized === 'not defined') return '✅';
+  if (normalized === 'action') return '🟡';
+  if (normalized === 'minor') return '🟠';
+  if (normalized === 'moderate') return '🔴';
+  if (normalized === 'major') return '🔴🔴';
   return '⚪';
 }
