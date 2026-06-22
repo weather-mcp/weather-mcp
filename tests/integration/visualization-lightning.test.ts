@@ -99,15 +99,43 @@ describe('Weather Imagery (v1.5.0)', () => {
       ).rejects.toThrow();
     });
 
-    it('should reject satellite imagery (not yet implemented)', async () => {
-      await expect(
-        getWeatherImagery({
-          latitude: 40.7128,
-          longitude: -74.006,
-          type: 'satellite',
-          animated: false
-        })
-      ).rejects.toThrow('not yet implemented');
+    it('should return GOES GeoColor satellite imagery via NASA GIBS', async () => {
+      const result = await getWeatherImagery({
+        latitude: 40.7128,
+        longitude: -74.006,
+        type: 'satellite',
+        animated: false
+      });
+
+      expect(result.type).toBe('satellite');
+      expect(result.source).toContain('GIBS');
+      expect(result.frames.length).toBe(1);
+      expect(result.frames[0].url).toContain('gibs.earthdata.nasa.gov');
+      expect(result.frames[0].url).toContain('GOES-East_ABI_GeoColor');
+    });
+
+    it('should select GOES-West for far-western longitudes', async () => {
+      const result = await getWeatherImagery({
+        latitude: 21.3069, // Honolulu
+        longitude: -157.8583,
+        type: 'satellite',
+        animated: false
+      });
+
+      expect(result.frames[0].url).toContain('GOES-West_ABI_GeoColor');
+    });
+
+    it('should return a single latest snapshot for satellite even if animated requested', async () => {
+      const result = await getWeatherImagery({
+        latitude: 40.7128,
+        longitude: -74.006,
+        type: 'satellite',
+        animated: true
+      });
+
+      // Satellite does not animate (GIBS sub-daily timestamps are irregular).
+      expect(result.animated).toBe(false);
+      expect(result.frames.length).toBe(1);
     });
   });
 });

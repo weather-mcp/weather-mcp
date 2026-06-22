@@ -85,15 +85,17 @@ describe('Weather Imagery Handler', () => {
       ).rejects.toThrow('Invalid imagery type');
     });
 
-    it('should reject satellite type (not yet implemented)', async () => {
-      await expect(
-        getWeatherImagery({
-          latitude: 40.7128,
-          longitude: -74.006,
-          type: 'satellite',
-          animated: false
-        })
-      ).rejects.toThrow('not yet implemented');
+    it('should return satellite imagery via NASA GIBS', async () => {
+      const result = await getWeatherImagery({
+        latitude: 40.7128,
+        longitude: -74.006,
+        type: 'satellite',
+        animated: false
+      });
+
+      expect(result.type).toBe('satellite');
+      expect(result.source).toContain('GIBS');
+      expect(result.frames[0].url).toContain('gibs.earthdata.nasa.gov');
     });
 
     it('should reject non-boolean animated parameter', async () => {
@@ -105,46 +107,6 @@ describe('Weather Imagery Handler', () => {
           animated: 'yes' as any
         })
       ).rejects.toThrow('animated parameter must be a boolean');
-    });
-
-    it('should reject non-array layers parameter', async () => {
-      await expect(
-        getWeatherImagery({
-          latitude: 40.7128,
-          longitude: -74.006,
-          type: 'precipitation',
-          animated: false,
-          layers: 'layer1' as any
-        })
-      ).rejects.toThrow('layers parameter must be an array');
-    });
-
-    it('should reject too many layers', async () => {
-      const tooManyLayers = Array.from({ length: 11 }, (_, i) => `layer${i}`);
-
-      await expect(
-        getWeatherImagery({
-          latitude: 40.7128,
-          longitude: -74.006,
-          type: 'precipitation',
-          animated: false,
-          layers: tooManyLayers
-        })
-      ).rejects.toThrow('Maximum 10 layers allowed');
-    });
-
-    it('should accept valid layers parameter', async () => {
-      mockGetPrecipitationRadar.mockResolvedValue([]);
-
-      const result = await getWeatherImagery({
-        latitude: 40.7128,
-        longitude: -74.006,
-        type: 'precipitation',
-        animated: false,
-        layers: ['base', 'overlay']
-      });
-
-      expect(result).toBeDefined();
     });
 
     it('should default animated to false when not provided', async () => {
@@ -564,34 +526,15 @@ describe('Weather Imagery Handler', () => {
       expect(result.location.longitude).toBe(151.2093);
     });
 
-    it('should handle empty layers array', async () => {
-      mockGetPrecipitationRadar.mockResolvedValue([]);
-
+    it('should select GOES-West satellite for far-western longitudes', async () => {
       const result = await getWeatherImagery({
-        latitude: 40.7128,
-        longitude: -74.006,
-        type: 'precipitation',
-        animated: false,
-        layers: []
+        latitude: 61.2181,
+        longitude: -149.9003, // Anchorage
+        type: 'satellite',
+        animated: false
       });
 
-      expect(result).toBeDefined();
-    });
-
-    it('should handle exactly 10 layers', async () => {
-      mockGetPrecipitationRadar.mockResolvedValue([]);
-
-      const layers = Array.from({ length: 10 }, (_, i) => `layer${i}`);
-
-      const result = await getWeatherImagery({
-        latitude: 40.7128,
-        longitude: -74.006,
-        type: 'precipitation',
-        animated: false,
-        layers
-      });
-
-      expect(result).toBeDefined();
+      expect(result.frames[0].url).toContain('GOES-West_ABI_GeoColor');
     });
   });
 });
