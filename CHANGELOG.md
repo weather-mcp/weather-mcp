@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **NCEI Climate Normals** - Implemented official NOAA 1991–2020 climate normals retrieval for US locations (previously a placeholder that always fell back to Open-Meteo)
+  - Finds the nearest NCEI station with daily normals via a bounding-box `/stations` query (sorted by distance, expands once if empty)
+  - Reads daily high/low temperature normals (`DLY-TMAX-NORMAL`/`DLY-TMIN-NORMAL`, °F) and monthly precipitation (`MLY-PRCP-NORMAL`) averaged to a daily value
+  - Handles Feb 29 (reference year is non-leap), missing-value sentinels, rate limits, and auth errors; caches results indefinitely
+  - Requires a free `NCEI_API_TOKEN`; gracefully falls back to Open-Meteo when unavailable or outside US coverage
+  - Used by `get_forecast` and `get_current_conditions` for US climate context
+
 ## [1.7.1] - 2026-06-21
 
 ### Fixed
