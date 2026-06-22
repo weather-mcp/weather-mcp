@@ -12,6 +12,7 @@ import type {
   AlertCollectionResponse,
   NOAAErrorResponse,
   NWPSGauge,
+  NWPSGaugesResponse,
   NWPSStageFlowResponse,
   USGSIVResponse
 } from '../types/noaa.js';
@@ -699,16 +700,16 @@ export class NOAAService {
         return cached as NWPSGauge[];
       }
 
-      const response = await this.nwpsClient.get<NWPSGauge[]>('/gauges');
-      const result = response.data;
+      const response = await this.nwpsClient.get<NWPSGaugesResponse>('/gauges');
+      const result = response.data.gauges ?? [];
 
       // Cache for 24 hours (gauge locations don't change often)
       this.cache.set(cacheKey, result, 86400000);
       return result;
     }
 
-    const response = await this.nwpsClient.get<NWPSGauge[]>('/gauges');
-    return response.data;
+    const response = await this.nwpsClient.get<NWPSGaugesResponse>('/gauges');
+    return response.data.gauges ?? [];
   }
 
   /**
@@ -749,17 +750,20 @@ export class NOAAService {
       }
     }
 
-    // NWPS API supports bounding box queries via query parameters
+    // NWPS API supports bounding box queries via query parameters.
+    // The endpoint requires bbox.{xmin,ymin,xmax,ymax} plus an srid; without
+    // them it ignores the filter and returns the entire ~13MB gauge catalog.
     const params = {
-      west: west.toString(),
-      south: south.toString(),
-      east: east.toString(),
-      north: north.toString()
+      'bbox.xmin': west.toString(),
+      'bbox.ymin': south.toString(),
+      'bbox.xmax': east.toString(),
+      'bbox.ymax': north.toString(),
+      srid: 'EPSG_4326'
     };
 
     try {
-      const response = await this.nwpsClient.get<NWPSGauge[]>('/gauges', { params });
-      const result = response.data;
+      const response = await this.nwpsClient.get<NWPSGaugesResponse>('/gauges', { params });
+      const result = response.data.gauges ?? [];
 
       // Cache for 24 hours
       if (CacheConfig.enabled) {

@@ -420,38 +420,65 @@ export interface HistoricCrest {
 export interface GaugeStatus {
   primary: number | null; // Stage in feet
   secondary: number | null; // Flow in kcfs (thousand cubic feet per second)
-  floodCategory: 'major' | 'moderate' | 'minor' | 'action' | 'no flooding' | null;
+  // NWPS returns underscore-delimited categories (e.g. "no_flooding", "not_defined")
+  floodCategory:
+    | 'major'
+    | 'moderate'
+    | 'minor'
+    | 'action'
+    | 'no_flooding'
+    | 'not_defined'
+    | null;
   validTime: string; // ISO 8601 datetime
+  primaryUnit?: string; // e.g. "ft"
+  secondaryUnit?: string; // e.g. "kcfs"
 }
 
 /**
  * River gauge metadata and current status from NWPS API
  */
+/**
+ * Office reference returned by the NWPS API (state, WFO, RFC).
+ */
+export interface NWPSOfficeRef {
+  abbreviation: string;
+  name: string;
+}
+
 export interface NWPSGauge {
   lid: string; // NWSLI (5-character identifier)
-  usgsId?: string; // USGS site number (optional)
+  usgsId?: string; // USGS site number (only on the per-gauge detail endpoint)
   name: string; // Gauge name (e.g., "Mississippi River at St. Louis")
   latitude: number;
   longitude: number;
-  state: string;
+  state: NWPSOfficeRef;
   county?: string;
-  timeZone: string; // IANA timezone (e.g., "America/Chicago")
-  wfo: string; // Weather Forecast Office
-  rfc: string; // River Forecast Center
+  timeZone?: string; // IANA timezone (e.g., "America/Chicago")
+  wfo?: NWPSOfficeRef; // Weather Forecast Office
+  rfc?: NWPSOfficeRef; // River Forecast Center
   status: {
     observed?: GaugeStatus;
     forecast?: GaugeStatus;
   };
-  flood: {
+  // Detailed flood/crest data is only present on the per-gauge detail endpoint,
+  // not on the bounding-box list response.
+  flood?: {
     categories: FloodCategories;
     crests?: {
       historic?: HistoricCrest[];
       recent?: HistoricCrest[];
     };
   };
-  inService: boolean;
+  inService?: boolean;
   upstreamLid?: string;
   downstreamLid?: string;
+}
+
+/**
+ * Response wrapper for the NWPS /gauges endpoint.
+ */
+export interface NWPSGaugesResponse {
+  gauges: NWPSGauge[];
 }
 
 /**
