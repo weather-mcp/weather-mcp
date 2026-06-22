@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-06-22
+
 ### Added
 - **Satellite imagery** - `get_weather_imagery type="satellite"` is now implemented (was a "not yet implemented" stub) using NOAA GOES-East/West ABI GeoColor via NASA GIBS (Western Hemisphere coverage, day+night). Returns the latest snapshot.
 - **Accurate global timezones** - `guessTimezoneFromCoords` now uses `tz-lookup` for precise coordinate→IANA resolution worldwide (including no-DST zones like Arizona and sub-regional US zones), replacing the US-only longitude heuristic. Improves time formatting for international users.
