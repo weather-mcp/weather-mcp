@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-06-21
+
+### Fixed
+- **River Conditions (NWPS API)** - Repaired the river gauge integration after upstream NWPS API changes broke `get_river_conditions`
+  - The NWPS `/gauges` endpoint stopped honoring the `west/south/east/north` bounding-box parameters, so every query silently downloaded the entire ~13MB gauge catalog (~12,700 gauges), causing request timeouts and retries
+  - Now queries with `bbox.{xmin,ymin,xmax,ymax}` plus the required `srid=EPSG_4326`; river gauge lookups return in under a second again
+  - Updated response parsing to unwrap the `{ "gauges": [...] }` envelope (previously expected a bare array)
+  - Updated the `NWPSGauge` type for the current schema: `state`/`wfo`/`rfc` are now `{ abbreviation, name }` objects, and `flood`/`inService`/`county`/`timeZone`/`usgsId` are optional (only returned by the per-gauge detail endpoint)
+  - Handle underscore-delimited flood categories (`no_flooding`, `not_defined`) in display output
+
+### Changed
+- **Dependencies** - Integrated Dependabot updates (PRs #18–#22)
+  - `@modelcontextprotocol/sdk` 1.21.x → 1.29.0
+  - `axios` 1.13.x → 1.18.0
+  - `dotenv` 17.2.x → 17.4.2
+  - `mqtt` 5.15.0 → 5.15.1
+  - `typescript` 5.9.3 → 6.0.3 (dev)
+  - `@types/node` 24.10.0 → 25.9.3 (dev)
+  - Development dependency group updates (Babel, esbuild)
+
+## [1.7.0] - 2025-11-16
+
+### Added
+- **Saved Locations** - Save frequently used locations with simple aliases (e.g., "home", "work", "cabin") and reference them by name instead of coordinates
+  - `save_location` - Save a location with an alias, optional activities, and geocoding by name
+  - `list_saved_locations` - View all saved locations
+  - `get_saved_location` - Get details for a saved location
+  - `remove_saved_location` - Delete a saved location
+  - Optional per-location `activities` (e.g., boating, fishing, hiking) for contextually relevant weather
+  - Smart updates: change a saved location's name/activities without re-specifying coordinates
+  - Locations persist to `~/.weather-mcp/locations.json`
+- **Location names in tools** - `get_forecast` accepts a `location_name` parameter to use a saved location instead of latitude/longitude
+
+### Changed
+- **Geocoding** - Switched location search to Nominatim/OpenStreetMap for better small-town coverage
+
 ## [1.6.1] - 2025-11-10
 
 ### Fixed
