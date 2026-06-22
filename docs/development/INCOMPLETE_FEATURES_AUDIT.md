@@ -12,13 +12,17 @@ behavior, current behavior, blast radius (callers/tests), and a recommendation.
 
 ## Summary
 
-| # | Feature | Location | Status | Recommendation |
-|---|---------|----------|--------|----------------|
-| 1 | NCEI climate normals | `src/services/ncei.ts` | ✅ **Implemented (this session)** | Done — keep |
-| 2 | Satellite imagery | `src/handlers/weatherImageryHandler.ts:84` | ❌ Stub (throws) | **Decide:** implement (GOES) or trim |
-| 3 | Imagery `layers` parameter | `src/index.ts:440`, `weatherImageryHandler.ts:35` | ⚠️ Accepted but ignored | **Decide:** implement or trim |
-| 4 | Coordinate→timezone heuristic | `src/utils/timezone.ts:121` | ⚠️ Simplified (US-only accurate) | Likely keep; optionally improve |
-| 5 | `getAllNWPSGauges` (full catalog) | `src/services/noaa.ts:693` | ⚠️ Deprecated, still used as fallback | Likely keep as fallback; document |
+| # | Feature | Location | Status | Resolution |
+|---|---------|----------|--------|------------|
+| 1 | NCEI climate normals | `src/services/ncei.ts` | ✅ **Implemented** | Done — NOAA CDO normals |
+| 2 | Satellite imagery | `src/services/gibs.ts`, `weatherImageryHandler.ts` | ✅ **Implemented** | NASA GIBS GOES GeoColor (RainViewer satellite was discontinued — see DATA_SOURCE_BLOCKERS.md) |
+| 3 | Imagery `layers` parameter | (removed) | ✅ **Trimmed** | No backing capability after RainViewer transition |
+| 4 | Coordinate→timezone heuristic | `src/utils/timezone.ts` | ✅ **Implemented** | Replaced with `tz-lookup` (accurate global) |
+| 5 | `getAllNWPSGauges` (full catalog) | `src/services/noaa.ts` | ✅ **Resolved** | Kept as fallback + added `securityEvent` warning log |
+
+> **All audited items are now resolved.** Details below are kept for historical context.
+> External-data-source caveats (RainViewer discontinuation, satellite "latest only", NCEI
+> rate limits) are tracked in [`DATA_SOURCE_BLOCKERS.md`](./DATA_SOURCE_BLOCKERS.md).
 
 ---
 

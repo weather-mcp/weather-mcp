@@ -408,7 +408,7 @@ const TOOL_DEFINITIONS = {
 
   get_weather_imagery: {
     name: 'get_weather_imagery' as const,
-    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location (global coverage). Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization. Supports precipitation radar (global via RainViewer). Includes disclaimer about data delays and official forecast consultation. For numerical forecast data, use get_forecast instead.',
+    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization. Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. Includes disclaimer about data delays and official forecast consultation. For numerical forecast data, use get_forecast instead.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -426,7 +426,7 @@ const TOOL_DEFINITIONS = {
         },
         type: {
           type: 'string' as const,
-          description: 'Type of imagery: "radar", "satellite", or "precipitation" (default: "precipitation")',
+          description: 'Type of imagery: "radar" or "precipitation" (global, RainViewer) or "satellite" (Western Hemisphere GOES GeoColor, NASA GIBS). Default: "precipitation"',
           enum: ['radar', 'satellite', 'precipitation'],
           default: 'precipitation'
         },
@@ -434,13 +434,6 @@ const TOOL_DEFINITIONS = {
           type: 'boolean' as const,
           description: 'Return animated frames showing progression over time (default: false)',
           default: false
-        },
-        layers: {
-          type: 'array' as const,
-          description: 'Optional layers to include in imagery (future enhancement)',
-          items: {
-            type: 'string' as const
-          }
         }
       },
       required: ['latitude', 'longitude', 'type']

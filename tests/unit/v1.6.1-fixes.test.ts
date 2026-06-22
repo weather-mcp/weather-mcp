@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { redactCoordinatesForLogging } from '../../src/utils/logger.js';
+import { guessTimezoneFromCoords } from '../../src/utils/timezone.js';
 
 describe('v1.6.1 Security & Quality Fixes', () => {
   describe('Coordinate Redaction (Privacy Fix)', () => {
@@ -196,49 +197,27 @@ describe('v1.6.1 Security & Quality Fixes', () => {
     });
   });
 
-  describe('Timezone Fallback to UTC', () => {
-    /**
-     * Simulate the guessTimezoneFromCoords function behavior
-     * This tests the fix that defaults to UTC instead of server timezone
-     * Note: This uses if-else logic to match the actual implementation
-     */
-    function guessTimezone(lat: number, lon: number): string {
-      // US timezone heuristic (order matters - checked from east to west)
-      if (lat >= 24 && lat <= 50 && lon >= -125 && lon <= -66) {
-        if (lon >= -75) return 'America/New_York';
-        else if (lon >= -87) return 'America/Chicago';
-        else if (lon >= -104) return 'America/Denver';
-        else if (lon >= -125) return 'America/Los_Angeles';
-      }
-      // Default to UTC for international (not server timezone)
-      return 'UTC';
-    }
+  describe('Timezone resolution (international accuracy)', () => {
+    // The original v1.6.1 fix avoided returning the *server* timezone for
+    // international queries (it fell back to UTC). That guarantee still holds,
+    // and resolution is now accurate via tz-lookup (see v1.8 work).
 
-    it('should return UTC for international locations', () => {
-      expect(guessTimezone(51.5074, -0.1278)).toBe('UTC'); // London
-      expect(guessTimezone(48.8566, 2.3522)).toBe('UTC'); // Paris
-      expect(guessTimezone(-33.8688, 151.2093)).toBe('UTC'); // Sydney
-      expect(guessTimezone(35.6762, 139.6503)).toBe('UTC'); // Tokyo
+    it('should resolve correct (non-server) timezones for international locations', () => {
+      expect(guessTimezoneFromCoords(51.5074, -0.1278)).toBe('Europe/London');
+      expect(guessTimezoneFromCoords(48.8566, 2.3522)).toBe('Europe/Paris');
+      expect(guessTimezoneFromCoords(-33.8688, 151.2093)).toBe('Australia/Sydney');
+      expect(guessTimezoneFromCoords(35.6762, 139.6503)).toBe('Asia/Tokyo');
     });
 
     it('should still handle US timezones correctly', () => {
-      expect(guessTimezone(40.7128, -74.0060)).toBe('America/New_York'); // NYC (-74)
-      // Test a location clearly in Chicago timezone
-      expect(guessTimezone(41.8781, -86.0)).toBe('America/Chicago'); // Indiana (-86)
-      // Test a location in Denver timezone
-      expect(guessTimezone(39.7392, -103.0)).toBe('America/Denver'); // Denver (-103)
-      // Test LA
-      expect(guessTimezone(34.0522, -118.2437)).toBe('America/Los_Angeles'); // LA (-118)
-
-      // Note: The simplified heuristic has boundary issues
-      // Real Chicago (-87.6) falls into Denver zone due to >= -104 check
-      expect(guessTimezone(41.8781, -87.6298)).toBe('America/Denver'); // Boundary case
+      expect(guessTimezoneFromCoords(40.7128, -74.006)).toBe('America/New_York');
+      expect(guessTimezoneFromCoords(41.8781, -87.6298)).toBe('America/Chicago');
+      expect(guessTimezoneFromCoords(39.7392, -104.9903)).toBe('America/Denver');
+      expect(guessTimezoneFromCoords(34.0522, -118.2437)).toBe('America/Los_Angeles');
     });
 
-    it('should not return server timezone for non-US locations', () => {
-      const internationalTimezone = guessTimezone(51.5074, -0.1278);
-      expect(internationalTimezone).toBe('UTC');
-      expect(internationalTimezone).not.toContain('America/');
+    it('should never return an America/* zone for a European location', () => {
+      expect(guessTimezoneFromCoords(51.5074, -0.1278)).not.toContain('America/');
     });
   });
 

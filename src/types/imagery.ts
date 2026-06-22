@@ -26,7 +26,6 @@ export interface WeatherImageryParams {
   longitude: number;
   type: ImageryType;
   animated?: boolean;
-  layers?: string[];
 }
 
 /**

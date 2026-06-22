@@ -5,6 +5,7 @@
 
 import { WeatherImageryParams, WeatherImageryResponse, ImageryType } from '../types/imagery.js';
 import { rainViewerService } from '../services/rainviewer.js';
+import { gibsService } from '../services/gibs.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { ValidationError } from '../errors/ApiError.js';
@@ -31,16 +32,6 @@ function validateImageryParams(params: WeatherImageryParams): void {
   if (params.animated !== undefined && typeof params.animated !== 'boolean') {
     throw new ValidationError('animated parameter must be a boolean', 'animated', params.animated);
   }
-
-  // Validate layers array if provided
-  if (params.layers !== undefined) {
-    if (!Array.isArray(params.layers)) {
-      throw new ValidationError('layers parameter must be an array', 'layers', params.layers);
-    }
-    if (params.layers.length > 10) {
-      throw new ValidationError('Maximum 10 layers allowed', 'layers', params.layers);
-    }
-  }
 }
 
 /**
@@ -61,8 +52,7 @@ export async function getWeatherImagery(params: WeatherImageryParams): Promise<W
     animated
   });
 
-  // For now, we'll focus on precipitation radar using RainViewer
-  // Future enhancements can add NOAA radar and satellite imagery
+  // Precipitation/radar via RainViewer (global); satellite via NASA GIBS GOES.
   switch (type) {
     case 'precipitation':
     case 'radar': {
@@ -82,13 +72,22 @@ export async function getWeatherImagery(params: WeatherImageryParams): Promise<W
     }
 
     case 'satellite': {
-      // Placeholder for satellite imagery
-      // Future implementation can use NOAA GOES-16/17 or other satellite APIs
-      throw new ValidationError(
-        'Satellite imagery is not yet implemented. Use type="precipitation" or type="radar" for precipitation radar.',
-        'type',
-        type
-      );
+      // NOAA GOES-East/West ABI GeoColor via NASA GIBS (Western Hemisphere).
+      // Satellite returns the latest snapshot only (no animation — GIBS sub-daily
+      // timestamps are irregular; use type="radar" for animated loops).
+      const frames = gibsService.getSatelliteImagery(latitude, longitude);
+
+      return {
+        type,
+        location: { latitude, longitude },
+        coverage: 'Western Hemisphere (Americas / eastern Pacific)',
+        resolution: 'Latest snapshot',
+        source: 'NASA GIBS (NOAA GOES GeoColor)',
+        animated: false,
+        frames,
+        generatedAt: new Date(),
+        disclaimer: 'Satellite imagery from NASA GIBS using NOAA GOES-East/West ABI GeoColor. Coverage is the Western Hemisphere; locations outside GOES range may appear blank. Shows the latest snapshot only (animation not available for satellite). Imagery has a processing delay of roughly 20-30 minutes.'
+      };
     }
 
     default: {

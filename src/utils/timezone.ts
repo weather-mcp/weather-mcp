@@ -4,6 +4,8 @@
  */
 
 import { DateTime } from 'luxon';
+import tzLookup from 'tz-lookup';
+import { logger } from './logger.js';
 
 /**
  * Format an ISO 8601 datetime string in the specified timezone
@@ -112,29 +114,34 @@ export function getTimezoneAbbreviation(timezone: string, datetime?: Date): stri
 }
 
 /**
- * Detect timezone from coordinates using a simple heuristic
- * This is a fallback when timezone is not provided by APIs
+ * Detect the IANA timezone for a coordinate.
+ *
+ * Uses `tz-lookup` for accurate global coordinate→timezone resolution (handles
+ * international locations, US territories, and no-DST zones like Arizona). Falls
+ * back to a coarse US longitude heuristic and finally UTC if the lookup fails
+ * (e.g. invalid coordinates).
+ *
  * @param latitude - Latitude
  * @param longitude - Longitude
- * @returns Best-guess IANA timezone identifier
+ * @returns IANA timezone identifier
  */
 export function guessTimezoneFromCoords(latitude: number, longitude: number): string {
-  // This is a simplified heuristic - in practice, APIs usually provide timezone
-  // For production use, consider integrating a proper coordinate-to-timezone library
-  // like tz-lookup or @photostructure/tz-lookup for accurate global coverage
+  try {
+    return tzLookup(latitude, longitude);
+  } catch (error) {
+    logger.warn('tz-lookup failed; falling back to coarse timezone heuristic', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
 
-  // Map to common US timezones for North America based on longitude
+  // Fallback: coarse US longitude bands, then UTC for everything else.
   if (latitude >= 24 && latitude <= 50 && longitude >= -125 && longitude <= -66) {
     if (longitude >= -75) return 'America/New_York';
     if (longitude >= -87) return 'America/Chicago';
     if (longitude >= -104) return 'America/Denver';
-    if (longitude >= -125) return 'America/Los_Angeles';
+    return 'America/Los_Angeles';
   }
 
-  // For international locations, default to UTC instead of server timezone
-  // This provides predictable, unambiguous timestamps for all users
-  // Note: The previous fallback to Intl.DateTimeFormat().resolvedOptions().timeZone
-  // would return the server's local timezone, which is misleading for international queries
   return 'UTC';
 }
 

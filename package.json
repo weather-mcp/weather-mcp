@@ -60,12 +60,14 @@
     "dotenv": "^17.2.3",
     "luxon": "^3.7.2",
     "mqtt": "^5.14.1",
-    "ngeohash": "^0.6.3"
+    "ngeohash": "^0.6.3",
+    "tz-lookup": "^6.1.25"
   },
   "devDependencies": {
     "@types/luxon": "^3.7.1",
     "@types/ngeohash": "^0.6.8",
     "@types/node": "^25.9.3",
+    "@types/tz-lookup": "^6.1.2",
     "@vitest/coverage-v8": "^4.0.8",
     "tsx": "^4.20.6",
     "typescript": "^6.0.3",

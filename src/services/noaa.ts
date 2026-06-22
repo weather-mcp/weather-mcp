@@ -773,11 +773,18 @@ export class NOAAService {
 
       return result;
     } catch (error) {
-      // If bounding box query fails, fall back to client-side filtering
-      // This provides compatibility if the API doesn't support bbox queries
-      logger.warn('NWPS bounding box query failed, falling back to client-side filtering', {
-        error: error instanceof Error ? error.message : String(error)
-      });
+      // If the bounding-box query fails, fall back to downloading the entire
+      // gauge catalog and filtering client-side. This is a heavy path (~13MB /
+      // ~12,700 gauges) and should be rare — a sustained occurrence signals the
+      // NWPS bbox query has regressed (see v1.7.1 fix) and needs investigation.
+      logger.warn(
+        'NWPS bounding box query failed; falling back to full gauge catalog download (heavy path)',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          fallback: 'getAllNWPSGauges',
+          securityEvent: true
+        }
+      );
 
       const allGauges = await this.getAllNWPSGauges();
       const filtered = allGauges.filter(gauge =>
