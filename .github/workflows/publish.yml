@@ -1,0 +1,74 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  publish-npm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance attestation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify version consistency
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          SERVER_VERSION=$(node -p "require('./server.json').version")
+          SERVER_PKG_VERSION=$(node -p "require('./server.json').packages[0].version")
+          echo "package.json: $PKG_VERSION | server.json: $SERVER_VERSION / $SERVER_PKG_VERSION"
+          if [ "$PKG_VERSION" != "$SERVER_VERSION" ] || [ "$PKG_VERSION" != "$SERVER_PKG_VERSION" ]; then
+            echo "::error::server.json version does not match package.json — sync them before releasing"
+            exit 1
+          fi
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v${PKG_VERSION}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version v${PKG_VERSION}"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Skip if version already published
+        id: check
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "@dangahagan/weather-mcp@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::v${PKG_VERSION} is already on npm — skipping publish"
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.check.outputs.already_published == 'false'
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify publication
+        if: steps.check.outputs.already_published == 'false'
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          sleep 10
+          PUBLISHED=$(npm view "@dangahagan/weather-mcp@${PKG_VERSION}" version)
+          echo "npm now serves: ${PUBLISHED}"
+          [ "$PUBLISHED" = "$PKG_VERSION" ]

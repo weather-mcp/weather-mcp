@@ -8,13 +8,13 @@ For experienced users, here's the recommended publishing workflow:
 
 1. **Pre-release quality checks** → Run code-reviewer & security-auditor in parallel; review reports; fix all CRITICAL/HIGH findings; run test-automator (see "Pre-Release Quality Automation")
 2. **Pre-release documentation update** → Update all documentation for new version (see "Pre-Release Documentation Update")
-3. **Update versions** → Update `package.json` and `server.json` to new version
+3. **Update versions** → Update `package.json` and `server.json` to new version (must match — CI enforces this)
 4. **Commit & push** → Commit version updates to main branch
 5. **Build & test** → Run `npm run build` and `npm test`
-6. **Publish to npm** → Run `npm publish --access public`
-7. **Create GitHub release** → Use `gh release create` or web UI
-8. **Publish to MCP registry** → Run `./mcp-publisher login github` then `./mcp-publisher publish`
-9. **Verify** → Check npm, GitHub releases, MCP registry, and documentation consistency
+6. **Tag & create GitHub release** → `git tag vX.Y.Z && git push origin vX.Y.Z`, then `gh release create vX.Y.Z`
+7. **npm publish (automated)** → Pushing the `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which verifies versions match, builds, tests, and publishes to npm with provenance. Requires the `NPM_TOKEN` repository secret (granular npm access token with read/write on this package — check expiry!). Manual fallback: `npm publish --access public`.
+8. **Publish to MCP registry (manual)** → Run `./mcp-publisher login github` then `./mcp-publisher publish`. This cannot be automated in CI: GitHub Actions OIDC authenticates the `io.github.weather-mcp/*` namespace (the repo owner), but this server is registered as `io.github.dgahagan/*`, which requires interactive login as the `dgahagan` GitHub user.
+9. **Verify** → Check npm, GitHub releases, MCP registry, and documentation consistency (`./scripts/check-doc-versions.sh`)
 
 See detailed instructions below for each step.
 
