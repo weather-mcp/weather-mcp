@@ -114,10 +114,12 @@ echo "🔧 ${TOOL_COUNT} MCP tools defined in src/index.ts"
 
 # --- 6. Doc reference updates --------------------------------------------------
 SUMMARY_TEXT=${SUMMARY:-"See CHANGELOG.md"}
+# Escape sed-replacement metacharacters (/ & \) so summaries can contain paths
+SUMMARY_SED=$(printf '%s' "$SUMMARY_TEXT" | sed -e 's/[\/&\\]/\\&/g')
 
 sed -i -E \
   -e "s/\*\*Version:\*\* [0-9]+\.[0-9]+\.[0-9]+/**Version:** ${NEW_VERSION}/g" \
-  -e "s/- \*\*New in v[0-9]+\.[0-9]+\.[0-9]+:\*\* .*/- **New in v${NEW_VERSION}:** ${SUMMARY_TEXT}/" \
+  -e "s/- \*\*New in v[0-9]+\.[0-9]+\.[0-9]+:\*\* .*/- **New in v${NEW_VERSION}:** ${SUMMARY_SED}/" \
   -e "s/\*\*Test Coverage:\*\* [0-9,]+ tests/**Test Coverage:** ${TEST_COUNT_FMT} tests/" \
   -e "s/[0-9]+ MCP Tools/${TOOL_COUNT} MCP Tools/" \
   -e "s/^\*\*Last Updated:\*\* .*/**Last Updated:** ${TODAY} (v${NEW_VERSION})/" \
