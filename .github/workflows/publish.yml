@@ -23,6 +23,10 @@ jobs:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
 
+      # Trusted publishing (OIDC) requires npm >= 11.5.1
+      - name: Update npm
+        run: npm install -g npm@latest && npm --version
+
       - name: Verify version consistency
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
@@ -58,11 +62,12 @@ jobs:
             echo "already_published=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Auth via npm Trusted Publishing (OIDC) — no token/secret needed.
+      # Configured at npmjs.com package settings: repo weather-mcp/weather-mcp,
+      # workflow publish.yml. Provenance is generated automatically.
       - name: Publish to npm
         if: steps.check.outputs.already_published == 'false'
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
       - name: Verify publication
         if: steps.check.outputs.already_published == 'false'

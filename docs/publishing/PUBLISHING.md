@@ -12,7 +12,7 @@ For experienced users, here's the recommended publishing workflow:
 4. **Commit & push** → Commit version updates to main branch
 5. **Build & test** → Run `npm run build` and `npm test`
 6. **Tag & create GitHub release** → `git tag vX.Y.Z && git push origin vX.Y.Z`, then `gh release create vX.Y.Z`
-7. **npm publish (automated)** → Pushing the `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which verifies versions match, builds, tests, and publishes to npm with provenance. Requires the `NPM_TOKEN` repository secret (granular npm access token with read/write on this package — check expiry!). Manual fallback: `npm publish --access public`.
+7. **npm publish (automated)** → Pushing the `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which verifies versions match, builds, tests, and publishes to npm with provenance. Auth is via npm Trusted Publishing (OIDC) — configured on npmjs.com under the package's Settings → Trusted Publisher (repo `weather-mcp/weather-mcp`, workflow `publish.yml`); no token or secret needed. Manual fallback: `npm publish --access public`.
 8. **Publish to MCP registry (manual)** → Run `./mcp-publisher login github` then `./mcp-publisher publish`. This cannot be automated in CI: GitHub Actions OIDC authenticates the `io.github.weather-mcp/*` namespace (the repo owner), but this server is registered as `io.github.dgahagan/*`, which requires interactive login as the `dgahagan` GitHub user.
 9. **Verify** → Check npm, GitHub releases, MCP registry, and documentation consistency (`./scripts/check-doc-versions.sh`)
 
