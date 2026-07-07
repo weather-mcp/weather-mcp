@@ -20,14 +20,16 @@ export function formatInTimezone(
   format: 'full' | 'long' | 'medium' | 'short' = 'medium'
 ): string {
   try {
-    const dt = DateTime.fromISO(isoString, { setZone: false });
+    // Timezone-naive strings (e.g. Open-Meteo's "2026-07-07T04:32") are already
+    // location-local, so they must be interpreted in the target zone — parsing them
+    // in the server's zone and converting would apply the offset twice. Strings with
+    // an explicit offset keep their instant and are converted for display.
+    const zonedDt = DateTime.fromISO(isoString, { zone: timezone });
 
-    if (!dt.isValid) {
+    if (!zonedDt.isValid) {
       // Fallback to JavaScript Date if Luxon can't parse
       return new Date(isoString).toLocaleString('en-US', { timeZone: timezone });
     }
-
-    const zonedDt = dt.setZone(timezone);
 
     // Format based on requested style
     switch (format) {
@@ -55,13 +57,13 @@ export function formatInTimezone(
  */
 export function formatDateInTimezone(isoString: string, timezone: string): string {
   try {
-    const dt = DateTime.fromISO(isoString, { setZone: false });
+    // See formatInTimezone: naive strings are location-local, parse in target zone
+    const zonedDt = DateTime.fromISO(isoString, { zone: timezone });
 
-    if (!dt.isValid) {
+    if (!zonedDt.isValid) {
       return new Date(isoString).toLocaleDateString('en-US', { timeZone: timezone });
     }
 
-    const zonedDt = dt.setZone(timezone);
     return zonedDt.toLocaleString(DateTime.DATE_MED);
   } catch (error) {
     return new Date(isoString).toLocaleDateString('en-US', { timeZone: timezone });
@@ -76,16 +78,16 @@ export function formatDateInTimezone(isoString: string, timezone: string): strin
  */
 export function formatTimeInTimezone(isoString: string, timezone: string): string {
   try {
-    const dt = DateTime.fromISO(isoString, { setZone: false });
+    // See formatInTimezone: naive strings are location-local, parse in target zone
+    const zonedDt = DateTime.fromISO(isoString, { zone: timezone });
 
-    if (!dt.isValid) {
+    if (!zonedDt.isValid) {
       return new Date(isoString).toLocaleTimeString('en-US', {
         timeZone: timezone,
         timeZoneName: 'short'
       });
     }
 
-    const zonedDt = dt.setZone(timezone);
     return zonedDt.toLocaleString(DateTime.TIME_WITH_SHORT_OFFSET);
   } catch (error) {
     return new Date(isoString).toLocaleTimeString('en-US', {
@@ -158,8 +160,8 @@ export function formatTimeRangeInTimezone(
   timezone: string
 ): string {
   try {
-    const start = DateTime.fromISO(startTime, { setZone: false }).setZone(timezone);
-    const end = DateTime.fromISO(endTime, { setZone: false }).setZone(timezone);
+    const start = DateTime.fromISO(startTime, { zone: timezone });
+    const end = DateTime.fromISO(endTime, { zone: timezone });
 
     if (!start.isValid || !end.isValid) {
       return `${formatInTimezone(startTime, timezone, 'short')} - ${formatInTimezone(endTime, timezone, 'short')}`;

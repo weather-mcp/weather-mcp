@@ -330,7 +330,8 @@ function formatOpenMeteoMarineConditions(
     output += `**Next ${daysToShow} days:**\n\n`;
 
     for (let i = 0; i < daysToShow; i++) {
-      const dt = DateTime.fromISO(data.daily.time[i], { setZone: false }).setZone(data.timezone);
+      // Open-Meteo daily dates are location-local; parse in the location timezone
+      const dt = DateTime.fromISO(data.daily.time[i], { zone: data.timezone });
       const dayName = dt.toLocaleString({ weekday: 'short', month: 'short', day: 'numeric' });
 
       output += `**${dayName}:**\n`;

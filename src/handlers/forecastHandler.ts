@@ -491,8 +491,9 @@ async function formatOpenMeteoForecast(
     const numDays = Math.min(daily.time.length, days);
 
     for (let i = 0; i < numDays; i++) {
-      // Use timezone-aware date formatting
-      const dt = DateTime.fromISO(daily.time[i], { setZone: false }).setZone(forecast.timezone);
+      // Open-Meteo returns location-local naive timestamps; parse directly in the
+      // forecast timezone to avoid a double offset shift via the server's zone
+      const dt = DateTime.fromISO(daily.time[i], { zone: forecast.timezone });
       output += `## ${dt.toLocaleString({ weekday: 'long', month: 'long', day: 'numeric' })}\n`;
 
       if (daily.temperature_2m_max?.[i] !== undefined && daily.temperature_2m_min?.[i] !== undefined) {
@@ -505,12 +506,12 @@ async function formatOpenMeteoForecast(
 
       // Include sunrise/sunset data with timezone
       if (daily.sunrise?.[i]) {
-        const sunrise = DateTime.fromISO(daily.sunrise[i], { setZone: false }).setZone(forecast.timezone);
+        const sunrise = DateTime.fromISO(daily.sunrise[i], { zone: forecast.timezone });
         output += `**Sunrise:** ${sunrise.toLocaleString(DateTime.TIME_SIMPLE)}\n`;
       }
 
       if (daily.sunset?.[i]) {
-        const sunset = DateTime.fromISO(daily.sunset[i], { setZone: false }).setZone(forecast.timezone);
+        const sunset = DateTime.fromISO(daily.sunset[i], { zone: forecast.timezone });
         output += `**Sunset:** ${sunset.toLocaleString(DateTime.TIME_SIMPLE)}\n`;
       }
 

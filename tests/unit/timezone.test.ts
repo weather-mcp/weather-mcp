@@ -75,6 +75,29 @@ describe('Timezone Utilities', () => {
       expect(result).toContain('Nov 7, 2025');
       expect(result).toMatch(/2:30\s*PM/); // Handle non-breaking space
     });
+
+    // Open-Meteo returns timezone-naive strings that are already local to the
+    // requested location. They must render verbatim in that timezone — not be
+    // parsed in the server's zone and shifted (the v1.8.2 sunrise/sunset bug).
+    it('should treat timezone-naive strings as location-local (no double shift)', () => {
+      const tokyoSunrise = formatInTimezone('2026-07-07T04:32', 'Asia/Tokyo', 'short');
+      expect(tokyoSunrise).toMatch(/4:32\s*AM/);
+      expect(tokyoSunrise).toContain('7/7/2026');
+
+      const fijiSunrise = formatInTimezone('2026-07-07T06:29', 'Pacific/Fiji', 'short');
+      expect(fijiSunrise).toMatch(/6:29\s*AM/);
+
+      const utcNoon = formatInTimezone('2026-07-07T12:00', 'Etc/GMT', 'short');
+      expect(utcNoon).toMatch(/12:00\s*PM/);
+    });
+
+    it('should treat naive strings as location-local in date/time/range formatters', () => {
+      expect(formatDateInTimezone('2026-07-07T01:00', 'Pacific/Honolulu')).toContain('Jul 7, 2026');
+      expect(formatTimeInTimezone('2026-07-07T04:32', 'Asia/Tokyo')).toMatch(/4:32:00\s*AM/);
+      expect(
+        formatTimeRangeInTimezone('2026-07-07T14:00', '2026-07-07T17:00', 'Asia/Tokyo')
+      ).toMatch(/2:00\s*PM.*5:00\s*PM/);
+    });
   });
 
   describe('formatDateInTimezone', () => {
