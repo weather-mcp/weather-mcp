@@ -11,16 +11,22 @@ import * as blitzortungModule from '../../src/services/blitzortung.js';
 // Mock the blitzortung service
 vi.mock('../../src/services/blitzortung.js', () => ({
   blitzortungService: {
-    getLightningStrikes: vi.fn()
+    getLightningStrikes: vi.fn(),
+    getCoverageStart: vi.fn()
   }
 }));
 
 describe('Lightning Activity Handler', () => {
   let mockGetLightningStrikes: Mock;
+  let mockGetCoverageStart: Mock;
 
   beforeEach(() => {
     mockGetLightningStrikes = blitzortungModule.blitzortungService.getLightningStrikes as Mock;
     mockGetLightningStrikes.mockReset();
+    mockGetCoverageStart = blitzortungModule.blitzortungService.getCoverageStart as Mock;
+    mockGetCoverageStart.mockReset();
+    // Default: area has been monitored for 3 hours, so any window <= 120 min is fully covered
+    mockGetCoverageStart.mockReturnValue(new Date(Date.now() - 3 * 60 * 60 * 1000));
   });
 
   describe('Parameter Validation', () => {
@@ -450,6 +456,9 @@ describe('Lightning Activity Handler', () => {
       expect(result.strikes).toEqual([]);
       expect(result.statistics).toBeDefined();
       expect(result.safety).toBeDefined();
+      expect(result.coverage).toBeDefined();
+      expect(result.coverage.isComplete).toBe(true);
+      expect(result.coverage.coverageMinutes).toBe(60);
       expect(result.source).toBe('Blitzortung.org');
       expect(result.generatedAt).toBeInstanceOf(Date);
       expect(result.disclaimer).toBeDefined();
@@ -524,6 +533,11 @@ describe('Lightning Activity Handler', () => {
           nearestStrikeTime: null,
           isActiveThunderstorm: false
         },
+        coverage: {
+          monitoringSince: new Date('2024-01-01T10:00:00Z'),
+          coverageMinutes: 60,
+          isComplete: true
+        },
         source: 'Blitzortung.org',
         generatedAt: new Date('2024-01-01T13:00:00Z'),
         disclaimer: 'Lightning data from Blitzortung.org community network.'
@@ -577,6 +591,11 @@ describe('Lightning Activity Handler', () => {
           nearestStrikeDistance: 12.3,
           nearestStrikeTime: new Date('2024-01-01T12:45:00Z'),
           isActiveThunderstorm: true
+        },
+        coverage: {
+          monitoringSince: new Date('2024-01-01T10:00:00Z'),
+          coverageMinutes: 60,
+          isComplete: true
         },
         source: 'Blitzortung.org',
         generatedAt: new Date('2024-01-01T13:00:00Z'),
@@ -633,7 +652,12 @@ describe('Lightning Activity Handler', () => {
             nearestStrikeTime: null,
             isActiveThunderstorm: false
           },
-          source: 'Blitzortung.org',
+          coverage: {
+          monitoringSince: new Date('2024-01-01T10:00:00Z'),
+          coverageMinutes: 60,
+          isComplete: true
+        },
+        source: 'Blitzortung.org',
           generatedAt: new Date()
         };
 
@@ -678,6 +702,11 @@ describe('Lightning Activity Handler', () => {
           nearestStrikeDistance: 1,
           nearestStrikeTime: new Date(),
           isActiveThunderstorm: false
+        },
+        coverage: {
+          monitoringSince: new Date('2024-01-01T10:00:00Z'),
+          coverageMinutes: 60,
+          isComplete: true
         },
         source: 'Blitzortung.org',
         generatedAt: new Date()
@@ -730,6 +759,109 @@ describe('Lightning Activity Handler', () => {
 
       expect(result.searchRadius).toBe(500);
       expect(result.timeWindow).toBe(120);
+    });
+  });
+
+  describe('Monitoring Coverage (cold-buffer safety)', () => {
+    it('should mark coverage incomplete when monitoring started mid-window', async () => {
+      mockGetLightningStrikes.mockResolvedValue([]);
+      // Monitoring for this area began 2 minutes ago; window is 60 minutes
+      mockGetCoverageStart.mockReturnValue(new Date(Date.now() - 2 * 60 * 1000));
+
+      const result = await getLightningActivity({
+        latitude: 40.7128,
+        longitude: -74.006,
+        timeWindow: 60
+      });
+
+      expect(result.coverage.isComplete).toBe(false);
+      expect(result.coverage.coverageMinutes).toBeGreaterThan(1.9);
+      expect(result.coverage.coverageMinutes).toBeLessThan(2.5);
+      expect(result.coverage.monitoringSince).toBeInstanceOf(Date);
+    });
+
+    it('should make a safe verdict inconclusive under incomplete coverage', async () => {
+      mockGetLightningStrikes.mockResolvedValue([]);
+      mockGetCoverageStart.mockReturnValue(new Date(Date.now() - 2 * 60 * 1000));
+
+      const result = await getLightningActivity({
+        latitude: 40.7128,
+        longitude: -74.006,
+        timeWindow: 60
+      });
+
+      expect(result.safety.level).toBe('safe');
+      expect(result.safety.message).toContain('does NOT confirm');
+      expect(result.safety.recommendations[0]).toContain('inconclusive');
+    });
+
+    it('should report zero coverage when the area is not monitored at all', async () => {
+      mockGetLightningStrikes.mockResolvedValue([]);
+      mockGetCoverageStart.mockReturnValue(null);
+
+      const result = await getLightningActivity({
+        latitude: 40.7128,
+        longitude: -74.006
+      });
+
+      expect(result.coverage.monitoringSince).toBeNull();
+      expect(result.coverage.coverageMinutes).toBe(0);
+      expect(result.coverage.isComplete).toBe(false);
+      expect(result.safety.message).toContain('does NOT confirm');
+    });
+
+    it('should not alter non-safe verdicts under incomplete coverage', async () => {
+      const strikes: LightningStrike[] = [
+        {
+          timestamp: new Date(Date.now() - 1 * 60 * 1000),
+          latitude: 40.72,
+          longitude: -74.0,
+          polarity: -1,
+          amplitude: 50,
+          distance: 5
+        }
+      ];
+      mockGetLightningStrikes.mockResolvedValue(strikes);
+      mockGetCoverageStart.mockReturnValue(new Date(Date.now() - 2 * 60 * 1000));
+
+      const result = await getLightningActivity({
+        latitude: 40.7128,
+        longitude: -74.006
+      });
+
+      expect(result.safety.level).toBe('extreme');
+      expect(result.safety.message).toContain('EXTREME DANGER');
+    });
+
+    it('should render LIMITED DATA warning in formatted output', async () => {
+      mockGetLightningStrikes.mockResolvedValue([]);
+      mockGetCoverageStart.mockReturnValue(new Date(Date.now() - 2 * 60 * 1000));
+
+      const result = await getLightningActivity({
+        latitude: 40.7128,
+        longitude: -74.006,
+        timeWindow: 60
+      });
+      const formatted = formatLightningActivityResponse(result);
+
+      expect(formatted).toContain('SAFE (LIMITED DATA)');
+      expect(formatted).toContain('Limited monitoring coverage');
+      expect(formatted).toMatch(/\*\*Monitoring Coverage:\*\* \d+\.\d of 60 minutes ⚠️/);
+    });
+
+    it('should render full coverage without warnings', async () => {
+      mockGetLightningStrikes.mockResolvedValue([]);
+
+      const result = await getLightningActivity({
+        latitude: 40.7128,
+        longitude: -74.006,
+        timeWindow: 60
+      });
+      const formatted = formatLightningActivityResponse(result);
+
+      expect(formatted).not.toContain('LIMITED DATA');
+      expect(formatted).not.toContain('Limited monitoring coverage');
+      expect(formatted).toContain('**Monitoring Coverage:** 60.0 of 60 minutes');
     });
   });
 });

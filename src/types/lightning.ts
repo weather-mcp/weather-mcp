@@ -57,6 +57,18 @@ export interface LightningSafetyAssessment {
 }
 
 /**
+ * How much of the requested time window is actually backed by live monitoring.
+ * Strikes are collected into a rolling buffer that only fills while the area's
+ * MQTT subscriptions are active, so a fresh server (or a first query for an
+ * area) may cover far less history than the requested window.
+ */
+export interface LightningMonitoringCoverage {
+  monitoringSince: Date | null; // When live coverage of the queried area began (null = unknown/none)
+  coverageMinutes: number;      // Minutes of the requested window actually monitored
+  isComplete: boolean;          // True when coverage spans the full requested window
+}
+
+/**
  * Lightning activity response
  */
 export interface LightningActivityResponse {
@@ -73,6 +85,7 @@ export interface LightningActivityResponse {
   strikes: LightningStrike[];
   statistics: LightningStatistics;
   safety: LightningSafetyAssessment;
+  coverage: LightningMonitoringCoverage;
   source: string;
   generatedAt: Date;
   disclaimer?: string;

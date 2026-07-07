@@ -74,6 +74,10 @@ export class BlitzortungService {
 
   // Subscription management with LRU tracking
   private subscribedGeohashes: Map<string, number> = new Map(); // geohash -> last access timestamp
+  // Strikes only accumulate for a geohash while it is subscribed, so a query's real
+  // monitoring coverage starts at the newest first-subscription among its geohashes —
+  // not at the requested time window. Tracked so results can disclose limited coverage.
+  private geohashFirstSubscribed: Map<string, number> = new Map(); // geohash -> first subscribed timestamp
   private readonly maxSubscriptions = 50; // Limit concurrent subscriptions to prevent unbounded growth
   private isConnecting = false;
   private isConnected = false;
@@ -299,6 +303,7 @@ export class BlitzortungService {
         const geohashPath = geohash.split('').join('/');
         const topic = `${this.topicPrefix}/${geohashPath}/#`;
         subscriptions.push(topic);
+        this.geohashFirstSubscribed.set(geohash, now);
       }
       // Update access time for all geohashes in this request (LRU tracking)
       this.subscribedGeohashes.set(geohash, now);
@@ -371,6 +376,7 @@ export class BlitzortungService {
     // Remove from tracking map
     for (const [geohash] of toEvict) {
       this.subscribedGeohashes.delete(geohash);
+      this.geohashFirstSubscribed.delete(geohash);
     }
 
     logger.debug('Eviction complete', {
@@ -424,6 +430,7 @@ export class BlitzortungService {
         // Remove from tracking
         for (const geohash of staleGeohashes) {
           this.subscribedGeohashes.delete(geohash);
+          this.geohashFirstSubscribed.delete(geohash);
         }
 
         logger.debug('Pruning complete', {
@@ -479,6 +486,33 @@ export class BlitzortungService {
       // Return empty array on error to allow graceful degradation
       return [];
     }
+  }
+
+  /**
+   * Get the moment from which the entire queried area has been continuously
+   * monitored, or null if any part of it is not currently subscribed (or the
+   * broker is disconnected). Callers use this to detect that a "0 strikes"
+   * result covers less than the requested time window.
+   */
+  getCoverageStart(latitude: number, longitude: number, radiusKm: number): Date | null {
+    if (!this.isConnected) {
+      return null;
+    }
+
+    const geohashes = calculateGeohashSubscriptions(latitude, longitude, radiusKm);
+    let coverageStart = 0;
+
+    for (const geohash of geohashes) {
+      const firstSubscribed = this.geohashFirstSubscribed.get(geohash);
+      if (firstSubscribed === undefined) {
+        return null;
+      }
+      if (firstSubscribed > coverageStart) {
+        coverageStart = firstSubscribed;
+      }
+    }
+
+    return coverageStart > 0 ? new Date(coverageStart) : null;
   }
 
   /**
@@ -570,6 +604,7 @@ export class BlitzortungService {
         this.client!.end(false, {}, () => {
           this.isConnected = false;
           this.subscribedGeohashes.clear();
+          this.geohashFirstSubscribed.clear();
           logger.info('Disconnected from Blitzortung MQTT broker');
           resolve();
         });

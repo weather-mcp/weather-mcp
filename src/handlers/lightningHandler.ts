@@ -6,6 +6,7 @@
 import {
   LightningActivityParams,
   LightningActivityResponse,
+  LightningMonitoringCoverage,
   LightningStrike,
   LightningStatistics,
   LightningSafetyAssessment,
@@ -198,6 +199,30 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
   const now = new Date();
   const searchStart = new Date(now.getTime() - timeWindow * 60 * 1000);
 
+  // Strikes only accumulate while the area's live subscriptions are active. If
+  // monitoring began after the start of the requested window (fresh server, or
+  // first query for this area), a "no strikes" result is inconclusive — say so
+  // instead of implying verified safety.
+  const coverageStart = blitzortungService.getCoverageStart(latitude, longitude, radius);
+  const coverageMinutes = coverageStart
+    ? Math.max(0, Math.min(timeWindow, (now.getTime() - coverageStart.getTime()) / (1000 * 60)))
+    : 0;
+  const coverage: LightningMonitoringCoverage = {
+    monitoringSince: coverageStart,
+    coverageMinutes,
+    isComplete: coverageMinutes >= timeWindow
+  };
+
+  if (!coverage.isComplete && safety.level === 'safe') {
+    safety.message =
+      'No lightning strikes observed during the limited monitoring period. ' +
+      'This does NOT confirm the absence of lightning activity.';
+    safety.recommendations.unshift(
+      `Live monitoring of this area covers only ${coverageMinutes.toFixed(1)} of the requested ` +
+      `${timeWindow} minutes — treat this result as inconclusive and re-check shortly.`
+    );
+  }
+
   return {
     location: { latitude, longitude },
     searchRadius: radius,
@@ -209,6 +234,7 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
     strikes,
     statistics,
     safety,
+    coverage,
     source: 'Blitzortung.org',
     generatedAt: now,
     disclaimer: 'Lightning data from Blitzortung.org community network. Data may have 5-15 minute delay. For life-safety decisions, consult official weather services and local emergency management. When thunder roars, go indoors!'
@@ -236,10 +262,25 @@ export function formatLightningActivityResponse(response: LightningActivityRespo
     extreme: '🔴'
   }[response.safety.level];
 
-  lines.push(`## ${safetyIcon} Safety Status: ${response.safety.level.toUpperCase()}`);
+  const limitedData = !response.coverage.isComplete;
+  const statusSuffix = limitedData && response.safety.level === 'safe' ? ' (LIMITED DATA)' : '';
+  lines.push(`## ${safetyIcon} Safety Status: ${response.safety.level.toUpperCase()}${statusSuffix}`);
   lines.push('');
   lines.push(response.safety.message);
   lines.push('');
+
+  if (limitedData) {
+    const since = response.coverage.monitoringSince
+      ? ` (since ${response.coverage.monitoringSince.toISOString()})`
+      : '';
+    lines.push(
+      `⚠️ **Limited monitoring coverage:** Live strike collection for this area spans ` +
+      `${response.coverage.coverageMinutes.toFixed(1)} of the requested ${response.timeWindow} minutes${since}. ` +
+      `An absence of strikes in this report does not confirm an absence of lightning. ` +
+      `Re-check in a few minutes or consult official weather services before making safety decisions.`
+    );
+    lines.push('');
+  }
 
   // Recommendations
   if (response.safety.recommendations.length > 0) {
@@ -255,6 +296,10 @@ export function formatLightningActivityResponse(response: LightningActivityRespo
   lines.push('## 📊 Lightning Statistics');
   lines.push('');
   lines.push(`**Total Strikes:** ${response.statistics.totalStrikes}`);
+  lines.push(
+    `**Monitoring Coverage:** ${response.coverage.coverageMinutes.toFixed(1)} of ${response.timeWindow} minutes` +
+    (response.coverage.isComplete ? '' : ' ⚠️')
+  );
 
   if (response.statistics.totalStrikes > 0) {
     lines.push(`**Cloud-to-Ground:** ${response.statistics.cloudToGroundStrikes}`);
