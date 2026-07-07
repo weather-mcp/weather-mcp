@@ -73,7 +73,15 @@ jobs:
         if: steps.check.outputs.already_published == 'false'
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
-          sleep 10
-          PUBLISHED=$(npm view "@dangahagan/weather-mcp@${PKG_VERSION}" version)
-          echo "npm now serves: ${PUBLISHED}"
-          [ "$PUBLISHED" = "$PKG_VERSION" ]
+          # Registry propagation can take a minute or two
+          for i in $(seq 1 10); do
+            PUBLISHED=$(npm view "@dangahagan/weather-mcp@${PKG_VERSION}" version 2>/dev/null || true)
+            if [ "$PUBLISHED" = "$PKG_VERSION" ]; then
+              echo "npm now serves: ${PUBLISHED}"
+              exit 0
+            fi
+            echo "Attempt $i: not visible yet, retrying in 15s..."
+            sleep 15
+          done
+          echo "::error::v${PKG_VERSION} not visible on npm after 10 attempts"
+          exit 1
