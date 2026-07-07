@@ -53,7 +53,7 @@ The tradeoff is honest: US data (NOAA) is richer than international data (Open-M
 
 ## Tools
 
-Sixteen tools, all documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
+All 16 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 | Tool | What it does | Coverage |
 |------|-------------|----------|

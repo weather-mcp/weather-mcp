@@ -101,15 +101,25 @@ if [ -z "$TEST_COUNT" ]; then
   exit 1
 fi
 TEST_COUNT_FMT=$(node -p "(${TEST_COUNT}).toLocaleString('en-US')")
+TEST_COUNT_BADGE=${TEST_COUNT_FMT//,/%2C}   # shields.io URL-encodes the comma
 echo "   ${TEST_COUNT_FMT} tests passing"
 
-# --- 5. Doc reference updates --------------------------------------------------
+# --- 5. Tool count (from the TOOL_DEFINITIONS registry in src/index.ts) --------
+TOOL_COUNT=$(grep -cE "name: '[a-z_]+' as const" src/index.ts)
+if [ "$TOOL_COUNT" -eq 0 ]; then
+  echo "❌ Could not count tools in src/index.ts — did the TOOL_DEFINITIONS format change?"
+  exit 1
+fi
+echo "🔧 ${TOOL_COUNT} MCP tools defined in src/index.ts"
+
+# --- 6. Doc reference updates --------------------------------------------------
 SUMMARY_TEXT=${SUMMARY:-"See CHANGELOG.md"}
 
 sed -i -E \
   -e "s/\*\*Version:\*\* [0-9]+\.[0-9]+\.[0-9]+/**Version:** ${NEW_VERSION}/g" \
   -e "s/- \*\*New in v[0-9]+\.[0-9]+\.[0-9]+:\*\* .*/- **New in v${NEW_VERSION}:** ${SUMMARY_TEXT}/" \
   -e "s/\*\*Test Coverage:\*\* [0-9,]+ tests/**Test Coverage:** ${TEST_COUNT_FMT} tests/" \
+  -e "s/[0-9]+ MCP Tools/${TOOL_COUNT} MCP Tools/" \
   -e "s/^\*\*Last Updated:\*\* .*/**Last Updated:** ${TODAY} (v${NEW_VERSION})/" \
   CLAUDE.md
 
@@ -118,21 +128,43 @@ sed -i -E \
   -e "s/\*\*Test Coverage:\*\* [0-9,]+ tests/**Test Coverage:** ${TEST_COUNT_FMT} tests/" \
   docs/README.md
 
+# README: tests badge, test-count prose, and "N tools" mentions
 sed -i -E \
-  -e "s/test suite with [0-9,]+ automated tests/test suite with ${TEST_COUNT_FMT} automated tests/" \
-  -e "s/\*\*[0-9,]+ tests\*\* across unit and integration test suites/**${TEST_COUNT_FMT} tests** across unit and integration test suites/" \
+  -e "s/tests-[0-9%C]+%20passing/tests-${TEST_COUNT_BADGE}%20passing/" \
+  -e "s/TypeScript, [0-9,]+ tests/TypeScript, ${TEST_COUNT_FMT} tests/" \
+  -e "s/Run all [0-9,]+ tests/Run all ${TEST_COUNT_FMT} tests/" \
+  -e "s/\b[0-9]+ tools\b/${TOOL_COUNT} tools/g" \
   README.md
 
-echo "📝 Updated CLAUDE.md, docs/README.md, README.md"
+sed -i -E "s/all [0-9]+ MCP tools/all ${TOOL_COUNT} MCP tools/" docs/TOOLS.md
 
-# --- 6. SECURITY.md supported-versions row (minor/major bumps) -----------------
+# npm and MCP registry descriptions mention the tool count
+sed -i -E "s/[0-9]+ weather tools/${TOOL_COUNT} weather tools/" package.json server.json
+
+echo "📝 Updated CLAUDE.md, docs/README.md, README.md, docs/TOOLS.md, package.json, server.json"
+
+# --- 7. Social preview image (tool count in the tagline) ------------------------
+if ! grep -q "${TOOL_COUNT} weather tools" .github/social-preview.html; then
+  sed -i -E "s/[0-9]+ weather tools/${TOOL_COUNT} weather tools/" .github/social-preview.html
+  CHROME=$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)
+  if [ -n "$CHROME" ]; then
+    "$CHROME" --headless --disable-gpu --no-sandbox --hide-scrollbars --window-size=1280,640 \
+      --screenshot=.github/social-preview.png "file://$PWD/.github/social-preview.html" >/dev/null 2>&1
+    echo "🖼️  Social preview PNG re-rendered with ${TOOL_COUNT} tools"
+  else
+    echo "⚠️  .github/social-preview.html updated, but no Chrome found to re-render the PNG"
+  fi
+  echo "   ⚠️  Manual step: upload .github/social-preview.png at GitHub → Settings → Social preview"
+fi
+
+# --- 8. SECURITY.md supported-versions row (minor/major bumps) -----------------
 MAJOR_MINOR=$(echo "$NEW_VERSION" | cut -d. -f1-2)
 if ! grep -q "| ${MAJOR_MINOR}.x" SECURITY.md; then
   sed -i "0,/^| [0-9]/s//| ${MAJOR_MINOR}.x   | :white_check_mark: |\n&/" SECURITY.md
   echo "📝 SECURITY.md: added ${MAJOR_MINOR}.x to supported versions"
 fi
 
-# --- 7. Verify -----------------------------------------------------------------
+# --- 9. Verify -----------------------------------------------------------------
 echo ""
 ./scripts/check-doc-versions.sh
 
