@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-07-06
+
+### Changed
+- **Dependencies** - Integrated Dependabot updates (PRs #33–#34)
+  - `mqtt` 5.15.1 → 5.15.2 (fixes: don't overwrite explicit TLS SNI servername; support relative WebSocket URLs)
+  - `@types/node` 26.0.0 → 26.1.0 (dev)
+  - `@vitest/coverage-v8` / `vitest` 4.1.9 → 4.1.10 (dev)
+  - `tsx` 4.22.4 → 4.23.0 (dev)
+
+### Fixed
+- **MCP Registry sync** - `server.json` version had fallen behind (stuck at 1.6.1 while npm was at 1.8.0); now synced with `package.json` as part of the release process
+
 ## [1.8.0] - 2026-06-22
 
 ### Added

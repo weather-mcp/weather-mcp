@@ -71,7 +71,7 @@ else
 fi
 
 # Check CHANGELOG.md top entry
-CHANGELOG_TOP_VERSION=$(grep -m 1 "^## \[" CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+CHANGELOG_TOP_VERSION=$(grep -m 1 "^## \[[0-9]" CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 if [ "$CHANGELOG_TOP_VERSION" == "$PACKAGE_VERSION" ]; then
   echo "✅ CHANGELOG.md top entry: ${GREEN}v${CHANGELOG_TOP_VERSION}${NC}"
 else
@@ -87,7 +87,7 @@ if [ -n "$TEST_COUNT" ]; then
   echo "📊 Actual test count: ${GREEN}${TEST_COUNT}${NC}"
 
   # Check README.md test count
-  README_TEST_COUNT=$(grep -E "[0-9]+ (automated )?tests" README.md | head -1 | grep -oE '[0-9]+')
+  README_TEST_COUNT=$(grep -E "[0-9,]+ (automated )?tests" README.md | head -1 | tr -d ',' | grep -oE '[0-9]+' | head -1)
   if [ "$README_TEST_COUNT" == "$TEST_COUNT" ]; then
     echo "✅ README.md test count: ${GREEN}${README_TEST_COUNT}${NC}"
   else
@@ -96,7 +96,7 @@ if [ -n "$TEST_COUNT" ]; then
   fi
 
   # Check CLAUDE.md test count
-  CLAUDE_TEST_COUNT=$(grep -E "Test Coverage.*[0-9]+ tests" CLAUDE.md | head -1 | grep -oE '[0-9]+' | head -1)
+  CLAUDE_TEST_COUNT=$(grep -E "Test Coverage.*[0-9,]+ tests" CLAUDE.md | head -1 | tr -d ',' | grep -oE '[0-9]+' | head -1)
   if [ "$CLAUDE_TEST_COUNT" == "$TEST_COUNT" ]; then
     echo "✅ CLAUDE.md test count: ${GREEN}${CLAUDE_TEST_COUNT}${NC}"
   else
