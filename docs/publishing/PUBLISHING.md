@@ -7,10 +7,10 @@ This guide covers how to publish the Weather MCP Server to npm, create GitHub re
 For experienced users, here's the recommended publishing workflow:
 
 1. **Pre-release quality checks** → Run code-reviewer & security-auditor in parallel; review reports; fix all CRITICAL/HIGH findings; run test-automator (see "Pre-Release Quality Automation")
-2. **Pre-release documentation update** → Update all documentation for new version (see "Pre-Release Documentation Update")
-3. **Update versions** → Update `package.json` and `server.json` to new version (must match — CI enforces this)
-4. **Commit & push** → Commit version updates to main branch
-5. **Build & test** → Run `npm run build` and `npm test`
+2. **Prepare the release (automated)** → Run `./scripts/update-docs-for-release.sh <patch|minor|major|X.Y.Z> ["summary"]`. This bumps `package.json` + `server.json`, promotes the CHANGELOG `[Unreleased]` section (or seeds a draft from conventional commits since the last tag), updates version/test-count references in CLAUDE.md, README.md, docs/README.md, and SECURITY.md, and runs `check-doc-versions.sh`. Tip: write CHANGELOG notes under `[Unreleased]` as you develop — the script promotes them verbatim.
+3. **Review & edit** → `git diff` — especially CHANGELOG wording if it was seeded from commit subjects
+4. **Commit & push** → `git add -A && git commit -m "chore: Release vX.Y.Z" && git push origin main`
+5. **Build & test** → Run `npm run build` and `npm test` (CI re-runs these before publishing)
 6. **Tag & create GitHub release** → `git tag vX.Y.Z && git push origin vX.Y.Z`, then `gh release create vX.Y.Z`
 7. **npm publish (automated)** → Pushing the `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which verifies versions match, builds, tests, and publishes to npm with provenance. Auth is via npm Trusted Publishing (OIDC) — configured on npmjs.com under the package's Settings → Trusted Publisher (repo `weather-mcp/weather-mcp`, workflow `publish.yml`); no token or secret needed. Manual fallback: `npm publish --access public`.
 8. **Publish to MCP registry (manual)** → Run `./mcp-publisher login github` then `./mcp-publisher publish`. This cannot be automated in CI: GitHub Actions OIDC authenticates the `io.github.weather-mcp/*` namespace (the repo owner), but this server is registered as `io.github.dgahagan/*`, which requires interactive login as the `dgahagan` GitHub user.
