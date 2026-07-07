@@ -64,7 +64,7 @@ All 16 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `search_location` | Geocode place names to coordinates ("Paris" → 48.85, 2.35) | 🌍 Global |
 | `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance | 🌍 Global |
 | `get_marine_conditions` | Wave height, swell, ocean currents, Douglas Sea Scale — includes Great Lakes and major US bays | 🌍 Global |
-| `get_weather_imagery` | Precipitation radar tiles, static or 2-hour animated loops | 🌍 Global |
+| `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery | 🌍 Global |
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
 | `get_river_conditions` | River gauge levels, flood stages, streamflow | 🇺🇸 US |
 | `get_wildfire_info` | Active fires, containment, size, proximity-based safety guidance | 🇺🇸 US |
@@ -98,6 +98,7 @@ All free, all public, no authentication required:
 | [USGS Water Services](https://waterservices.usgs.gov/) + [NOAA NWPS](https://water.noaa.gov/) | River levels, streamflow, flood stages | US |
 | [NIFC WFIGS](https://data-nifc.opendata.arcgis.com/) | Active wildfire perimeters and incidents | US |
 | [RainViewer](https://www.rainviewer.com/api.html) | Precipitation radar imagery | Global |
+| [NASA GIBS](https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api) | GOES GeoColor satellite imagery | Western Hemisphere |
 | [Blitzortung.org](https://www.blitzortung.org/) | Community lightning detection network | Global |
 
 Open-Meteo allows 10,000 requests/day for non-commercial use; caching keeps typical AI usage far below that. Please respect the upstream providers' fair-use terms.

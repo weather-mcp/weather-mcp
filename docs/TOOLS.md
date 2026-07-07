@@ -18,7 +18,7 @@ Complete reference for all 16 MCP tools provided by the Weather MCP Server.
 
 7. [get_air_quality](#7-get_air_quality) — AQI + pollutants, global
 8. [get_marine_conditions](#8-get_marine_conditions) — Waves/swell/currents, global
-9. [get_weather_imagery](#9-get_weather_imagery) — Radar/precipitation maps, global
+9. [get_weather_imagery](#9-get_weather_imagery) — Radar, precipitation, and satellite imagery
 10. [get_lightning_activity](#10-get_lightning_activity) — Strike detection, global
 11. [get_river_conditions](#11-get_river_conditions) — River levels/flooding, US
 12. [get_wildfire_info](#12-get_wildfire_info) — Active fires, US
@@ -289,34 +289,36 @@ Provides comprehensive marine weather data with intelligent dual-source support:
 - Optional 5-day forecast with daily summaries
 
 ### 9. get_weather_imagery
-Get weather radar and precipitation imagery for visual weather analysis.
+Get weather radar, precipitation, and satellite imagery for visual weather analysis.
 
 **Parameters:**
 - `latitude` (required): Latitude coordinate (-90 to 90)
 - `longitude` (required): Longitude coordinate (-180 to 180)
-- `type` (required): Imagery type - "precipitation", "radar", or "satellite" (Note: satellite not yet implemented)
+- `type` (optional): Imagery type - "precipitation" (default), "radar", or "satellite"
 - `animated` (optional): Return animated loop vs static image (default: false)
 - `layers` (optional): Additional map layers (reserved for future use)
 
 **Description:**
-Provides access to weather radar and precipitation imagery from RainViewer API with global coverage. Returns tile URLs for efficient rendering of current precipitation or animated radar loops showing up to 2 hours of history. Perfect for visual confirmation of approaching weather systems.
+Provides access to weather imagery from two sources: precipitation/radar tiles from the RainViewer API (global coverage, static or animated loops showing up to 2 hours of history), and satellite imagery from NOAA GOES-East/West ABI GeoColor via NASA GIBS (Western Hemisphere, day and night). Perfect for visual confirmation of approaching weather systems.
 
 **Examples:**
 ```
 "Show me the current radar for New York"
 "Get animated precipitation radar for London for the last 2 hours"
+"Show me a satellite image of the hurricane off Florida"
 "Is there any precipitation showing on radar near me?"
 ```
 
 **Returns:**
 - Precipitation radar imagery (static or animated)
+- Satellite snapshot (GOES GeoColor, when `type="satellite"`)
 - Tile URLs for efficient rendering
 - Frame timestamps for animated sequences
 - Coverage area and resolution information
 - Automatic coordinate-to-tile calculation
 - Up to 2 hours of historical radar frames when animated
 
-**Note:** Satellite imagery is planned for a future release. Precipitation radar provides global coverage via the free RainViewer API.
+**Note:** Precipitation/radar coverage is global (RainViewer). Satellite coverage is Western Hemisphere only (GOES GeoColor via NASA GIBS).
 
 ### 10. get_lightning_activity
 Get real-time lightning strike detection and safety assessment for outdoor activity planning.

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-07-07
+
+Documentation and packaging release — no functional changes to the server or tools.
+
+### Changed
+- **README overhaul** - Restructured for prospective users: install one-liner and value proposition up front, honest "Why this server?" positioning, compact 16-tool table, and data source credits. The full tool reference moved to the new [docs/TOOLS.md](./docs/TOOLS.md)
+- **Package metadata** - npm and MCP registry descriptions/keywords now reflect all 16 tools and the no-API-key design; added a social preview image for GitHub link sharing
+- **Publishing pipeline** - npm publishing now runs automatically on version tags via GitHub Actions with Trusted Publishing (OIDC); release prep script keeps versions, changelog, test counts, and tool counts in sync across all docs
+
+### Fixed
+- **Stale imagery docs** - Tool reference incorrectly said satellite imagery was "not yet implemented"; it has been available since v1.8.0 (GOES GeoColor via NASA GIBS, Western Hemisphere)
+
 ## [1.8.1] - 2026-07-06
 
 ### Changed
