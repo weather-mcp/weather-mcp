@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "name": "io.github.dgahagan/weather-mcp",
   "title": "Weather Data MCP Server",
-  "description": "Weather forecasts, alerts, air quality, marine, radar imagery, lightning. NOAA + Open-Meteo.",
+  "description": "16 weather tools, no API keys: forecasts, alerts, air quality, marine, radar, lightning, wildfires.",
   "version": "1.8.1",
   "packages": [
     {
@@ -26,6 +26,9 @@
     "noaa",
     "open-meteo",
     "historical-weather",
-    "climate"
+    "climate",
+    "air-quality",
+    "weather-alerts",
+    "no-api-key"
   ]
 }
