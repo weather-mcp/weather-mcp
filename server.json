@@ -2,13 +2,13 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "name": "io.github.dgahagan/weather-mcp",
   "title": "Weather Data MCP Server",
-  "description": "16 weather tools, no API keys: forecasts, alerts, air quality, marine, radar, lightning, wildfires.",
-  "version": "1.10.0",
+  "description": "17 weather tools, no API keys: a one-call weather summary plus forecasts, alerts, air quality, marine, radar, lightning, wildfires.",
+  "version": "1.11.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@dangahagan/weather-mcp",
-      "version": "1.10.0",
+      "version": "1.11.0",
       "transport": {
         "type": "stdio"
       }
