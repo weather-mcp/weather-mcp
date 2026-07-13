@@ -11,9 +11,25 @@
 
 import type { OpenMeteoHistoricalResponse, ClimateNormals } from '../types/openmeteo.js';
 import { celsiusToFahrenheit } from './units.js';
+import { UnitPreferences, IMPERIAL_PREFERENCES } from '../config/units.js';
+import { temperatureLabel, precipitationLabel } from './unitFormat.js';
 import type { OpenMeteoService } from '../services/openmeteo.js';
 import type { NCEIService } from '../services/ncei.js';
 import { logger } from './logger.js';
+
+/**
+ * Climate normals are stored canonically in imperial units (°F, inches).
+ * These helpers convert them to the caller's preferred units for display.
+ */
+function normalTempToPref(fahrenheit: number, prefs: UnitPreferences): number {
+  return prefs.temperature === 'C' ? Math.round(((fahrenheit - 32) * 5) / 9) : Math.round(fahrenheit);
+}
+
+function normalPrecipToPref(inches: number, prefs: UnitPreferences): number {
+  return prefs.precipitation === 'mm'
+    ? Math.round(inches * 25.4 * 10) / 10
+    : inches;
+}
 
 /**
  * Convert millimeters to inches
@@ -132,17 +148,24 @@ export function calculateDeparture(actual: number, normal: number): string {
  */
 export function formatNormals(
   normals: ClimateNormals,
-  currentTemp?: { high?: number; low?: number }
+  currentTemp?: { high?: number; low?: number },
+  prefs: UnitPreferences = IMPERIAL_PREFERENCES
 ): string {
+  // currentTemp values arrive already in the caller's units; convert the
+  // stored (imperial) normals into the same units for a like-for-like display.
+  const tempU = temperatureLabel(prefs);
+  const normalHigh = normalTempToPref(normals.tempHigh, prefs);
+  const normalLow = normalTempToPref(normals.tempLow, prefs);
+
   let output = `\n## 📊 Climate Context\n\n`;
-  output += `**Normal High:** ${normals.tempHigh}°F\n`;
-  output += `**Normal Low:** ${normals.tempLow}°F\n`;
-  output += `**Normal Precipitation:** ${normals.precipitation}" \n`;
+  output += `**Normal High:** ${normalHigh}${tempU}\n`;
+  output += `**Normal Low:** ${normalLow}${tempU}\n`;
+  output += `**Normal Precipitation:** ${normalPrecipToPref(normals.precipitation, prefs)} ${precipitationLabel(prefs)}\n`;
 
   if (currentTemp) {
     if (currentTemp.high !== undefined) {
-      const departure = calculateDeparture(currentTemp.high, normals.tempHigh);
-      output += `**High Departure:** ${departure}°F`;
+      const departure = calculateDeparture(currentTemp.high, normalHigh);
+      output += `**High Departure:** ${departure}${tempU}`;
       if (departure.startsWith('+')) {
         output += ` (warmer than normal)`;
       } else if (departure.startsWith('-')) {
@@ -152,8 +175,8 @@ export function formatNormals(
     }
 
     if (currentTemp.low !== undefined) {
-      const departure = calculateDeparture(currentTemp.low, normals.tempLow);
-      output += `**Low Departure:** ${departure}°F`;
+      const departure = calculateDeparture(currentTemp.low, normalLow);
+      output += `**Low Departure:** ${departure}${tempU}`;
       if (departure.startsWith('+')) {
         output += ` (warmer than normal)`;
       } else if (departure.startsWith('-')) {

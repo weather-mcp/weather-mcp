@@ -155,6 +155,49 @@ const server = new Server(
 );
 
 /**
+ * Shared unit / localization parameters. Spread into weather tools so the AI can
+ * request output units per call. Omitting them falls back to the server default
+ * (WEATHER_UNITS env, default imperial).
+ */
+const UNIT_SCHEMA_PROPERTIES = {
+  units: {
+    type: 'string' as const,
+    description: 'Unit system for output: "imperial" (°F, mph, inHg) or "metric" (°C, km/h, hPa). Defaults to the server setting (imperial unless configured otherwise). Individual *_unit overrides below take precedence.',
+    enum: ['imperial', 'metric']
+  },
+  temperature_unit: {
+    type: 'string' as const,
+    description: 'Override temperature unit: "F" or "C".',
+    enum: ['F', 'C']
+  },
+  wind_speed_unit: {
+    type: 'string' as const,
+    description: 'Override wind speed unit: "mph", "kmh", "ms", or "kn" (knots).',
+    enum: ['mph', 'kmh', 'ms', 'kn']
+  },
+  precipitation_unit: {
+    type: 'string' as const,
+    description: 'Override precipitation unit: "inch" or "mm".',
+    enum: ['inch', 'mm']
+  },
+  pressure_unit: {
+    type: 'string' as const,
+    description: 'Override pressure unit: "inHg" or "hPa".',
+    enum: ['inHg', 'hPa']
+  },
+  distance_unit: {
+    type: 'string' as const,
+    description: 'Override distance/visibility/elevation unit: "mi" or "km".',
+    enum: ['mi', 'km']
+  },
+  time_format: {
+    type: 'string' as const,
+    description: 'Clock format for times: "12h" or "24h".',
+    enum: ['12h', '24h']
+  }
+};
+
+/**
  * Tool definitions - each tool defined separately for conditional registration
  */
 const TOOL_DEFINITIONS = {
@@ -213,7 +256,8 @@ const TOOL_DEFINITIONS = {
           description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), or "openmeteo" (global)',
           enum: ['auto', 'noaa', 'openmeteo'],
           default: 'auto'
-        }
+        },
+        ...UNIT_SCHEMA_PROPERTIES
       },
       required: []
     }
@@ -246,7 +290,8 @@ const TOOL_DEFINITIONS = {
           type: 'boolean' as const,
           description: 'Include climate normals (30-year averages) for comparison with current conditions (default: false). Shows normal high/low temperatures and precipitation, with departure from normal.',
           default: false
-        }
+        },
+        ...UNIT_SCHEMA_PROPERTIES
       },
       required: ['latitude', 'longitude']
     }
@@ -312,7 +357,8 @@ const TOOL_DEFINITIONS = {
           minimum: 1,
           maximum: 500,
           default: 168
-        }
+        },
+        ...UNIT_SCHEMA_PROPERTIES
       },
       required: ['latitude', 'longitude', 'start_date', 'end_date']
     }

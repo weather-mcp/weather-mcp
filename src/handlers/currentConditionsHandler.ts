@@ -7,6 +7,15 @@ import { OpenMeteoService } from '../services/openmeteo.js';
 import { NCEIService } from '../services/ncei.js';
 import { validateCoordinates, validateOptionalBoolean } from '../utils/validation.js';
 import { convertToFahrenheit } from '../utils/temperatureConversion.js';
+import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
+import {
+  formatTemperatureQV,
+  formatWindSpeedQV,
+  formatPressureQV,
+  formatVisibilityQV,
+  formatHeightFromFt,
+  formatPrecipFromMm,
+} from '../utils/unitFormat.js';
 import { DisplayThresholds } from '../config/displayThresholds.js';
 import {
   getHainesCategory,
@@ -21,7 +30,7 @@ import { extractSnowDepth, formatSnowData, hasWinterWeather } from '../utils/sno
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
 
-interface CurrentConditionsArgs {
+interface CurrentConditionsArgs extends UnitArgs {
   latitude?: number;
   longitude?: number;
   include_fire_weather?: boolean;
@@ -46,6 +55,7 @@ export async function handleGetCurrentConditions(
     'include_normals',
     false
   );
+  const prefs = resolveUnitPreferences(args as CurrentConditionsArgs);
 
   // Get current observation
   const observation = await noaaService.getCurrentConditions(latitude, longitude);
@@ -69,23 +79,25 @@ export async function handleGetCurrentConditions(
   // Format current conditions
   let output = `# Current Weather Conditions\n\n`;
   output += `**Station:** ${props.station}\n`;
-  output += `**Time:** ${formatInTimezone(props.timestamp, timezone)}\n\n`;
+  output += `**Time:** ${formatInTimezone(props.timestamp, timezone, 'medium', prefs.timeFormat)}\n\n`;
 
   // Main conditions
   if (props.textDescription) {
     output += `**Conditions:** ${props.textDescription}\n`;
   }
 
-  // Temperature section
+  // Temperature section.
+  // Canonical Fahrenheit values drive the display-threshold comparisons; the
+  // strings shown to the user are formatted in the caller's preferred unit.
   const tempF = convertToFahrenheit(props.temperature.value, props.temperature.unitCode);
   if (tempF !== null) {
-    output += `**Temperature:** ${Math.round(tempF)}°F\n`;
+    output += `**Temperature:** ${formatTemperatureQV(props.temperature, prefs)}\n`;
 
     // Show heat index when temperature is high and heat index is available
     if (props.heatIndex) {
       const heatIndexF = convertToFahrenheit(props.heatIndex.value, props.heatIndex.unitCode);
       if (heatIndexF !== null && tempF > DisplayThresholds.temperature.showHeatIndex && heatIndexF > tempF) {
-        output += `**Feels Like (Heat Index):** ${Math.round(heatIndexF)}°F\n`;
+        output += `**Feels Like (Heat Index):** ${formatTemperatureQV(props.heatIndex, prefs)}\n`;
       }
     }
 
@@ -93,7 +105,7 @@ export async function handleGetCurrentConditions(
     if (props.windChill) {
       const windChillF = convertToFahrenheit(props.windChill.value, props.windChill.unitCode);
       if (windChillF !== null && tempF < DisplayThresholds.temperature.showWindChill && windChillF < tempF) {
-        output += `**Feels Like (Wind Chill):** ${Math.round(windChillF)}°F\n`;
+        output += `**Feels Like (Wind Chill):** ${formatTemperatureQV(props.windChill, prefs)}\n`;
       }
     }
   }
@@ -103,30 +115,27 @@ export async function handleGetCurrentConditions(
   const min24F = props.minTemperatureLast24Hours ? convertToFahrenheit(props.minTemperatureLast24Hours.value, props.minTemperatureLast24Hours.unitCode) : null;
   if (max24F !== null || min24F !== null) {
     let range = `**24-Hour Range:**`;
-    if (max24F !== null) range += ` High ${Math.round(max24F)}°F`;
+    if (max24F !== null) range += ` High ${formatTemperatureQV(props.maxTemperatureLast24Hours, prefs)}`;
     if (max24F !== null && min24F !== null) range += ` /`;
-    if (min24F !== null) range += ` Low ${Math.round(min24F)}°F`;
+    if (min24F !== null) range += ` Low ${formatTemperatureQV(props.minTemperatureLast24Hours, prefs)}`;
     output += `${range}\n`;
   }
 
   if (props.dewpoint.value !== null) {
-    const dewF = convertToFahrenheit(props.dewpoint.value, props.dewpoint.unitCode);
-    if (dewF !== null) {
-      output += `**Dewpoint:** ${Math.round(dewF)}°F\n`;
-    }
+    output += `**Dewpoint:** ${formatTemperatureQV(props.dewpoint, prefs)}\n`;
   }
 
   if (props.relativeHumidity.value !== null) {
     output += `**Humidity:** ${Math.round(props.relativeHumidity.value)}%\n`;
   }
 
-  // Wind section
+  // Wind section (canonical mph drives the gust-significance comparison)
   if (props.windSpeed && props.windSpeed.value !== null) {
     const windMph = props.windSpeed.unitCode.includes('km_h')
       ? props.windSpeed.value * 0.621371
       : props.windSpeed.value * 2.23694; // m/s to mph
     const windDir = props.windDirection?.value ?? null;
-    output += `**Wind:** ${Math.round(windMph)} mph`;
+    output += `**Wind:** ${formatWindSpeedQV(props.windSpeed, prefs)}`;
     if (windDir !== null) {
       output += ` from ${Math.round(windDir)}°`;
     }
@@ -137,21 +146,20 @@ export async function handleGetCurrentConditions(
         ? props.windGust.value * 0.621371
         : props.windGust.value * 2.23694;
       if (gustMph > windMph * DisplayThresholds.wind.gustSignificanceRatio) {
-        output += `, gusting to ${Math.round(gustMph)} mph`;
+        output += `, gusting to ${formatWindSpeedQV(props.windGust, prefs)}`;
       }
     }
     output += `\n`;
   }
 
   if (props.barometricPressure && props.barometricPressure.value !== null) {
-    const pressureInHg = props.barometricPressure.value * 0.0002953;
-    output += `**Pressure:** ${pressureInHg.toFixed(2)} inHg\n`;
+    output += `**Pressure:** ${formatPressureQV(props.barometricPressure, prefs)}\n`;
   }
 
-  // Enhanced visibility and cloud cover
+  // Enhanced visibility and cloud cover (canonical miles drives the descriptors)
   if (props.visibility && props.visibility.value !== null) {
     const visibilityMiles = props.visibility.value * 0.000621371;
-    output += `**Visibility:** ${visibilityMiles.toFixed(1)} miles`;
+    output += `**Visibility:** ${formatVisibilityQV(props.visibility, prefs)}`;
 
     // Add descriptive text for visibility
     if (visibilityMiles < DisplayThresholds.visibility.denseFog) {
@@ -185,7 +193,7 @@ export async function handleGetCurrentConditions(
           const heightFt = layer.base.unitCode.includes('m')
             ? layer.base.value * 3.28084
             : layer.base.value;
-          return `${desc} at ${Math.round(heightFt).toLocaleString()} ft`;
+          return `${desc} at ${formatHeightFromFt(heightFt, prefs)}`;
         }
         return desc;
       });
@@ -204,24 +212,18 @@ export async function handleGetCurrentConditions(
     output += `\n## Recent Precipitation\n`;
 
     if (precip1h !== null && props.precipitationLastHour) {
-      const precipIn = props.precipitationLastHour.unitCode.includes('mm')
-        ? precip1h * 0.0393701
-        : precip1h;
-      output += `**Last Hour:** ${precipIn.toFixed(2)} inches\n`;
+      const mm = props.precipitationLastHour.unitCode.includes('mm') ? precip1h : precip1h * 25.4;
+      output += `**Last Hour:** ${formatPrecipFromMm(mm, prefs)}\n`;
     }
 
     if (precip3h !== null && props.precipitationLast3Hours) {
-      const precipIn = props.precipitationLast3Hours.unitCode.includes('mm')
-        ? precip3h * 0.0393701
-        : precip3h;
-      output += `**Last 3 Hours:** ${precipIn.toFixed(2)} inches\n`;
+      const mm = props.precipitationLast3Hours.unitCode.includes('mm') ? precip3h : precip3h * 25.4;
+      output += `**Last 3 Hours:** ${formatPrecipFromMm(mm, prefs)}\n`;
     }
 
     if (precip6h !== null && props.precipitationLast6Hours) {
-      const precipIn = props.precipitationLast6Hours.unitCode.includes('mm')
-        ? precip6h * 0.0393701
-        : precip6h;
-      output += `**Last 6 Hours:** ${precipIn.toFixed(2)} inches\n`;
+      const mm = props.precipitationLast6Hours.unitCode.includes('mm') ? precip6h : precip6h * 25.4;
+      output += `**Last 6 Hours:** ${formatPrecipFromMm(mm, prefs)}\n`;
     }
   }
 
@@ -350,13 +352,16 @@ export async function handleGetCurrentConditions(
         day
       );
 
-      // Format and display normals with current temperature for comparison
+      // Format and display normals with current temperature for comparison.
+      // currentTemps must be in the caller's units to match formatNormals output.
+      const toPref = (f: number): number =>
+        prefs.temperature === 'C' ? Math.round(((f - 32) * 5) / 9) : Math.round(f);
       const currentTemps = {
-        high: max24F !== null ? Math.round(max24F) : undefined,
-        low: min24F !== null ? Math.round(min24F) : undefined
+        high: max24F !== null ? toPref(max24F) : undefined,
+        low: min24F !== null ? toPref(min24F) : undefined
       };
 
-      output += formatNormals(normals, currentTemps);
+      output += formatNormals(normals, currentTemps, prefs);
     } catch (error) {
       // If normals fetch fails, just skip it (don't error the whole request)
       output += `\n## Climate Normals\n\n`;

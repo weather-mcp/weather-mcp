@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-07-13
+
+### Added
+- **Unit localization for weather output** - Temperature, wind speed, precipitation, pressure, and distance/visibility/elevation can now be rendered in imperial or metric units. Set a server-wide default with the `WEATHER_UNITS` environment variable (`imperial` | `metric`, default `imperial`), or override per request with a `units` parameter on `get_forecast`, `get_current_conditions`, and `get_historical_weather`. This closes the gap that previously forced forks to hardcode Celsius in source.
+- **Per-unit overrides** - Pin individual units independently of the system, via env (`WEATHER_TEMPERATURE_UNIT`, `WEATHER_WIND_SPEED_UNIT`, `WEATHER_PRECIPITATION_UNIT`, `WEATHER_PRESSURE_UNIT`, `WEATHER_DISTANCE_UNIT`) or per-call params (`temperature_unit`, `wind_speed_unit`, `pressure_unit`, etc.). Wind supports `mph`, `kmh`, `ms`, and `kn` (knots); pressure supports `inHg` and `hPa`.
+- **12h / 24h clock format** - Times (forecast headers, sunrise/sunset, observation times) honor a `WEATHER_TIME_FORMAT` env default or per-call `time_format` parameter.
+
+### Changed
+- The Open-Meteo request now asks upstream for the requested units directly (no double conversion), and the NOAA forecast path uses the NWS `units=us|si` parameter. Unit-system signatures are included in cache keys so imperial and metric responses stay distinct.
+- Climate-normals output (`formatNormals`) is now unit-aware and matches the requested system.
+- Minor: the climate-normals "Normal Precipitation" line now uses the `in` label (was `"`), matching the rest of the forecast output.
+
+### Notes
+- Default output is unchanged (imperial), so existing users see no difference unless they opt in.
+- Domain-specialized readings keep their conventional units: fire-weather mixing height/transport wind, river gauge stage, and the marine tool's dual metric/imperial wave output are unaffected by this setting.
+
 ## [1.8.2] - 2026-07-07
 
 Documentation and packaging release — no functional changes to the server or tools.

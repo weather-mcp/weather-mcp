@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA and Open-Meteo APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, and severe weather alerts.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.8.2 (Production Ready)
+- **Version:** 1.10.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** @modelcontextprotocol/sdk v1.21.0
 
@@ -270,11 +270,20 @@ CACHE_MAX_SIZE=1000            # Max cache entries (100-10000, default: 1000)
 # API Configuration
 API_TIMEOUT_MS=30000           # API timeout in milliseconds (5000-120000, default: 30000)
 
+# Units / Localization (v1.10.0)
+WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
+# Optional per-unit overrides (follow WEATHER_UNITS if unset):
+#   WEATHER_TEMPERATURE_UNIT (F|C), WEATHER_WIND_SPEED_UNIT (mph|kmh|ms|kn),
+#   WEATHER_PRECIPITATION_UNIT (inch|mm), WEATHER_PRESSURE_UNIT (inHg|hPa),
+#   WEATHER_DISTANCE_UNIT (mi|km), WEATHER_TIME_FORMAT (12h|24h)
+
 # Logging
 LOG_LEVEL=1                    # 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR (default: 1)
 ```
 
-All environment variables are validated with bounds checking in `src/config/cache.ts`.
+Cache/API/logging variables are validated in `src/config/cache.ts`; unit variables
+are parsed and validated in `src/config/units.ts`. Per-call unit parameters are
+resolved by `src/utils/unitPreferences.ts` and formatted via `src/utils/unitFormat.ts`.
 
 ## Caching Strategy
 
@@ -529,11 +538,11 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.8.2
+- **Version:** 1.10.0
 - **Status:** Production Ready ✅
-- **New in v1.8.2:** Documentation overhaul: restructured README, new tool reference (docs/TOOLS.md), refreshed npm/registry metadata
+- **New in v1.10.0:** Unit localization — imperial/metric (plus per-unit overrides and 12h/24h) via `WEATHER_UNITS` env or a per-call `units` parameter on forecast/current/historical tools
 - **Security Rating:** A- (Excellent, 93/100)
-- **Test Coverage:** 1,084 tests, 100% pass rate
+- **Test Coverage:** 1,116 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
 
 ## Useful References
@@ -556,6 +565,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2026-07-07 (v1.8.2)
+**Last Updated:** 2026-07-13 (v1.10.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.
