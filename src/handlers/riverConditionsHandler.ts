@@ -3,7 +3,9 @@
  */
 
 import { NOAAService } from '../services/noaa.js';
-import { validateCoordinates } from '../utils/validation.js';
+import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
+import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
 import type { NWPSGauge } from '../types/noaa.js';
@@ -11,15 +13,20 @@ import type { NWPSGauge } from '../types/noaa.js';
 interface RiverConditionsArgs {
   latitude?: number;
   longitude?: number;
+  location_name?: string;
+  city_name?: string;
   radius?: number; // search radius in km (default: 50)
 }
 
 export async function handleGetRiverConditions(
   args: unknown,
-  noaaService: NOAAService
+  noaaService: NOAAService,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Validate input parameters with runtime checks
-  const { latitude, longitude } = validateCoordinates(args);
+  // Resolve location from coordinates, a saved location name, or a geocoded city name
+  const resolved = await resolveLocationAsync(args as RiverConditionsArgs, locationStore, geocodingService);
+  const { latitude, longitude } = resolved;
 
   // Validate radius parameter
   let radius = (args as RiverConditionsArgs)?.radius ?? 50; // default 50 km
@@ -92,14 +99,14 @@ export async function handleGetRiverConditions(
   output += `*Data sources: NOAA National Water Prediction Service (NWPS), USGS Water Services*\n`;
   output += `*River conditions are updated hourly. Always consult official sources for critical decisions.*\n`;
 
-  return {
+  return prependLocationLine({
     content: [
       {
         type: 'text',
         text: output
       }
     ]
-  };
+  }, resolved);
 }
 
 /**

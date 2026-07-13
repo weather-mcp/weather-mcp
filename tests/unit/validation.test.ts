@@ -10,6 +10,7 @@ import {
   validateGranularity,
   validateOptionalBoolean,
   validateHistoricalWeatherParams,
+  validateDetail,
 } from '../../src/utils/validation.js';
 
 describe('Validation Utilities', () => {
@@ -374,6 +375,30 @@ describe('Validation Utilities', () => {
       expect(() => validateLatitude(Number.MAX_VALUE)).toThrow();
       expect(() => validateLatitude(Number.MIN_VALUE)).not.toThrow();
       expect(() => validateLatitude(-0)).not.toThrow();
+    });
+  });
+
+  describe('validateDetail', () => {
+    it('defaults to "standard" when undefined', () => {
+      expect(validateDetail(undefined)).toBe('standard');
+    });
+
+    it('honors a custom default when undefined', () => {
+      expect(validateDetail(undefined, 'summary')).toBe('summary');
+    });
+
+    it('accepts each valid level', () => {
+      expect(validateDetail('summary')).toBe('summary');
+      expect(validateDetail('standard')).toBe('standard');
+      expect(validateDetail('full')).toBe('full');
+    });
+
+    it('rejects an unknown level', () => {
+      expect(() => validateDetail('verbose')).toThrow(/detail/i);
+    });
+
+    it('rejects a non-string value', () => {
+      expect(() => validateDetail(3 as unknown)).toThrow(/string/i);
     });
   });
 });

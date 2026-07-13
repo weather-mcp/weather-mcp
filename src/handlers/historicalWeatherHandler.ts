@@ -4,6 +4,9 @@
 
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
+import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
+import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { validateHistoricalWeatherParams } from '../utils/validation.js';
 import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
 import {
@@ -20,10 +23,19 @@ import { ApiConstants, FormatConstants } from '../config/displayThresholds.js';
 export async function handleGetHistoricalWeather(
   args: unknown,
   noaaService: NOAAService,
-  openMeteoService: OpenMeteoService
+  openMeteoService: OpenMeteoService,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Validate input parameters with runtime checks
-  const { latitude, longitude, start_date, end_date, limit = FormatConstants.defaultHistoricalLimit } = validateHistoricalWeatherParams(args);
+  // Resolve location first (coordinates, saved name, or geocoded city), then
+  // validate the date range. Coordinates from resolution are re-validated by
+  // validateHistoricalWeatherParams alongside the dates.
+  const resolved = await resolveLocationAsync(args as { latitude?: number; longitude?: number; location_name?: string; city_name?: string }, locationStore, geocodingService);
+  const { latitude, longitude, start_date, end_date, limit = FormatConstants.defaultHistoricalLimit } = validateHistoricalWeatherParams({
+    ...(args as Record<string, unknown>),
+    latitude: resolved.latitude,
+    longitude: resolved.longitude
+  });
   const prefs = resolveUnitPreferences(args as UnitArgs);
   const tempU = temperatureLabel(prefs);
   const windU = windSpeedLabel(prefs);
@@ -123,14 +135,14 @@ export async function handleGetHistoricalWeather(
           output += `\n`;
         }
 
-        return {
+        return prependLocationLine({
           content: [
             {
               type: 'text',
               text: output
             }
           ]
-        };
+        }, resolved);
       } else if (weatherData.daily) {
         // Format daily summaries
         let output = `# Historical Weather Data (Daily Summaries)\n\n`;
@@ -174,14 +186,14 @@ export async function handleGetHistoricalWeather(
           output += `\n`;
         }
 
-        return {
+        return prependLocationLine({
           content: [
             {
               type: 'text',
               text: output
             }
           ]
-        };
+        }, resolved);
       } else {
         throw new Error('No weather data available in response');
       }
@@ -201,14 +213,14 @@ export async function handleGetHistoricalWeather(
     );
 
     if (!observations.features || observations.features.length === 0) {
-      return {
+      return prependLocationLine({
         content: [
           {
             type: 'text',
             text: `No historical observations found for the specified date range (${start_date} to ${end_date}).\n\nThis may occur because:\n- The dates are outside the station's available data range\n- There are gaps in the observation records for this location\n- The weather station near this location may not have archived data for these dates\n\nNote: Historical weather data availability varies by location and weather station. Some stations have limited historical records.`
           }
         ]
-      };
+      }, resolved);
     }
 
     // Format the observations
@@ -236,13 +248,13 @@ export async function handleGetHistoricalWeather(
       output += `\n`;
     }
 
-    return {
+    return prependLocationLine({
       content: [
         {
           type: 'text',
           text: output
         }
       ]
-    };
+    }, resolved);
   }
 }

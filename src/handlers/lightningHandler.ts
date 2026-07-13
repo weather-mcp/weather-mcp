@@ -13,9 +13,52 @@ import {
   LightningSafetyLevel
 } from '../types/lightning.js';
 import { blitzortungService } from '../services/blitzortung.js';
+import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
+import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { ValidationError } from '../errors/ApiError.js';
+
+interface LightningActivityArgs {
+  latitude?: number;
+  longitude?: number;
+  location_name?: string;
+  city_name?: string;
+  radius?: number;
+  timeWindow?: number;
+}
+
+/**
+ * Tool entry point: resolve the location (coordinates, saved name, or geocoded
+ * city), fetch lightning activity, and format it with a resolved-location header.
+ */
+export async function handleGetLightningActivity(
+  args: unknown,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  const typedArgs = (args ?? {}) as LightningActivityArgs;
+  const resolved = await resolveLocationAsync(typedArgs, locationStore, geocodingService);
+
+  const result = await getLightningActivity({
+    latitude: resolved.latitude,
+    longitude: resolved.longitude,
+    radius: typedArgs.radius,
+    timeWindow: typedArgs.timeWindow
+  });
+
+  const formatted = formatLightningActivityResponse(result);
+
+  return prependLocationLine({
+    content: [
+      {
+        type: 'text',
+        text: formatted
+      }
+    ]
+  }, resolved);
+}
 
 /**
  * Validate lightning activity request parameters

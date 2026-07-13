@@ -19,6 +19,7 @@ export type ToolName =
   | 'get_current_conditions'
   | 'get_alerts'
   | 'get_historical_weather'
+  | 'get_weather_summary'
   | 'check_service_status'
   | 'search_location'
   | 'get_air_quality'
@@ -36,50 +37,60 @@ export type ToolName =
  * Tool presets for easy configuration
  */
 const TOOL_PRESETS: Record<string, ToolName[]> = {
-  // Essential weather tools - minimal overhead
+  // The DEFAULT preset (used when ENABLED_TOOLS is unset), so this is what most
+  // users actually see. Led by get_weather_summary (one call answers the common
+  // "what's the weather?" question), with the atomic follow-up tools and
+  // geocoding/health-check helpers. Every tool accepts city_name/location_name,
+  // so this 6-tool set covers the bulk of real usage on its own.
   basic: [
+    'get_weather_summary',
     'get_forecast',
     'get_current_conditions',
     'get_alerts',
     'search_location',
-    'check_service_status',
-    'save_location',
-    'list_saved_locations',
-    'get_saved_location',
-    'remove_saved_location'
+    'check_service_status'
   ],
 
-  // Basic + historical data
+  // Basic + history, air quality, and saved-location personalization
   standard: [
+    'get_weather_summary',
     'get_forecast',
     'get_current_conditions',
     'get_alerts',
     'get_historical_weather',
-    'search_location',
-    'check_service_status',
-    'save_location',
-    'list_saved_locations',
-    'get_saved_location',
-    'remove_saved_location'
-  ],
-
-  // Standard + environmental data
-  full: [
-    'get_forecast',
-    'get_current_conditions',
-    'get_alerts',
-    'get_historical_weather',
-    'search_location',
-    'check_service_status',
     'get_air_quality',
+    'search_location',
+    'check_service_status',
     'save_location',
     'list_saved_locations',
     'get_saved_location',
     'remove_saved_location'
   ],
 
-  // All available tools
+  // Standard + the specialized environmental & safety tools (everything)
+  full: [
+    'get_weather_summary',
+    'get_forecast',
+    'get_current_conditions',
+    'get_alerts',
+    'get_historical_weather',
+    'get_air_quality',
+    'get_marine_conditions',
+    'get_weather_imagery',
+    'get_lightning_activity',
+    'get_river_conditions',
+    'get_wildfire_info',
+    'search_location',
+    'check_service_status',
+    'save_location',
+    'list_saved_locations',
+    'get_saved_location',
+    'remove_saved_location'
+  ],
+
+  // All available tools (identical set to `full`)
   all: [
+    'get_weather_summary',
     'get_forecast',
     'get_current_conditions',
     'get_alerts',
@@ -110,6 +121,9 @@ const TOOL_ALIASES: Record<string, ToolName> = {
   'warnings': 'get_alerts',
   'historical': 'get_historical_weather',
   'history': 'get_historical_weather',
+  'summary': 'get_weather_summary',
+  'weather_summary': 'get_weather_summary',
+  'overview': 'get_weather_summary',
   'status': 'check_service_status',
   'location': 'search_location',
   'search': 'search_location',
@@ -246,6 +260,7 @@ function isToolName(name: string): name is ToolName {
     'get_current_conditions',
     'get_alerts',
     'get_historical_weather',
+    'get_weather_summary',
     'check_service_status',
     'search_location',
     'get_air_quality',

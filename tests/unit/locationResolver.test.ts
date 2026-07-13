@@ -9,7 +9,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   resolveLocationAsync,
   clearCityGeocodeCache,
+  formatLocationLine,
+  prependLocationLine,
 } from '../../src/utils/locationResolver.js';
+import type { ResolvedLocation } from '../../src/utils/locationResolver.js';
 import type { LocationStore } from '../../src/services/locationStore.js';
 import type { GeocodingService, GeocodingResult } from '../../src/services/geocoding.js';
 import type { SavedLocation } from '../../src/types/savedLocations.js';
@@ -228,5 +231,66 @@ describe('resolveLocationAsync', () => {
         /coordinates|location_name|city_name/i
       );
     });
+  });
+});
+
+describe('formatLocationLine', () => {
+  it('returns an empty string for direct coordinate input', () => {
+    const resolved: ResolvedLocation = {
+      latitude: 40.7128,
+      longitude: -74.006,
+      source: 'coordinates',
+    };
+    expect(formatLocationLine(resolved)).toBe('');
+  });
+
+  it('discloses the matched name and coordinates for a saved location', () => {
+    const resolved: ResolvedLocation = {
+      latitude: 47.6062,
+      longitude: -122.3321,
+      source: 'saved_location',
+      location_name: 'home',
+    };
+    expect(formatLocationLine(resolved)).toBe('**Location:** home (47.6062, -122.3321)\n\n');
+  });
+
+  it('discloses the geocoder display name for a city lookup', () => {
+    const resolved: ResolvedLocation = {
+      latitude: 48.8566,
+      longitude: 2.3522,
+      source: 'geocoded',
+      location_name: 'Paris, Île-de-France, France',
+    };
+    expect(formatLocationLine(resolved)).toContain('Paris, Île-de-France, France');
+    expect(formatLocationLine(resolved)).toContain('48.8566, 2.3522');
+  });
+});
+
+describe('prependLocationLine', () => {
+  it('prepends the location line to the first text block for a name lookup', () => {
+    const resolved: ResolvedLocation = {
+      latitude: 47.6062,
+      longitude: -122.3321,
+      source: 'saved_location',
+      location_name: 'home',
+    };
+    const result = { content: [{ type: 'text', text: '# Forecast\n' }] };
+
+    const out = prependLocationLine(result, resolved);
+
+    expect(out.content[0].text).toBe('**Location:** home (47.6062, -122.3321)\n\n# Forecast\n');
+  });
+
+  it('is a no-op for direct coordinate input', () => {
+    const resolved: ResolvedLocation = {
+      latitude: 40.7128,
+      longitude: -74.006,
+      source: 'coordinates',
+    };
+    const result = { content: [{ type: 'text', text: '# Forecast\n' }] };
+
+    prependLocationLine(result, resolved);
+
+    expect(result.content[0].text).toBe('# Forecast\n');
   });
 });

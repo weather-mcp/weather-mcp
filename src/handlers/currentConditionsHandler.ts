@@ -5,7 +5,10 @@
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { NCEIService } from '../services/ncei.js';
-import { validateCoordinates, validateOptionalBoolean } from '../utils/validation.js';
+import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
+import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { validateOptionalBoolean } from '../utils/validation.js';
 import { convertToFahrenheit } from '../utils/temperatureConversion.js';
 import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
 import {
@@ -33,6 +36,8 @@ import { getClimateNormals, formatNormals, getDateComponents } from '../utils/no
 interface CurrentConditionsArgs extends UnitArgs {
   latitude?: number;
   longitude?: number;
+  location_name?: string;
+  city_name?: string;
   include_fire_weather?: boolean;
   include_normals?: boolean;
 }
@@ -41,10 +46,13 @@ export async function handleGetCurrentConditions(
   args: unknown,
   noaaService: NOAAService,
   openMeteoService: OpenMeteoService,
-  nceiService: NCEIService
+  nceiService: NCEIService,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Validate input parameters with runtime checks
-  const { latitude, longitude } = validateCoordinates(args);
+  // Resolve location from coordinates, a saved location name, or a geocoded city name
+  const resolved = await resolveLocationAsync(args as CurrentConditionsArgs, locationStore, geocodingService);
+  const { latitude, longitude } = resolved;
   const includeFireWeather = validateOptionalBoolean(
     (args as CurrentConditionsArgs)?.include_fire_weather,
     'include_fire_weather',
@@ -372,12 +380,12 @@ export async function handleGetCurrentConditions(
   output += `\n---\n`;
   output += `*Data source: NOAA National Weather Service*\n`;
 
-  return {
+  return prependLocationLine({
     content: [
       {
         type: 'text',
         text: output
       }
     ]
-  };
+  }, resolved);
 }
