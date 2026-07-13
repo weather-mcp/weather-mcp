@@ -8,13 +8,14 @@ import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { NCEIService } from '../services/ncei.js';
 import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
 import type { GridpointProperties, GridpointDataSeries } from '../types/noaa.js';
 import {
   validateForecastDays,
   validateGranularity,
   validateOptionalBoolean,
 } from '../utils/validation.js';
-import { resolveLocation } from '../utils/locationResolver.js';
+import { resolveLocationAsync, ResolvedLocation } from '../utils/locationResolver.js';
 import { logger } from '../utils/logger.js';
 import {
   extractSnowfallForecast,
@@ -29,6 +30,7 @@ interface ForecastArgs {
   latitude?: number;
   longitude?: number;
   location_name?: string;
+  city_name?: string;
   days?: number;
   granularity?: 'daily' | 'hourly';
   include_precipitation_probability?: boolean;
@@ -166,10 +168,12 @@ export async function handleGetForecast(
   noaaService: NOAAService,
   openMeteoService: OpenMeteoService,
   locationStore: LocationStore,
+  geocodingService: GeocodingService,
   nceiService?: NCEIService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Resolve location from either coordinates or saved location name
-  const { latitude, longitude } = resolveLocation(args as ForecastArgs, locationStore);
+  // Resolve location from coordinates, a saved location name, or a geocoded city name
+  const resolved = await resolveLocationAsync(args as ForecastArgs, locationStore, geocodingService);
+  const { latitude, longitude } = resolved;
   const days = validateForecastDays(args);
   const granularity = validateGranularity((args as ForecastArgs)?.granularity);
   const include_precipitation_probability = validateOptionalBoolean(
@@ -200,8 +204,9 @@ export async function handleGetForecast(
   }
 
   // Use NOAA for US locations or if explicitly requested
+  let result: { content: Array<{ type: string; text: string }> };
   if (useNOAA) {
-    return await formatNOAAForecast(
+    result = await formatNOAAForecast(
       noaaService,
       openMeteoService,
       nceiService,
@@ -215,7 +220,7 @@ export async function handleGetForecast(
     );
   } else {
     // Use Open-Meteo for international locations
-    return await formatOpenMeteoForecast(
+    result = await formatOpenMeteoForecast(
       openMeteoService,
       nceiService,
       latitude,
@@ -226,6 +231,28 @@ export async function handleGetForecast(
       include_normals
     );
   }
+
+  // If the location was resolved from a name (saved or geocoded), show the user
+  // what it matched so an ambiguous city name is transparent.
+  const locationLine = formatLocationLine(resolved);
+  if (locationLine && result.content.length > 0 && result.content[0]?.type === 'text') {
+    result.content[0].text = locationLine + result.content[0].text;
+  }
+
+  return result;
+}
+
+/**
+ * Build a header line describing how a location name was resolved.
+ * Returns an empty string for direct-coordinate requests (nothing to disclose).
+ */
+function formatLocationLine(resolved: ResolvedLocation): string {
+  if (resolved.source === 'coordinates' || !resolved.location_name) {
+    return '';
+  }
+
+  const coords = `${resolved.latitude.toFixed(4)}, ${resolved.longitude.toFixed(4)}`;
+  return `**Location:** ${resolved.location_name} (${coords})\n\n`;
 }
 
 /**

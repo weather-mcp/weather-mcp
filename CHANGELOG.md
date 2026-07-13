@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-07-13
+
+### Added
+- **`city_name` parameter for `get_forecast`** - Request a forecast by free-text place name (e.g. `city_name="Paris, France"` or `city_name="Bend, Oregon"`) without first saving the location or looking up coordinates. The name is geocoded on demand via the existing multi-provider geocoding service (Census/Nominatim/Open-Meteo), and the resolved place is disclosed in the output as a `**Location:**` header so an ambiguous match is transparent. Coordinates and saved `location_name` still take precedence when provided. (Inspired by the community `jablum` fork.)
+- **Geocode caching** - City-name lookups are cached with an infinite TTL (a place's coordinates are static), so repeated forecasts for the same city do not re-hit the geocoding providers.
+
 ## [1.8.2] - 2026-07-07
 
 Documentation and packaging release — no functional changes to the server or tools.

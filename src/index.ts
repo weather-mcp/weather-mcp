@@ -74,7 +74,7 @@ function redactSensitiveFields(args: unknown): unknown {
   const redacted: Record<string, unknown> = {};
   const sensitiveFields = [
     'latitude', 'longitude', 'lat', 'lon',
-    'location', 'city', 'state', 'address', 'query',
+    'location', 'city', 'city_name', 'state', 'address', 'query',
     'zipcode', 'postalCode', 'place', 'coordinates'
   ];
 
@@ -160,7 +160,7 @@ const server = new Server(
 const TOOL_DEFINITIONS = {
   get_forecast: {
     name: 'get_forecast' as const,
-    description: 'Get future weather forecast for a location (global coverage). Use this for upcoming weather predictions (e.g., "tomorrow", "this week", "next 7 days", "hourly forecast"). Returns forecast data including temperature, precipitation, wind, conditions, and sunrise/sunset times. Supports both daily and hourly granularity. Automatically selects best data source: NOAA for US locations (more detailed), Open-Meteo for international locations. For current weather, use get_current_conditions. For past weather, use get_historical_weather. Can use either coordinates OR a saved location name (e.g., location_name="home"). If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get future weather forecast for a location (global coverage). Use this for upcoming weather predictions (e.g., "tomorrow", "this week", "next 7 days", "hourly forecast"). Returns forecast data including temperature, precipitation, wind, conditions, and sunrise/sunset times. Supports both daily and hourly granularity. Automatically selects best data source: NOAA for US locations (more detailed), Open-Meteo for international locations. For current weather, use get_current_conditions. For past weather, use get_historical_weather. Provide the location in ONE of three ways: coordinates (latitude+longitude), a saved location name (location_name="home"), or a free-text city name (city_name="Paris, France") which is geocoded automatically. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -179,6 +179,10 @@ const TOOL_DEFINITIONS = {
         location_name: {
           type: 'string' as const,
           description: 'Name of a saved location (e.g., "home", "cabin"). Use this instead of latitude/longitude to reference a saved location. List saved locations with list_saved_locations.'
+        },
+        city_name: {
+          type: 'string' as const,
+          description: 'Free-text place name to geocode (e.g., "Paris, France", "Bend, Oregon"). Use this instead of latitude/longitude when you only have a place name and it is not a saved location. Include state/country for disambiguation when possible.'
         },
         days: {
           type: 'number' as const,
@@ -665,7 +669,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'get_forecast':
         return await withAnalytics('get_forecast', async () =>
-          handleGetForecast(args, noaaService, openMeteoService, locationStore, nceiService)
+          handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService)
         );
 
       case 'get_current_conditions':
