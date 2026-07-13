@@ -52,13 +52,15 @@ export async function handleGetHistoricalWeather(
       // Format the response based on data granularity
       if (useHourly && weatherData.hourly) {
         // Format hourly observations
+        const maxObservations = Math.min(limit, weatherData.hourly.time.length);
         let output = `# Historical Weather Observations (Hourly)\n\n`;
-        output += `**Period:** ${startTime.toLocaleDateString()} to ${endTime.toLocaleDateString()}\n`;
+        // Use the requested date strings directly; constructing a Date and calling
+        // toLocaleDateString() would shift the displayed day in non-UTC server zones.
+        output += `**Period:** ${start_date.split('T')[0]} to ${end_date.split('T')[0]}\n`;
         output += `**Location:** ${weatherData.latitude.toFixed(4)}°N, ${Math.abs(weatherData.longitude).toFixed(4)}°${weatherData.longitude >= 0 ? 'E' : 'W'} (${weatherData.elevation}m elevation)\n`;
-        output += `**Number of observations:** ${weatherData.hourly.time.length}\n`;
+        output += `**Number of observations:** ${maxObservations}${maxObservations < weatherData.hourly.time.length ? ` (of ${weatherData.hourly.time.length} available)` : ''}\n`;
         output += `**Data source:** Open-Meteo Historical Weather API (Reanalysis)\n\n`;
 
-        const maxObservations = Math.min(limit, weatherData.hourly.time.length);
         for (let i = 0; i < maxObservations; i++) {
           const time = new Date(weatherData.hourly.time[i]);
           output += `## ${time.toLocaleString()}\n`;
@@ -118,7 +120,7 @@ export async function handleGetHistoricalWeather(
       } else if (weatherData.daily) {
         // Format daily summaries
         let output = `# Historical Weather Data (Daily Summaries)\n\n`;
-        output += `**Period:** ${startTime.toLocaleDateString()} to ${endTime.toLocaleDateString()}\n`;
+        output += `**Period:** ${start_date.split('T')[0]} to ${end_date.split('T')[0]}\n`;
         output += `**Location:** ${weatherData.latitude.toFixed(4)}°N, ${Math.abs(weatherData.longitude).toFixed(4)}°${weatherData.longitude >= 0 ? 'E' : 'W'} (${weatherData.elevation}m elevation)\n`;
         output += `**Number of days:** ${weatherData.daily.time.length}\n`;
         output += `**Data source:** Open-Meteo Historical Weather API (Reanalysis)\n\n`;
@@ -197,7 +199,7 @@ export async function handleGetHistoricalWeather(
 
     // Format the observations
     let output = `# Historical Weather Observations\n\n`;
-    output += `**Period:** ${startTime.toLocaleDateString()} to ${endTime.toLocaleDateString()}\n`;
+    output += `**Period:** ${start_date.split('T')[0]} to ${end_date.split('T')[0]}\n`;
     output += `**Number of observations:** ${observations.features.length}\n`;
     output += `**Data source:** NOAA Real-time API\n\n`;
 

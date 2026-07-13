@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.3] - 2026-07-13
+
+### Fixed
+- **`get_historical_weather` header date shift** - The `**Period:**` line built a `Date` from the requested `start_date`/`end_date` and rendered it with `toLocaleDateString()`, which shifted the displayed range one day earlier in server timezones behind UTC (e.g. a `2024-01-10 → 2024-01-11` request showed `1/9/2024 to 1/10/2024`). Now displays the requested ISO dates directly. Observation data was always correct; only the header was wrong.
+- **`get_historical_weather` observation count** - The hourly header reported the total number of observations fetched rather than the number actually shown (e.g. `Number of observations: 48` when `limit: 3` returned 3 rows). Now shows the displayed count with the available total for context (`3 (of 48 available)`).
+
 ## [1.8.2] - 2026-07-07
 
 Documentation and packaging release — no functional changes to the server or tools.

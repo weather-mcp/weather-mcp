@@ -1,6 +1,6 @@
 {
   "name": "@dangahagan/weather-mcp",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "description": "MCP server giving AI assistants 16 weather tools with zero API keys: global forecasts, current conditions, alerts, air quality, marine conditions, lightning detection, radar imagery, river levels, wildfire tracking, and historical weather back to 1940. Built entirely on free public APIs (NOAA, Open-Meteo, USGS, NIFC).",
   "mcpName": "io.github.dgahagan/weather-mcp",
   "main": "dist/index.js",
