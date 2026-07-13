@@ -188,7 +188,7 @@ describe('Climate Normals Utilities', () => {
       expect(output).toContain('## 📊 Climate Context');
       expect(output).toContain('**Normal High:** 65°F');
       expect(output).toContain('**Normal Low:** 45°F');
-      expect(output).toContain('**Normal Precipitation:** 0.12"');
+      expect(output).toContain('**Normal Precipitation:** 0.12 in');
       expect(output).toContain('*Climate normals based on 1991-2020 data*');
       expect(output).toContain('*Source: Open-Meteo*');
       expect(output).not.toContain('Departure');

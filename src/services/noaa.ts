@@ -308,16 +308,17 @@ export class NOAAService {
   /**
    * Get forecast for a location using grid coordinates
    */
-  async getForecast(office: string, gridX: number, gridY: number): Promise<ForecastResponse> {
-    // Check cache first (if enabled)
+  async getForecast(office: string, gridX: number, gridY: number, units: 'us' | 'si' = 'us'): Promise<ForecastResponse> {
+    const url = `/gridpoints/${office}/${gridX},${gridY}/forecast?units=${units}`;
+
+    // Check cache first (if enabled; units in the key keeps us/si distinct)
     if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('forecast', office, gridX, gridY);
+      const cacheKey = Cache.generateKey('forecast', office, gridX, gridY, units);
       const cached = this.cache.get(cacheKey);
       if (cached) {
         return cached as ForecastResponse;
       }
 
-      const url = `/gridpoints/${office}/${gridX},${gridY}/forecast`;
       const result = await this.makeRequest<ForecastResponse>(url);
 
       // Cache with forecast TTL (2 hours)
@@ -325,23 +326,23 @@ export class NOAAService {
       return result;
     }
 
-    const url = `/gridpoints/${office}/${gridX},${gridY}/forecast`;
     return this.makeRequest<ForecastResponse>(url);
   }
 
   /**
    * Get hourly forecast for a location using grid coordinates
    */
-  async getHourlyForecast(office: string, gridX: number, gridY: number): Promise<ForecastResponse> {
-    // Check cache first (if enabled)
+  async getHourlyForecast(office: string, gridX: number, gridY: number, units: 'us' | 'si' = 'us'): Promise<ForecastResponse> {
+    const url = `/gridpoints/${office}/${gridX},${gridY}/forecast/hourly?units=${units}`;
+
+    // Check cache first (if enabled; units in the key keeps us/si distinct)
     if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('hourly-forecast', office, gridX, gridY);
+      const cacheKey = Cache.generateKey('hourly-forecast', office, gridX, gridY, units);
       const cached = this.cache.get(cacheKey);
       if (cached) {
         return cached as ForecastResponse;
       }
 
-      const url = `/gridpoints/${office}/${gridX},${gridY}/forecast/hourly`;
       const result = await this.makeRequest<ForecastResponse>(url);
 
       // Cache with forecast TTL (2 hours) - hourly forecasts update at same rate as daily
@@ -349,7 +350,6 @@ export class NOAAService {
       return result;
     }
 
-    const url = `/gridpoints/${office}/${gridX},${gridY}/forecast/hourly`;
     return this.makeRequest<ForecastResponse>(url);
   }
 
@@ -357,20 +357,20 @@ export class NOAAService {
    * Get forecast for a location using lat/lon (convenience method)
    * This combines getPointData and getForecast
    */
-  async getForecastByCoordinates(latitude: number, longitude: number): Promise<ForecastResponse> {
+  async getForecastByCoordinates(latitude: number, longitude: number, units: 'us' | 'si' = 'us'): Promise<ForecastResponse> {
     const pointData = await this.getPointData(latitude, longitude);
     const { gridId, gridX, gridY } = pointData.properties;
-    return this.getForecast(gridId, gridX, gridY);
+    return this.getForecast(gridId, gridX, gridY, units);
   }
 
   /**
    * Get hourly forecast for a location using lat/lon (convenience method)
    * This combines getPointData and getHourlyForecast
    */
-  async getHourlyForecastByCoordinates(latitude: number, longitude: number): Promise<ForecastResponse> {
+  async getHourlyForecastByCoordinates(latitude: number, longitude: number, units: 'us' | 'si' = 'us'): Promise<ForecastResponse> {
     const pointData = await this.getPointData(latitude, longitude);
     const { gridId, gridX, gridY } = pointData.properties;
-    return this.getHourlyForecast(gridId, gridX, gridY);
+    return this.getHourlyForecast(gridId, gridX, gridY, units);
   }
 
   /**

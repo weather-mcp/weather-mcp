@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1%2C105%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-1%2C129%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 16 tools, zero API keys, zero signup, zero cost.**
@@ -45,7 +45,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
-- **Fully open source** — MIT licensed, readable TypeScript, 1,105 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 1,129 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 16 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -84,6 +84,7 @@ All 16 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 - **Safety-aware output** — lightning, wildfire, flood, and marine tools include graded safety assessments and plain-language recommendations, not just raw numbers.
 - **Winter weather** — snow depth, snowfall accumulation, and ice accumulation forecasts with sensible trace-amount filtering.
 - **Timezone-aware** — every timestamp is rendered in the location's local time with DST handled correctly.
+- **Imperial or metric** — pick your units server-wide (`WEATHER_UNITS`) or per request (`units: "metric"`), with fine-grained overrides (wind in knots, pressure in hPa, 24-hour clock). Defaults to imperial. See [Units & Localization](#units--localization).
 - **Built-in caching** — an LRU cache with per-data-type TTLs (5 minutes for alerts, 2 hours for forecasts, forever for finalized historical data) makes repeat queries return in <10ms and cuts upstream API calls by 50–80%.
 - **Actionable errors** — failures explain what happened and link to the upstream status page instead of dumping a stack trace.
 
@@ -198,11 +199,32 @@ ENABLED_TOOLS=all,-marine                       # Remove from a preset
 
 Short aliases are supported: `forecast`, `current`, `alerts`, `historical`, `status`, `search`, `aqi`, `marine`, `radar`, `lightning`, and more.
 
+### Units & Localization
+
+Output defaults to **imperial** (°F, mph, inHg, miles) and can be switched to **metric** (°C, km/h, hPa, km) server-wide or per request. Precedence: a per-call parameter beats a per-unit env override, which beats the `WEATHER_UNITS` system default.
+
+```bash
+WEATHER_UNITS=metric            # switch everything to metric
+WEATHER_WIND_SPEED_UNIT=kn      # ...but wind in knots
+WEATHER_TIME_FORMAT=24h         # 24-hour clock
+```
+
+Or per call — the AI can honor "in Celsius" on the fly:
+
+```jsonc
+{ "latitude": 47.6, "longitude": -122.3, "units": "metric" }
+{ "latitude": 47.6, "longitude": -122.3, "wind_speed_unit": "kn", "pressure_unit": "hPa" }
+```
+
+Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weather`. Wind accepts `mph`/`kmh`/`ms`/`kn`; pressure `inHg`/`hPa`. Domain-specialized readings (fire-weather heights, river gauge stage, and the marine tool's dual-unit wave output) keep their conventional units.
+
 ### Other settings
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `ENABLED_TOOLS` | `basic` | Tool preset or list (see above) |
+| `WEATHER_UNITS` | `imperial` | Default unit system: `imperial` or `metric` |
+| `WEATHER_TEMPERATURE_UNIT` … | — | Per-unit overrides: `_TEMPERATURE_`(F/C), `_WIND_SPEED_`(mph/kmh/ms/kn), `_PRECIPITATION_`(inch/mm), `_PRESSURE_`(inHg/hPa), `_DISTANCE_`(mi/km), `_TIME_FORMAT`(12h/24h) |
 | `CACHE_ENABLED` | `true` | Enable/disable response caching |
 | `CACHE_MAX_SIZE` | `1000` | Max cache entries (100–10000) |
 | `API_TIMEOUT_MS` | `30000` | Upstream API timeout (5000–120000) |
@@ -234,7 +256,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 1,105 tests (~2 seconds)
+npm test               # Run all 1,129 tests (~2 seconds)
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

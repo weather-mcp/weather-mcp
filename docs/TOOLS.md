@@ -33,6 +33,7 @@ Complete reference for all 16 MCP tools provided by the Weather MCP Server.
 Also in this document:
 - [Finding Coordinates](#finding-coordinates)
 - [Using Saved Locations with Weather Tools](#using-saved-locations-with-weather-tools)
+- [Units & Localization](#units--localization)
 - [Error Handling & Service Status](#error-handling--service-status)
 
 ---
@@ -50,6 +51,8 @@ Get weather forecast for any location worldwide.
 - `include_precipitation_probability` (optional): Include rain chances (default: true)
 - `include_normals` (optional): Include climate normals for comparison (default: false)
 - `source` (optional): "auto" (default), "noaa" (US only), or "openmeteo" (global)
+- `units` (optional): "imperial" (default) or "metric" — see [Units & Localization](#units--localization)
+- Unit overrides (optional): `temperature_unit`, `wind_speed_unit`, `precipitation_unit`, `pressure_unit`, `distance_unit`, `time_format`
 
 *Coordinates not required when `location_name` or `city_name` is provided. Precedence: coordinates > `location_name` > `city_name`.
 
@@ -84,6 +87,7 @@ Get current weather conditions for a location (US only).
 - `longitude` (required): Longitude coordinate (-180 to 180)
 - `include_fire_weather` (optional): Include fire weather indices (default: false)
 - `include_normals` (optional): Include climate normals for comparison (default: false)
+- `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 
 **Example:**
 ```
@@ -136,6 +140,7 @@ Get historical weather observations for a location.
 - `start_date` (required): Start date in ISO format (YYYY-MM-DD)
 - `end_date` (required): End date in ISO format (YYYY-MM-DD)
 - `limit` (optional): Max observations to return (1-500, default: 168)
+- `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 
 **Data Source Selection:**
 The server automatically chooses the best data source based on your date range:
@@ -586,6 +591,32 @@ get_forecast(location_name="home")
 - `get_forecast` - Weather forecasts using saved locations
 
 **Coming Soon:** Support for saved locations in all weather tools (current conditions, alerts, air quality, marine conditions, etc.)
+
+## Units & Localization
+
+Weather output defaults to **imperial** units and can be switched to **metric** either server-wide (environment variables) or per request (tool parameters). Precedence, highest first: a per-call `*_unit` override → a per-call `units` preset → a per-unit env override → the `WEATHER_UNITS` env default → imperial.
+
+**Per-call parameters** (on `get_forecast`, `get_current_conditions`, `get_historical_weather`):
+
+| Parameter | Values | Applies to |
+|-----------|--------|------------|
+| `units` | `imperial`, `metric` | Whole system (sets all of the below) |
+| `temperature_unit` | `F`, `C` | Temperature, dewpoint, feels-like, normals |
+| `wind_speed_unit` | `mph`, `kmh`, `ms`, `kn` | Wind speed and gusts |
+| `precipitation_unit` | `inch`, `mm` | Precipitation, snowfall |
+| `pressure_unit` | `inHg`, `hPa` | Barometric pressure |
+| `distance_unit` | `mi`, `km` | Visibility, elevation |
+| `time_format` | `12h`, `24h` | Clock times (headers, sunrise/sunset) |
+
+**Environment defaults:** `WEATHER_UNITS` (`imperial`\|`metric`), plus `WEATHER_TEMPERATURE_UNIT`, `WEATHER_WIND_SPEED_UNIT`, `WEATHER_PRECIPITATION_UNIT`, `WEATHER_PRESSURE_UNIT`, `WEATHER_DISTANCE_UNIT`, `WEATHER_TIME_FORMAT`.
+
+**Examples:**
+```
+"What's the forecast for Berlin in Celsius?"  → units: "metric"
+"Wind in knots for the marina"                → wind_speed_unit: "kn"
+```
+
+**Note:** Fire-weather heights/transport wind, river gauge stage, and the marine tool's wave output use their domain-standard units and are not affected by this setting.
 
 ## Error Handling & Service Status
 

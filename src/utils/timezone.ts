@@ -17,7 +17,8 @@ import { logger } from './logger.js';
 export function formatInTimezone(
   isoString: string,
   timezone: string,
-  format: 'full' | 'long' | 'medium' | 'short' = 'medium'
+  format: 'full' | 'long' | 'medium' | 'short' = 'medium',
+  timeFormat: '12h' | '24h' = '12h'
 ): string {
   try {
     // Timezone-naive strings (e.g. Open-Meteo's "2026-07-07T04:32") are already
@@ -31,17 +32,21 @@ export function formatInTimezone(
       return new Date(isoString).toLocaleString('en-US', { timeZone: timezone });
     }
 
+    // hour12 override lets callers honor a 24-hour preference; undefined keeps
+    // the locale default (12-hour for en-US).
+    const hourOpt = timeFormat === '24h' ? { hour12: false } : {};
+
     // Format based on requested style
     switch (format) {
       case 'full':
-        return zonedDt.toLocaleString(DateTime.DATETIME_FULL);
+        return zonedDt.toLocaleString({ ...DateTime.DATETIME_FULL, ...hourOpt });
       case 'long':
-        return zonedDt.toLocaleString(DateTime.DATETIME_MED_WITH_SECONDS);
+        return zonedDt.toLocaleString({ ...DateTime.DATETIME_MED_WITH_SECONDS, ...hourOpt });
       case 'short':
-        return zonedDt.toLocaleString(DateTime.DATETIME_SHORT);
+        return zonedDt.toLocaleString({ ...DateTime.DATETIME_SHORT, ...hourOpt });
       case 'medium':
       default:
-        return zonedDt.toLocaleString(DateTime.DATETIME_MED);
+        return zonedDt.toLocaleString({ ...DateTime.DATETIME_MED, ...hourOpt });
     }
   } catch (error) {
     // Fallback to standard Date formatting if anything goes wrong
