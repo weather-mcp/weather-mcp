@@ -8,7 +8,42 @@ import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
-import type { NWPSGauge } from '../types/noaa.js';
+import type { NWPSGauge, GaugeStatus } from '../types/noaa.js';
+
+/**
+ * NWPS emits large negative sentinels (e.g. -999, -999999) for missing stage/flow
+ * values. Any real river stage or flow is well above this threshold, so treat values
+ * at or below it as "no data".
+ */
+const NWPS_SENTINEL_THRESHOLD = -900;
+
+/**
+ * True only for a real, present numeric reading (not null, not a missing-data sentinel).
+ */
+export function isRealValue(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > NWPS_SENTINEL_THRESHOLD;
+}
+
+/**
+ * True when a gauge's validTime is a real, plausible timestamp. NWPS uses a year-0001
+ * placeholder (renders as "Dec 31, 1") for stale/absent forecasts, so reject anything
+ * that fails to parse or predates 2000.
+ */
+function hasPlausibleValidTime(validTime: string | undefined): boolean {
+  if (!validTime) return false;
+  const parsed = Date.parse(validTime);
+  if (Number.isNaN(parsed)) return false;
+  return new Date(parsed).getUTCFullYear() >= 2000;
+}
+
+/**
+ * A forecast is worth displaying only if it carries at least one real value AND a
+ * plausible timestamp. Otherwise NWPS is returning a placeholder (-999 values, year-0001
+ * time, "fcst_not_current" category) that should be suppressed rather than rendered raw.
+ */
+export function isUsableForecast(status: GaugeStatus): boolean {
+  return (isRealValue(status.primary) || isRealValue(status.secondary)) && hasPlausibleValidTime(status.validTime);
+}
 
 interface RiverConditionsArgs {
   latitude?: number;
@@ -128,11 +163,11 @@ function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string
     output += `### Current Conditions\n`;
     output += `**Observed:** ${formatInTimezone(obs.validTime, timezone)}\n`;
 
-    if (obs.primary !== null) {
+    if (isRealValue(obs.primary)) {
       output += `**River Stage:** ${obs.primary.toFixed(2)} ft\n`;
     }
 
-    if (obs.secondary !== null) {
+    if (isRealValue(obs.secondary)) {
       output += `**Flow Rate:** ${obs.secondary.toFixed(2)} kcfs (${(obs.secondary * 1000).toFixed(0)} cfs)\n`;
     }
 
@@ -155,24 +190,25 @@ function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string
     output += `**Major Flood:** ${cat.major.toFixed(1)} ft\n\n`;
 
     // Show stage relative to flood levels if we have current stage
-    if (gauge.status.observed?.primary !== null && gauge.status.observed?.primary !== undefined) {
+    if (isRealValue(gauge.status.observed?.primary)) {
       const currentStage = gauge.status.observed.primary;
       const pctToAction = ((currentStage / cat.action) * 100).toFixed(0);
       output += `**Current stage is ${pctToAction}% of action stage**\n\n`;
     }
   }
 
-  // Forecast (if available)
-  if (gauge.status.forecast) {
+  // Forecast (only when NWPS returns a real, current forecast — placeholder rows with
+  // -999 values and a year-0001 validTime are suppressed rather than rendered raw).
+  if (gauge.status.forecast && isUsableForecast(gauge.status.forecast)) {
     const forecast = gauge.status.forecast;
     output += `### Forecast\n`;
     output += `**Valid Time:** ${formatInTimezone(forecast.validTime, timezone)}\n`;
 
-    if (forecast.primary !== null) {
+    if (isRealValue(forecast.primary)) {
       output += `**Forecasted Stage:** ${forecast.primary.toFixed(2)} ft\n`;
     }
 
-    if (forecast.secondary !== null) {
+    if (isRealValue(forecast.secondary)) {
       output += `**Forecasted Flow:** ${forecast.secondary.toFixed(2)} kcfs\n`;
     }
 
