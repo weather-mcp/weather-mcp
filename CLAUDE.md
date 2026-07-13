@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA and Open-Meteo APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, and severe weather alerts.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.10.0 (Production Ready)
+- **Version:** 1.11.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** @modelcontextprotocol/sdk v1.21.0
 
@@ -68,24 +68,28 @@ src/
 4. **Caching Strategy:** LRU cache with TTL based on data volatility (see `src/config/cache.ts`)
 5. **Error Hierarchy:** Custom error classes for different failure scenarios
 
-## Key Features (16 MCP Tools)
+## Key Features (17 MCP Tools)
 
-1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location) - Supports saved locations via `location_name` and free-text place names via `city_name` (geocoded)
+All location-based tools accept coordinates, a saved `location_name`, or a
+free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
+
+1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); `detail` output control
 2. **get_current_conditions** - Current weather + fire weather indices (NOAA, US only)
-3. **get_alerts** - Weather alerts/warnings (NOAA, US only)
+3. **get_alerts** - Weather alerts/warnings (NOAA, US only); `detail` output control
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo, global)
-5. **check_service_status** - API health check (all services)
-6. **search_location** - Location search/geocoding (Nominatim/OSM, better small town coverage)
-7. **get_air_quality** - Air quality index + pollutants (Open-Meteo, global)
-8. **get_marine_conditions** - Wave height, swell, currents (Open-Meteo, global)
-9. **get_weather_imagery** - Weather radar/precipitation imagery (RainViewer, global)
-10. **get_lightning_activity** - Real-time lightning detection (Blitzortung.org, global)
-11. **get_river_conditions** - River levels and flood monitoring (NOAA/USGS, US only)
-12. **get_wildfire_info** - Active wildfire tracking (NIFC, US only)
-13. **save_location** - Save frequently used locations with aliases (NEW in v1.7.0)
-14. **list_saved_locations** - View all saved locations (NEW in v1.7.0)
-15. **get_saved_location** - Get details for a saved location (NEW in v1.7.0)
-16. **remove_saved_location** - Delete a saved location (NEW in v1.7.0)
+5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning) (NEW in v1.11.0)
+6. **check_service_status** - API health check (all services)
+7. **search_location** - Location search/geocoding (Nominatim/OSM, better small town coverage)
+8. **get_air_quality** - Air quality index + pollutants (Open-Meteo, global)
+9. **get_marine_conditions** - Wave height, swell, currents (Open-Meteo, global)
+10. **get_weather_imagery** - Weather radar/precipitation imagery (RainViewer, global); `detail` controls URL vs embedded images
+11. **get_lightning_activity** - Real-time lightning detection (Blitzortung.org, global)
+12. **get_river_conditions** - River levels and flood monitoring (NOAA/USGS, US only)
+13. **get_wildfire_info** - Active wildfire tracking (NIFC, US only)
+14. **save_location** - Save frequently used locations with aliases (NEW in v1.7.0)
+15. **list_saved_locations** - View all saved locations (NEW in v1.7.0)
+16. **get_saved_location** - Get details for a saved location (NEW in v1.7.0)
+17. **remove_saved_location** - Delete a saved location (NEW in v1.7.0)
 
 ## Development Guidelines
 
@@ -468,14 +472,17 @@ your_tool: {
 
 ### Currently Supported Tools
 
-- ✅ `get_forecast` - Full support for `location_name` (saved) and `city_name` (geocoded on demand)
+As of v1.11.0, **every location-based weather tool** accepts `location_name`
+(saved) and `city_name` (geocoded on demand) in addition to `latitude`/`longitude`,
+via the shared `resolveLocationAsync` helper and the `LOCATION_SCHEMA_PROPERTIES`
+schema fragment in `src/index.ts`. Name-based lookups echo the resolved place in a
+`**Location:**` header (see `formatLocationLine`/`prependLocationLine` in
+`src/utils/locationResolver.ts`):
 
-**Coming Soon:**
-- `get_current_conditions`
-- `get_alerts`
-- `get_air_quality`
-- `get_marine_conditions`
-- All other weather tools
+- ✅ `get_forecast`, `get_current_conditions`, `get_alerts`, `get_historical_weather`
+- ✅ `get_air_quality`, `get_marine_conditions`, `get_weather_imagery`
+- ✅ `get_lightning_activity`, `get_river_conditions`, `get_wildfire_info`
+- ✅ `get_weather_summary` (composite; resolves once, fans out to the above)
 
 ## Common Tasks
 
@@ -538,12 +545,13 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.10.0
+- **Version:** 1.11.0
 - **Status:** Production Ready ✅
+- **New in v1.11.0:** Universal location resolution (`location_name`/`city_name` on every location-based tool), `get_weather_summary` composite tool, `detail` output control (forecast/alerts/imagery), and a "summary-first" 6-tool default `basic` preset led by `get_weather_summary` (history, air quality, saved-location CRUD, and specialized tools live in `standard`/`full`)
 - **New in v1.10.0:** Unit localization — imperial/metric (plus per-unit overrides and 12h/24h) via `WEATHER_UNITS` env or a per-call `units` parameter on forecast/current/historical tools
 - **New in v1.9.0:** `city_name` parameter for `get_forecast` — request a forecast by free-text place name (geocoded on demand, with caching)
 - **Security Rating:** A- (Excellent, 93/100)
-- **Test Coverage:** 1,129 tests, 100% pass rate
+- **Test Coverage:** 1,149 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
 
 ## Useful References
@@ -566,6 +574,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2026-07-13 (v1.10.0)
+**Last Updated:** 2026-07-13 (v1.11.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.

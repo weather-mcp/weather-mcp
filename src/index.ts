@@ -33,10 +33,11 @@ import { handleCheckServiceStatus } from './handlers/statusHandler.js';
 import { handleSearchLocation } from './handlers/locationHandler.js';
 import { handleGetAirQuality } from './handlers/airQualityHandler.js';
 import { handleGetMarineConditions } from './handlers/marineConditionsHandler.js';
-import { getWeatherImagery, formatWeatherImageryResponse } from './handlers/weatherImageryHandler.js';
-import { getLightningActivity, formatLightningActivityResponse } from './handlers/lightningHandler.js';
+import { handleGetWeatherImagery } from './handlers/weatherImageryHandler.js';
+import { handleGetLightningActivity } from './handlers/lightningHandler.js';
 import { handleGetRiverConditions } from './handlers/riverConditionsHandler.js';
 import { handleGetWildfireInfo } from './handlers/wildfireHandler.js';
+import { handleGetWeatherSummary } from './handlers/weatherSummaryHandler.js';
 import {
   handleSaveLocation,
   handleListSavedLocations,
@@ -198,6 +199,47 @@ const UNIT_SCHEMA_PROPERTIES = {
 };
 
 /**
+ * Shared location parameters. Spread into every location-based weather tool so
+ * the AI can provide a location in ONE of three consistent ways: coordinates,
+ * a saved location name, or a free-text city name (geocoded on demand). Tools
+ * using this fragment must declare `required: []` — resolveLocationAsync enforces
+ * that at least one usable form is present at call time.
+ */
+const LOCATION_SCHEMA_PROPERTIES = {
+  latitude: {
+    type: 'number' as const,
+    description: 'Latitude of the location (-90 to 90). Not required if location_name or city_name is provided.',
+    minimum: -90,
+    maximum: 90
+  },
+  longitude: {
+    type: 'number' as const,
+    description: 'Longitude of the location (-180 to 180). Not required if location_name or city_name is provided.',
+    minimum: -180,
+    maximum: 180
+  },
+  location_name: {
+    type: 'string' as const,
+    description: 'Name of a saved location (e.g., "home", "cabin"). Use instead of coordinates to reference a saved location. List them with list_saved_locations.'
+  },
+  city_name: {
+    type: 'string' as const,
+    description: 'Free-text place name to geocode (e.g., "Paris, France", "Bend, Oregon"). Use instead of coordinates when you only have a place name and it is not a saved location. Include state/country for disambiguation when possible.'
+  }
+};
+
+/**
+ * Shared output-verbosity parameter for high-volume tools.
+ */
+const DETAIL_SCHEMA_PROPERTY = {
+  detail: {
+    type: 'string' as const,
+    description: 'Output verbosity: "summary" (shortest), "standard" (default, balanced), or "full" (everything the source provides, e.g. full alert descriptions, uncapped hourly forecast, embedded imagery).',
+    enum: ['summary', 'standard', 'full']
+  }
+};
+
+/**
  * Tool definitions - each tool defined separately for conditional registration
  */
 const TOOL_DEFINITIONS = {
@@ -207,26 +249,7 @@ const TOOL_DEFINITIONS = {
     inputSchema: {
       type: 'object' as const,
       properties: {
-        latitude: {
-          type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90). Not required if location_name is provided.',
-          minimum: -90,
-          maximum: 90
-        },
-        longitude: {
-          type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180). Not required if location_name is provided.',
-          minimum: -180,
-          maximum: 180
-        },
-        location_name: {
-          type: 'string' as const,
-          description: 'Name of a saved location (e.g., "home", "cabin"). Use this instead of latitude/longitude to reference a saved location. List saved locations with list_saved_locations.'
-        },
-        city_name: {
-          type: 'string' as const,
-          description: 'Free-text place name to geocode (e.g., "Paris, France", "Bend, Oregon"). Use this instead of latitude/longitude when you only have a place name and it is not a saved location. Include state/country for disambiguation when possible.'
-        },
+        ...LOCATION_SCHEMA_PROPERTIES,
         days: {
           type: 'number' as const,
           description: 'Number of days to include in forecast (1-16 for global, 1-7 for US NOAA, default: 7)',
@@ -261,6 +284,7 @@ const TOOL_DEFINITIONS = {
           enum: ['auto', 'noaa', 'openmeteo'],
           default: 'auto'
         },
+        ...DETAIL_SCHEMA_PROPERTY,
         ...UNIT_SCHEMA_PROPERTIES
       },
       required: []
@@ -269,22 +293,11 @@ const TOOL_DEFINITIONS = {
 
   get_current_conditions: {
     name: 'get_current_conditions' as const,
-    description: 'Get the most recent weather observation for a location (US only). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns the latest observation from the nearest weather station. Optionally includes fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) when requested. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get the most recent weather observation for a location (US only). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns the latest observation from the nearest weather station. Optionally includes fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) when requested. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        latitude: {
-          type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90)',
-          minimum: -90,
-          maximum: 90
-        },
-        longitude: {
-          type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180)',
-          minimum: -180,
-          maximum: 180
-        },
+        ...LOCATION_SCHEMA_PROPERTIES,
         include_fire_weather: {
           type: 'boolean' as const,
           description: 'Include fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) in the response (default: false, US only)',
@@ -297,56 +310,35 @@ const TOOL_DEFINITIONS = {
         },
         ...UNIT_SCHEMA_PROPERTIES
       },
-      required: ['latitude', 'longitude']
+      required: []
     }
   },
 
   get_alerts: {
     name: 'get_alerts' as const,
-    description: 'Get active weather alerts, watches, warnings, and advisories for a location (US only). Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get active weather alerts, watches, warnings, and advisories for a location (US only). Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        latitude: {
-          type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90)',
-          minimum: -90,
-          maximum: 90
-        },
-        longitude: {
-          type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180)',
-          minimum: -180,
-          maximum: 180
-        },
+        ...LOCATION_SCHEMA_PROPERTIES,
         active_only: {
           type: 'boolean' as const,
           description: 'Whether to show only active alerts (default: true)',
           default: true
-        }
+        },
+        ...DETAIL_SCHEMA_PROPERTY
       },
-      required: ['latitude', 'longitude']
+      required: []
     }
   },
 
   get_historical_weather: {
     name: 'get_historical_weather' as const,
-    description: 'Get historical weather data for a specific date range in the past. Use this when the user asks about weather on specific past dates (e.g., "yesterday", "last week", "November 4, 2024", "30 years ago"). Automatically uses NOAA API for recent dates (last 7 days, US only) or Open-Meteo API for older dates (worldwide, back to 1940). Do NOT use for current conditions - use get_current_conditions instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get historical weather data for a specific date range in the past. Use this when the user asks about weather on specific past dates (e.g., "yesterday", "last week", "November 4, 2024", "30 years ago"). Automatically uses NOAA API for recent dates (last 7 days, US only) or Open-Meteo API for older dates (worldwide, back to 1940). Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. Do NOT use for current conditions - use get_current_conditions instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        latitude: {
-          type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90)',
-          minimum: -90,
-          maximum: 90
-        },
-        longitude: {
-          type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180)',
-          minimum: -180,
-          maximum: 180
-        },
+        ...LOCATION_SCHEMA_PROPERTIES,
         start_date: {
           type: 'string' as const,
           description: 'Start date in ISO format (YYYY-MM-DD or ISO 8601 datetime)',
@@ -364,7 +356,36 @@ const TOOL_DEFINITIONS = {
         },
         ...UNIT_SCHEMA_PROPERTIES
       },
-      required: ['latitude', 'longitude', 'start_date', 'end_date']
+      required: ['start_date', 'end_date']
+    }
+  },
+
+  get_weather_summary: {
+    name: 'get_weather_summary' as const,
+    description: 'Get a combined weather overview for a location in a SINGLE call. Best for broad questions like "What\'s the weather like in Seattle?", "Is it safe to hike today?", or "Give me a weather rundown". Aggregates current conditions, forecast, and active alerts by default, and can also include air quality and lightning. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For a single specific data product (just the forecast, just alerts, etc.), call that specialized tool directly. Sections that are unavailable for a location (e.g. US-only alerts abroad) are noted rather than failing the whole summary.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        ...LOCATION_SCHEMA_PROPERTIES,
+        include: {
+          type: 'array' as const,
+          description: 'Which sections to include (default: ["current", "forecast", "alerts"]). Add "air_quality" and/or "lightning" for a fuller picture.',
+          items: {
+            type: 'string' as const,
+            enum: ['current', 'forecast', 'alerts', 'air_quality', 'lightning']
+          }
+        },
+        days: {
+          type: 'number' as const,
+          description: 'Number of forecast days to include when the forecast section is requested (1-16, default: 7)',
+          minimum: 1,
+          maximum: 16,
+          default: 7
+        },
+        ...DETAIL_SCHEMA_PROPERTY,
+        ...UNIT_SCHEMA_PROPERTIES
+      },
+      required: []
     }
   },
 
@@ -402,78 +423,45 @@ const TOOL_DEFINITIONS = {
 
   get_air_quality: {
     name: 'get_air_quality' as const,
-    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", or health-related environmental conditions. Returns current conditions and optional hourly forecast. Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO.',
+    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", or health-related environmental conditions. Returns current conditions and optional hourly forecast. Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        latitude: {
-          type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90)',
-          minimum: -90,
-          maximum: 90
-        },
-        longitude: {
-          type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180)',
-          minimum: -180,
-          maximum: 180
-        },
+        ...LOCATION_SCHEMA_PROPERTIES,
         forecast: {
           type: 'boolean' as const,
           description: 'Include hourly air quality forecast for next 5 days (default: false, shows current only)',
           default: false
         }
       },
-      required: ['latitude', 'longitude']
+      required: []
     }
   },
 
   get_marine_conditions: {
     name: 'get_marine_conditions' as const,
-    description: 'Get marine conditions including wave height, swell, ocean currents, and sea state for a location (global coverage). Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Returns current conditions and optional daily/hourly forecast. Includes significant wave height, wind waves, swell, wave period, and ocean currents. Shows safety assessment for maritime activities. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
+    description: 'Get marine conditions including wave height, swell, ocean currents, and sea state for a location (global coverage). Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Returns current conditions and optional daily/hourly forecast. Includes significant wave height, wind waves, swell, wave period, and ocean currents. Shows safety assessment for maritime activities. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        latitude: {
-          type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90)',
-          minimum: -90,
-          maximum: 90
-        },
-        longitude: {
-          type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180)',
-          minimum: -180,
-          maximum: 180
-        },
+        ...LOCATION_SCHEMA_PROPERTIES,
         forecast: {
           type: 'boolean' as const,
           description: 'Include marine forecast for next 5 days (default: false, shows current only)',
           default: false
         }
       },
-      required: ['latitude', 'longitude']
+      required: []
     }
   },
 
   get_weather_imagery: {
     name: 'get_weather_imagery' as const,
-    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization. Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. Includes disclaimer about data delays and official forecast consultation. For numerical forecast data, use get_forecast instead.',
+    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization. Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. By default returns direct image URLs; use detail="full" to embed Markdown images. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For numerical forecast data, use get_forecast instead.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        latitude: {
-          type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90)',
-          minimum: -90,
-          maximum: 90
-        },
-        longitude: {
-          type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180)',
-          minimum: -180,
-          maximum: 180
-        },
+        ...LOCATION_SCHEMA_PROPERTIES,
         type: {
           type: 'string' as const,
           description: 'Type of imagery: "radar" or "precipitation" (global, RainViewer) or "satellite" (Western Hemisphere GOES GeoColor, NASA GIBS). Default: "precipitation"',
@@ -484,30 +472,20 @@ const TOOL_DEFINITIONS = {
           type: 'boolean' as const,
           description: 'Return animated frames showing progression over time (default: false)',
           default: false
-        }
+        },
+        ...DETAIL_SCHEMA_PROPERTY
       },
-      required: ['latitude', 'longitude', 'type']
+      required: ['type']
     }
   },
 
   get_lightning_activity: {
     name: 'get_lightning_activity' as const,
-    description: 'Get real-time lightning strike activity and safety assessment for a location (global coverage). Use this when asked about "lightning nearby", "lightning strikes", "thunderstorm activity", "is it safe from lightning", or "lightning danger". Returns recent strikes within specified radius and time window, including distance, polarity, intensity, and critical safety recommendations. Provides 4-level safety assessment (safe/elevated/high/extreme) based on proximity. SAFETY-CRITICAL tool for outdoor activities and severe weather monitoring.',
+    description: 'Get real-time lightning strike activity and safety assessment for a location (global coverage). Use this when asked about "lightning nearby", "lightning strikes", "thunderstorm activity", "is it safe from lightning", or "lightning danger". Returns recent strikes within specified radius and time window, including distance, polarity, intensity, and critical safety recommendations. Provides 4-level safety assessment (safe/elevated/high/extreme) based on proximity. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for outdoor activities and severe weather monitoring.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        latitude: {
-          type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90)',
-          minimum: -90,
-          maximum: 90
-        },
-        longitude: {
-          type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180)',
-          minimum: -180,
-          maximum: 180
-        },
+        ...LOCATION_SCHEMA_PROPERTIES,
         radius: {
           type: 'number' as const,
           description: 'Search radius in kilometers (1-500, default: 100)',
@@ -523,28 +501,17 @@ const TOOL_DEFINITIONS = {
           default: 60
         }
       },
-      required: ['latitude', 'longitude']
+      required: []
     }
   },
 
   get_river_conditions: {
     name: 'get_river_conditions' as const,
-    description: 'Monitor river levels and flood status for a location (US only). Use this when asked about "river flooding", "river level", "flood stage", "streamflow", "safe to kayak", or "river conditions". Returns current river gauge data within specified radius including river stage, flow rate, flood category levels (action/minor/moderate/major), and forecasted conditions. Provides safety assessment based on flood stages. SAFETY-CRITICAL tool for flood-prone areas and water recreation.',
+    description: 'Monitor river levels and flood status for a location (US only). Use this when asked about "river flooding", "river level", "flood stage", "streamflow", "safe to kayak", or "river conditions". Returns current river gauge data within specified radius including river stage, flow rate, flood category levels (action/minor/moderate/major), and forecasted conditions. Provides safety assessment based on flood stages. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for flood-prone areas and water recreation.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        latitude: {
-          type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90)',
-          minimum: -90,
-          maximum: 90
-        },
-        longitude: {
-          type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180)',
-          minimum: -180,
-          maximum: 180
-        },
+        ...LOCATION_SCHEMA_PROPERTIES,
         radius: {
           type: 'number' as const,
           description: 'Search radius in kilometers (1-500, default: 50)',
@@ -553,28 +520,17 @@ const TOOL_DEFINITIONS = {
           default: 50
         }
       },
-      required: ['latitude', 'longitude']
+      required: []
     }
   },
 
   get_wildfire_info: {
     name: 'get_wildfire_info' as const,
-    description: 'Monitor active wildfires and fire perimeters for a location (US focus). Use this when asked about "wildfires nearby", "fire danger", "active fires", "wildfire smoke", "fire perimeters", or "evacuation risk". Returns active wildfire information within specified radius including fire name, size, containment percentage, distance from location, and safety assessment. Provides critical evacuation awareness and air quality impact information. SAFETY-CRITICAL tool for wildfire-prone areas.',
+    description: 'Monitor active wildfires and fire perimeters for a location (US focus). Use this when asked about "wildfires nearby", "fire danger", "active fires", "wildfire smoke", "fire perimeters", or "evacuation risk". Returns active wildfire information within specified radius including fire name, size, containment percentage, distance from location, and safety assessment. Provides critical evacuation awareness and air quality impact information. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for wildfire-prone areas.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        latitude: {
-          type: 'number' as const,
-          description: 'Latitude of the location (-90 to 90)',
-          minimum: -90,
-          maximum: 90
-        },
-        longitude: {
-          type: 'number' as const,
-          description: 'Longitude of the location (-180 to 180)',
-          minimum: -180,
-          maximum: 180
-        },
+        ...LOCATION_SCHEMA_PROPERTIES,
         radius: {
           type: 'number' as const,
           description: 'Search radius in kilometers (1-500, default: 100)',
@@ -583,7 +539,7 @@ const TOOL_DEFINITIONS = {
           default: 100
         }
       },
-      required: ['latitude', 'longitude']
+      required: []
     }
   },
 
@@ -720,17 +676,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_current_conditions':
         return await withAnalytics('get_current_conditions', async () =>
-          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService)
+          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService)
         );
 
       case 'get_alerts':
         return await withAnalytics('get_alerts', async () =>
-          handleGetAlerts(args, noaaService)
+          handleGetAlerts(args, noaaService, locationStore, geocodingService)
         );
 
       case 'get_historical_weather':
         return await withAnalytics('get_historical_weather', async () =>
-          handleGetHistoricalWeather(args, noaaService, openMeteoService)
+          handleGetHistoricalWeather(args, noaaService, openMeteoService, locationStore, geocodingService)
+        );
+
+      case 'get_weather_summary':
+        return await withAnalytics('get_weather_summary', async () =>
+          handleGetWeatherSummary(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService)
         );
 
       case 'check_service_status':
@@ -745,50 +706,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_air_quality':
         return await withAnalytics('get_air_quality', async () =>
-          handleGetAirQuality(args, openMeteoService)
+          handleGetAirQuality(args, openMeteoService, locationStore, geocodingService)
         );
 
       case 'get_marine_conditions':
         return await withAnalytics('get_marine_conditions', async () =>
-          handleGetMarineConditions(args, noaaService, openMeteoService)
+          handleGetMarineConditions(args, noaaService, openMeteoService, locationStore, geocodingService)
         );
 
       case 'get_weather_imagery':
-        return await withAnalytics('get_weather_imagery', async () => {
-          const result = await getWeatherImagery(args as any);
-          const formatted = formatWeatherImageryResponse(result);
-          return {
-            content: [
-              {
-                type: 'text',
-                text: formatted
-              }
-            ]
-          };
-        });
+        return await withAnalytics('get_weather_imagery', async () =>
+          handleGetWeatherImagery(args, locationStore, geocodingService)
+        );
 
       case 'get_lightning_activity':
-        return await withAnalytics('get_lightning_activity', async () => {
-          const result = await getLightningActivity(args as any);
-          const formatted = formatLightningActivityResponse(result);
-          return {
-            content: [
-              {
-                type: 'text',
-                text: formatted
-              }
-            ]
-          };
-        });
+        return await withAnalytics('get_lightning_activity', async () =>
+          handleGetLightningActivity(args, locationStore, geocodingService)
+        );
 
       case 'get_river_conditions':
         return await withAnalytics('get_river_conditions', async () =>
-          handleGetRiverConditions(args, noaaService)
+          handleGetRiverConditions(args, noaaService, locationStore, geocodingService)
         );
 
       case 'get_wildfire_info':
         return await withAnalytics('get_wildfire_info', async () =>
-          handleGetWildfireInfo(args, nifcService)
+          handleGetWildfireInfo(args, nifcService, locationStore, geocodingService)
         );
 
       case 'save_location':

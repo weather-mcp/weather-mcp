@@ -6,9 +6,56 @@
 import { WeatherImageryParams, WeatherImageryResponse, ImageryType } from '../types/imagery.js';
 import { rainViewerService } from '../services/rainviewer.js';
 import { gibsService } from '../services/gibs.js';
-import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
+import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { validateLatitude, validateLongitude, validateDetail, DetailLevel } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { ValidationError } from '../errors/ApiError.js';
+
+interface WeatherImageryArgs {
+  latitude?: number;
+  longitude?: number;
+  location_name?: string;
+  city_name?: string;
+  type?: ImageryType;
+  animated?: boolean;
+  detail?: DetailLevel;
+}
+
+/**
+ * Tool entry point: resolve the location (coordinates, saved name, or geocoded
+ * city), fetch imagery, and format it. Markdown image embeds are opt-in via
+ * detail="full"; the default surfaces direct URLs and metadata (lighter for
+ * text-only agents).
+ */
+export async function handleGetWeatherImagery(
+  args: unknown,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  const typedArgs = (args ?? {}) as WeatherImageryArgs;
+  const resolved = await resolveLocationAsync(typedArgs, locationStore, geocodingService);
+  const detail = validateDetail(typedArgs.detail);
+
+  const result = await getWeatherImagery({
+    latitude: resolved.latitude,
+    longitude: resolved.longitude,
+    type: (typedArgs.type ?? 'precipitation') as ImageryType,
+    animated: typedArgs.animated
+  });
+
+  const formatted = formatWeatherImageryResponse(result, detail);
+
+  return prependLocationLine({
+    content: [
+      {
+        type: 'text',
+        text: formatted
+      }
+    ]
+  }, resolved);
+}
 
 /**
  * Validate imagery request parameters
@@ -97,9 +144,30 @@ export async function getWeatherImagery(params: WeatherImageryParams): Promise<W
 }
 
 /**
- * Format weather imagery response for display
+ * Render a single imagery frame line.
+ * At detail="full" the image is embedded as Markdown so rich clients render it;
+ * otherwise the direct URL is shown as text (cheaper, and usable by text-only
+ * agents that would otherwise carry an un-renderable image tag).
  */
-export function formatWeatherImageryResponse(response: WeatherImageryResponse): string {
+function formatFrameLine(
+  frame: { url: string; description?: string },
+  detail: DetailLevel
+): string {
+  if (detail === 'full') {
+    return `![${frame.description || 'Weather imagery'}](${frame.url})`;
+  }
+  return `**Image URL:** ${frame.url}`;
+}
+
+/**
+ * Format weather imagery response for display
+ * @param response - Imagery result to render
+ * @param detail - Verbosity; "full" embeds Markdown images, otherwise URLs are text
+ */
+export function formatWeatherImageryResponse(
+  response: WeatherImageryResponse,
+  detail: DetailLevel = 'standard'
+): string {
   const lines: string[] = [];
 
   lines.push('# Weather Imagery');
@@ -133,7 +201,7 @@ export function formatWeatherImageryResponse(response: WeatherImageryResponse): 
     framesToShow.forEach((frame) => {
       const frameNumber = response.frames.indexOf(frame) + 1;
       lines.push(`### Frame ${frameNumber} - ${frame.timestamp.toISOString()}`);
-      lines.push(`![${frame.description || 'Weather imagery'}](${frame.url})`);
+      lines.push(formatFrameLine(frame, detail));
       lines.push('');
     });
 
@@ -146,7 +214,7 @@ export function formatWeatherImageryResponse(response: WeatherImageryResponse): 
     lines.push('');
     const frame = response.frames[0];
     lines.push(`**Timestamp:** ${frame.timestamp.toISOString()}`);
-    lines.push(`![${frame.description || 'Weather imagery'}](${frame.url})`);
+    lines.push(formatFrameLine(frame, detail));
     lines.push('');
   } else {
     lines.push('## ⚠️ No Imagery Available');

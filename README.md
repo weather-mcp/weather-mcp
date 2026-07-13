@@ -6,7 +6,7 @@
 [![Tests](https://img.shields.io/badge/tests-1%2C129%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
-**Give your AI assistant real weather data — 16 tools, zero API keys, zero signup, zero cost.**
+**Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
 
 Weather MCP is a [Model Context Protocol](https://modelcontextprotocol.io) server that connects AI assistants (Claude, Cursor, Cline, Zed, and any other MCP client) to live weather data: forecasts, current conditions, alerts, air quality, marine conditions, lightning, radar, rivers, wildfires, and 85+ years of historical weather. It's built entirely on free public data sources — NOAA, Open-Meteo, USGS, NIFC, RainViewer, and Blitzortung.org — so there is nothing to sign up for and no key to paste in.
 
@@ -47,13 +47,13 @@ Choose this one if you want:
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
 - **Fully open source** — MIT licensed, readable TypeScript, 1,129 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
-- **Breadth** — 16 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
+- **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
 The tradeoff is honest: US data (NOAA) is richer than international data (Open-Meteo), some tools are US-only, and free APIs come with fair-use rate limits. See [Coverage & Limitations](#coverage--limitations).
 
 ## Tools
 
-All 16 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
+All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 | Tool | What it does | Coverage |
 |------|-------------|----------|
@@ -61,6 +61,7 @@ All 16 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_current_conditions` | Real-time observations: temperature, wind, heat index/wind chill, snow depth, optional fire-weather indices | 🇺🇸 US |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity | 🇺🇸 US |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
+| `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
 | `search_location` | Geocode place names to coordinates ("Paris" → 48.85, 2.35) | 🌍 Global |
 | `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance | 🌍 Global |
 | `get_marine_conditions` | Wave height, swell, ocean currents, Douglas Sea Scale — includes Great Lakes and major US bays | 🌍 Global |
@@ -74,7 +75,11 @@ All 16 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_saved_location` | Details for one saved location | — |
 | `remove_saved_location` | Delete a saved location | — |
 
-> **Default preset:** to keep your AI's context lean, the server exposes 5 essential tools by default (`forecast`, `current_conditions`, `alerts`, `search_location`, `check_service_status`). Enable everything with one environment variable — see [Tool Selection](#tool-selection).
+> **Default preset:** with no configuration, the server exposes 6 tools led by `get_weather_summary` (one call covers most "what's the weather?" questions), plus `forecast`, `current_conditions`, `alerts`, `search_location`, and `check_service_status`. Enable everything with one environment variable — see [Tool Selection](#tool-selection).
+
+> **Consistent location input:** every location-based tool accepts the same three forms — `latitude`+`longitude`, a saved `location_name` (e.g. `"home"`), or a free-text `city_name` (e.g. `"Bend, Oregon"`, geocoded automatically). When a name is used, the response echoes the resolved place and coordinates.
+
+> **Output verbosity:** high-volume tools (`get_forecast`, `get_alerts`, `get_weather_imagery`) accept `detail: "summary" | "standard" | "full"` (default `standard`) to trade completeness for token cost — e.g. `full` returns the complete alert text and uncapped hourly forecast.
 
 ## Feature highlights
 
@@ -185,10 +190,10 @@ Control which tools are exposed to reduce context overhead:
 
 | Preset | Tools |
 |--------|-------|
-| `basic` (default) | forecast, current_conditions, alerts, search_location, check_service_status |
-| `standard` | basic + historical_weather |
-| `full` | standard + air_quality |
-| `all` | everything — all 16 tools including marine, imagery, lightning, rivers, wildfire, and saved locations |
+| `basic` (default) | weather_summary, forecast, current_conditions, alerts, search_location, check_service_status |
+| `standard` | basic + historical_weather, air_quality, and saved-location tools |
+| `full` | everything — standard + marine, imagery, lightning, rivers, wildfire (same as `all`) |
+| `all` | all 17 tools |
 
 ```bash
 ENABLED_TOOLS=all                               # Use a preset
@@ -280,7 +285,7 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
 ## Documentation
 
-- **[Tool Reference](./docs/TOOLS.md)** — all 16 tools: parameters, examples, sample output
+- **[Tool Reference](./docs/TOOLS.md)** — all 17 tools: parameters, examples, sample output
 - **[Client Setup](./docs/CLIENT_SETUP.md)** — step-by-step for 8 MCP clients
 - **[Error Handling](./docs/ERROR_HANDLING.md)** — how failures are reported
 - **[Testing Guide](./docs/testing/TESTING_GUIDE.md)** — manual testing procedures

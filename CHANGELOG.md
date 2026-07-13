@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-07-13
+
+### Added
+- **Universal location resolution across all weather tools** - Every location-based tool (`get_current_conditions`, `get_alerts`, `get_historical_weather`, `get_air_quality`, `get_marine_conditions`, `get_weather_imagery`, `get_lightning_activity`, `get_river_conditions`, `get_wildfire_info`) now accepts the same three location forms that `get_forecast` did: `latitude`+`longitude`, a saved `location_name`, or a free-text `city_name` (geocoded on demand). A shared `LOCATION_SCHEMA_PROPERTIES` fragment keeps the tool schemas consistent, and name-based lookups echo the resolved place and coordinates in a `**Location:**` header. This resolves the previous mismatch where saved-location guidance advertised calls the tool schemas rejected.
+- **`get_weather_summary` composite tool** - Answers broad "what's the weather like?" questions in a single call by aggregating current conditions, forecast, and alerts (optionally air quality and lightning) for one location. Accepts an `include` array, `detail`, and `days`. Location is resolved once and passed to each section so there is no repeated geocoding; a section that is unavailable (e.g. US-only alerts abroad) is noted rather than failing the whole summary.
+- **`detail` output control** - `get_forecast`, `get_alerts`, and `get_weather_imagery` accept `detail: "summary" | "standard" | "full"` (default `standard`) to trade completeness for token cost. Hourly forecasts are capped (24h summary / 48h standard) unless `full`; alerts include the full NWS description only at `full`; imagery returns direct URLs by default and embeds Markdown images only at `full`.
+
+### Changed
+- **Preset tiers reworked around a "summary-first" default.** The default `basic` preset (used when `ENABLED_TOOLS` is unset — what most users get) is now 6 tools led by `get_weather_summary`: `get_weather_summary`, `get_forecast`, `get_current_conditions`, `get_alerts`, `search_location`, `check_service_status`. `standard` adds history, air quality, and the four saved-location management tools (12 total). `full` adds the specialized environmental/safety tools (marine, imagery, lightning, river, wildfire) and is now the complete 17-tool set, identical to `all`. Because every tool accepts `city_name`/`location_name`, the default set answers most weather questions on its own.
+- The NOAA forecast path fetches point data once and reuses `gridId`/`gridX`/`gridY` for the forecast and gridpoint calls, avoiding duplicate upstream point lookups on a cold cache.
+
+### Fixed
+- `search_location` now escapes provider-returned strings (`name`, `display_name`) before embedding them in Markdown, matching the existing escaping of the user query.
+
 ## [1.10.0] - 2026-07-13
 
 ### Added

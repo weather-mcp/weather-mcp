@@ -63,7 +63,9 @@ export async function handleSearchLocation(
 
   for (let i = 0; i < results.length; i++) {
     const location = results[i];
-    output += `## ${i + 1}. ${location.name}\n\n`;
+    // Provider-returned strings (name, display_name, admin fields) are escaped
+    // before embedding — external text can otherwise alter Markdown rendering.
+    output += `## ${i + 1}. ${escapeMarkdown(location.name)}\n\n`;
 
     // Build location description
     const parts: string[] = [location.name];
@@ -71,7 +73,7 @@ export async function handleSearchLocation(
     if (location.admin2 && location.admin2 !== location.admin1) parts.push(location.admin2);
     if (location.country) parts.push(location.country);
 
-    output += `**Full Name:** ${location.display_name}\n`;
+    output += `**Full Name:** ${escapeMarkdown(location.display_name)}\n`;
     output += `**Coordinates:** ${location.latitude.toFixed(4)}°, ${location.longitude.toFixed(4)}°\n`;
 
     if (location.country_code) {

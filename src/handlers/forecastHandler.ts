@@ -14,8 +14,10 @@ import {
   validateForecastDays,
   validateGranularity,
   validateOptionalBoolean,
+  validateDetail,
+  DetailLevel,
 } from '../utils/validation.js';
-import { resolveLocationAsync, ResolvedLocation } from '../utils/locationResolver.js';
+import { resolveLocationAsync, formatLocationLine } from '../utils/locationResolver.js';
 import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
 import { UnitPreferences } from '../config/units.js';
 import {
@@ -47,6 +49,24 @@ interface ForecastArgs extends UnitArgs {
   include_severe_weather?: boolean;
   include_normals?: boolean;
   source?: 'auto' | 'noaa' | 'openmeteo';
+  detail?: DetailLevel;
+}
+
+/**
+ * Cap the number of hourly forecast entries by verbosity level.
+ * Hourly forecasts can emit up to days*24 entries (384 at 16 days), which is
+ * expensive for assistant contexts. Unless the user asks for detail="full",
+ * cap to a short horizon; the daily view still covers the full requested range.
+ *
+ * @param detail - Requested verbosity
+ * @param days - Number of forecast days requested
+ * @returns Maximum hourly entries to emit
+ */
+function hourlyEntryCap(detail: DetailLevel, days: number): number {
+  const maxHours = days * 24;
+  if (detail === 'full') return maxHours;
+  if (detail === 'summary') return Math.min(24, maxHours);
+  return Math.min(48, maxHours); // standard default
 }
 
 /**
@@ -201,6 +221,8 @@ export async function handleGetForecast(
     'include_normals',
     false
   );
+  // Output verbosity: caps hourly output unless detail="full" (see hourlyEntryCap)
+  const detail = validateDetail((args as ForecastArgs)?.detail);
 
   // Resolve unit preferences (per-call params over the server default)
   const prefs = resolveUnitPreferences(args as ForecastArgs);
@@ -230,7 +252,8 @@ export async function handleGetForecast(
       include_precipitation_probability,
       include_severe_weather,
       include_normals,
-      prefs
+      prefs,
+      detail
     );
   } else {
     // Use Open-Meteo for international locations
@@ -243,7 +266,8 @@ export async function handleGetForecast(
       granularity,
       include_precipitation_probability,
       include_normals,
-      prefs
+      prefs,
+      detail
     );
   }
 
@@ -255,19 +279,6 @@ export async function handleGetForecast(
   }
 
   return result;
-}
-
-/**
- * Build a header line describing how a location name was resolved.
- * Returns an empty string for direct-coordinate requests (nothing to disclose).
- */
-function formatLocationLine(resolved: ResolvedLocation): string {
-  if (resolved.source === 'coordinates' || !resolved.location_name) {
-    return '';
-  }
-
-  const coords = `${resolved.latitude.toFixed(4)}, ${resolved.longitude.toFixed(4)}`;
-  return `**Location:** ${resolved.location_name} (${coords})\n\n`;
 }
 
 /**
@@ -284,29 +295,29 @@ async function formatNOAAForecast(
   include_precipitation_probability: boolean,
   include_severe_weather: boolean,
   include_normals: boolean,
-  prefs: UnitPreferences
+  prefs: UnitPreferences,
+  detail: DetailLevel
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   const noaaUnits = noaaUnitsParam(prefs);
-  // Get timezone for proper time formatting
-  let timezone = guessTimezoneFromCoords(latitude, longitude);
-  try {
-    const points = await noaaService.getPointData(latitude, longitude);
-    if (points.properties.timeZone) {
-      timezone = points.properties.timeZone;
-    }
-  } catch (error) {
-    // Use fallback timezone
-  }
+  // Fetch point data once. It yields both the timezone AND the grid coordinates,
+  // so downstream forecast/gridpoint calls use the grid-based methods directly
+  // instead of re-resolving the point (avoids duplicate upstream lookups on a
+  // cold cache). A point-data failure here propagates — the forecast can't be
+  // built without it anyway.
+  const points = await noaaService.getPointData(latitude, longitude);
+  const { gridId, gridX, gridY } = points.properties;
+  const timezone = points.properties.timeZone || guessTimezoneFromCoords(latitude, longitude);
+
   // Get forecast data based on granularity (units=us|si controls NWS output units)
   const forecast = granularity === 'hourly'
-    ? await noaaService.getHourlyForecastByCoordinates(latitude, longitude, noaaUnits)
-    : await noaaService.getForecastByCoordinates(latitude, longitude, noaaUnits);
+    ? await noaaService.getHourlyForecast(gridId, gridX, gridY, noaaUnits)
+    : await noaaService.getForecast(gridId, gridX, gridY, noaaUnits);
 
   // Determine how many periods to show
   let periods;
   if (granularity === 'hourly') {
-    // For hourly, show up to days * 24 hours
-    periods = forecast.properties.periods.slice(0, days * 24);
+    // Hourly output is capped by verbosity (see hourlyEntryCap) unless full
+    periods = forecast.properties.periods.slice(0, hourlyEntryCap(detail, days));
   } else {
     // For daily, show up to days * 2 (day/night periods)
     periods = forecast.properties.periods.slice(0, days * 2);
@@ -320,6 +331,9 @@ async function formatNOAAForecast(
     output += `**Updated:** ${formatInTimezone(forecast.properties.updated, timezone, 'medium', prefs.timeFormat)}\n`;
   }
   output += `**Showing:** ${periods.length} ${granularity === 'hourly' ? 'hours' : 'periods'}\n\n`;
+  if (granularity === 'hourly' && detail !== 'full' && forecast.properties.periods.length > periods.length) {
+    output += `*Hourly output capped at ${periods.length} hours (detail="${detail}"). Use detail="full" for the full ${days}-day hourly forecast.*\n\n`;
+  }
 
   for (const period of periods) {
     // For hourly forecasts, use the start time as the header since period names are empty
@@ -349,8 +363,8 @@ async function formatNOAAForecast(
 
     output += `**Forecast:** ${period.shortForecast}\n\n`;
 
-    // For daily forecasts, include detailed forecast
-    if (granularity === 'daily' && period.detailedForecast) {
+    // For daily forecasts, include the long detailed forecast (omitted at summary)
+    if (granularity === 'daily' && detail !== 'summary' && period.detailedForecast) {
       output += `${period.detailedForecast}\n\n`;
     }
   }
@@ -364,7 +378,7 @@ async function formatNOAAForecast(
   // Add severe weather probabilities if requested
   if (include_severe_weather) {
     try {
-      gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude);
+      gridpointData = await noaaService.getGridpointData(gridId, gridX, gridY);
       const severeWeatherSection = formatSevereWeather(gridpointData.properties);
       if (severeWeatherSection) {
         output += `\n${severeWeatherSection}`;
@@ -379,7 +393,7 @@ async function formatNOAAForecast(
   try {
     // Fetch gridpoint data if we haven't already
     if (!gridpointData) {
-      gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude);
+      gridpointData = await noaaService.getGridpointData(gridId, gridX, gridY);
     }
 
     // Calculate time range for forecast period
@@ -469,7 +483,8 @@ async function formatOpenMeteoForecast(
   granularity: 'daily' | 'hourly',
   include_precipitation_probability: boolean,
   include_normals: boolean,
-  prefs: UnitPreferences
+  prefs: UnitPreferences,
+  detail: DetailLevel
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Unit labels for output (Open-Meteo returns values already in requested units)
   const tempU = temperatureLabel(prefs);
@@ -492,9 +507,12 @@ async function formatOpenMeteoForecast(
   output += `**Forecast Days:** ${days}\n\n`;
 
   if (granularity === 'hourly' && forecast.hourly) {
-    // Format hourly data
+    // Format hourly data (capped by verbosity unless detail="full")
     const hourly = forecast.hourly;
-    const numHours = Math.min(hourly.time.length, days * 24);
+    const numHours = Math.min(hourly.time.length, hourlyEntryCap(detail, days));
+    if (detail !== 'full' && hourly.time.length > numHours) {
+      output += `*Hourly output capped at ${numHours} hours (detail="${detail}"). Use detail="full" for the full ${days}-day hourly forecast.*\n\n`;
+    }
 
     for (let i = 0; i < numHours; i++) {
       output += `## ${formatInTimezone(hourly.time[i], forecast.timezone, 'short', prefs.timeFormat)}\n`;

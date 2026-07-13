@@ -157,6 +157,40 @@ export function validateGranularity(value: unknown): 'daily' | 'hourly' {
 }
 
 /**
+ * Output verbosity levels for high-volume weather tools.
+ * - summary: shortest useful answer (fewest entries, headline-only)
+ * - standard: sensible default balancing detail and token cost
+ * - full: everything the source provides (long descriptions, all entries)
+ */
+export type DetailLevel = 'summary' | 'standard' | 'full';
+
+/**
+ * Validate the shared `detail` output-control parameter.
+ * @param value - Value to validate (from tool args)
+ * @param defaultValue - Level to use when omitted (defaults to 'standard')
+ * @returns Validated detail level
+ * @throws {Error} If value is present but not a valid level
+ */
+export function validateDetail(
+  value: unknown,
+  defaultValue: DetailLevel = 'standard'
+): DetailLevel {
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid detail: must be a string, received ${typeof value}`);
+  }
+
+  if (value !== 'summary' && value !== 'standard' && value !== 'full') {
+    throw new Error(`Invalid detail: "${value}". Must be one of "summary", "standard", or "full".`);
+  }
+
+  return value;
+}
+
+/**
  * Validate optional boolean with default
  * @param value - Value to validate
  * @param name - Parameter name for error messages

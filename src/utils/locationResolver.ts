@@ -23,6 +23,47 @@ export interface ResolvedLocation {
 }
 
 /**
+ * Build a header line describing how a location name was resolved.
+ *
+ * Returns an empty string for direct-coordinate requests (nothing to disclose),
+ * otherwise a Markdown line showing the matched name and coordinates so an
+ * ambiguous saved/geocoded lookup is transparent to the user. Shared across all
+ * weather handlers so location disclosure is consistent.
+ *
+ * @param resolved - Result from resolveLocation/resolveLocationAsync
+ * @returns Markdown line (with trailing blank line) or '' for coordinate input
+ */
+export function formatLocationLine(resolved: ResolvedLocation): string {
+  if (resolved.source === 'coordinates' || !resolved.location_name) {
+    return '';
+  }
+
+  const coords = `${resolved.latitude.toFixed(4)}, ${resolved.longitude.toFixed(4)}`;
+  return `**Location:** ${resolved.location_name} (${coords})\n\n`;
+}
+
+/**
+ * Prepend the resolved-location header to a handler's text content, if any.
+ *
+ * Mutates the first text block of a standard `{ content: [...] }` handler result
+ * so name-based lookups (saved location or geocoded city) surface what matched.
+ * A no-op for direct-coordinate requests.
+ *
+ * @param result - Handler result whose first text block will be prefixed
+ * @param resolved - Result from resolveLocationAsync
+ * @returns The same result object (for convenient chaining)
+ */
+export function prependLocationLine<
+  T extends { content: Array<{ type: string; text: string }> }
+>(result: T, resolved: ResolvedLocation): T {
+  const locationLine = formatLocationLine(resolved);
+  if (locationLine && result.content.length > 0 && result.content[0]?.type === 'text') {
+    result.content[0].text = locationLine + result.content[0].text;
+  }
+  return result;
+}
+
+/**
  * Cached geocode result for a free-text city name.
  * City coordinates are effectively static, so these are cached with an
  * Infinity TTL (see CacheConfig.ttl.geocoding).
