@@ -8,13 +8,26 @@ import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { NCEIService } from '../services/ncei.js';
 import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
 import type { GridpointProperties, GridpointDataSeries } from '../types/noaa.js';
 import {
   validateForecastDays,
   validateGranularity,
   validateOptionalBoolean,
+  validateDetail,
+  DetailLevel,
 } from '../utils/validation.js';
-import { resolveLocation } from '../utils/locationResolver.js';
+import { resolveLocationAsync, formatLocationLine } from '../utils/locationResolver.js';
+import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
+import { UnitPreferences } from '../config/units.js';
+import {
+  temperatureLabel,
+  windSpeedLabel,
+  precipitationLabel,
+  noaaUnitsParam,
+  formatElevationFromM,
+  formatLuxonTime,
+} from '../utils/unitFormat.js';
 import { logger } from '../utils/logger.js';
 import {
   extractSnowfallForecast,
@@ -25,16 +38,35 @@ import {
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
 
-interface ForecastArgs {
+interface ForecastArgs extends UnitArgs {
   latitude?: number;
   longitude?: number;
   location_name?: string;
+  city_name?: string;
   days?: number;
   granularity?: 'daily' | 'hourly';
   include_precipitation_probability?: boolean;
   include_severe_weather?: boolean;
   include_normals?: boolean;
   source?: 'auto' | 'noaa' | 'openmeteo';
+  detail?: DetailLevel;
+}
+
+/**
+ * Cap the number of hourly forecast entries by verbosity level.
+ * Hourly forecasts can emit up to days*24 entries (384 at 16 days), which is
+ * expensive for assistant contexts. Unless the user asks for detail="full",
+ * cap to a short horizon; the daily view still covers the full requested range.
+ *
+ * @param detail - Requested verbosity
+ * @param days - Number of forecast days requested
+ * @returns Maximum hourly entries to emit
+ */
+function hourlyEntryCap(detail: DetailLevel, days: number): number {
+  const maxHours = days * 24;
+  if (detail === 'full') return maxHours;
+  if (detail === 'summary') return Math.min(24, maxHours);
+  return Math.min(48, maxHours); // standard default
 }
 
 /**
@@ -166,10 +198,12 @@ export async function handleGetForecast(
   noaaService: NOAAService,
   openMeteoService: OpenMeteoService,
   locationStore: LocationStore,
+  geocodingService: GeocodingService,
   nceiService?: NCEIService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Resolve location from either coordinates or saved location name
-  const { latitude, longitude } = resolveLocation(args as ForecastArgs, locationStore);
+  // Resolve location from coordinates, a saved location name, or a geocoded city name
+  const resolved = await resolveLocationAsync(args as ForecastArgs, locationStore, geocodingService);
+  const { latitude, longitude } = resolved;
   const days = validateForecastDays(args);
   const granularity = validateGranularity((args as ForecastArgs)?.granularity);
   const include_precipitation_probability = validateOptionalBoolean(
@@ -187,6 +221,11 @@ export async function handleGetForecast(
     'include_normals',
     false
   );
+  // Output verbosity: caps hourly output unless detail="full" (see hourlyEntryCap)
+  const detail = validateDetail((args as ForecastArgs)?.detail);
+
+  // Resolve unit preferences (per-call params over the server default)
+  const prefs = resolveUnitPreferences(args as ForecastArgs);
 
   // Get source preference or auto-detect
   const requestedSource = (args as ForecastArgs)?.source || 'auto';
@@ -200,8 +239,9 @@ export async function handleGetForecast(
   }
 
   // Use NOAA for US locations or if explicitly requested
+  let result: { content: Array<{ type: string; text: string }> };
   if (useNOAA) {
-    return await formatNOAAForecast(
+    result = await formatNOAAForecast(
       noaaService,
       openMeteoService,
       nceiService,
@@ -211,11 +251,13 @@ export async function handleGetForecast(
       granularity,
       include_precipitation_probability,
       include_severe_weather,
-      include_normals
+      include_normals,
+      prefs,
+      detail
     );
   } else {
     // Use Open-Meteo for international locations
-    return await formatOpenMeteoForecast(
+    result = await formatOpenMeteoForecast(
       openMeteoService,
       nceiService,
       latitude,
@@ -223,9 +265,20 @@ export async function handleGetForecast(
       days,
       granularity,
       include_precipitation_probability,
-      include_normals
+      include_normals,
+      prefs,
+      detail
     );
   }
+
+  // If the location was resolved from a name (saved or geocoded), show the user
+  // what it matched so an ambiguous city name is transparent.
+  const locationLine = formatLocationLine(resolved);
+  if (locationLine && result.content.length > 0 && result.content[0]?.type === 'text') {
+    result.content[0].text = locationLine + result.content[0].text;
+  }
+
+  return result;
 }
 
 /**
@@ -241,28 +294,30 @@ async function formatNOAAForecast(
   granularity: 'daily' | 'hourly',
   include_precipitation_probability: boolean,
   include_severe_weather: boolean,
-  include_normals: boolean
+  include_normals: boolean,
+  prefs: UnitPreferences,
+  detail: DetailLevel
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Get timezone for proper time formatting
-  let timezone = guessTimezoneFromCoords(latitude, longitude);
-  try {
-    const points = await noaaService.getPointData(latitude, longitude);
-    if (points.properties.timeZone) {
-      timezone = points.properties.timeZone;
-    }
-  } catch (error) {
-    // Use fallback timezone
-  }
-  // Get forecast data based on granularity
+  const noaaUnits = noaaUnitsParam(prefs);
+  // Fetch point data once. It yields both the timezone AND the grid coordinates,
+  // so downstream forecast/gridpoint calls use the grid-based methods directly
+  // instead of re-resolving the point (avoids duplicate upstream lookups on a
+  // cold cache). A point-data failure here propagates — the forecast can't be
+  // built without it anyway.
+  const points = await noaaService.getPointData(latitude, longitude);
+  const { gridId, gridX, gridY } = points.properties;
+  const timezone = points.properties.timeZone || guessTimezoneFromCoords(latitude, longitude);
+
+  // Get forecast data based on granularity (units=us|si controls NWS output units)
   const forecast = granularity === 'hourly'
-    ? await noaaService.getHourlyForecastByCoordinates(latitude, longitude)
-    : await noaaService.getForecastByCoordinates(latitude, longitude);
+    ? await noaaService.getHourlyForecast(gridId, gridX, gridY, noaaUnits)
+    : await noaaService.getForecast(gridId, gridX, gridY, noaaUnits);
 
   // Determine how many periods to show
   let periods;
   if (granularity === 'hourly') {
-    // For hourly, show up to days * 24 hours
-    periods = forecast.properties.periods.slice(0, days * 24);
+    // Hourly output is capped by verbosity (see hourlyEntryCap) unless full
+    periods = forecast.properties.periods.slice(0, hourlyEntryCap(detail, days));
   } else {
     // For daily, show up to days * 2 (day/night periods)
     periods = forecast.properties.periods.slice(0, days * 2);
@@ -271,16 +326,19 @@ async function formatNOAAForecast(
   // Format the forecast for display
   let output = `# Weather Forecast (${granularity === 'hourly' ? 'Hourly' : 'Daily'})\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
-  output += `**Elevation:** ${forecast.properties.elevation.value}m\n`;
+  output += `**Elevation:** ${formatElevationFromM(forecast.properties.elevation.value, prefs)}\n`;
   if (forecast.properties.updated) {
-    output += `**Updated:** ${formatInTimezone(forecast.properties.updated, timezone)}\n`;
+    output += `**Updated:** ${formatInTimezone(forecast.properties.updated, timezone, 'medium', prefs.timeFormat)}\n`;
   }
   output += `**Showing:** ${periods.length} ${granularity === 'hourly' ? 'hours' : 'periods'}\n\n`;
+  if (granularity === 'hourly' && detail !== 'full' && forecast.properties.periods.length > periods.length) {
+    output += `*Hourly output capped at ${periods.length} hours (detail="${detail}"). Use detail="full" for the full ${days}-day hourly forecast.*\n\n`;
+  }
 
   for (const period of periods) {
     // For hourly forecasts, use the start time as the header since period names are empty
     const periodHeader = granularity === 'hourly' && !period.name
-      ? formatInTimezone(period.startTime, timezone, 'short')
+      ? formatInTimezone(period.startTime, timezone, 'short', prefs.timeFormat)
       : period.name;
     output += `## ${periodHeader}\n`;
     output += `**Temperature:** ${period.temperature}°${period.temperatureUnit}`;
@@ -305,8 +363,8 @@ async function formatNOAAForecast(
 
     output += `**Forecast:** ${period.shortForecast}\n\n`;
 
-    // For daily forecasts, include detailed forecast
-    if (granularity === 'daily' && period.detailedForecast) {
+    // For daily forecasts, include the long detailed forecast (omitted at summary)
+    if (granularity === 'daily' && detail !== 'summary' && period.detailedForecast) {
       output += `${period.detailedForecast}\n\n`;
     }
   }
@@ -320,7 +378,7 @@ async function formatNOAAForecast(
   // Add severe weather probabilities if requested
   if (include_severe_weather) {
     try {
-      gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude);
+      gridpointData = await noaaService.getGridpointData(gridId, gridX, gridY);
       const severeWeatherSection = formatSevereWeather(gridpointData.properties);
       if (severeWeatherSection) {
         output += `\n${severeWeatherSection}`;
@@ -335,7 +393,7 @@ async function formatNOAAForecast(
   try {
     // Fetch gridpoint data if we haven't already
     if (!gridpointData) {
-      gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude);
+      gridpointData = await noaaService.getGridpointData(gridId, gridX, gridY);
     }
 
     // Calculate time range for forecast period
@@ -394,7 +452,7 @@ async function formatNOAAForecast(
           low: forecastLow
         };
 
-        output += formatNormals(normals, currentTemps);
+        output += formatNormals(normals, currentTemps, prefs);
       }
     } catch (error) {
       // If normals fetch fails, just skip it (don't error the whole request)
@@ -424,34 +482,45 @@ async function formatOpenMeteoForecast(
   days: number,
   granularity: 'daily' | 'hourly',
   include_precipitation_probability: boolean,
-  include_normals: boolean
+  include_normals: boolean,
+  prefs: UnitPreferences,
+  detail: DetailLevel
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Get forecast data from Open-Meteo
+  // Unit labels for output (Open-Meteo returns values already in requested units)
+  const tempU = temperatureLabel(prefs);
+  const windU = windSpeedLabel(prefs);
+  const precipU = precipitationLabel(prefs);
+
+  // Get forecast data from Open-Meteo in the requested units
   const forecast = await openMeteoService.getForecast(
     latitude,
     longitude,
     days,
-    granularity === 'hourly'
+    granularity === 'hourly',
+    prefs
   );
 
   let output = `# Weather Forecast (${granularity === 'hourly' ? 'Hourly' : 'Daily'})\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
-  output += `**Elevation:** ${forecast.elevation}m\n`;
+  output += `**Elevation:** ${formatElevationFromM(forecast.elevation, prefs)}\n`;
   output += `**Timezone:** ${forecast.timezone}\n`;
   output += `**Forecast Days:** ${days}\n\n`;
 
   if (granularity === 'hourly' && forecast.hourly) {
-    // Format hourly data
+    // Format hourly data (capped by verbosity unless detail="full")
     const hourly = forecast.hourly;
-    const numHours = Math.min(hourly.time.length, days * 24);
+    const numHours = Math.min(hourly.time.length, hourlyEntryCap(detail, days));
+    if (detail !== 'full' && hourly.time.length > numHours) {
+      output += `*Hourly output capped at ${numHours} hours (detail="${detail}"). Use detail="full" for the full ${days}-day hourly forecast.*\n\n`;
+    }
 
     for (let i = 0; i < numHours; i++) {
-      output += `## ${formatInTimezone(hourly.time[i], forecast.timezone, 'short')}\n`;
+      output += `## ${formatInTimezone(hourly.time[i], forecast.timezone, 'short', prefs.timeFormat)}\n`;
 
       if (hourly.temperature_2m?.[i] !== undefined) {
-        output += `**Temperature:** ${Math.round(hourly.temperature_2m[i])}°F`;
+        output += `**Temperature:** ${Math.round(hourly.temperature_2m[i])}${tempU}`;
         if (hourly.apparent_temperature?.[i] !== undefined) {
-          output += ` (feels like ${Math.round(hourly.apparent_temperature[i])}°F)`;
+          output += ` (feels like ${Math.round(hourly.apparent_temperature[i])}${tempU})`;
         }
         output += `\n`;
       }
@@ -461,17 +530,17 @@ async function formatOpenMeteoForecast(
       }
 
       if (hourly.precipitation?.[i] !== undefined && hourly.precipitation[i] > 0) {
-        output += `**Precipitation:** ${hourly.precipitation[i].toFixed(2)} in\n`;
+        output += `**Precipitation:** ${hourly.precipitation[i].toFixed(2)} ${precipU}\n`;
       }
 
       if (hourly.wind_speed_10m?.[i] !== undefined) {
         const windDir = hourly.wind_direction_10m?.[i] !== undefined
           ? ` ${getWindDirection(hourly.wind_direction_10m[i])}`
           : '';
-        output += `**Wind:** ${Math.round(hourly.wind_speed_10m[i])} mph${windDir}\n`;
+        output += `**Wind:** ${Math.round(hourly.wind_speed_10m[i])} ${windU}${windDir}\n`;
 
         if (hourly.wind_gusts_10m?.[i] !== undefined && hourly.wind_gusts_10m[i] > hourly.wind_speed_10m[i] * 1.2) {
-          output += `**Wind Gusts:** ${Math.round(hourly.wind_gusts_10m[i])} mph\n`;
+          output += `**Wind Gusts:** ${Math.round(hourly.wind_gusts_10m[i])} ${windU}\n`;
         }
       }
 
@@ -491,27 +560,28 @@ async function formatOpenMeteoForecast(
     const numDays = Math.min(daily.time.length, days);
 
     for (let i = 0; i < numDays; i++) {
-      // Use timezone-aware date formatting
-      const dt = DateTime.fromISO(daily.time[i], { setZone: false }).setZone(forecast.timezone);
+      // Open-Meteo returns location-local naive timestamps; parse directly in the
+      // forecast timezone to avoid a double offset shift via the server's zone
+      const dt = DateTime.fromISO(daily.time[i], { zone: forecast.timezone });
       output += `## ${dt.toLocaleString({ weekday: 'long', month: 'long', day: 'numeric' })}\n`;
 
       if (daily.temperature_2m_max?.[i] !== undefined && daily.temperature_2m_min?.[i] !== undefined) {
-        output += `**Temperature:** High ${Math.round(daily.temperature_2m_max[i])}°F / Low ${Math.round(daily.temperature_2m_min[i])}°F\n`;
+        output += `**Temperature:** High ${Math.round(daily.temperature_2m_max[i])}${tempU} / Low ${Math.round(daily.temperature_2m_min[i])}${tempU}\n`;
       }
 
       if (daily.apparent_temperature_max?.[i] !== undefined && daily.apparent_temperature_min?.[i] !== undefined) {
-        output += `**Feels Like:** High ${Math.round(daily.apparent_temperature_max[i])}°F / Low ${Math.round(daily.apparent_temperature_min[i])}°F\n`;
+        output += `**Feels Like:** High ${Math.round(daily.apparent_temperature_max[i])}${tempU} / Low ${Math.round(daily.apparent_temperature_min[i])}${tempU}\n`;
       }
 
       // Include sunrise/sunset data with timezone
       if (daily.sunrise?.[i]) {
-        const sunrise = DateTime.fromISO(daily.sunrise[i], { setZone: false }).setZone(forecast.timezone);
-        output += `**Sunrise:** ${sunrise.toLocaleString(DateTime.TIME_SIMPLE)}\n`;
+        const sunrise = DateTime.fromISO(daily.sunrise[i], { zone: forecast.timezone });
+        output += `**Sunrise:** ${formatLuxonTime(sunrise, prefs)}\n`;
       }
 
       if (daily.sunset?.[i]) {
-        const sunset = DateTime.fromISO(daily.sunset[i], { setZone: false }).setZone(forecast.timezone);
-        output += `**Sunset:** ${sunset.toLocaleString(DateTime.TIME_SIMPLE)}\n`;
+        const sunset = DateTime.fromISO(daily.sunset[i], { zone: forecast.timezone });
+        output += `**Sunset:** ${formatLuxonTime(sunset, prefs)}\n`;
       }
 
       if (daily.daylight_duration?.[i] !== undefined) {
@@ -525,17 +595,17 @@ async function formatOpenMeteoForecast(
       }
 
       if (daily.precipitation_sum?.[i] !== undefined && daily.precipitation_sum[i] > 0) {
-        output += `**Precipitation:** ${daily.precipitation_sum[i].toFixed(2)} in\n`;
+        output += `**Precipitation:** ${daily.precipitation_sum[i].toFixed(2)} ${precipU}\n`;
       }
 
       if (daily.wind_speed_10m_max?.[i] !== undefined) {
         const windDir = daily.wind_direction_10m_dominant?.[i] !== undefined
           ? ` ${getWindDirection(daily.wind_direction_10m_dominant[i])}`
           : '';
-        output += `**Wind:** ${Math.round(daily.wind_speed_10m_max[i])} mph${windDir}\n`;
+        output += `**Wind:** ${Math.round(daily.wind_speed_10m_max[i])} ${windU}${windDir}\n`;
 
         if (daily.wind_gusts_10m_max?.[i] !== undefined && daily.wind_gusts_10m_max[i] > daily.wind_speed_10m_max[i] * 1.2) {
-          output += `**Wind Gusts:** ${Math.round(daily.wind_gusts_10m_max[i])} mph\n`;
+          output += `**Wind Gusts:** ${Math.round(daily.wind_gusts_10m_max[i])} ${windU}\n`;
         }
       }
 
@@ -582,7 +652,7 @@ async function formatOpenMeteoForecast(
             : undefined
         };
 
-        output += formatNormals(normals, currentTemps);
+        output += formatNormals(normals, currentTemps, prefs);
       }
     } catch (error) {
       // If normals fetch fails, just skip it (don't error the whole request)

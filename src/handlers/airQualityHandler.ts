@@ -3,7 +3,10 @@
  */
 
 import { OpenMeteoService } from '../services/openmeteo.js';
-import { validateCoordinates, validateOptionalBoolean } from '../utils/validation.js';
+import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
+import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { validateOptionalBoolean } from '../utils/validation.js';
 import {
   getUSAQICategory,
   getEuropeanAQICategory,
@@ -17,15 +20,20 @@ import type { OpenMeteoAirQualityResponse } from '../types/openmeteo.js';
 interface AirQualityArgs {
   latitude?: number;
   longitude?: number;
+  location_name?: string;
+  city_name?: string;
   forecast?: boolean;
 }
 
 export async function handleGetAirQuality(
   args: unknown,
-  openMeteoService: OpenMeteoService
+  openMeteoService: OpenMeteoService,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Validate input parameters with runtime checks
-  const { latitude, longitude } = validateCoordinates(args);
+  // Resolve location from coordinates, a saved location name, or a geocoded city name
+  const resolved = await resolveLocationAsync(args as AirQualityArgs, locationStore, geocodingService);
+  const { latitude, longitude } = resolved;
   const forecast = validateOptionalBoolean(
     (args as AirQualityArgs)?.forecast,
     'forecast',
@@ -43,14 +51,14 @@ export async function handleGetAirQuality(
   // Format the air quality data for display
   const output = formatAirQuality(airQualityData, latitude, longitude, forecast);
 
-  return {
+  return prependLocationLine({
     content: [
       {
         type: 'text',
         text: output
       }
     ]
-  };
+  }, resolved);
 }
 
 /**

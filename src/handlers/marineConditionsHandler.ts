@@ -6,7 +6,10 @@
 import { DateTime } from 'luxon';
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
-import { validateCoordinates, validateOptionalBoolean } from '../utils/validation.js';
+import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
+import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { validateOptionalBoolean } from '../utils/validation.js';
 import {
   formatWaveHeight,
   formatWavePeriod,
@@ -26,16 +29,21 @@ import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js'
 interface MarineConditionsArgs {
   latitude?: number;
   longitude?: number;
+  location_name?: string;
+  city_name?: string;
   forecast?: boolean;
 }
 
 export async function handleGetMarineConditions(
   args: unknown,
   noaaService: NOAAService,
-  openMeteoService: OpenMeteoService
+  openMeteoService: OpenMeteoService,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Validate input parameters with runtime checks
-  const { latitude, longitude } = validateCoordinates(args);
+  // Resolve location from coordinates, a saved location name, or a geocoded city name
+  const resolved = await resolveLocationAsync(args as MarineConditionsArgs, locationStore, geocodingService);
+  const { latitude, longitude } = resolved;
   const forecast = validateOptionalBoolean(
     (args as MarineConditionsArgs)?.forecast,
     'forecast',
@@ -86,14 +94,14 @@ export async function handleGetMarineConditions(
           forecast
         );
 
-        return {
+        return prependLocationLine({
           content: [
             {
               type: 'text',
               text: output
             }
           ]
-        };
+        }, resolved);
       } else {
         const redacted2 = redactCoordinatesForLogging(latitude, longitude);
         logger.info('NOAA gridpoint has no marine data, falling back to Open-Meteo', {
@@ -123,14 +131,14 @@ export async function handleGetMarineConditions(
   // Format the marine data for display
   const output = formatOpenMeteoMarineConditions(marineData, latitude, longitude, forecast);
 
-  return {
+  return prependLocationLine({
     content: [
       {
         type: 'text',
         text: output
       }
     ]
-  };
+  }, resolved);
 }
 
 /**
@@ -330,7 +338,8 @@ function formatOpenMeteoMarineConditions(
     output += `**Next ${daysToShow} days:**\n\n`;
 
     for (let i = 0; i < daysToShow; i++) {
-      const dt = DateTime.fromISO(data.daily.time[i], { setZone: false }).setZone(data.timezone);
+      // Open-Meteo daily dates are location-local; parse in the location timezone
+      const dt = DateTime.fromISO(data.daily.time[i], { zone: data.timezone });
       const dayName = dt.toLocaleString({ weekday: 'short', month: 'short', day: 'numeric' });
 
       output += `**${dayName}:**\n`;

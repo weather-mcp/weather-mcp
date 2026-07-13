@@ -3,7 +3,9 @@
  */
 
 import { NIFCService } from '../services/nifc.js';
-import { validateCoordinates } from '../utils/validation.js';
+import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
+import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
 import type { WildfireInfo } from '../types/wildfire.js';
@@ -11,15 +13,20 @@ import type { WildfireInfo } from '../types/wildfire.js';
 interface WildfireArgs {
   latitude?: number;
   longitude?: number;
+  location_name?: string;
+  city_name?: string;
   radius?: number; // search radius in km (default: 100)
 }
 
 export async function handleGetWildfireInfo(
   args: unknown,
-  nifcService: NIFCService
+  nifcService: NIFCService,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Validate input parameters with runtime checks
-  const { latitude, longitude } = validateCoordinates(args);
+  // Resolve location from coordinates, a saved location name, or a geocoded city name
+  const resolved = await resolveLocationAsync(args as WildfireArgs, locationStore, geocodingService);
+  const { latitude, longitude } = resolved;
 
   // Validate radius parameter
   let radius = (args as WildfireArgs)?.radius ?? 100; // default 100 km
@@ -172,14 +179,14 @@ export async function handleGetWildfireInfo(
   output += `*Wildfire data is updated throughout the day. Always consult official sources for evacuation orders and emergency information.*\n`;
   output += `*For active incidents and evacuation orders, visit: https://inciweb.nwcg.gov/*\n`;
 
-  return {
+  return prependLocationLine({
     content: [
       {
         type: 'text',
         text: output
       }
     ]
-  };
+  }, resolved);
 }
 
 /**

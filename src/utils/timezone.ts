@@ -17,29 +17,36 @@ import { logger } from './logger.js';
 export function formatInTimezone(
   isoString: string,
   timezone: string,
-  format: 'full' | 'long' | 'medium' | 'short' = 'medium'
+  format: 'full' | 'long' | 'medium' | 'short' = 'medium',
+  timeFormat: '12h' | '24h' = '12h'
 ): string {
   try {
-    const dt = DateTime.fromISO(isoString, { setZone: false });
+    // Timezone-naive strings (e.g. Open-Meteo's "2026-07-07T04:32") are already
+    // location-local, so they must be interpreted in the target zone — parsing them
+    // in the server's zone and converting would apply the offset twice. Strings with
+    // an explicit offset keep their instant and are converted for display.
+    const zonedDt = DateTime.fromISO(isoString, { zone: timezone });
 
-    if (!dt.isValid) {
+    if (!zonedDt.isValid) {
       // Fallback to JavaScript Date if Luxon can't parse
       return new Date(isoString).toLocaleString('en-US', { timeZone: timezone });
     }
 
-    const zonedDt = dt.setZone(timezone);
+    // hour12 override lets callers honor a 24-hour preference; undefined keeps
+    // the locale default (12-hour for en-US).
+    const hourOpt = timeFormat === '24h' ? { hour12: false } : {};
 
     // Format based on requested style
     switch (format) {
       case 'full':
-        return zonedDt.toLocaleString(DateTime.DATETIME_FULL);
+        return zonedDt.toLocaleString({ ...DateTime.DATETIME_FULL, ...hourOpt });
       case 'long':
-        return zonedDt.toLocaleString(DateTime.DATETIME_MED_WITH_SECONDS);
+        return zonedDt.toLocaleString({ ...DateTime.DATETIME_MED_WITH_SECONDS, ...hourOpt });
       case 'short':
-        return zonedDt.toLocaleString(DateTime.DATETIME_SHORT);
+        return zonedDt.toLocaleString({ ...DateTime.DATETIME_SHORT, ...hourOpt });
       case 'medium':
       default:
-        return zonedDt.toLocaleString(DateTime.DATETIME_MED);
+        return zonedDt.toLocaleString({ ...DateTime.DATETIME_MED, ...hourOpt });
     }
   } catch (error) {
     // Fallback to standard Date formatting if anything goes wrong
@@ -55,13 +62,13 @@ export function formatInTimezone(
  */
 export function formatDateInTimezone(isoString: string, timezone: string): string {
   try {
-    const dt = DateTime.fromISO(isoString, { setZone: false });
+    // See formatInTimezone: naive strings are location-local, parse in target zone
+    const zonedDt = DateTime.fromISO(isoString, { zone: timezone });
 
-    if (!dt.isValid) {
+    if (!zonedDt.isValid) {
       return new Date(isoString).toLocaleDateString('en-US', { timeZone: timezone });
     }
 
-    const zonedDt = dt.setZone(timezone);
     return zonedDt.toLocaleString(DateTime.DATE_MED);
   } catch (error) {
     return new Date(isoString).toLocaleDateString('en-US', { timeZone: timezone });
@@ -76,16 +83,16 @@ export function formatDateInTimezone(isoString: string, timezone: string): strin
  */
 export function formatTimeInTimezone(isoString: string, timezone: string): string {
   try {
-    const dt = DateTime.fromISO(isoString, { setZone: false });
+    // See formatInTimezone: naive strings are location-local, parse in target zone
+    const zonedDt = DateTime.fromISO(isoString, { zone: timezone });
 
-    if (!dt.isValid) {
+    if (!zonedDt.isValid) {
       return new Date(isoString).toLocaleTimeString('en-US', {
         timeZone: timezone,
         timeZoneName: 'short'
       });
     }
 
-    const zonedDt = dt.setZone(timezone);
     return zonedDt.toLocaleString(DateTime.TIME_WITH_SHORT_OFFSET);
   } catch (error) {
     return new Date(isoString).toLocaleTimeString('en-US', {
@@ -158,8 +165,8 @@ export function formatTimeRangeInTimezone(
   timezone: string
 ): string {
   try {
-    const start = DateTime.fromISO(startTime, { setZone: false }).setZone(timezone);
-    const end = DateTime.fromISO(endTime, { setZone: false }).setZone(timezone);
+    const start = DateTime.fromISO(startTime, { zone: timezone });
+    const end = DateTime.fromISO(endTime, { zone: timezone });
 
     if (!start.isValid || !end.isValid) {
       return `${formatInTimezone(startTime, timezone, 'short')} - ${formatInTimezone(endTime, timezone, 'short')}`;

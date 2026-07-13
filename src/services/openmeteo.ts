@@ -24,6 +24,8 @@ import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { computeNormalsFrom30YearData, getNormalsCacheKey } from '../utils/normals.js';
 import { getUserAgent } from '../utils/version.js';
+import { UnitPreferences, IMPERIAL_PREFERENCES } from '../config/units.js';
+import { openMeteoUnitParams } from '../utils/unitFormat.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -31,6 +33,14 @@ import {
   DataNotFoundError,
   ApiError
 } from '../errors/ApiError.js';
+
+/**
+ * Compact signature of the unit preferences that affect an Open-Meteo request,
+ * used to keep cache entries for different unit systems distinct.
+ */
+function unitSignature(prefs: UnitPreferences): string {
+  return `${prefs.temperature}-${prefs.windSpeed}-${prefs.precipitation}`;
+}
 
 export interface OpenMeteoServiceConfig {
   baseURL?: string;
@@ -353,18 +363,19 @@ export class OpenMeteoService {
     longitude: number,
     startDate: string,
     endDate: string,
-    useHourly: boolean = true
+    useHourly: boolean = true,
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES
   ): Promise<OpenMeteoHistoricalResponse> {
     // Validate coordinates (checks for NaN, Infinity, and range)
     validateLatitude(latitude);
     validateLongitude(longitude);
 
     // Build parameters once
-    const params = this.buildHistoricalParams(latitude, longitude, startDate, endDate, useHourly);
+    const params = this.buildHistoricalParams(latitude, longitude, startDate, endDate, useHourly, prefs);
 
-    // Check cache first (if enabled)
+    // Check cache first (if enabled; unit signature keeps imperial/metric distinct)
     if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('openmeteo-historical', latitude, longitude, startDate, endDate, useHourly);
+      const cacheKey = Cache.generateKey('openmeteo-historical', latitude, longitude, startDate, endDate, useHourly, unitSignature(prefs));
       const cached = this.cache.get(cacheKey);
       if (cached) {
         return cached as OpenMeteoHistoricalResponse;
@@ -395,16 +406,15 @@ export class OpenMeteoService {
     longitude: number,
     startDate: string,
     endDate: string,
-    useHourly: boolean
+    useHourly: boolean,
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES
   ): Record<string, string | number> {
     const params: Record<string, string | number> = {
       latitude,
       longitude,
       start_date: startDate,
       end_date: endDate,
-      temperature_unit: 'fahrenheit',
-      wind_speed_unit: 'mph',
-      precipitation_unit: 'inch',
+      ...openMeteoUnitParams(prefs),
       timezone: 'auto'
     };
 
@@ -599,7 +609,8 @@ export class OpenMeteoService {
     latitude: number,
     longitude: number,
     days: number = 7,
-    hourly: boolean = false
+    hourly: boolean = false,
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES
   ): Promise<OpenMeteoForecastResponse> {
     // Validate coordinates
     validateLatitude(latitude);
@@ -614,11 +625,11 @@ export class OpenMeteoService {
     }
 
     // Build parameters
-    const params = this.buildForecastParams(latitude, longitude, days, hourly);
+    const params = this.buildForecastParams(latitude, longitude, days, hourly, prefs);
 
-    // Check cache first
+    // Check cache first (unit signature keeps imperial/metric responses distinct)
     if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('openmeteo-forecast', latitude, longitude, days, hourly);
+      const cacheKey = Cache.generateKey('openmeteo-forecast', latitude, longitude, days, hourly, unitSignature(prefs));
       const cached = this.cache.get(cacheKey);
       if (cached) {
         return cached as OpenMeteoForecastResponse;
@@ -647,15 +658,14 @@ export class OpenMeteoService {
     latitude: number,
     longitude: number,
     days: number,
-    hourly: boolean
+    hourly: boolean,
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES
   ): Record<string, string | number> {
     const params: Record<string, string | number> = {
       latitude,
       longitude,
       forecast_days: days,
-      temperature_unit: 'fahrenheit',
-      wind_speed_unit: 'mph',
-      precipitation_unit: 'inch',
+      ...openMeteoUnitParams(prefs),
       timezone: 'auto'
     };
 

@@ -280,7 +280,13 @@ describe('Weather Imagery Handler', () => {
 
       expect(formatted).toContain('## 📸 Current Imagery');
       expect(formatted).toContain('**Timestamp:** 2024-01-01T12:00:00.000Z');
-      expect(formatted).toContain('![Precipitation radar](https://example.com/frame.png)');
+      // Default (standard) surfaces the direct URL as text, not an embedded image
+      expect(formatted).toContain('**Image URL:** https://example.com/frame.png');
+      expect(formatted).not.toContain('![Precipitation radar]');
+
+      // detail="full" embeds the image as Markdown for rich clients
+      const full = formatWeatherImageryResponse(response, 'full');
+      expect(full).toContain('![Precipitation radar](https://example.com/frame.png)');
     });
 
     it('should format response with multiple frames (animated)', () => {

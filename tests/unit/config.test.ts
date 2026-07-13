@@ -22,6 +22,7 @@ describe('Cache Configuration', () => {
 
     it('should have proper TTL values', () => {
       expect(CacheConfig.ttl.gridCoordinates).toBe(Infinity);
+      expect(CacheConfig.ttl.geocoding).toBe(Infinity);
       expect(CacheConfig.ttl.stations).toBeGreaterThan(0);
       expect(CacheConfig.ttl.forecast).toBeGreaterThan(0);
       expect(CacheConfig.ttl.currentConditions).toBeGreaterThan(0);

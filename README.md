@@ -3,10 +3,10 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1%2C084%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-1%2C129%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
-**Give your AI assistant real weather data — 16 tools, zero API keys, zero signup, zero cost.**
+**Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
 
 Weather MCP is a [Model Context Protocol](https://modelcontextprotocol.io) server that connects AI assistants (Claude, Cursor, Cline, Zed, and any other MCP client) to live weather data: forecasts, current conditions, alerts, air quality, marine conditions, lightning, radar, rivers, wildfires, and 85+ years of historical weather. It's built entirely on free public data sources — NOAA, Open-Meteo, USGS, NIFC, RainViewer, and Blitzortung.org — so there is nothing to sign up for and no key to paste in.
 
@@ -45,22 +45,23 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
-- **Fully open source** — MIT licensed, readable TypeScript, 1,084 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 1,129 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
-- **Breadth** — 16 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
+- **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
 The tradeoff is honest: US data (NOAA) is richer than international data (Open-Meteo), some tools are US-only, and free APIs come with fair-use rate limits. See [Coverage & Limitations](#coverage--limitations).
 
 ## Tools
 
-All 16 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
+All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 | Tool | What it does | Coverage |
 |------|-------------|----------|
-| `get_forecast` | Daily/hourly forecasts up to 16 days, sunrise/sunset, UV, precipitation probability, optional climate-normals comparison | 🌍 Global |
+| `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name; sunrise/sunset, UV, precipitation probability, optional climate-normals comparison | 🌍 Global |
 | `get_current_conditions` | Real-time observations: temperature, wind, heat index/wind chill, snow depth, optional fire-weather indices | 🇺🇸 US |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity | 🇺🇸 US |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
+| `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
 | `search_location` | Geocode place names to coordinates ("Paris" → 48.85, 2.35) | 🌍 Global |
 | `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance | 🌍 Global |
 | `get_marine_conditions` | Wave height, swell, ocean currents, Douglas Sea Scale — includes Great Lakes and major US bays | 🌍 Global |
@@ -74,7 +75,11 @@ All 16 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_saved_location` | Details for one saved location | — |
 | `remove_saved_location` | Delete a saved location | — |
 
-> **Default preset:** to keep your AI's context lean, the server exposes 5 essential tools by default (`forecast`, `current_conditions`, `alerts`, `search_location`, `check_service_status`). Enable everything with one environment variable — see [Tool Selection](#tool-selection).
+> **Default preset:** with no configuration, the server exposes 6 tools led by `get_weather_summary` (one call covers most "what's the weather?" questions), plus `forecast`, `current_conditions`, `alerts`, `search_location`, and `check_service_status`. Enable everything with one environment variable — see [Tool Selection](#tool-selection).
+
+> **Consistent location input:** every location-based tool accepts the same three forms — `latitude`+`longitude`, a saved `location_name` (e.g. `"home"`), or a free-text `city_name` (e.g. `"Bend, Oregon"`, geocoded automatically). When a name is used, the response echoes the resolved place and coordinates.
+
+> **Output verbosity:** high-volume tools (`get_forecast`, `get_alerts`, `get_weather_imagery`) accept `detail: "summary" | "standard" | "full"` (default `standard`) to trade completeness for token cost — e.g. `full` returns the complete alert text and uncapped hourly forecast.
 
 ## Feature highlights
 
@@ -84,6 +89,7 @@ All 16 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 - **Safety-aware output** — lightning, wildfire, flood, and marine tools include graded safety assessments and plain-language recommendations, not just raw numbers.
 - **Winter weather** — snow depth, snowfall accumulation, and ice accumulation forecasts with sensible trace-amount filtering.
 - **Timezone-aware** — every timestamp is rendered in the location's local time with DST handled correctly.
+- **Imperial or metric** — pick your units server-wide (`WEATHER_UNITS`) or per request (`units: "metric"`), with fine-grained overrides (wind in knots, pressure in hPa, 24-hour clock). Defaults to imperial. See [Units & Localization](#units--localization).
 - **Built-in caching** — an LRU cache with per-data-type TTLs (5 minutes for alerts, 2 hours for forecasts, forever for finalized historical data) makes repeat queries return in <10ms and cuts upstream API calls by 50–80%.
 - **Actionable errors** — failures explain what happened and link to the upstream status page instead of dumping a stack trace.
 
@@ -184,10 +190,10 @@ Control which tools are exposed to reduce context overhead:
 
 | Preset | Tools |
 |--------|-------|
-| `basic` (default) | forecast, current_conditions, alerts, search_location, check_service_status |
-| `standard` | basic + historical_weather |
-| `full` | standard + air_quality |
-| `all` | everything — all 16 tools including marine, imagery, lightning, rivers, wildfire, and saved locations |
+| `basic` (default) | weather_summary, forecast, current_conditions, alerts, search_location, check_service_status |
+| `standard` | basic + historical_weather, air_quality, and saved-location tools |
+| `full` | everything — standard + marine, imagery, lightning, rivers, wildfire (same as `all`) |
+| `all` | all 17 tools |
 
 ```bash
 ENABLED_TOOLS=all                               # Use a preset
@@ -198,11 +204,32 @@ ENABLED_TOOLS=all,-marine                       # Remove from a preset
 
 Short aliases are supported: `forecast`, `current`, `alerts`, `historical`, `status`, `search`, `aqi`, `marine`, `radar`, `lightning`, and more.
 
+### Units & Localization
+
+Output defaults to **imperial** (°F, mph, inHg, miles) and can be switched to **metric** (°C, km/h, hPa, km) server-wide or per request. Precedence: a per-call parameter beats a per-unit env override, which beats the `WEATHER_UNITS` system default.
+
+```bash
+WEATHER_UNITS=metric            # switch everything to metric
+WEATHER_WIND_SPEED_UNIT=kn      # ...but wind in knots
+WEATHER_TIME_FORMAT=24h         # 24-hour clock
+```
+
+Or per call — the AI can honor "in Celsius" on the fly:
+
+```jsonc
+{ "latitude": 47.6, "longitude": -122.3, "units": "metric" }
+{ "latitude": 47.6, "longitude": -122.3, "wind_speed_unit": "kn", "pressure_unit": "hPa" }
+```
+
+Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weather`. Wind accepts `mph`/`kmh`/`ms`/`kn`; pressure `inHg`/`hPa`. Domain-specialized readings (fire-weather heights, river gauge stage, and the marine tool's dual-unit wave output) keep their conventional units.
+
 ### Other settings
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `ENABLED_TOOLS` | `basic` | Tool preset or list (see above) |
+| `WEATHER_UNITS` | `imperial` | Default unit system: `imperial` or `metric` |
+| `WEATHER_TEMPERATURE_UNIT` … | — | Per-unit overrides: `_TEMPERATURE_`(F/C), `_WIND_SPEED_`(mph/kmh/ms/kn), `_PRECIPITATION_`(inch/mm), `_PRESSURE_`(inHg/hPa), `_DISTANCE_`(mi/km), `_TIME_FORMAT`(12h/24h) |
 | `CACHE_ENABLED` | `true` | Enable/disable response caching |
 | `CACHE_MAX_SIZE` | `1000` | Max cache entries (100–10000) |
 | `API_TIMEOUT_MS` | `30000` | Upstream API timeout (5000–120000) |
@@ -234,7 +261,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 1,084 tests (~2 seconds)
+npm test               # Run all 1,129 tests (~2 seconds)
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```
@@ -258,7 +285,7 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
 ## Documentation
 
-- **[Tool Reference](./docs/TOOLS.md)** — all 16 tools: parameters, examples, sample output
+- **[Tool Reference](./docs/TOOLS.md)** — all 17 tools: parameters, examples, sample output
 - **[Client Setup](./docs/CLIENT_SETUP.md)** — step-by-step for 8 MCP clients
 - **[Error Handling](./docs/ERROR_HANDLING.md)** — how failures are reported
 - **[Testing Guide](./docs/testing/TESTING_GUIDE.md)** — manual testing procedures

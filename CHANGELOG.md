@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-07-13
+
+### Added
+- **Universal location resolution across all weather tools** - Every location-based tool (`get_current_conditions`, `get_alerts`, `get_historical_weather`, `get_air_quality`, `get_marine_conditions`, `get_weather_imagery`, `get_lightning_activity`, `get_river_conditions`, `get_wildfire_info`) now accepts the same three location forms that `get_forecast` did: `latitude`+`longitude`, a saved `location_name`, or a free-text `city_name` (geocoded on demand). A shared `LOCATION_SCHEMA_PROPERTIES` fragment keeps the tool schemas consistent, and name-based lookups echo the resolved place and coordinates in a `**Location:**` header. This resolves the previous mismatch where saved-location guidance advertised calls the tool schemas rejected.
+- **`get_weather_summary` composite tool** - Answers broad "what's the weather like?" questions in a single call by aggregating current conditions, forecast, and alerts (optionally air quality and lightning) for one location. Accepts an `include` array, `detail`, and `days`. Location is resolved once and passed to each section so there is no repeated geocoding; a section that is unavailable (e.g. US-only alerts abroad) is noted rather than failing the whole summary.
+- **`detail` output control** - `get_forecast`, `get_alerts`, and `get_weather_imagery` accept `detail: "summary" | "standard" | "full"` (default `standard`) to trade completeness for token cost. Hourly forecasts are capped (24h summary / 48h standard) unless `full`; alerts include the full NWS description only at `full`; imagery returns direct URLs by default and embeds Markdown images only at `full`.
+
+### Changed
+- **Preset tiers reworked around a "summary-first" default.** The default `basic` preset (used when `ENABLED_TOOLS` is unset — what most users get) is now 6 tools led by `get_weather_summary`: `get_weather_summary`, `get_forecast`, `get_current_conditions`, `get_alerts`, `search_location`, `check_service_status`. `standard` adds history, air quality, and the four saved-location management tools (12 total). `full` adds the specialized environmental/safety tools (marine, imagery, lightning, river, wildfire) and is now the complete 17-tool set, identical to `all`. Because every tool accepts `city_name`/`location_name`, the default set answers most weather questions on its own.
+- The NOAA forecast path fetches point data once and reuses `gridId`/`gridX`/`gridY` for the forecast and gridpoint calls, avoiding duplicate upstream point lookups on a cold cache.
+
+### Fixed
+- `search_location` now escapes provider-returned strings (`name`, `display_name`) before embedding them in Markdown, matching the existing escaping of the user query.
+
+## [1.10.0] - 2026-07-13
+
+### Added
+- **Unit localization for weather output** - Temperature, wind speed, precipitation, pressure, and distance/visibility/elevation can now be rendered in imperial or metric units. Set a server-wide default with the `WEATHER_UNITS` environment variable (`imperial` | `metric`, default `imperial`), or override per request with a `units` parameter on `get_forecast`, `get_current_conditions`, and `get_historical_weather`. This closes the gap that previously forced forks to hardcode Celsius in source.
+- **Per-unit overrides** - Pin individual units independently of the system, via env (`WEATHER_TEMPERATURE_UNIT`, `WEATHER_WIND_SPEED_UNIT`, `WEATHER_PRECIPITATION_UNIT`, `WEATHER_PRESSURE_UNIT`, `WEATHER_DISTANCE_UNIT`) or per-call params (`temperature_unit`, `wind_speed_unit`, `pressure_unit`, etc.). Wind supports `mph`, `kmh`, `ms`, and `kn` (knots); pressure supports `inHg` and `hPa`.
+- **12h / 24h clock format** - Times (forecast headers, sunrise/sunset, observation times) honor a `WEATHER_TIME_FORMAT` env default or per-call `time_format` parameter.
+
+### Changed
+- The Open-Meteo request now asks upstream for the requested units directly (no double conversion), and the NOAA forecast path uses the NWS `units=us|si` parameter. Unit-system signatures are included in cache keys so imperial and metric responses stay distinct.
+- Climate-normals output (`formatNormals`) is now unit-aware and matches the requested system.
+- Minor: the climate-normals "Normal Precipitation" line now uses the `in` label (was `"`), matching the rest of the forecast output.
+
+### Notes
+- Default output is unchanged (imperial), so existing users see no difference unless they opt in.
+- Domain-specialized readings keep their conventional units: fire-weather mixing height/transport wind, river gauge stage, and the marine tool's dual metric/imperial wave output are unaffected by this setting.
+
+## [1.9.0] - 2026-07-13
+
+### Added
+- **`city_name` parameter for `get_forecast`** - Request a forecast by free-text place name (e.g. `city_name="Paris, France"` or `city_name="Bend, Oregon"`) without first saving the location or looking up coordinates. The name is geocoded on demand via the existing multi-provider geocoding service (Census/Nominatim/Open-Meteo), and the resolved place is disclosed in the output as a `**Location:**` header so an ambiguous match is transparent. Coordinates and saved `location_name` still take precedence when provided. (Inspired by the community `jablum` fork.)
+- **Geocode caching** - City-name lookups are cached with an infinite TTL (a place's coordinates are static), so repeated forecasts for the same city do not re-hit the geocoding providers.
+
+## [1.8.3] - 2026-07-13
+
+### Fixed
+- **`get_historical_weather` header date shift** - The `**Period:**` line built a `Date` from the requested `start_date`/`end_date` and rendered it with `toLocaleDateString()`, which shifted the displayed range one day earlier in server timezones behind UTC (e.g. a `2024-01-10 → 2024-01-11` request showed `1/9/2024 to 1/10/2024`). Now displays the requested ISO dates directly. Observation data was always correct; only the header was wrong.
+- **`get_historical_weather` observation count** - The hourly header reported the total number of observations fetched rather than the number actually shown (e.g. `Number of observations: 48` when `limit: 3` returned 3 rows). Now shows the displayed count with the available total for context (`3 (of 48 available)`).
+
 ## [1.8.2] - 2026-07-07
 
 Documentation and packaging release — no functional changes to the server or tools.

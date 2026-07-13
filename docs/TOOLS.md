@@ -1,8 +1,10 @@
 # Tool Reference
 
-Complete reference for all 16 MCP tools provided by the Weather MCP Server.
+Complete reference for all 17 MCP tools provided by the Weather MCP Server.
 
-> **Note on tool presets:** By default the server exposes the `basic` preset (5 tools). Set `ENABLED_TOOLS=all` to enable everything. See [Tool Selection](../README.md#tool-selection) in the README.
+> **Note on tool presets:** By default the server exposes the `basic` preset (6 tools, led by `get_weather_summary`). Set `ENABLED_TOOLS=all` to enable everything. See [Tool Selection](../README.md#tool-selection) in the README.
+
+> **Common parameters (all location-based tools):** Every weather tool accepts the location in one of three ways — `latitude`+`longitude`, a saved `location_name` (e.g. `"home"`), or a free-text `city_name` (e.g. `"Bend, Oregon"`, geocoded on demand). Precedence: coordinates > `location_name` > `city_name`. When a name is used, the response echoes the resolved place in a `**Location:**` header. The high-volume tools (`get_forecast`, `get_alerts`, `get_weather_imagery`) also accept `detail`: `summary` | `standard` (default) | `full`.
 
 ## Contents
 
@@ -11,28 +13,30 @@ Complete reference for all 16 MCP tools provided by the Weather MCP Server.
 2. [get_current_conditions](#2-get_current_conditions) — Real-time observations, US
 3. [get_alerts](#3-get_alerts) — Watches/warnings/advisories, US
 4. [get_historical_weather](#4-get_historical_weather) — 1940–present, global
-5. [search_location](#5-search_location) — Geocoding, global
-6. [check_service_status](#6-check_service_status) — API health checks
+5. [get_weather_summary](#5-get_weather_summary) — One-call combined overview, global
+6. [search_location](#6-search_location) — Geocoding, global
+7. [check_service_status](#7-check_service_status) — API health checks
 
 **Environment & Safety**
 
-7. [get_air_quality](#7-get_air_quality) — AQI + pollutants, global
-8. [get_marine_conditions](#8-get_marine_conditions) — Waves/swell/currents, global
-9. [get_weather_imagery](#9-get_weather_imagery) — Radar, precipitation, and satellite imagery
-10. [get_lightning_activity](#10-get_lightning_activity) — Strike detection, global
-11. [get_river_conditions](#11-get_river_conditions) — River levels/flooding, US
-12. [get_wildfire_info](#12-get_wildfire_info) — Active fires, US
+8. [get_air_quality](#8-get_air_quality) — AQI + pollutants, global
+9. [get_marine_conditions](#9-get_marine_conditions) — Waves/swell/currents, global
+10. [get_weather_imagery](#10-get_weather_imagery) — Radar, precipitation, and satellite imagery
+11. [get_lightning_activity](#11-get_lightning_activity) — Strike detection, global
+12. [get_river_conditions](#12-get_river_conditions) — River levels/flooding, US
+13. [get_wildfire_info](#13-get_wildfire_info) — Active fires, US
 
 **Saved Locations**
 
-13. [save_location](#13-save_location)
-14. [list_saved_locations](#14-list_saved_locations)
-15. [get_saved_location](#15-get_saved_location)
-16. [remove_saved_location](#16-remove_saved_location)
+14. [save_location](#14-save_location)
+15. [list_saved_locations](#15-list_saved_locations)
+16. [get_saved_location](#16-get_saved_location)
+17. [remove_saved_location](#17-remove_saved_location)
 
 Also in this document:
 - [Finding Coordinates](#finding-coordinates)
 - [Using Saved Locations with Weather Tools](#using-saved-locations-with-weather-tools)
+- [Units & Localization](#units--localization)
 - [Error Handling & Service Status](#error-handling--service-status)
 
 ---
@@ -44,20 +48,24 @@ Get weather forecast for any location worldwide.
 - `latitude` (required*): Latitude coordinate (-90 to 90)
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location (e.g., "home") — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode (e.g., "Paris, France", "Bend, Oregon") — use instead of coordinates when you only have a place name
 - `days` (optional): Number of days in forecast (1-16, default: 7)
 - `granularity` (optional): "daily" or "hourly" (default: "daily")
 - `include_precipitation_probability` (optional): Include rain chances (default: true)
 - `include_normals` (optional): Include climate normals for comparison (default: false)
 - `source` (optional): "auto" (default), "noaa" (US only), or "openmeteo" (global)
+- `units` (optional): "imperial" (default) or "metric" — see [Units & Localization](#units--localization)
+- Unit overrides (optional): `temperature_unit`, `wind_speed_unit`, `precipitation_unit`, `pressure_unit`, `distance_unit`, `time_format`
 
-*Coordinates not required when `location_name` is provided.
+*Coordinates not required when `location_name` or `city_name` is provided. Precedence: coordinates > `location_name` > `city_name`.
 
 **Description:**
-Automatically selects the best data source: NOAA for US locations (more detailed) or Open-Meteo for international locations. Supports extended forecasts up to 16 days. Includes sunrise/sunset times, daylight duration, temperature, precipitation, wind, and UV index.
+Automatically selects the best data source: NOAA for US locations (more detailed) or Open-Meteo for international locations. Supports extended forecasts up to 16 days. Includes sunrise/sunset times, daylight duration, temperature, precipitation, wind, and UV index. When a location is resolved from `location_name` or `city_name`, the matched place is shown in a `**Location:**` header so ambiguous names are transparent.
 
 **Examples:**
 ```
 "Get a 7-day forecast for Paris (48.8534, 2.3488)"
+"What's the forecast for Bend, Oregon?"   (uses city_name — no coordinates needed)
 "Hourly forecast for Tokyo for the next 3 days"
 "16-day extended forecast for Sydney, Australia"
 ```
@@ -78,10 +86,15 @@ Automatically selects the best data source: NOAA for US locations (more detailed
 Get current weather conditions for a location (US only).
 
 **Parameters:**
-- `latitude` (required): Latitude coordinate (-90 to 90)
-- `longitude` (required): Longitude coordinate (-180 to 180)
+- `latitude` (required*): Latitude coordinate (-90 to 90)
+- `longitude` (required*): Longitude coordinate (-180 to 180)
+- `location_name` (optional): Name of a saved location — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `include_fire_weather` (optional): Include fire weather indices (default: false)
 - `include_normals` (optional): Include climate normals for comparison (default: false)
+- `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
+
+*Coordinates not required when `location_name` or `city_name` is provided.
 
 **Example:**
 ```
@@ -103,9 +116,14 @@ What are the current weather conditions in New York? (latitude: 40.7128, longitu
 Get active weather alerts, watches, warnings, and advisories for US locations.
 
 **Parameters:**
-- `latitude` (required): Latitude coordinate (-90 to 90)
-- `longitude` (required): Longitude coordinate (-180 to 180)
+- `latitude` (required*): Latitude coordinate (-90 to 90)
+- `longitude` (required*): Longitude coordinate (-180 to 180)
+- `location_name` (optional): Name of a saved location — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `active_only` (optional): Show only active alerts (default: true)
+- `detail` (optional): `summary` (headline + timing), `standard` (default; adds instructions), or `full` (adds the complete NWS description)
+
+*Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
 Retrieves current weather alerts from the NOAA API for safety-critical weather information. Returns severity levels (Extreme, Severe, Moderate, Minor), urgency indicators, effective/expiration times, and affected areas. Alerts are automatically sorted by severity with the most critical first.
@@ -129,11 +147,16 @@ Retrieves current weather alerts from the NOAA API for safety-critical weather i
 Get historical weather observations for a location.
 
 **Parameters:**
-- `latitude` (required): Latitude coordinate (-90 to 90)
-- `longitude` (required): Longitude coordinate (-180 to 180)
+- `latitude` (required*): Latitude coordinate (-90 to 90)
+- `longitude` (required*): Longitude coordinate (-180 to 180)
+- `location_name` (optional): Name of a saved location — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `start_date` (required): Start date in ISO format (YYYY-MM-DD)
 - `end_date` (required): End date in ISO format (YYYY-MM-DD)
 - `limit` (optional): Max observations to return (1-500, default: 168)
+- `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
+
+*Coordinates not required when `location_name` or `city_name` is provided.
 
 **Data Source Selection:**
 The server automatically chooses the best data source based on your date range:
@@ -184,7 +207,34 @@ If you get "No historical data available":
 - Note: Most recent data has a 5-day delay
 - Very recent dates (last 5 days) may not be available in archival data yet
 
-### 5. search_location
+### 5. get_weather_summary
+Get a combined weather overview for a location in a single call.
+
+**Parameters:**
+- `latitude` / `longitude` (required*): Coordinates (-90 to 90 / -180 to 180)
+- `location_name` (optional): Name of a saved location — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode — use instead of coordinates
+- `include` (optional): Array of sections to include — any of `current`, `forecast`, `alerts`, `air_quality`, `lightning` (default: `["current", "forecast", "alerts"]`)
+- `days` (optional): Forecast days when the forecast section is included (1-16, default: 7)
+- `detail` (optional): `summary` (default here), `standard`, or `full`
+- `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
+
+*Coordinates not required when `location_name` or `city_name` is provided. Precedence: coordinates > `location_name` > `city_name`.
+
+**Description:**
+Best for broad questions like "What's the weather like in Seattle?" or "Is it safe to hike today?". Aggregates several specialized tools for one location in a single response, resolving the location once so there is no repeated geocoding. Sections that are unavailable for a location (e.g. US-only alerts abroad) are noted rather than failing the whole summary. For a single specific data product, call that specialized tool directly.
+
+**Examples:**
+```
+"Give me a weather rundown for Bend, Oregon"
+"What's the weather like at home, and is there any lightning?"  (include=["current","forecast","lightning"])
+```
+
+**Returns:**
+- A `# Weather Summary` header with the resolved location and the included sections
+- Each requested section's full output (current conditions, forecast, alerts, air quality, lightning), separated by rules
+
+### 6. search_location
 Find coordinates for any location worldwide by name.
 
 **Parameters:**
@@ -209,7 +259,7 @@ Converts location names to coordinates. Returns multiple matches with detailed m
 - Country and region information
 - Feature type (capital, city, airport, etc.)
 
-### 6. check_service_status
+### 7. check_service_status
 Check the operational status of weather APIs and cache performance.
 
 **Parameters:** None
@@ -229,13 +279,17 @@ Check if the weather services are operational
 - Status page links and recommended actions if issues are detected
 - Overall service availability summary
 
-### 7. get_air_quality
+### 8. get_air_quality
 Get comprehensive air quality data for any location worldwide.
 
 **Parameters:**
-- `latitude` (required): Latitude coordinate (-90 to 90)
-- `longitude` (required): Longitude coordinate (-180 to 180)
+- `latitude` (required*): Latitude coordinate (-90 to 90)
+- `longitude` (required*): Longitude coordinate (-180 to 180)
+- `location_name` (optional): Name of a saved location — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `forecast` (optional): Include hourly forecast for next 5 days (default: false)
+
+*Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
 Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index.
@@ -255,13 +309,17 @@ Provides current air quality conditions using the Open-Meteo Air Quality API wit
 - Activity recommendations for sensitive groups
 - Optional 5-day hourly forecast
 
-### 8. get_marine_conditions
+### 9. get_marine_conditions
 Get marine weather conditions including wave height, swell, ocean currents, and sea state with automatic source selection for Great Lakes and coastal bays.
 
 **Parameters:**
-- `latitude` (required): Latitude coordinate (-90 to 90)
-- `longitude` (required): Longitude coordinate (-180 to 180)
+- `latitude` (required*): Latitude coordinate (-90 to 90)
+- `longitude` (required*): Longitude coordinate (-180 to 180)
+- `location_name` (optional): Name of a saved location — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `forecast` (optional): Include 5-day marine forecast (default: false)
+
+*Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
 Provides comprehensive marine weather data with intelligent dual-source support:
@@ -288,14 +346,19 @@ Provides comprehensive marine weather data with intelligent dual-source support:
 - Wave period for planning and safety
 - Optional 5-day forecast with daily summaries
 
-### 9. get_weather_imagery
+### 10. get_weather_imagery
 Get weather radar, precipitation, and satellite imagery for visual weather analysis.
 
 **Parameters:**
-- `latitude` (required): Latitude coordinate (-90 to 90)
-- `longitude` (required): Longitude coordinate (-180 to 180)
+- `latitude` (required*): Latitude coordinate (-90 to 90)
+- `longitude` (required*): Longitude coordinate (-180 to 180)
+- `location_name` (optional): Name of a saved location — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `type` (optional): Imagery type - "precipitation" (default), "radar", or "satellite"
 - `animated` (optional): Return animated loop vs static image (default: false)
+- `detail` (optional): `summary`/`standard` (default) surface direct image URLs; `full` embeds Markdown images
+
+*Coordinates not required when `location_name` or `city_name` is provided.
 - `layers` (optional): Additional map layers (reserved for future use)
 
 **Description:**
@@ -320,14 +383,18 @@ Provides access to weather imagery from two sources: precipitation/radar tiles f
 
 **Note:** Precipitation/radar coverage is global (RainViewer). Satellite coverage is Western Hemisphere only (GOES GeoColor via NASA GIBS).
 
-### 10. get_lightning_activity
+### 11. get_lightning_activity
 Get real-time lightning strike detection and safety assessment for outdoor activity planning.
 
 **Parameters:**
-- `latitude` (required): Latitude coordinate (-90 to 90)
-- `longitude` (required): Longitude coordinate (-180 to 180)
+- `latitude` (required*): Latitude coordinate (-90 to 90)
+- `longitude` (required*): Longitude coordinate (-180 to 180)
+- `location_name` (optional): Name of a saved location — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `radius` (optional): Search radius in kilometers (1-500, default: 100)
 - `timeWindow` (optional): Historical time window in minutes (1-180, default: 60)
+
+*Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
 Provides real-time lightning strike detection from the Blitzortung.org global lightning detection network. Includes comprehensive safety assessment with 4 risk levels based on strike proximity. Critical for outdoor safety planning including boating, hiking, golfing, and other outdoor activities.
@@ -361,13 +428,17 @@ Provides real-time lightning strike detection from the Blitzortung.org global li
 
 **Note:** Data provided by Blitzortung.org, a free community-operated lightning detection network. May have regional coverage variations.
 
-### 11. get_river_conditions
+### 12. get_river_conditions
 Monitor river levels and flood status using NOAA and USGS data sources.
 
 **Parameters:**
-- `latitude` (required): Latitude coordinate (-90 to 90)
-- `longitude` (required): Longitude coordinate (-180 to 180)
+- `latitude` (required*): Latitude coordinate (-90 to 90)
+- `longitude` (required*): Longitude coordinate (-180 to 180)
+- `location_name` (optional): Name of a saved location — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `radius` (optional): Search radius in kilometers (1-500, default: 50)
+
+*Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
 Provides comprehensive river and streamflow monitoring for flood safety and recreation planning. Automatically finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Uses NOAA National Water Prediction Service (NWPS) for gauge locations and USGS Water Services for real-time streamflow data.
@@ -392,13 +463,17 @@ Provides comprehensive river and streamflow monitoring for flood safety and recr
 
 **Note:** US coverage only. Data provided by NOAA National Water Prediction Service and USGS Water Services.
 
-### 12. get_wildfire_info
+### 13. get_wildfire_info
 Monitor active wildfires and fire perimeters for safety and evacuation planning.
 
 **Parameters:**
-- `latitude` (required): Latitude coordinate (-90 to 90)
-- `longitude` (required): Longitude coordinate (-180 to 180)
+- `latitude` (required*): Latitude coordinate (-90 to 90)
+- `longitude` (required*): Longitude coordinate (-180 to 180)
+- `location_name` (optional): Name of a saved location — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `radius` (optional): Search radius in kilometers (1-500, default: 100)
+
+*Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
 Provides critical wildfire monitoring and safety information using NIFC (National Interagency Fire Center) data. Reports active wildfires and prescribed burns within the specified radius, including fire size, containment status, and proximity-based safety assessments. Essential for residents in fire-prone regions and outdoor activity planning.
@@ -428,7 +503,7 @@ Provides critical wildfire monitoring and safety information using NIFC (Nationa
 
 **Note:** Data from NIFC WFIGS (Wildland Fire Interagency Geospatial Services). Always consult official sources for evacuation orders at https://inciweb.nwcg.gov/
 
-### 13. save_location
+### 14. save_location
 Save a location with an alias for easy reuse in weather queries.
 
 **Parameters:**
@@ -473,7 +548,7 @@ Saves a location to persistent storage (`~/.weather-mcp/locations.json`) for eas
 - Coordinates, timezone, and administrative region
 - Usage examples showing how to use with weather tools
 
-### 14. list_saved_locations
+### 15. list_saved_locations
 View all saved locations.
 
 **Parameters:** None
@@ -493,7 +568,7 @@ Lists all locations saved in your persistent storage with their aliases, names, 
 - Usage examples for each location
 - Total count of saved locations
 
-### 15. get_saved_location
+### 16. get_saved_location
 Get details for a specific saved location.
 
 **Parameters:**
@@ -515,7 +590,7 @@ Retrieves detailed information about a specific saved location, including coordi
 - Save and update timestamps
 - Usage examples
 
-### 16. remove_saved_location
+### 17. remove_saved_location
 Remove a saved location.
 
 **Parameters:**
@@ -584,6 +659,32 @@ get_forecast(location_name="home")
 - `get_forecast` - Weather forecasts using saved locations
 
 **Coming Soon:** Support for saved locations in all weather tools (current conditions, alerts, air quality, marine conditions, etc.)
+
+## Units & Localization
+
+Weather output defaults to **imperial** units and can be switched to **metric** either server-wide (environment variables) or per request (tool parameters). Precedence, highest first: a per-call `*_unit` override → a per-call `units` preset → a per-unit env override → the `WEATHER_UNITS` env default → imperial.
+
+**Per-call parameters** (on `get_forecast`, `get_current_conditions`, `get_historical_weather`):
+
+| Parameter | Values | Applies to |
+|-----------|--------|------------|
+| `units` | `imperial`, `metric` | Whole system (sets all of the below) |
+| `temperature_unit` | `F`, `C` | Temperature, dewpoint, feels-like, normals |
+| `wind_speed_unit` | `mph`, `kmh`, `ms`, `kn` | Wind speed and gusts |
+| `precipitation_unit` | `inch`, `mm` | Precipitation, snowfall |
+| `pressure_unit` | `inHg`, `hPa` | Barometric pressure |
+| `distance_unit` | `mi`, `km` | Visibility, elevation |
+| `time_format` | `12h`, `24h` | Clock times (headers, sunrise/sunset) |
+
+**Environment defaults:** `WEATHER_UNITS` (`imperial`\|`metric`), plus `WEATHER_TEMPERATURE_UNIT`, `WEATHER_WIND_SPEED_UNIT`, `WEATHER_PRECIPITATION_UNIT`, `WEATHER_PRESSURE_UNIT`, `WEATHER_DISTANCE_UNIT`, `WEATHER_TIME_FORMAT`.
+
+**Examples:**
+```
+"What's the forecast for Berlin in Celsius?"  → units: "metric"
+"Wind in knots for the marina"                → wind_speed_unit: "kn"
+```
+
+**Note:** Fire-weather heights/transport wind, river gauge stage, and the marine tool's wave output use their domain-standard units and are not affected by this setting.
 
 ## Error Handling & Service Status
 

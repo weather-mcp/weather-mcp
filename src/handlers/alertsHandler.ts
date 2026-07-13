@@ -3,26 +3,37 @@
  */
 
 import { NOAAService } from '../services/noaa.js';
-import { validateCoordinates, validateOptionalBoolean } from '../utils/validation.js';
+import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
+import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { validateOptionalBoolean, validateDetail } from '../utils/validation.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 
 interface AlertsArgs {
   latitude?: number;
   longitude?: number;
+  location_name?: string;
+  city_name?: string;
   active_only?: boolean;
+  detail?: 'summary' | 'standard' | 'full';
 }
 
 export async function handleGetAlerts(
   args: unknown,
-  noaaService: NOAAService
+  noaaService: NOAAService,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Validate input parameters with runtime checks
-  const { latitude, longitude } = validateCoordinates(args);
+  // Resolve location from coordinates, a saved location name, or a geocoded city name
+  const resolved = await resolveLocationAsync(args as AlertsArgs, locationStore, geocodingService);
+  const { latitude, longitude } = resolved;
   const active_only = validateOptionalBoolean(
     (args as AlertsArgs)?.active_only,
     'active_only',
     true
   );
+  // Output verbosity: 'full' includes the complete NWS description text.
+  const detail = validateDetail((args as AlertsArgs)?.detail);
 
   // Get timezone for proper time formatting
   let timezone = guessTimezoneFromCoords(latitude, longitude); // fallback
@@ -107,26 +118,35 @@ export async function handleGetAlerts(
         output += `**Ends:** ${formatInTimezone(props.ends, timezone)}\n`;
       }
 
-      output += `\n**Description:**\n${props.description}\n`;
+      // Full NWS description text is verbose; include it only at detail=full.
+      if (detail === 'full' && props.description) {
+        output += `\n**Description:**\n${props.description}\n`;
+      }
 
-      if (props.instruction) {
+      // Actionable instructions are surfaced at standard and full (not summary).
+      if (detail !== 'summary' && props.instruction) {
         output += `\n**Instructions:**\n${props.instruction}\n`;
       }
 
       output += `\n**Recommended Response:** ${props.response}\n`;
       output += `**Sender:** ${props.senderName}\n\n`;
     }
+
+    if (detail !== 'full') {
+      output += `*Showing ${detail === 'summary' ? 'a condensed summary' : 'standard detail'}. `;
+      output += `Use detail="full" for complete alert descriptions.*\n\n`;
+    }
   }
 
   output += `---\n`;
   output += `*Data source: NOAA National Weather Service*\n`;
 
-  return {
+  return prependLocationLine({
     content: [
       {
         type: 'text',
         text: output
       }
     ]
-  };
+  }, resolved);
 }

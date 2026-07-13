@@ -4,17 +4,42 @@
 
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
+import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
+import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { validateHistoricalWeatherParams } from '../utils/validation.js';
-import { convertToFahrenheit } from '../utils/temperatureConversion.js';
+import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
+import {
+  temperatureLabel,
+  windSpeedLabel,
+  precipitationLabel,
+  formatElevationFromM,
+  formatTemperatureQV,
+  formatWindSpeedQV,
+  formatPressureFromPa,
+} from '../utils/unitFormat.js';
 import { ApiConstants, FormatConstants } from '../config/displayThresholds.js';
 
 export async function handleGetHistoricalWeather(
   args: unknown,
   noaaService: NOAAService,
-  openMeteoService: OpenMeteoService
+  openMeteoService: OpenMeteoService,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Validate input parameters with runtime checks
-  const { latitude, longitude, start_date, end_date, limit = FormatConstants.defaultHistoricalLimit } = validateHistoricalWeatherParams(args);
+  // Resolve location first (coordinates, saved name, or geocoded city), then
+  // validate the date range. Coordinates from resolution are re-validated by
+  // validateHistoricalWeatherParams alongside the dates.
+  const resolved = await resolveLocationAsync(args as { latitude?: number; longitude?: number; location_name?: string; city_name?: string }, locationStore, geocodingService);
+  const { latitude, longitude, start_date, end_date, limit = FormatConstants.defaultHistoricalLimit } = validateHistoricalWeatherParams({
+    ...(args as Record<string, unknown>),
+    latitude: resolved.latitude,
+    longitude: resolved.longitude
+  });
+  const prefs = resolveUnitPreferences(args as UnitArgs);
+  const tempU = temperatureLabel(prefs);
+  const windU = windSpeedLabel(prefs);
+  const precipU = precipitationLabel(prefs);
 
   // Parse dates
   const startTime = new Date(start_date);
@@ -46,29 +71,32 @@ export async function handleGetHistoricalWeather(
         longitude,
         start_date.split('T')[0], // Ensure YYYY-MM-DD format
         end_date.split('T')[0],
-        useHourly
+        useHourly,
+        prefs
       );
 
       // Format the response based on data granularity
       if (useHourly && weatherData.hourly) {
         // Format hourly observations
+        const maxObservations = Math.min(limit, weatherData.hourly.time.length);
         let output = `# Historical Weather Observations (Hourly)\n\n`;
-        output += `**Period:** ${startTime.toLocaleDateString()} to ${endTime.toLocaleDateString()}\n`;
-        output += `**Location:** ${weatherData.latitude.toFixed(4)}°N, ${Math.abs(weatherData.longitude).toFixed(4)}°${weatherData.longitude >= 0 ? 'E' : 'W'} (${weatherData.elevation}m elevation)\n`;
-        output += `**Number of observations:** ${weatherData.hourly.time.length}\n`;
+        // Use the requested date strings directly; constructing a Date and calling
+        // toLocaleDateString() would shift the displayed day in non-UTC server zones.
+        output += `**Period:** ${start_date.split('T')[0]} to ${end_date.split('T')[0]}\n`;
+        output += `**Location:** ${weatherData.latitude.toFixed(4)}°N, ${Math.abs(weatherData.longitude).toFixed(4)}°${weatherData.longitude >= 0 ? 'E' : 'W'} (${formatElevationFromM(weatherData.elevation, prefs)} elevation)\n`;
+        output += `**Number of observations:** ${maxObservations}${maxObservations < weatherData.hourly.time.length ? ` (of ${weatherData.hourly.time.length} available)` : ''}\n`;
         output += `**Data source:** Open-Meteo Historical Weather API (Reanalysis)\n\n`;
 
-        const maxObservations = Math.min(limit, weatherData.hourly.time.length);
         for (let i = 0; i < maxObservations; i++) {
           const time = new Date(weatherData.hourly.time[i]);
           output += `## ${time.toLocaleString()}\n`;
 
           if (weatherData.hourly.temperature_2m?.[i] !== null && weatherData.hourly.temperature_2m?.[i] !== undefined) {
-            output += `- **Temperature:** ${Math.round(weatherData.hourly.temperature_2m[i])}°F\n`;
+            output += `- **Temperature:** ${Math.round(weatherData.hourly.temperature_2m[i])}${tempU}\n`;
           }
 
           if (weatherData.hourly.apparent_temperature?.[i] !== null && weatherData.hourly.apparent_temperature?.[i] !== undefined) {
-            output += `- **Feels Like:** ${Math.round(weatherData.hourly.apparent_temperature[i])}°F\n`;
+            output += `- **Feels Like:** ${Math.round(weatherData.hourly.apparent_temperature[i])}${tempU}\n`;
           }
 
           if (weatherData.hourly.weather_code?.[i] !== null && weatherData.hourly.weather_code?.[i] !== undefined) {
@@ -76,15 +104,15 @@ export async function handleGetHistoricalWeather(
           }
 
           if (weatherData.hourly.precipitation?.[i] !== null && weatherData.hourly.precipitation?.[i] !== undefined && weatherData.hourly.precipitation[i] > 0) {
-            output += `- **Precipitation:** ${weatherData.hourly.precipitation[i].toFixed(2)} in\n`;
+            output += `- **Precipitation:** ${weatherData.hourly.precipitation[i].toFixed(2)} ${precipU}\n`;
           }
 
           if (weatherData.hourly.snowfall?.[i] !== null && weatherData.hourly.snowfall?.[i] !== undefined && weatherData.hourly.snowfall[i] > 0) {
-            output += `- **Snowfall:** ${weatherData.hourly.snowfall[i].toFixed(1)} in\n`;
+            output += `- **Snowfall:** ${weatherData.hourly.snowfall[i].toFixed(1)} ${precipU}\n`;
           }
 
           if (weatherData.hourly.wind_speed_10m?.[i] !== null && weatherData.hourly.wind_speed_10m?.[i] !== undefined) {
-            output += `- **Wind:** ${Math.round(weatherData.hourly.wind_speed_10m[i])} mph`;
+            output += `- **Wind:** ${Math.round(weatherData.hourly.wind_speed_10m[i])} ${windU}`;
             if (weatherData.hourly.wind_direction_10m?.[i] !== null && weatherData.hourly.wind_direction_10m?.[i] !== undefined) {
               output += ` from ${Math.round(weatherData.hourly.wind_direction_10m[i])}°`;
             }
@@ -96,8 +124,8 @@ export async function handleGetHistoricalWeather(
           }
 
           if (weatherData.hourly.pressure_msl?.[i] !== null && weatherData.hourly.pressure_msl?.[i] !== undefined) {
-            const pressureInHg = weatherData.hourly.pressure_msl[i] * 0.02953;
-            output += `- **Pressure:** ${pressureInHg.toFixed(2)} inHg\n`;
+            // Open-Meteo returns pressure_msl in hPa regardless of unit params
+            output += `- **Pressure:** ${formatPressureFromPa(weatherData.hourly.pressure_msl[i] * 100, prefs)}\n`;
           }
 
           if (weatherData.hourly.cloud_cover?.[i] !== null && weatherData.hourly.cloud_cover?.[i] !== undefined) {
@@ -107,19 +135,19 @@ export async function handleGetHistoricalWeather(
           output += `\n`;
         }
 
-        return {
+        return prependLocationLine({
           content: [
             {
               type: 'text',
               text: output
             }
           ]
-        };
+        }, resolved);
       } else if (weatherData.daily) {
         // Format daily summaries
         let output = `# Historical Weather Data (Daily Summaries)\n\n`;
-        output += `**Period:** ${startTime.toLocaleDateString()} to ${endTime.toLocaleDateString()}\n`;
-        output += `**Location:** ${weatherData.latitude.toFixed(4)}°N, ${Math.abs(weatherData.longitude).toFixed(4)}°${weatherData.longitude >= 0 ? 'E' : 'W'} (${weatherData.elevation}m elevation)\n`;
+        output += `**Period:** ${start_date.split('T')[0]} to ${end_date.split('T')[0]}\n`;
+        output += `**Location:** ${weatherData.latitude.toFixed(4)}°N, ${Math.abs(weatherData.longitude).toFixed(4)}°${weatherData.longitude >= 0 ? 'E' : 'W'} (${formatElevationFromM(weatherData.elevation, prefs)} elevation)\n`;
         output += `**Number of days:** ${weatherData.daily.time.length}\n`;
         output += `**Data source:** Open-Meteo Historical Weather API (Reanalysis)\n\n`;
 
@@ -128,15 +156,15 @@ export async function handleGetHistoricalWeather(
           output += `## ${date.toLocaleDateString()}\n`;
 
           if (weatherData.daily.temperature_2m_max?.[i] !== null && weatherData.daily.temperature_2m_max?.[i] !== undefined) {
-            output += `- **High Temperature:** ${Math.round(weatherData.daily.temperature_2m_max[i])}°F\n`;
+            output += `- **High Temperature:** ${Math.round(weatherData.daily.temperature_2m_max[i])}${tempU}\n`;
           }
 
           if (weatherData.daily.temperature_2m_min?.[i] !== null && weatherData.daily.temperature_2m_min?.[i] !== undefined) {
-            output += `- **Low Temperature:** ${Math.round(weatherData.daily.temperature_2m_min[i])}°F\n`;
+            output += `- **Low Temperature:** ${Math.round(weatherData.daily.temperature_2m_min[i])}${tempU}\n`;
           }
 
           if (weatherData.daily.temperature_2m_mean?.[i] !== null && weatherData.daily.temperature_2m_mean?.[i] !== undefined) {
-            output += `- **Average Temperature:** ${Math.round(weatherData.daily.temperature_2m_mean[i])}°F\n`;
+            output += `- **Average Temperature:** ${Math.round(weatherData.daily.temperature_2m_mean[i])}${tempU}\n`;
           }
 
           if (weatherData.daily.weather_code?.[i] !== null && weatherData.daily.weather_code?.[i] !== undefined) {
@@ -144,28 +172,28 @@ export async function handleGetHistoricalWeather(
           }
 
           if (weatherData.daily.precipitation_sum?.[i] !== null && weatherData.daily.precipitation_sum?.[i] !== undefined) {
-            output += `- **Precipitation:** ${weatherData.daily.precipitation_sum[i].toFixed(2)} in\n`;
+            output += `- **Precipitation:** ${weatherData.daily.precipitation_sum[i].toFixed(2)} ${precipU}\n`;
           }
 
           if (weatherData.daily.snowfall_sum?.[i] !== null && weatherData.daily.snowfall_sum?.[i] !== undefined && weatherData.daily.snowfall_sum[i] > 0) {
-            output += `- **Snowfall:** ${weatherData.daily.snowfall_sum[i].toFixed(1)} in\n`;
+            output += `- **Snowfall:** ${weatherData.daily.snowfall_sum[i].toFixed(1)} ${precipU}\n`;
           }
 
           if (weatherData.daily.wind_speed_10m_max?.[i] !== null && weatherData.daily.wind_speed_10m_max?.[i] !== undefined) {
-            output += `- **Max Wind Speed:** ${Math.round(weatherData.daily.wind_speed_10m_max[i])} mph\n`;
+            output += `- **Max Wind Speed:** ${Math.round(weatherData.daily.wind_speed_10m_max[i])} ${windU}\n`;
           }
 
           output += `\n`;
         }
 
-        return {
+        return prependLocationLine({
           content: [
             {
               type: 'text',
               text: output
             }
           ]
-        };
+        }, resolved);
       } else {
         throw new Error('No weather data available in response');
       }
@@ -185,19 +213,19 @@ export async function handleGetHistoricalWeather(
     );
 
     if (!observations.features || observations.features.length === 0) {
-      return {
+      return prependLocationLine({
         content: [
           {
             type: 'text',
             text: `No historical observations found for the specified date range (${start_date} to ${end_date}).\n\nThis may occur because:\n- The dates are outside the station's available data range\n- There are gaps in the observation records for this location\n- The weather station near this location may not have archived data for these dates\n\nNote: Historical weather data availability varies by location and weather station. Some stations have limited historical records.`
           }
         ]
-      };
+      }, resolved);
     }
 
     // Format the observations
     let output = `# Historical Weather Observations\n\n`;
-    output += `**Period:** ${startTime.toLocaleDateString()} to ${endTime.toLocaleDateString()}\n`;
+    output += `**Period:** ${start_date.split('T')[0]} to ${end_date.split('T')[0]}\n`;
     output += `**Number of observations:** ${observations.features.length}\n`;
     output += `**Data source:** NOAA Real-time API\n\n`;
 
@@ -206,10 +234,7 @@ export async function handleGetHistoricalWeather(
       output += `## ${new Date(props.timestamp).toLocaleString()}\n`;
 
       if (props.temperature.value !== null) {
-        const tempF = convertToFahrenheit(props.temperature.value, props.temperature.unitCode);
-        if (tempF !== null) {
-          output += `- **Temperature:** ${Math.round(tempF)}°F\n`;
-        }
+        output += `- **Temperature:** ${formatTemperatureQV(props.temperature, prefs)}\n`;
       }
 
       if (props.textDescription) {
@@ -217,22 +242,19 @@ export async function handleGetHistoricalWeather(
       }
 
       if (props.windSpeed.value !== null) {
-        const windMph = props.windSpeed.unitCode.includes('km_h')
-          ? props.windSpeed.value * 0.621371
-          : props.windSpeed.value * 2.23694;
-        output += `- **Wind:** ${Math.round(windMph)} mph\n`;
+        output += `- **Wind:** ${formatWindSpeedQV(props.windSpeed, prefs)}\n`;
       }
 
       output += `\n`;
     }
 
-    return {
+    return prependLocationLine({
       content: [
         {
           type: 'text',
           text: output
         }
       ]
-    };
+    }, resolved);
   }
 }
