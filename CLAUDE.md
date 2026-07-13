@@ -274,6 +274,12 @@ CACHE_MAX_SIZE=1000            # Max cache entries (100-10000, default: 1000)
 # API Configuration
 API_TIMEOUT_MS=30000           # API timeout in milliseconds (5000-120000, default: 30000)
 
+# Lightning
+WEATHER_LIGHTNING_PREWARM=true # Subscribe saved locations at startup so lightning
+                               # coverage accumulates before the first query (default: true).
+                               # Set false to skip the startup MQTT connection. No effect
+                               # when get_lightning_activity is disabled.
+
 # Units / Localization (v1.10.0)
 WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
 # Optional per-unit overrides (follow WEATHER_UNITS if unset):
