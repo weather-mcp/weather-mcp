@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-07-13
+
 ### Added
 - **Startup pre-warming of lightning monitoring for saved locations** - Blitzortung strikes are only buffered for an area once it has been subscribed, so the first `get_lightning_activity` query for a location previously reported ~zero monitoring coverage. The server now subscribes each saved location's geohashes at startup (best-effort and non-blocking) so their coverage accumulates before the first query. Disable with `WEATHER_LIGHTNING_PREWARM=false` (also skipped automatically when the lightning tool is not enabled). The limited-coverage notice now explains *why* coverage can be low on a first lookup and that historical strikes cannot be backfilled.
 
