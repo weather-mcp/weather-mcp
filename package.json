@@ -82,7 +82,7 @@
     "@types/tz-lookup": "^6.1.2",
     "@vitest/coverage-v8": "^4.0.8",
     "tsx": "^4.23.1",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.0.8"
   }
 }
