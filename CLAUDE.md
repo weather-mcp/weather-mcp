@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA and Open-Meteo APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, and severe weather alerts.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.8.2 (Production Ready)
+- **Version:** 1.9.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** @modelcontextprotocol/sdk v1.21.0
 
@@ -70,7 +70,7 @@ src/
 
 ## Key Features (16 MCP Tools)
 
-1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location) - Now supports saved locations via `location_name`
+1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location) - Supports saved locations via `location_name` and free-text place names via `city_name` (geocoded)
 2. **get_current_conditions** - Current weather + fire weather indices (NOAA, US only)
 3. **get_alerts** - Weather alerts/warnings (NOAA, US only)
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo, global)
@@ -459,7 +459,7 @@ your_tool: {
 
 ### Currently Supported Tools
 
-- ✅ `get_forecast` - Full support for `location_name`
+- ✅ `get_forecast` - Full support for `location_name` (saved) and `city_name` (geocoded on demand)
 
 **Coming Soon:**
 - `get_current_conditions`
@@ -529,11 +529,11 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.8.2
+- **Version:** 1.9.0
 - **Status:** Production Ready ✅
-- **New in v1.8.2:** Documentation overhaul: restructured README, new tool reference (docs/TOOLS.md), refreshed npm/registry metadata
+- **New in v1.9.0:** `city_name` parameter for `get_forecast` — request a forecast by free-text place name (geocoded on demand, with caching)
 - **Security Rating:** A- (Excellent, 93/100)
-- **Test Coverage:** 1,084 tests, 100% pass rate
+- **Test Coverage:** 1,105 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
 
 ## Useful References
@@ -556,6 +556,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2026-07-07 (v1.8.2)
+**Last Updated:** 2026-07-13 (v1.9.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.

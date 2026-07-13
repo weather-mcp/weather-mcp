@@ -3,19 +3,52 @@
  */
 
 import { LocationStore } from '../services/locationStore.js';
+import { GeocodingService } from '../services/geocoding.js';
 import { validateLatitude, validateLongitude } from './validation.js';
+import { Cache } from './cache.js';
+import { CacheConfig } from '../config/cache.js';
 
 export interface LocationInput {
   latitude?: number;
   longitude?: number;
   location_name?: string;
+  city_name?: string;
 }
 
 export interface ResolvedLocation {
   latitude: number;
   longitude: number;
-  source: 'coordinates' | 'saved_location';
+  source: 'coordinates' | 'saved_location' | 'geocoded';
   location_name?: string;
+}
+
+/**
+ * Cached geocode result for a free-text city name.
+ * City coordinates are effectively static, so these are cached with an
+ * Infinity TTL (see CacheConfig.ttl.geocoding).
+ */
+interface CachedCityGeocode {
+  latitude: number;
+  longitude: number;
+  display_name: string;
+}
+
+// Module-level cache for city_name -> coordinates lookups.
+const cityGeocodeCache = new Cache<CachedCityGeocode>(CacheConfig.maxSize);
+
+/**
+ * Build the cache key for a city geocode lookup.
+ */
+function cityGeocodeKey(cityName: string): string {
+  return `city-geocode:${cityName.toLowerCase().trim()}`;
+}
+
+/**
+ * Clear the module-level city geocode cache.
+ * Exposed primarily for tests to guarantee a clean slate.
+ */
+export function clearCityGeocodeCache(): void {
+  cityGeocodeCache.clear();
 }
 
 /**
@@ -99,6 +132,107 @@ export function resolveLocation(
     'Examples:\n' +
     '  - Using coordinates: latitude=47.6062, longitude=-122.3321\n' +
     '  - Using saved location: location_name="home"\n\n' +
+    'Use save_location to save frequently used locations.'
+  );
+}
+
+/**
+ * Resolve location coordinates from direct coordinates, a saved location name,
+ * or a free-text city name that is geocoded on demand.
+ *
+ * Resolution precedence: coordinates > location_name (saved) > city_name (geocoded).
+ * Geocoded city lookups are cached (see cityGeocodeCache) so repeated requests for
+ * the same place do not re-hit the geocoding providers.
+ *
+ * @param args - Arguments containing coordinates, a saved location_name, or a city_name
+ * @param locationStore - Location store instance (for saved locations)
+ * @param geocodingService - Geocoding service (for city_name lookups)
+ * @returns Resolved coordinates and metadata
+ * @throws Error if nothing usable is provided, validation fails, or geocoding finds no match
+ */
+export async function resolveLocationAsync(
+  args: LocationInput,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
+): Promise<ResolvedLocation> {
+  // 1. Explicit coordinates take precedence
+  if (typeof args.latitude === 'number' && typeof args.longitude === 'number') {
+    validateLatitude(args.latitude);
+    validateLongitude(args.longitude);
+
+    return {
+      latitude: args.latitude,
+      longitude: args.longitude,
+      source: 'coordinates'
+    };
+  }
+
+  // 2. Saved location by name (reuse the synchronous resolver's matching logic)
+  if (args.location_name && typeof args.location_name === 'string') {
+    return resolveLocation({ location_name: args.location_name }, locationStore);
+  }
+
+  // 3. Free-text city name -> geocode on demand
+  if (args.city_name && typeof args.city_name === 'string') {
+    const cityName = args.city_name.trim();
+
+    if (cityName.length === 0) {
+      throw new Error('city_name cannot be empty');
+    }
+
+    const cacheKey = cityGeocodeKey(cityName);
+
+    if (CacheConfig.enabled) {
+      const cached = cityGeocodeCache.get(cacheKey);
+      if (cached) {
+        return {
+          latitude: cached.latitude,
+          longitude: cached.longitude,
+          source: 'geocoded',
+          location_name: cached.display_name
+        };
+      }
+    }
+
+    const results = await geocodingService.geocode(cityName, 1);
+
+    if (!results || results.length === 0) {
+      throw new Error(
+        `Could not find a location matching "${cityName}".\n\n` +
+        'Try a more specific name (e.g. "Paris, France" or "Bend, Oregon"), ' +
+        'or use search_location to look up coordinates.'
+      );
+    }
+
+    const best = results[0];
+
+    if (CacheConfig.enabled) {
+      cityGeocodeCache.set(
+        cacheKey,
+        {
+          latitude: best.latitude,
+          longitude: best.longitude,
+          display_name: best.display_name
+        },
+        CacheConfig.ttl.geocoding
+      );
+    }
+
+    return {
+      latitude: best.latitude,
+      longitude: best.longitude,
+      source: 'geocoded',
+      location_name: best.display_name
+    };
+  }
+
+  // Nothing usable provided
+  throw new Error(
+    'Provide one of: coordinates (latitude + longitude), a saved location_name, or a city_name.\n\n' +
+    'Examples:\n' +
+    '  - Using coordinates: latitude=47.6062, longitude=-122.3321\n' +
+    '  - Using saved location: location_name="home"\n' +
+    '  - Using a city name: city_name="Paris, France"\n\n' +
     'Use save_location to save frequently used locations.'
   );
 }

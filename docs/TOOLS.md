@@ -44,20 +44,22 @@ Get weather forecast for any location worldwide.
 - `latitude` (required*): Latitude coordinate (-90 to 90)
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location (e.g., "home") — use instead of coordinates
+- `city_name` (optional): Free-text place name to geocode (e.g., "Paris, France", "Bend, Oregon") — use instead of coordinates when you only have a place name
 - `days` (optional): Number of days in forecast (1-16, default: 7)
 - `granularity` (optional): "daily" or "hourly" (default: "daily")
 - `include_precipitation_probability` (optional): Include rain chances (default: true)
 - `include_normals` (optional): Include climate normals for comparison (default: false)
 - `source` (optional): "auto" (default), "noaa" (US only), or "openmeteo" (global)
 
-*Coordinates not required when `location_name` is provided.
+*Coordinates not required when `location_name` or `city_name` is provided. Precedence: coordinates > `location_name` > `city_name`.
 
 **Description:**
-Automatically selects the best data source: NOAA for US locations (more detailed) or Open-Meteo for international locations. Supports extended forecasts up to 16 days. Includes sunrise/sunset times, daylight duration, temperature, precipitation, wind, and UV index.
+Automatically selects the best data source: NOAA for US locations (more detailed) or Open-Meteo for international locations. Supports extended forecasts up to 16 days. Includes sunrise/sunset times, daylight duration, temperature, precipitation, wind, and UV index. When a location is resolved from `location_name` or `city_name`, the matched place is shown in a `**Location:**` header so ambiguous names are transparent.
 
 **Examples:**
 ```
 "Get a 7-day forecast for Paris (48.8534, 2.3488)"
+"What's the forecast for Bend, Oregon?"   (uses city_name — no coordinates needed)
 "Hourly forecast for Tokyo for the next 3 days"
 "16-day extended forecast for Sydney, Australia"
 ```
