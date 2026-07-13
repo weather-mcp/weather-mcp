@@ -489,6 +489,34 @@ export class BlitzortungService {
   }
 
   /**
+   * Begin buffering strikes for a location without waiting for or returning results.
+   *
+   * Subscribes the area's geohashes so the rolling buffer starts filling immediately.
+   * Intended for startup pre-warming of known locations (e.g. saved locations) so that
+   * later queries have real monitoring coverage instead of starting from zero. Best-effort:
+   * failures are swallowed and must never block or crash startup.
+   */
+  async prewarmLocation(
+    latitude: number,
+    longitude: number,
+    radiusKm: number = 100
+  ): Promise<void> {
+    try {
+      await this.subscribeToLocation(latitude, longitude, radiusKm);
+      const redacted = redactCoordinatesForLogging(latitude, longitude);
+      logger.info('Pre-warmed lightning monitoring for location', {
+        latitude: redacted.lat,
+        longitude: redacted.lon,
+        radiusKm
+      });
+    } catch (error) {
+      logger.warn('Failed to pre-warm lightning monitoring for location', {
+        error: (error as Error).message
+      });
+    }
+  }
+
+  /**
    * Get the moment from which the entire queried area has been continuously
    * monitored, or null if any part of it is not currently subscribed (or the
    * broker is disconnected). Callers use this to detect that a "0 strikes"
