@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA and Open-Meteo APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, and severe weather alerts.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.11.0 (Production Ready)
+- **Version:** 1.11.1 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** @modelcontextprotocol/sdk v1.21.0
 
@@ -273,6 +273,12 @@ CACHE_MAX_SIZE=1000            # Max cache entries (100-10000, default: 1000)
 
 # API Configuration
 API_TIMEOUT_MS=30000           # API timeout in milliseconds (5000-120000, default: 30000)
+
+# Lightning
+WEATHER_LIGHTNING_PREWARM=true # Subscribe saved locations at startup so lightning
+                               # coverage accumulates before the first query (default: true).
+                               # Set false to skip the startup MQTT connection. No effect
+                               # when get_lightning_activity is disabled.
 
 # Units / Localization (v1.10.0)
 WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
@@ -545,13 +551,14 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.11.0
+- **Version:** 1.11.1
 - **Status:** Production Ready ✅
+- **New in v1.11.1:** Geocoding fix — `city_name`/`search_location` lookups no longer fail at low result limits (RFC 3986 `%20` encoding + result floor); river forecast no longer prints NWPS `-999`/year-0001 placeholder sentinels; lightning monitoring is pre-warmed for saved locations at startup (`WEATHER_LIGHTNING_PREWARM`)
 - **New in v1.11.0:** Universal location resolution (`location_name`/`city_name` on every location-based tool), `get_weather_summary` composite tool, `detail` output control (forecast/alerts/imagery), and a "summary-first" 6-tool default `basic` preset led by `get_weather_summary` (history, air quality, saved-location CRUD, and specialized tools live in `standard`/`full`)
 - **New in v1.10.0:** Unit localization — imperial/metric (plus per-unit overrides and 12h/24h) via `WEATHER_UNITS` env or a per-call `units` parameter on forecast/current/historical tools
 - **New in v1.9.0:** `city_name` parameter for `get_forecast` — request a forecast by free-text place name (geocoded on demand, with caching)
 - **Security Rating:** A- (Excellent, 93/100)
-- **Test Coverage:** 1,149 tests, 100% pass rate
+- **Test Coverage:** 1,165 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
 
 ## Useful References
@@ -574,6 +581,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2026-07-13 (v1.11.0)
+**Last Updated:** 2026-07-13 (v1.11.1)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.

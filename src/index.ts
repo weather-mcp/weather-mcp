@@ -21,6 +21,7 @@ import { NCEIService } from './services/ncei.js';
 import { NIFCService } from './services/nifc.js';
 import { GeocodingService } from './services/geocoding.js';
 import { LocationStore } from './services/locationStore.js';
+import { blitzortungService } from './services/blitzortung.js';
 import { CacheConfig } from './config/cache.js';
 import { toolConfig } from './config/tools.js';
 import { logger } from './utils/logger.js';
@@ -784,6 +785,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 /**
  * Start the server
  */
+/**
+ * Pre-warm live lightning monitoring for saved locations at startup.
+ *
+ * The Blitzortung feed only buffers strikes for an area once it is subscribed, so the
+ * first query to a location otherwise reports zero monitoring coverage. Subscribing
+ * saved locations at startup lets their coverage accumulate before the user asks.
+ * Best-effort and fully non-blocking: it opens a persistent MQTT connection, so it is
+ * skipped when the lightning tool is disabled or when WEATHER_LIGHTNING_PREWARM=false.
+ */
+function prewarmLightningMonitoring(): void {
+  if (process.env.WEATHER_LIGHTNING_PREWARM === 'false') {
+    return;
+  }
+  if (!toolConfig.isEnabled('get_lightning_activity')) {
+    return;
+  }
+
+  const savedLocations = Object.values(locationStore.getAll());
+  if (savedLocations.length === 0) {
+    return;
+  }
+
+  logger.info('Pre-warming lightning monitoring for saved locations', {
+    count: savedLocations.length
+  });
+
+  // Fire-and-forget: prewarmLocation swallows its own errors and must never block
+  // startup or the stdio transport.
+  for (const location of savedLocations) {
+    void blitzortungService.prewarmLocation(location.latitude, location.longitude);
+  }
+}
+
 async function main() {
   const transport = new StdioServerTransport();
 
@@ -824,6 +858,10 @@ async function main() {
       enabledTools: toolConfig.getEnabledTools().length,
       toolList: toolConfig.getEnabledTools().join(', ')
     });
+
+    // Begin buffering lightning strikes for saved locations so their coverage
+    // accumulates before the first query (non-blocking, best-effort).
+    prewarmLightningMonitoring();
 
     // Inform users about version and upgrade options
     logger.info('Version check', {

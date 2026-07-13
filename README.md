@@ -233,6 +233,7 @@ Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weath
 | `CACHE_ENABLED` | `true` | Enable/disable response caching |
 | `CACHE_MAX_SIZE` | `1000` | Max cache entries (100–10000) |
 | `API_TIMEOUT_MS` | `30000` | Upstream API timeout (5000–120000) |
+| `WEATHER_LIGHTNING_PREWARM` | `true` | Subscribe saved locations' geohashes at startup so `get_lightning_activity` has coverage before the first query. Set `false` to skip this and avoid the persistent MQTT connection at startup. No effect when the lightning tool is disabled. |
 | `LOG_LEVEL` | `1` | 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR (logs go to stderr) |
 | `NCEI_API_TOKEN` | — | Optional [free NCEI token](https://www.ncdc.noaa.gov/cdo-web/token) for official NOAA climate normals (US); falls back to Open-Meteo automatically |
 

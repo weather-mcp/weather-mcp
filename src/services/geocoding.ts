@@ -9,6 +9,31 @@ import { DataNotFoundError, RateLimitError, ServiceUnavailableError } from '../e
 import { logger } from '../utils/logger.js';
 
 /**
+ * Serialize query parameters using RFC 3986 percent-encoding (spaces -> %20).
+ *
+ * Axios's default serializer encodes spaces as "+" (application/x-www-form-urlencoded
+ * style). Nominatim treats such "+"-encoded queries inconsistently — notably it can
+ * return ZERO matches at limit=1 for a query that returns matches with %20 encoding
+ * (e.g. "Clare, MI"). Forcing %20 keeps geocoding results stable across providers and
+ * result limits. Shared by every provider client below.
+ */
+export function rfc3986ParamsSerializer(params: Record<string, unknown>): string {
+  return Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join('&');
+}
+
+/**
+ * Minimum number of results requested from an upstream provider, regardless of the
+ * caller's requested limit. Some providers (Nominatim in particular) rank or de-duplicate
+ * unreliably when asked for a single result, so we always request a small floor and then
+ * slice down to the caller's limit. Prevents fragile limit=1 lookups (e.g. the on-demand
+ * city_name resolver) from spuriously returning "no results".
+ */
+const PROVIDER_RESULT_FLOOR = 5;
+
+/**
  * Geocoding result with standardized format across all providers
  */
 export interface GeocodingResult {
@@ -77,7 +102,8 @@ class CensusGovProvider implements GeocodingProvider {
       timeout: 10000,
       headers: {
         'Accept': 'application/json'
-      }
+      },
+      paramsSerializer: { serialize: rfc3986ParamsSerializer }
     });
 
     // Rate limit to 5 requests/second to be respectful
@@ -167,7 +193,8 @@ class NominatimProvider implements GeocodingProvider {
       headers: {
         'User-Agent': '(weather-mcp, github.com/weather-mcp/weather-mcp)',
         'Accept': 'application/json'
-      }
+      },
+      paramsSerializer: { serialize: rfc3986ParamsSerializer }
     });
 
     // Strict 1 request/second rate limit as per Nominatim usage policy
@@ -273,7 +300,8 @@ class OpenMeteoProvider implements GeocodingProvider {
       timeout: 10000,
       headers: {
         'Accept': 'application/json'
-      }
+      },
+      paramsSerializer: { serialize: rfc3986ParamsSerializer }
     });
   }
 
@@ -426,15 +454,19 @@ export class GeocodingService {
 
     const errors: string[] = [];
 
+    // Always request at least PROVIDER_RESULT_FLOOR from upstream (providers rank
+    // unreliably at limit=1), then slice to the caller's requested limit.
+    const providerLimit = Math.max(limit, PROVIDER_RESULT_FLOOR);
+
     // Try each provider in order
     for (const provider of providers) {
       try {
         logger.debug(`Trying provider: ${provider.name}`);
-        const results = await provider.geocode(query, limit);
+        const results = await provider.geocode(query, providerLimit);
 
         if (results.length > 0) {
           logger.info(`Geocoding successful via ${provider.name}: ${results.length} result(s)`);
-          return results;
+          return results.slice(0, limit);
         }
 
         logger.debug(`${provider.name}: No results found`);

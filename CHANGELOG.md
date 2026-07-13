@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-07-13
+
+### Added
+- **Startup pre-warming of lightning monitoring for saved locations** - Blitzortung strikes are only buffered for an area once it has been subscribed, so the first `get_lightning_activity` query for a location previously reported ~zero monitoring coverage. The server now subscribes each saved location's geohashes at startup (best-effort and non-blocking) so their coverage accumulates before the first query. Disable with `WEATHER_LIGHTNING_PREWARM=false` (also skipped automatically when the lightning tool is not enabled). The limited-coverage notice now explains *why* coverage can be low on a first lookup and that historical strikes cannot be backfilled.
+
+### Fixed
+- **`city_name` and low-limit `search_location` geocoding failed for valid US places** - The geocoding client serialized query spaces as `+` instead of RFC 3986 `%20`, and Nominatim returns zero matches for such `+`-encoded queries when only one result is requested. Because the on-demand `city_name` resolver requests a single result, every `city_name` lookup (e.g. `city_name="Clare, MI"`) — and any `search_location(..., limit=1)` — failed with "No locations found" even though the place exists. Query parameters are now percent-encoded (`%20`), and the geocoding service requests a small result floor internally before slicing to the caller's limit, so single-result lookups are no longer at the fragile boundary. (`src/services/geocoding.ts`)
+- **River forecast rendered NWPS placeholder sentinels literally** - `get_river_conditions` printed `-999.00 ft` / `-999.00 kcfs` and a year-0001 "Dec 31, 1" valid time for gauges whose forecast is not current. Missing-data sentinels (values `<= -900`) and implausible timestamps (year `< 2000`) are now detected: the `### Forecast` block is shown only when it carries at least one real value and a plausible time, and is otherwise suppressed. The same guard is applied to observed stage/flow. (`src/handlers/riverConditionsHandler.ts`)
+
 ## [1.11.0] - 2026-07-13
 
 ### Added

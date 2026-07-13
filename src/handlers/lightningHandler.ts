@@ -323,6 +323,15 @@ export function formatLightningActivityResponse(response: LightningActivityRespo
       `Re-check in a few minutes or consult official weather services before making safety decisions.`
     );
     lines.push('');
+    // Explain WHY coverage is limited so a fresh/near-zero reading is not mistaken for
+    // verified calm — this is expected on a first query, not an error.
+    lines.push(
+      '*Why: lightning is monitored via a live feed that only begins buffering strikes once ' +
+      'an area is first queried, so a location’s first lookup starts near zero coverage and ' +
+      'builds over the following minutes. Saved locations are pre-warmed at startup. Historical ' +
+      'strikes cannot be backfilled.*'
+    );
+    lines.push('');
   }
 
   // Recommendations
