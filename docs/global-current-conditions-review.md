@@ -7,6 +7,13 @@
 but **two issues should be fixed before cutting v1.12.0** — a metric snowfall
 unit bug (I1) and the Canadian-border routing gap (I2).
 
+> **Resolution (2026-07-16):** all four issues below were fixed on this branch
+> via `docs/global-conditions-hardening-plan.md` and live-verified — I1
+> `900f6bd`+`4a4f2c6`, I2 `cfeb314` (tests `510c32f`), I3 `900f6bd`, I4
+> `f25c634`. One plan assumption was corrected during execution: NOAA's
+> coverage 404 surfaces as `DataNotFoundError` (not `InvalidLocationError`),
+> so the I2 fallback catches both non-retryable client-error classes.
+
 ## How this was verified
 
 - **Gate:** `npm run build` clean, `npm test` 1210/1210 passing.
@@ -41,7 +48,7 @@ unit bug (I1) and the Canadian-border routing gap (I2).
 
 ## Issues
 
-### I1 — Metric snowfall is mislabeled and understated 10× (fix before release)
+### I1 — Metric snowfall is mislabeled and understated 10× (fix before release) — ✅ FIXED (`900f6bd`, `4a4f2c6`)
 
 **Severity: High (data correctness).** Open-Meteo returns `snowfall` in **cm**
 when the precipitation unit is mm (it only converts snowfall when
@@ -71,7 +78,7 @@ the assumption, so the suite passes while the metric label is wrong.
   — the archive API also reports cm in metric. Not introduced by this branch,
   but it's the identical fix and worth folding in (or ticketing).
 
-### I2 — Canadian border cities error out instead of falling back (fix or mitigate before release)
+### I2 — Canadian border cities error out instead of falling back (fix or mitigate before release) — ✅ FIXED (`cfeb314`)
 
 **Severity: High (user impact) — pre-existing pattern, newly prominent.**
 `isInUS` is a bounding-box check, and the CONUS box (lat 24.5–49.4,
@@ -97,7 +104,7 @@ Northern Mexico (e.g. Tijuana at 32.5°N) has the same exposure.
   *"Retry with source: 'openmeteo' for model-based data at this location."* —
   so AI clients can self-recover.
 
-### I3 — "Recent Precipitation" section can render all zeros
+### I3 — "Recent Precipitation" section can render all zeros — ✅ FIXED (`900f6bd`)
 
 **Severity: Low (cosmetic).** The section gates on raw `precipitation > 0`, but
 values are displayed at 2 decimals (imperial), so trace amounts render as:
@@ -112,7 +119,7 @@ Seen live at Sydney, Guam, and Ushuaia — any drizzle < 0.005 in triggers it.
 **Fix:** gate on the rounded display value (e.g. ≥ 0.005 in / ≥ 0.05 mm), or
 print "Trace" below the threshold.
 
-### I4 — International `get_weather_summary` leaks a raw NOAA error for alerts
+### I4 — International `get_weather_summary` leaks a raw NOAA error for alerts — ✅ FIXED (`f25c634`)
 
 **Severity: Low (polish, but every international user sees it).** The default
 `include` is `["current", "forecast", "alerts"]`, so every non-US summary ends

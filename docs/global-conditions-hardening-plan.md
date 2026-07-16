@@ -1,6 +1,6 @@
 # Global Conditions Hardening — Design Plan
 
-**Status:** SETTLED
+**Status:** IMPLEMENTED (2026-07-16, rides v1.12.0)
 **Parent:** `docs/global-current-conditions-review.md` (post-implementation review
 findings I1–I4); grandparent `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md`
 **Target release:** v1.12.0 (unreleased — these are pre-release fixes riding the
@@ -74,6 +74,15 @@ the `current`/`forecast` sections of `get_weather_summary`.
   point" — the coverage failure). On that catch: log a `logger.warn` (include
   coordinates and `fallback: true`), then run the existing Open-Meteo branch
   for the same request.
+  - **Correction (found in live verification, 2026-07-16):** the coverage 404
+    actually surfaces as **`DataNotFoundError`** — NOAA's `handleError` maps
+    404 there, and `InvalidLocationError` is its generic non-404 4xx branch
+    (the plan misread the throw sites). The implemented fallback catches
+    **both** non-retryable client-error classes; the transient classes
+    (`RateLimitError`, `ServiceUnavailableError`, network) propagate exactly
+    as designed. Caught live against Toronto before the mocked tests were
+    written — the same lesson as the pressure and snowfall traps: verify
+    upstream behavior live, not just against fixtures.
 - Prepend a one-line note to the fallback output so the source switch is
   explained, directly under the top heading:
   `*NOAA does not cover this location; showing Open-Meteo model data instead.*`

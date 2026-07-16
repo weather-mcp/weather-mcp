@@ -7,13 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.12.0] - 2026-07-15
+## [1.12.0] - 2026-07-16
 
 ### Added
+- **Auto-fallback from NOAA to Open-Meteo for border-adjacent locations** - The US routing boxes overrun the border (Toronto, Vancouver, and Windsor all sit inside them), so `get_current_conditions` and `get_forecast` with `source: "auto"` previously returned a hard NOAA error for those cities. When NOAA rejects an auto-routed point (its non-retryable coverage/4xx failures), both tools now fall back to Open-Meteo model data and note the switch under the heading. Transient NOAA outages still propagate as errors, and an explicit `source: "noaa"` keeps its strict error contract. (`src/handlers/currentConditionsHandler.ts`, `src/handlers/forecastHandler.ts`)
 - **Global `get_current_conditions`** - The tool is no longer US-only. It now uses the same auto-select routing as `get_forecast`: US coordinates keep returning NOAA station observations (unchanged output), and international coordinates return Open-Meteo current weather — temperature, feels-like, today's range, dewpoint, humidity, wind with gusts, pressure, cloud cover, and recent precipitation. This also fixes the `current` section of `get_weather_summary`, which previously failed outside the US. (`src/handlers/currentConditionsHandler.ts`, `src/services/openmeteo.ts`)
 - **`source` parameter on `get_current_conditions`** - `"auto"` (default, NOAA in the US and Open-Meteo elsewhere), `"noaa"` (US only), or `"openmeteo"` (works anywhere, including the US — useful for comparison). Same contract as `get_forecast`'s `source`. (`src/index.ts`)
 - **`OpenMeteoService.getCurrentConditions()`** - New service method with a 15-minute cache TTL keyed by unit signature, so imperial and metric responses never share an entry. (`src/services/openmeteo.ts`)
 - **Exported `isInUS()` geography helper** - Extracted from `forecastHandler` into `src/utils/geography.ts` with the same bounding boxes (CONUS, Alaska, Hawaii, Puerto Rico) so both tools route identically. (`src/utils/geography.ts`)
+
+### Fixed
+- **Metric snowfall was understated 10×** - Open-Meteo reports `snowfall` in **cm** unless `precipitation_unit=inch` is requested (its own `current_units` metadata says so), but the output labelled the raw value with the caller's precipitation unit — a real 1.4 mm snowfall rendered as "0.1 mm". Snowfall is now converted to mm for metric output in current conditions and in historical weather (hourly `snowfall` and daily `snowfall_sum`); imperial output was already correct. (`src/utils/unitFormat.ts`, `src/handlers/currentConditionsHandler.ts`, `src/handlers/historicalWeatherHandler.ts`)
+- **Trace precipitation rendered an all-zero section** - Drizzle below display precision (e.g. 0.004 in) triggered a `## Recent Precipitation` section reading "0.00 in". The section and its breakout lines are now gated on a per-unit trace floor (0.005 in / 0.05 mm). (`src/config/displayThresholds.ts`)
+- **International weather summaries leaked a raw NOAA error for alerts** - Every non-US `get_weather_summary` ended with `⚠️ Could not retrieve alerts data … Parameter "point" is invalid: out of bounds`. Non-US locations now get a clean "Weather alerts are currently available for US locations only." note, without the doomed NOAA round-trip. (`src/handlers/weatherSummaryHandler.ts`)
 
 ### Notes
 - International current conditions are **model-interpolated values, not station observations**, and are labelled as such in the output footer. Visibility and snow depth are not included on the international path (hourly-only variables in Open-Meteo).

@@ -100,6 +100,14 @@ downstream consumers see a familiar shape:
     `temperature_unit=fahrenheit`. Pressure must be **converted**
     (`formatPressureFromPa(hPa * 100, prefs)`), not relabelled. Every other
     field we read does honour the unit params.
+  - **Second correction (found in live review, 2026-07-16):** `snowfall` is the
+    other exception — Open-Meteo converts it to inch under
+    `precipitation_unit=inch` but otherwise reports **cm**, not mm
+    (`current_units` says `"snowfall": "cm"` alongside `"precipitation": "mm"`),
+    so metric output was understated 10×. Fixed via `snowfallToPrecipUnit` in
+    `src/utils/unitFormat.ts` (also applied to the historical handler's hourly
+    `snowfall` / daily `snowfall_sum`, which had the same pre-existing bug).
+    See `docs/global-conditions-hardening-plan.md` D1.
 - Timezone comes from the response's `timezone` field (no station lookup).
 - `prependLocationLine` behavior unchanged.
 
