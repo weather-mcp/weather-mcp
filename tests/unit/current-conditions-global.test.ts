@@ -381,6 +381,65 @@ describe('handleGetCurrentConditions — Open-Meteo formatter', () => {
       expect(textOf(result)).not.toContain('## Recent Precipitation');
     });
   });
+
+  describe('snowfall cm-to-mm conversion (D1)', () => {
+    it('converts metric snowfall from cm to mm on display', async () => {
+      // API reports snowfall in cm even under precipitation_unit=mm — 0.14 cm
+      // must render as 1.4 mm, not 0.14 mm.
+      const response = buildOpenMeteoCurrentResponse({ precipitation: 0.5, snowfall: 0.14 });
+      const fakes = buildFakes(response);
+
+      const result = await callCurrentConditions({ ...LONDON, units: 'metric' }, fakes);
+      expect(textOf(result)).toContain('**Snowfall:** 1.4 mm');
+    });
+
+    it('leaves imperial snowfall unchanged (passthrough)', async () => {
+      const response = buildOpenMeteoCurrentResponse({ precipitation: 0.5, snowfall: 0.3 });
+      const fakes = buildFakes(response);
+
+      const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, fakes);
+      expect(textOf(result)).toContain('**Snowfall:** 0.30 in');
+    });
+  });
+
+  describe('trace-precipitation display floor (D3)', () => {
+    it('omits the section when imperial precipitation is below the floor (0.005 in)', async () => {
+      const response = buildOpenMeteoCurrentResponse({ precipitation: 0.004 });
+      const fakes = buildFakes(response);
+
+      const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, fakes);
+      expect(textOf(result)).not.toContain('## Recent Precipitation');
+    });
+
+    it('omits the section when metric precipitation is below the floor (0.05 mm)', async () => {
+      const response = buildOpenMeteoCurrentResponse({ precipitation: 0.04 });
+      const fakes = buildFakes(response);
+
+      const result = await callCurrentConditions({ ...LONDON, units: 'metric' }, fakes);
+      expect(textOf(result)).not.toContain('## Recent Precipitation');
+    });
+
+    it('shows the section when precipitation is exactly at the floor', async () => {
+      const response = buildOpenMeteoCurrentResponse({ precipitation: 0.005 });
+      const fakes = buildFakes(response);
+
+      const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, fakes);
+      expect(textOf(result)).toContain('## Recent Precipitation');
+    });
+
+    it('omits a breakout line below the floor while the section itself still shows', async () => {
+      // precipitation clears the floor so the section renders, but rain is
+      // below it and must be individually suppressed.
+      const response = buildOpenMeteoCurrentResponse({ precipitation: 0.5, rain: 0.001 });
+      const fakes = buildFakes(response);
+
+      const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, fakes);
+      const text = textOf(result);
+
+      expect(text).toContain('## Recent Precipitation');
+      expect(text).not.toContain('**Rain:**');
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

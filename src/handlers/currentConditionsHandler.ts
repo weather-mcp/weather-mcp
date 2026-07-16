@@ -23,6 +23,7 @@ import {
   windSpeedLabel,
   precipitationLabel,
   withLabel,
+  snowfallToPrecipUnit,
 } from '../utils/unitFormat.js';
 import { isInUS } from '../utils/geography.js';
 import { UnitPreferences } from '../config/units.js';
@@ -532,20 +533,30 @@ async function formatOpenMeteoCurrentConditions(
     output += `**Cloud Cover:** ${Math.round(current.cloud_cover)}%\n`;
   }
 
-  // Precipitation section (only when there is something to report)
+  // Precipitation section (only when there is something worth reporting).
+  // Gated on a trace floor rather than `> 0`: raw drizzle otherwise renders
+  // an all-zero section at display precision (e.g. "**Current:** 0.00 in").
   const precipDecimals = prefs.precipitation === 'mm' ? 1 : 2;
-  if (current.precipitation !== undefined && current.precipitation > 0) {
+  const traceFloor = DisplayThresholds.precipitation.traceFloor[prefs.precipitation];
+  // Snowfall is the other field (besides pressure_msl) that Open-Meteo does
+  // not convert to the caller's precipitation unit — it reports cm unless
+  // precipitation_unit=inch was requested. Convert before display/comparison
+  // so the label and the trace-floor check both operate on the shown value.
+  const snowfall = current.snowfall !== undefined
+    ? snowfallToPrecipUnit(current.snowfall, prefs)
+    : undefined;
+  if (current.precipitation !== undefined && current.precipitation >= traceFloor) {
     output += `\n## Recent Precipitation\n`;
     output += `**Current:** ${withLabel(current.precipitation, precipU, precipDecimals)}\n`;
 
-    if (current.rain !== undefined && current.rain > 0) {
+    if (current.rain !== undefined && current.rain >= traceFloor) {
       output += `**Rain:** ${withLabel(current.rain, precipU, precipDecimals)}\n`;
     }
-    if (current.showers !== undefined && current.showers > 0) {
+    if (current.showers !== undefined && current.showers >= traceFloor) {
       output += `**Showers:** ${withLabel(current.showers, precipU, precipDecimals)}\n`;
     }
-    if (current.snowfall !== undefined && current.snowfall > 0) {
-      output += `**Snowfall:** ${withLabel(current.snowfall, precipU, precipDecimals)}\n`;
+    if (snowfall !== undefined && snowfall >= traceFloor) {
+      output += `**Snowfall:** ${withLabel(snowfall, precipU, precipDecimals)}\n`;
     }
   }
 

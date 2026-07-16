@@ -58,6 +58,20 @@ export const DisplayThresholds = {
     moderate: 0.3,
     /** Heavy precipitation (inches per hour) */
     heavy: 0.5,
+    /**
+     * Minimum precipitation before the "Recent Precipitation" section (and
+     * its breakout lines) is shown — half of the smallest displayed
+     * increment. Without this, trace drizzle renders an all-zero section
+     * (e.g. "**Current:** 0.00 in") because the gate used to be `> 0` while
+     * display rounds to 2 decimals (imperial) / 1 decimal (metric).
+     *
+     * Keyed by unit because Open-Meteo returns values already in the
+     * caller's unit — same rationale as `temperature.feelsLikeGap`.
+     */
+    traceFloor: {
+      inch: 0.005,
+      mm: 0.05,
+    },
   },
 } as const;
 
