@@ -1,6 +1,6 @@
 # Max-Range Expansion — Design Plan
 
-**Status:** SETTLED (2026-07-16) — ready for `/impl-plan`
+**Status:** IMPLEMENTED (2026-07-16) — all tasks landed on `feat/max-range-expansion`; see `docs/max-range-expansion-implementation-plan.md` for commit SHAs
 **Parent:** Full-codebase range audit (2026-07-16, this doc's What/Why) following
 the `get_air_quality` forecast fix (`forecast_days` param + day-grouped output +
 null-horizon trimming, committed 3e50ebc on `feat/global-current-conditions`)

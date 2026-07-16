@@ -173,7 +173,7 @@ Get historical weather observations for a location.
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `start_date` (required): Start date in ISO format (YYYY-MM-DD)
 - `end_date` (required): End date in ISO format (YYYY-MM-DD)
-- `limit` (optional): Max observations to return (1-500, default: 168)
+- `limit` (optional): Max hourly observations to return (1-744, default: 168; 744 = the full 31-day hourly window). Applies to hourly output only — daily-granularity output for ranges over 31 days always shows the full range.
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 
 *Coordinates not required when `location_name` or `city_name` is provided.
@@ -338,7 +338,8 @@ Get marine weather conditions including wave height, swell, ocean currents, and 
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `forecast` (optional): Include 5-day marine forecast (default: false)
+- `forecast` (optional): Include daily marine forecast (default: false)
+- `forecast_days` (optional): Number of forecast days when `forecast=true` (1-16, default: 5). The marine model typically provides ~10 days of data — trailing days without data are omitted with a note.
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
@@ -365,7 +366,7 @@ Provides comprehensive marine weather data with intelligent dual-source support:
 - Sea state interpretation (Calm → Phenomenal based on Douglas Sea Scale)
 - Safety assessment for maritime activities
 - Wave period for planning and safety
-- Optional 5-day forecast with daily summaries
+- Optional daily forecast up to 16 days (`forecast_days`, default 5; days past the marine model's ~10-day horizon are trimmed with a note)
 
 ### 10. get_weather_imagery
 Get weather radar, precipitation, and satellite imagery for visual weather analysis.
@@ -377,7 +378,7 @@ Get weather radar, precipitation, and satellite imagery for visual weather analy
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `type` (optional): Imagery type - "precipitation" (default), "radar", or "satellite"
 - `animated` (optional): Return animated loop vs static image (default: false)
-- `detail` (optional): `summary`/`standard` (default) surface direct image URLs; `full` embeds Markdown images
+- `detail` (optional): `summary`/`standard` (default) surface direct image URLs and show 3 representative frames of longer animations; `full` embeds Markdown images and lists every animation frame
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 - `layers` (optional): Additional map layers (reserved for future use)
