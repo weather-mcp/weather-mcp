@@ -266,8 +266,8 @@ code contradicts it.
 
 ## Progress Tracker
 
-- [ ] T1 — Extract `isInUS` into geography utils (`sonnet`)
-- [ ] T2 — Open-Meteo current-weather response types (`haiku`)
+- [x] T1 — Extract `isInUS` into geography utils (`sonnet`) — `987cf96`
+- [x] T2 — Open-Meteo current-weather response types (`haiku`) — `8de3593`
 - [ ] T3 — `OpenMeteoService.getCurrentConditions()` (`sonnet`)
 - [ ] T4 — Route non-US current conditions to Open-Meteo (`opus`)
 - [ ] T5 — Handler routing and formatter tests (`sonnet`)
