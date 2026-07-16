@@ -17,6 +17,7 @@ import {
   formatTemperatureQV,
   formatWindSpeedQV,
   formatPressureFromPa,
+  snowfallToPrecipUnit,
 } from '../utils/unitFormat.js';
 import { ApiConstants, FormatConstants } from '../config/displayThresholds.js';
 
@@ -108,7 +109,7 @@ export async function handleGetHistoricalWeather(
           }
 
           if (weatherData.hourly.snowfall?.[i] !== null && weatherData.hourly.snowfall?.[i] !== undefined && weatherData.hourly.snowfall[i] > 0) {
-            output += `- **Snowfall:** ${weatherData.hourly.snowfall[i].toFixed(1)} ${precipU}\n`;
+            output += `- **Snowfall:** ${snowfallToPrecipUnit(weatherData.hourly.snowfall[i], prefs).toFixed(1)} ${precipU}\n`;
           }
 
           if (weatherData.hourly.wind_speed_10m?.[i] !== null && weatherData.hourly.wind_speed_10m?.[i] !== undefined) {
@@ -176,7 +177,7 @@ export async function handleGetHistoricalWeather(
           }
 
           if (weatherData.daily.snowfall_sum?.[i] !== null && weatherData.daily.snowfall_sum?.[i] !== undefined && weatherData.daily.snowfall_sum[i] > 0) {
-            output += `- **Snowfall:** ${weatherData.daily.snowfall_sum[i].toFixed(1)} ${precipU}\n`;
+            output += `- **Snowfall:** ${snowfallToPrecipUnit(weatherData.daily.snowfall_sum[i], prefs).toFixed(1)} ${precipU}\n`;
           }
 
           if (weatherData.daily.wind_speed_10m_max?.[i] !== null && weatherData.daily.wind_speed_10m_max?.[i] !== undefined) {
