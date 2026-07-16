@@ -244,7 +244,7 @@ The design-sensitive core — the orchestrator does this one itself.
 ## Progress Tracker
 
 - [x] T1 — Marine service: 16-day cap, drop dead hourly fetch (`sonnet`) — `1c71eb6`
-- [ ] T2 — Marine handler: forecast_days + full-range null-trimmed display (`opus`)
+- [x] T2 — Marine handler: forecast_days + full-range null-trimmed display (`opus`) — `165fc1b`
 - [ ] T3 — Marine forecast unit tests (`sonnet`)
 - [ ] T4 — Historical hourly limit ceiling 500 → 744 (`sonnet`)
 - [ ] T5 — detail="full" lists all animation frames (`sonnet`)
