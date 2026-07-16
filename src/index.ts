@@ -478,7 +478,7 @@ const TOOL_DEFINITIONS = {
 
   get_weather_imagery: {
     name: 'get_weather_imagery' as const,
-    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization. Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. By default returns direct image URLs; use detail="full" to embed Markdown images. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For numerical forecast data, use get_forecast instead.',
+    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization. Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. By default returns direct image URLs; use detail="full" to embed Markdown images and list every animation frame (lower detail levels show 3 representative frames of longer animations). Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For numerical forecast data, use get_forecast instead.',
     inputSchema: {
       type: 'object' as const,
       properties: {

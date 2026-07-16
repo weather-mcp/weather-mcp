@@ -313,7 +313,7 @@ describe('Weather Imagery Handler', () => {
       expect(formatted).toContain('### Frame 1');
       expect(formatted).toContain('### Frame 7'); // Middle frame
       expect(formatted).toContain('### Frame 12'); // Last frame
-      expect(formatted).toContain('*Showing 3 of 12 frames for brevity*');
+      expect(formatted).toContain('*Showing 3 of 12 frames for brevity — use detail="full" for all frames*');
     });
 
     it('should show all frames when 5 or fewer', () => {
@@ -342,6 +342,86 @@ describe('Weather Imagery Handler', () => {
       expect(formatted).toContain('### Frame 4');
       expect(formatted).toContain('### Frame 5');
       expect(formatted).not.toContain('Showing 3 of 5 frames');
+    });
+
+    it('should list every frame when detail="full", even for long animations', () => {
+      const frames: ImageryFrame[] = Array.from({ length: 13 }, (_, i) => ({
+        url: `https://example.com/frame${i}.png`,
+        timestamp: new Date(`2024-01-01T${String(i).padStart(2, '0')}:00:00Z`),
+        description: `Frame ${i + 1}`
+      }));
+
+      const response: WeatherImageryResponse = {
+        type: 'precipitation',
+        location: { latitude: 40.7128, longitude: -74.006 },
+        coverage: 'Global',
+        resolution: '13 frames',
+        source: 'RainViewer',
+        animated: true,
+        frames,
+        generatedAt: new Date('2024-01-01T12:00:00Z')
+      };
+
+      const formatted = formatWeatherImageryResponse(response, 'full');
+
+      const frameHeadingCount = (formatted.match(/### Frame /g) || []).length;
+      expect(frameHeadingCount).toBe(13);
+      expect(formatted).toContain('### Frame 1 ');
+      expect(formatted).toContain('### Frame 13 ');
+      expect(formatted).not.toContain('Showing 3 of');
+    });
+
+    it('should still show only 3 representative frames at detail="standard" for long animations', () => {
+      const frames: ImageryFrame[] = Array.from({ length: 13 }, (_, i) => ({
+        url: `https://example.com/frame${i}.png`,
+        timestamp: new Date(`2024-01-01T${String(i).padStart(2, '0')}:00:00Z`),
+        description: `Frame ${i + 1}`
+      }));
+
+      const response: WeatherImageryResponse = {
+        type: 'precipitation',
+        location: { latitude: 40.7128, longitude: -74.006 },
+        coverage: 'Global',
+        resolution: '13 frames',
+        source: 'RainViewer',
+        animated: true,
+        frames,
+        generatedAt: new Date('2024-01-01T12:00:00Z')
+      };
+
+      const formatted = formatWeatherImageryResponse(response, 'standard');
+
+      const frameHeadingCount = (formatted.match(/### Frame /g) || []).length;
+      expect(frameHeadingCount).toBe(3);
+      expect(formatted).toContain('### Frame 1 ');
+      expect(formatted).toContain('### Frame 7 '); // Middle frame
+      expect(formatted).toContain('### Frame 13 '); // Last frame
+      expect(formatted).toContain('*Showing 3 of 13 frames for brevity — use detail="full" for all frames*');
+    });
+
+    it('should show all frames at detail="standard" when 5 or fewer, with no brevity note', () => {
+      const frames: ImageryFrame[] = Array.from({ length: 4 }, (_, i) => ({
+        url: `https://example.com/frame${i}.png`,
+        timestamp: new Date(`2024-01-01T${12 + i}:00:00Z`),
+        description: `Frame ${i + 1}`
+      }));
+
+      const response: WeatherImageryResponse = {
+        type: 'precipitation',
+        location: { latitude: 40.7128, longitude: -74.006 },
+        coverage: 'Global',
+        resolution: '4 frames',
+        source: 'RainViewer',
+        animated: true,
+        frames,
+        generatedAt: new Date('2024-01-01T12:00:00Z')
+      };
+
+      const formatted = formatWeatherImageryResponse(response, 'standard');
+
+      const frameHeadingCount = (formatted.match(/### Frame /g) || []).length;
+      expect(frameHeadingCount).toBe(4);
+      expect(formatted).not.toContain('Showing 3 of');
     });
 
     it('should include disclaimer when present', () => {
