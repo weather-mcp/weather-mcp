@@ -277,8 +277,8 @@ code contradicts it.
 - [x] T2 — Open-Meteo current-weather response types (`haiku`) — `8de3593`
 - [x] T3 — `OpenMeteoService.getCurrentConditions()` (`sonnet`) — `824f2bd`
 - [x] T4 — Route non-US current conditions to Open-Meteo (`opus`) — `9df95ad`
-- [ ] T5 — Handler routing and formatter tests (`sonnet`)
-- [ ] T6 — Expose `source` on `get_current_conditions` (`sonnet`)
+- [x] T5 — Handler routing and formatter tests (`sonnet`) — `cb82b03`
+- [x] T6 — Expose `source` on `get_current_conditions` (`sonnet`) — `b3af4d9`
 - [ ] T7 — Docs and version (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
