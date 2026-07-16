@@ -6,7 +6,7 @@ import { OpenMeteoService } from '../services/openmeteo.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
-import { validateOptionalBoolean } from '../utils/validation.js';
+import { validateOptionalBoolean, validatePositiveInteger } from '../utils/validation.js';
 import {
   getUSAQICategory,
   getEuropeanAQICategory,
@@ -15,7 +15,7 @@ import {
   formatPollutantConcentration,
   shouldUseUSAQI
 } from '../utils/airQuality.js';
-import type { OpenMeteoAirQualityResponse } from '../types/openmeteo.js';
+import type { OpenMeteoAirQualityResponse, OpenMeteoAirQualityHourlyData } from '../types/openmeteo.js';
 
 interface AirQualityArgs {
   latitude?: number;
@@ -23,7 +23,11 @@ interface AirQualityArgs {
   location_name?: string;
   city_name?: string;
   forecast?: boolean;
+  forecast_days?: number;
 }
+
+const DEFAULT_FORECAST_DAYS = 5;
+const MAX_FORECAST_DAYS = 7; // Open-Meteo air quality API limit (168 hours)
 
 export async function handleGetAirQuality(
   args: unknown,
@@ -39,13 +43,17 @@ export async function handleGetAirQuality(
     'forecast',
     false
   );
+  const rawForecastDays = (args as AirQualityArgs)?.forecast_days;
+  const forecastDays = rawForecastDays === undefined
+    ? DEFAULT_FORECAST_DAYS
+    : validatePositiveInteger(rawForecastDays, 'forecast_days', 1, MAX_FORECAST_DAYS);
 
   // Get air quality data
   const airQualityData = await openMeteoService.getAirQuality(
     latitude,
     longitude,
     forecast,
-    5 // Default 5-day forecast
+    forecastDays
   );
 
   // Format the air quality data for display
@@ -183,41 +191,156 @@ function formatAirQuality(
   if (includeForecast && data.hourly && data.hourly.time && data.hourly.time.length > 0) {
     output += `---\n\n`;
     output += `## Air Quality Forecast\n\n`;
-
-    // Show next 24 hours
-    const hoursToShow = Math.min(24, data.hourly.time.length);
-    output += `**Next ${hoursToShow} hours:**\n\n`;
-
-    // Group by 6-hour periods for readability
-    const periods = Math.ceil(hoursToShow / 6);
-    for (let i = 0; i < periods; i++) {
-      const startIdx = i * 6;
-      const endIdx = Math.min(startIdx + 6, hoursToShow);
-
-      const startTime = new Date(data.hourly.time[startIdx]);
-      const endTime = new Date(data.hourly.time[endIdx - 1]);
-
-      // Get AQI range for this period
-      let minAQI = Infinity;
-      let maxAQI = -Infinity;
-
-      for (let j = startIdx; j < endIdx; j++) {
-        const aqiValue = useUSAQI ? data.hourly.us_aqi?.[j] : data.hourly.european_aqi?.[j];
-        if (aqiValue !== undefined) {
-          minAQI = Math.min(minAQI, aqiValue);
-          maxAQI = Math.max(maxAQI, aqiValue);
-        }
-      }
-
-      const avgAQI = (minAQI + maxAQI) / 2;
-      const aqiCategory = useUSAQI ? getUSAQICategory(avgAQI) : getEuropeanAQICategory(avgAQI);
-
-      output += `**${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}:** `;
-      output += `${useUSAQI ? 'US' : 'EU'} AQI ${Math.round(minAQI)}-${Math.round(maxAQI)} (${aqiCategory.level})\n`;
-    }
-
-    output += `\n*Forecast includes ${data.hourly.time.length} hours of data*\n`;
+    output += formatHourlyForecast(data.hourly, useUSAQI, current.time);
   }
 
   return output;
+}
+
+/**
+ * Format the hourly AQI forecast grouped by local calendar day, with 6-hour
+ * period ranges inside each day. Hours before the current observation time
+ * are skipped. Open-Meteo returns location-local ISO timestamps
+ * ("YYYY-MM-DDTHH:mm" with timezone=auto), so dates and hours are read
+ * directly from the strings instead of being parsed through the server's
+ * local timezone.
+ */
+function formatHourlyForecast(
+  hourly: OpenMeteoAirQualityHourlyData,
+  useUSAQI: boolean,
+  currentTime: string
+): string {
+  const times = hourly.time;
+  let output = '';
+
+  // The declared types say number[], but past the model's real horizon the
+  // API pads the arrays with nulls — which would coerce to 0 ("Good") in
+  // Math.min/max. Treat anything non-finite as missing.
+  const aqiAt = (i: number): number | undefined => {
+    const value = useUSAQI ? hourly.us_aqi?.[i] : hourly.european_aqi?.[i];
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  };
+
+  // Skip hours already past. ISO local timestamps compare lexicographically.
+  const nowHour = currentTime.slice(0, 13);
+  let startIdx = times.findIndex((t) => t.slice(0, 13) >= nowHour);
+  if (startIdx === -1) {
+    startIdx = 0;
+  }
+
+  // Trim trailing hours with no AQI data (nulls past the model horizon)
+  let lastIdx = times.length - 1;
+  while (lastIdx >= startIdx && aqiAt(lastIdx) === undefined) {
+    lastIdx--;
+  }
+  if (lastIdx < startIdx) {
+    return `*No AQI forecast data available for this location.*\n`;
+  }
+
+  // Group remaining hourly indices by local calendar date
+  const dayOrder: string[] = [];
+  const dayIndices = new Map<string, number[]>();
+  for (let i = startIdx; i <= lastIdx; i++) {
+    const date = times[i].slice(0, 10);
+    let indices = dayIndices.get(date);
+    if (!indices) {
+      indices = [];
+      dayIndices.set(date, indices);
+      dayOrder.push(date);
+    }
+    indices.push(i);
+  }
+
+  const aqiScale = useUSAQI ? 'US' : 'EU';
+
+  for (const date of dayOrder) {
+    const indices = dayIndices.get(date)!;
+
+    let dayPeak = -Infinity;
+    for (const i of indices) {
+      const value = aqiAt(i);
+      if (value !== undefined) {
+        dayPeak = Math.max(dayPeak, value);
+      }
+    }
+
+    if (dayPeak === -Infinity) {
+      output += `### ${formatDayLabel(date)}\n\n*No AQI data available for this day*\n\n`;
+      continue;
+    }
+
+    const peakCategory = useUSAQI ? getUSAQICategory(dayPeak) : getEuropeanAQICategory(dayPeak);
+    output += `### ${formatDayLabel(date)} — peak ${aqiScale} AQI ${Math.round(dayPeak)} (${peakCategory.level})\n\n`;
+
+    // 6-hour periods aligned to the local clock (12 AM / 6 AM / 12 PM / 6 PM)
+    const periods = new Map<number, number[]>();
+    for (const i of indices) {
+      const hour = parseInt(times[i].slice(11, 13), 10);
+      const period = Math.floor(hour / 6);
+      let periodIndices = periods.get(period);
+      if (!periodIndices) {
+        periodIndices = [];
+        periods.set(period, periodIndices);
+      }
+      periodIndices.push(i);
+    }
+
+    for (const [, periodIndices] of [...periods.entries()].sort((a, b) => a[0] - b[0])) {
+      let minAQI = Infinity;
+      let maxAQI = -Infinity;
+      for (const i of periodIndices) {
+        const value = aqiAt(i);
+        if (value !== undefined) {
+          minAQI = Math.min(minAQI, value);
+          maxAQI = Math.max(maxAQI, value);
+        }
+      }
+      if (maxAQI === -Infinity) {
+        continue;
+      }
+
+      const startHour = parseInt(times[periodIndices[0]].slice(11, 13), 10);
+      const endHour = parseInt(times[periodIndices[periodIndices.length - 1]].slice(11, 13), 10);
+      const category = useUSAQI ? getUSAQICategory(maxAQI) : getEuropeanAQICategory(maxAQI);
+      const range = Math.round(minAQI) === Math.round(maxAQI)
+        ? `${Math.round(maxAQI)}`
+        : `${Math.round(minAQI)}-${Math.round(maxAQI)}`;
+
+      output += `- **${formatHour(startHour)} – ${formatHour(endHour)}:** ${aqiScale} AQI ${range} (${category.level})\n`;
+    }
+
+    output += `\n`;
+  }
+
+  const hoursShown = lastIdx - startIdx + 1;
+  output += `*Forecast covers ${hoursShown} hours across ${dayOrder.length} day(s). `;
+  output += `Each period's category reflects its peak AQI.*\n`;
+  if (lastIdx < times.length - 1) {
+    const missing = times.length - 1 - lastIdx;
+    output += `*The air quality model provided no data for the final ${missing} requested hour(s).*\n`;
+  }
+
+  return output;
+}
+
+/**
+ * Format a local hour (0-23) as a 12-hour clock label
+ */
+function formatHour(hour: number): string {
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12} ${hour < 12 ? 'AM' : 'PM'}`;
+}
+
+/**
+ * Format a "YYYY-MM-DD" date as a weekday + date label. Anchored to noon UTC
+ * so the printed day never shifts with the server's timezone.
+ */
+function formatDayLabel(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  return d.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC'
+  });
 }

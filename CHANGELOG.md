@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`forecast_days` parameter on `get_air_quality`** - Request 1-7 days of AQI forecast (default: 5; 7 days / 168 hours is the Open-Meteo air quality model's maximum). Previously the service always fetched 5 days but the output silently showed only the first 24 hours. (`src/handlers/airQualityHandler.ts`, `src/index.ts`)
+
+### Fixed
+- **Null AQI hours rendered as "AQI 0 (Good)"** - Past the air quality model's real horizon, Open-Meteo pads the hourly arrays with `null`s, which coerced to `0` in the range math and displayed as Good air quality — dangerously misleading for the exact days users would check before an event. Non-finite values are now treated as missing: trailing no-data hours are trimmed (with a note about how many requested hours the model couldn't provide), interior nulls are excluded from period ranges, and an all-null response yields a clear "no forecast data" message. (`src/handlers/airQualityHandler.ts`)
+
+### Changed
+- **Air quality forecast now shows the full fetched range, grouped by day** - The forecast section previously printed a single undated "Next 24 hours" block whose 6-hour buckets included hours already past and gave no hint which calendar day an evening spike belonged to. It now renders every fetched day under a dated header (e.g. `### Thursday, Jul 17 — peak US AQI 133 (Unhealthy for Sensitive Groups)`) with 6-hour period ranges inside each day, skips hours before the current observation time, and labels each period with the category of its **peak** AQI (previously the midpoint of min/max, which understated health risk in rising-pollution periods). Dates and hours are read from Open-Meteo's location-local timestamps directly, so output no longer shifts with the server's timezone. (`src/handlers/airQualityHandler.ts`)
+
 ## [1.12.0] - 2026-07-16
 
 ### Added

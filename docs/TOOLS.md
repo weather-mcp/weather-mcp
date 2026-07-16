@@ -307,12 +307,13 @@ Get comprehensive air quality data for any location worldwide.
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `forecast` (optional): Include hourly forecast for next 5 days (default: false)
+- `forecast` (optional): Include an hourly AQI forecast grouped by day (default: false)
+- `forecast_days` (optional): Days of forecast when `forecast=true` (1-7, default: 5; 7 days / 168 hours is the model maximum)
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
-Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index.
+Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index. With `forecast=true`, the full forecast range is shown grouped by calendar day — each day gets a dated header with its peak AQI, plus 6-hour period ranges labeled by the period's peak AQI category. Hours already past are skipped.
 
 **Examples:**
 ```
