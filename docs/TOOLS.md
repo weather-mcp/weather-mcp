@@ -10,7 +10,7 @@ Complete reference for all 17 MCP tools provided by the Weather MCP Server.
 
 **Core Weather**
 1. [get_forecast](#1-get_forecast) — Forecasts, global
-2. [get_current_conditions](#2-get_current_conditions) — Real-time observations, US
+2. [get_current_conditions](#2-get_current_conditions) — Current weather, global
 3. [get_alerts](#3-get_alerts) — Watches/warnings/advisories, US
 4. [get_historical_weather](#4-get_historical_weather) — 1940–present, global
 5. [get_weather_summary](#5-get_weather_summary) — One-call combined overview, global
@@ -83,25 +83,34 @@ Automatically selects the best data source: NOAA for US locations (more detailed
 - All timestamps in local timezone
 
 ### 2. get_current_conditions
-Get current weather conditions for a location (US only).
+Get current weather conditions for a location (global).
 
 **Parameters:**
 - `latitude` (required*): Latitude coordinate (-90 to 90)
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `include_fire_weather` (optional): Include fire weather indices (default: false)
+- `include_fire_weather` (optional): Include fire weather indices (default: false, US only)
 - `include_normals` (optional): Include climate normals for comparison (default: false)
+- `source` (optional): `"auto"` (default), `"noaa"`, or `"openmeteo"` — see Description
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
+**Description:**
+Automatically selects the best data source: NOAA for US locations (real station
+observations, richer detail) or Open-Meteo for international locations. Open-Meteo
+values are **model-interpolated, not station observations**, and the output footer
+says so. Use `source` to force a provider — `"openmeteo"` works anywhere including
+the US (useful for comparison), while `"noaa"` outside the US will error.
+
 **Example:**
 ```
 What are the current weather conditions in New York? (latitude: 40.7128, longitude: -74.0060)
+What's the weather right now in Tokyo?
 ```
 
-**Returns:**
+**Returns (US, via NOAA):**
 - Current temperature, humidity, wind, pressure
 - Heat index or wind chill (when applicable)
 - 24-hour temperature range
@@ -111,6 +120,17 @@ What are the current weather conditions in New York? (latitude: 40.7128, longitu
 - Climate normals comparison (when `include_normals=true`)
 - Fire weather indices (when `include_fire_weather=true`) — Haines Index, Grassland Fire Danger, Red Flag Threat, mixing height, transport winds
 - All timestamps in local timezone
+
+**Returns (international, via Open-Meteo):**
+- Current temperature and feels-like (when it diverges meaningfully from actual)
+- Today's high/low range
+- Dewpoint, humidity, wind with gusts, pressure, cloud cover percentage
+- Recent precipitation (broken out into rain/showers/snowfall when present)
+- Climate normals comparison (when `include_normals=true`)
+- All timestamps in the location's local timezone
+
+Visibility, snow depth, cloud layer detail, and fire weather indices are not
+available on the international path.
 
 ### 3. get_alerts
 Get active weather alerts, watches, warnings, and advisories for US locations.

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-07-15
+
+### Added
+- **Global `get_current_conditions`** - The tool is no longer US-only. It now uses the same auto-select routing as `get_forecast`: US coordinates keep returning NOAA station observations (unchanged output), and international coordinates return Open-Meteo current weather — temperature, feels-like, today's range, dewpoint, humidity, wind with gusts, pressure, cloud cover, and recent precipitation. This also fixes the `current` section of `get_weather_summary`, which previously failed outside the US. (`src/handlers/currentConditionsHandler.ts`, `src/services/openmeteo.ts`)
+- **`source` parameter on `get_current_conditions`** - `"auto"` (default, NOAA in the US and Open-Meteo elsewhere), `"noaa"` (US only), or `"openmeteo"` (works anywhere, including the US — useful for comparison). Same contract as `get_forecast`'s `source`. (`src/index.ts`)
+- **`OpenMeteoService.getCurrentConditions()`** - New service method with a 15-minute cache TTL keyed by unit signature, so imperial and metric responses never share an entry. (`src/services/openmeteo.ts`)
+- **Exported `isInUS()` geography helper** - Extracted from `forecastHandler` into `src/utils/geography.ts` with the same bounding boxes (CONUS, Alaska, Hawaii, Puerto Rico) so both tools route identically. (`src/utils/geography.ts`)
+
+### Notes
+- International current conditions are **model-interpolated values, not station observations**, and are labelled as such in the output footer. Visibility and snow depth are not included on the international path (hourly-only variables in Open-Meteo).
+- Fire weather indices (`include_fire_weather`) remain US-only; international requests emit a short note instead of making a NOAA call.
+- `get_alerts`, `get_river_conditions`, and `get_wildfire_info` are still US-only.
+
 ## [1.11.1] - 2026-07-13
 
 ### Added

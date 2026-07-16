@@ -58,7 +58,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | Tool | What it does | Coverage |
 |------|-------------|----------|
 | `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name; sunrise/sunset, UV, precipitation probability, optional climate-normals comparison | 🌍 Global |
-| `get_current_conditions` | Real-time observations: temperature, wind, heat index/wind chill, snow depth, optional fire-weather indices | 🇺🇸 US |
+| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional fire-weather indices), Open-Meteo model data elsewhere | 🌍 Global |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity | 🇺🇸 US |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
 | `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
@@ -248,7 +248,7 @@ Being honest about what free public data can and can't do:
 | Forecasts (up to 16 days) | ✅ | Richer detail via NOAA |
 | Historical weather (1940+) | ✅ (>7 days old) | Station-level detail for last 7 days |
 | Air quality, marine, radar, lightning | ✅ | — |
-| Current conditions | ❌ | ✅ |
+| Current conditions | ✅ | Station observations via NOAA (richer detail) |
 | Weather alerts | ❌ | ✅ |
 | River conditions, wildfires | ❌ | ✅ |
 

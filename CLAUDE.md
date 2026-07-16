@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA and Open-Meteo APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, and severe weather alerts.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.11.1 (Production Ready)
+- **Version:** 1.12.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** @modelcontextprotocol/sdk v1.21.0
 
@@ -74,7 +74,7 @@ All location-based tools accept coordinates, a saved `location_name`, or a
 free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
 
 1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); `detail` output control
-2. **get_current_conditions** - Current weather + fire weather indices (NOAA, US only)
+2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere; auto-select via `source`); fire weather indices are US-only
 3. **get_alerts** - Weather alerts/warnings (NOAA, US only); `detail` output control
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo, global)
 5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning) (NEW in v1.11.0)
@@ -551,14 +551,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.11.1
+- **Version:** 1.12.0
 - **Status:** Production Ready ✅
+- **New in v1.12.0:** Global `get_current_conditions` — NOAA station observations in the US (unchanged), Open-Meteo model data elsewhere, auto-selected by the shared `isInUS` helper and overridable with a `source` parameter (`auto`/`noaa`/`openmeteo`). Fixes the `current` section of `get_weather_summary` outside the US. Fire weather indices remain US-only; `get_alerts`, rivers, and wildfire are still US-only.
 - **New in v1.11.1:** Geocoding fix — `city_name`/`search_location` lookups no longer fail at low result limits (RFC 3986 `%20` encoding + result floor); river forecast no longer prints NWPS `-999`/year-0001 placeholder sentinels; lightning monitoring is pre-warmed for saved locations at startup (`WEATHER_LIGHTNING_PREWARM`)
 - **New in v1.11.0:** Universal location resolution (`location_name`/`city_name` on every location-based tool), `get_weather_summary` composite tool, `detail` output control (forecast/alerts/imagery), and a "summary-first" 6-tool default `basic` preset led by `get_weather_summary` (history, air quality, saved-location CRUD, and specialized tools live in `standard`/`full`)
 - **New in v1.10.0:** Unit localization — imperial/metric (plus per-unit overrides and 12h/24h) via `WEATHER_UNITS` env or a per-call `units` parameter on forecast/current/historical tools
 - **New in v1.9.0:** `city_name` parameter for `get_forecast` — request a forecast by free-text place name (geocoded on demand, with caching)
 - **Security Rating:** A- (Excellent, 93/100)
-- **Test Coverage:** 1,165 tests, 100% pass rate
+- **Test Coverage:** 1,208 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
 
 ## Useful References
@@ -581,6 +582,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2026-07-13 (v1.11.1)
+**Last Updated:** 2026-07-15 (v1.12.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.

@@ -1,6 +1,6 @@
 # Global Current Conditions — Design Plan
 
-**Status:** SETTLED (2026-07-15)
+**Status:** IMPLEMENTED (2026-07-15, v1.12.0)
 **Parent:** `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md` (Phase 1)
 **Target release:** v1.12.0
 **Branch (for /impl-plan):** `feat/global-current-conditions`

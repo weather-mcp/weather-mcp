@@ -1,8 +1,8 @@
 # International Coverage Roadmap
 
 **Created:** 2026-07-15
-**Status:** Proposed
-**Goal:** Extend the four remaining US-only tools to worldwide coverage using free, open APIs, preserving the project's zero-cost model.
+**Status:** In progress — Phase 1 shipped in v1.12.0 (2026-07-15); Phases 2–5 proposed
+**Goal:** Extend the remaining US-only tools (`get_alerts`, `get_river_conditions`, `get_wildfire_info`) to worldwide coverage using free, open APIs, preserving the project's zero-cost model.
 
 ## Current Coverage Inventory
 
@@ -17,12 +17,12 @@ Already global (no work needed):
 | `get_weather_imagery` | RainViewer | Global |
 | `get_lightning_activity` | Blitzortung.org | Global |
 | `search_location` / geocoding | Nominatim/OSM | Global |
+| `get_current_conditions` | NOAA (US) / Open-Meteo (auto-select) | Global (since v1.12.0 — Phase 1) |
 
 US-only today:
 
 | Tool | Provider | Gap |
 |------|----------|-----|
-| `get_current_conditions` | NOAA stations | No fallback outside US (`currentConditionsHandler.ts` imports `OpenMeteoService` but never uses it) |
 | `get_alerts` | NOAA CAP | US alerts only |
 | `get_river_conditions` | NOAA NWPS + USGS | US gauges only |
 | `get_wildfire_info` | NIFC | US incidents only |
@@ -31,9 +31,15 @@ US-only today:
 
 The auto-select pattern to replicate everywhere: `forecastHandler.ts:235` (US → NOAA, elsewhere → Open-Meteo).
 
-## Priority 1 — Global current conditions (no new provider)
+## Priority 1 — Global current conditions (no new provider) ✅ DONE (v1.12.0)
 
-**Design plan:** `docs/global-current-conditions-plan.md` (settled 2026-07-15)
+**Design plan:** `docs/global-current-conditions-plan.md` (implemented 2026-07-15)
+
+**Shipped:** `OpenMeteoService.getCurrentConditions()` plus US/non-US auto-select in
+`currentConditionsHandler.ts`, routed by the shared `isInUS` helper in
+`src/utils/geography.ts` and overridable with a `source` parameter. The
+aviationweather.gov METAR supplement below was **not** taken up and remains
+available as a future option.
 
 **API:** Open-Meteo forecast API `current=` parameters (temperature, humidity, apparent temperature, wind, gusts, pressure, precipitation, cloud cover, weather code).
 
@@ -99,7 +105,7 @@ All options preserve the zero-cost model; only FIRMS breaks the zero-key model (
 
 | Phase | Change | New provider? | Effort |
 |-------|--------|---------------|--------|
-| 1 | Open-Meteo fallback in `get_current_conditions` | No | Small |
+| ~~1~~ ✅ | ~~Open-Meteo fallback in `get_current_conditions`~~ — shipped in v1.12.0 | No | Small |
 | 2 | Open-Meteo Flood API in `get_river_conditions` | No (new endpoint) | Small–medium |
 | 3 | MeteoAlarm + GeoMet alerts routing | Yes (2, keyless) | Medium |
 | 4 | NASA FIRMS in `get_wildfire_info` | Yes (free key, optional) | Medium |
