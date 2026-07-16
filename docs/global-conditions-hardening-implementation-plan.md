@@ -1,6 +1,6 @@
 # Global Conditions Hardening — Implementation Plan
 
-**Status:** READY (2026-07-16)
+**Status:** COMPLETE (2026-07-16) — all tasks landed on `feat/global-current-conditions`
 
 Execution plan for `docs/global-conditions-hardening-plan.md` (the WHAT/WHY);
 rules live in `docs/orchestration-playbook.md`.
@@ -224,7 +224,7 @@ The design-sensitive core — the orchestrator does this one itself.
 - [x] T4 — Auto-mode NOAA → Open-Meteo fallback (`opus`) — `cfeb314`
 - [x] T5 — Fallback routing tests (`sonnet`) — `510c32f`
 - [x] T6 — Clean US-only alerts note in weather summary (`sonnet`) — `f25c634`
-- [ ] T7 — Docs (`opus`)
+- [x] T7 — Docs (`opus`) — `44a990a`
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, all six design-plan
