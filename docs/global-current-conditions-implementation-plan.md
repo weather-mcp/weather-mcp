@@ -268,7 +268,7 @@ code contradicts it.
 
 - [x] T1 — Extract `isInUS` into geography utils (`sonnet`) — `987cf96`
 - [x] T2 — Open-Meteo current-weather response types (`haiku`) — `8de3593`
-- [ ] T3 — `OpenMeteoService.getCurrentConditions()` (`sonnet`)
+- [x] T3 — `OpenMeteoService.getCurrentConditions()` (`sonnet`) — `824f2bd`
 - [ ] T4 — Route non-US current conditions to Open-Meteo (`opus`)
 - [ ] T5 — Handler routing and formatter tests (`sonnet`)
 - [ ] T6 — Expose `source` on `get_current_conditions` (`sonnet`)
