@@ -246,7 +246,7 @@ The design-sensitive core — the orchestrator does this one itself.
 - [x] T1 — Marine service: 16-day cap, drop dead hourly fetch (`sonnet`) — `1c71eb6`
 - [x] T2 — Marine handler: forecast_days + full-range null-trimmed display (`opus`) — `165fc1b`
 - [x] T3 — Marine forecast unit tests (`sonnet`) — `7ebae1c`
-- [ ] T4 — Historical hourly limit ceiling 500 → 744 (`sonnet`)
+- [x] T4 — Historical hourly limit ceiling 500 → 744 (`sonnet`) — `9f7e9ec`
 - [ ] T5 — detail="full" lists all animation frames (`sonnet`)
 - [x] T6 — RainViewer nowcast appended defensively (`sonnet`) — `7c6e1db`
 - [ ] T7 — Live sweep + docs (`opus`)
