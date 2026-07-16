@@ -221,7 +221,7 @@ The design-sensitive core — the orchestrator does this one itself.
 - [x] T1 — Snowfall unit helper (`sonnet`) — `f2499c5`
 - [x] T2 — Current-conditions snowfall conversion + trace floor (`sonnet`) — `900f6bd`
 - [x] T3 — Historical snowfall conversion (`sonnet`) — `4a4f2c6`
-- [ ] T4 — Auto-mode NOAA → Open-Meteo fallback (`opus`)
+- [x] T4 — Auto-mode NOAA → Open-Meteo fallback (`opus`) — `cfeb314`
 - [ ] T5 — Fallback routing tests (`sonnet`)
 - [ ] T6 — Clean US-only alerts note in weather summary (`sonnet`)
 - [ ] T7 — Docs (`opus`)
