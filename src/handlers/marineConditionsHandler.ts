@@ -9,7 +9,7 @@ import { OpenMeteoService } from '../services/openmeteo.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
-import { validateOptionalBoolean } from '../utils/validation.js';
+import { validateOptionalBoolean, validatePositiveInteger } from '../utils/validation.js';
 import {
   formatWaveHeight,
   formatWavePeriod,
@@ -32,7 +32,13 @@ interface MarineConditionsArgs {
   location_name?: string;
   city_name?: string;
   forecast?: boolean;
+  forecast_days?: number;
 }
+
+const DEFAULT_FORECAST_DAYS = 5;
+// Open-Meteo Marine API accepts up to 16 days (verified live 2026-07-16);
+// the model horizon is typically ~10 days, with trailing days null-padded.
+const MAX_FORECAST_DAYS = 16;
 
 export async function handleGetMarineConditions(
   args: unknown,
@@ -49,6 +55,10 @@ export async function handleGetMarineConditions(
     'forecast',
     false
   );
+  const rawForecastDays = (args as MarineConditionsArgs)?.forecast_days;
+  const forecastDays = rawForecastDays === undefined
+    ? DEFAULT_FORECAST_DAYS
+    : validatePositiveInteger(rawForecastDays, 'forecast_days', 1, MAX_FORECAST_DAYS);
 
   // Get timezone for proper time formatting
   let timezone = guessTimezoneFromCoords(latitude, longitude); // fallback
@@ -125,7 +135,7 @@ export async function handleGetMarineConditions(
     latitude,
     longitude,
     forecast,
-    5 // Default 5-day forecast
+    forecastDays
   );
 
   // Format the marine data for display
@@ -334,45 +344,74 @@ function formatOpenMeteoMarineConditions(
     output += `---\n\n`;
     output += `## 📅 Marine Forecast\n\n`;
 
-    const daysToShow = Math.min(5, data.daily.time.length);
-    output += `**Next ${daysToShow} days:**\n\n`;
+    const daily = data.daily;
+    const requestedDays = daily.time.length;
 
-    for (let i = 0; i < daysToShow; i++) {
-      // Open-Meteo daily dates are location-local; parse in the location timezone
-      const dt = DateTime.fromISO(data.daily.time[i], { zone: data.timezone });
-      const dayName = dt.toLocaleString({ weekday: 'short', month: 'short', day: 'numeric' });
+    // The declared types say number[], but past the marine model's real
+    // horizon (~10 days) the API pads the arrays with nulls — which would
+    // render as "0 m (Calm)" days. Treat anything non-finite as missing;
+    // a day with no finite wave_height_max is a no-data day.
+    const finiteAt = (values: number[] | undefined, i: number): number | undefined => {
+      const value = values?.[i];
+      return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+    };
 
-      output += `**${dayName}:**\n`;
-
-      if (data.daily.wave_height_max?.[i] !== undefined) {
-        const maxWaveHeight = data.daily.wave_height_max[i];
-        const category = getWaveHeightCategory(maxWaveHeight);
-        output += `  • Max Wave Height: ${formatWaveHeight(maxWaveHeight)} (${category.description})\n`;
-      }
-
-      if (data.daily.wave_direction_dominant?.[i] !== undefined) {
-        output += `  • Wave Direction: ${formatDirection(data.daily.wave_direction_dominant[i])}\n`;
-      }
-
-      if (data.daily.wave_period_max?.[i] !== undefined) {
-        output += `  • Max Wave Period: ${formatWavePeriod(data.daily.wave_period_max[i])}\n`;
-      }
-
-      // Show swell info if significant
-      if (data.daily.swell_wave_height_max?.[i] !== undefined && data.daily.swell_wave_height_max[i] > 0.5) {
-        output += `  • Swell Height: ${formatWaveHeight(data.daily.swell_wave_height_max[i])}\n`;
-
-        if (data.daily.swell_wave_direction_dominant?.[i] !== undefined) {
-          output += `  • Swell Direction: ${formatDirection(data.daily.swell_wave_direction_dominant[i])}\n`;
-        }
-      }
-
-      output += `\n`;
+    // Trim trailing no-data days (nulls past the model horizon)
+    let lastIdx = requestedDays - 1;
+    while (lastIdx >= 0 && finiteAt(daily.wave_height_max, lastIdx) === undefined) {
+      lastIdx--;
     }
 
-    // Add hourly forecast note if available
-    if (data.hourly && data.hourly.time && data.hourly.time.length > 0) {
-      output += `*Hourly forecast data available for ${data.hourly.time.length} hours*\n\n`;
+    if (lastIdx < 0) {
+      output += `*No marine forecast data available for this location.*\n\n`;
+    } else {
+      output += `**Next ${lastIdx + 1} days:**\n\n`;
+
+      for (let i = 0; i <= lastIdx; i++) {
+        // Open-Meteo daily dates are location-local; parse in the location timezone
+        const dt = DateTime.fromISO(daily.time[i], { zone: data.timezone });
+        const dayName = dt.toLocaleString({ weekday: 'short', month: 'short', day: 'numeric' });
+
+        output += `**${dayName}:**\n`;
+
+        const maxWaveHeight = finiteAt(daily.wave_height_max, i);
+        if (maxWaveHeight === undefined) {
+          // Interior gap in the model data
+          output += `  • No marine data available for this day\n\n`;
+          continue;
+        }
+
+        const category = getWaveHeightCategory(maxWaveHeight);
+        output += `  • Max Wave Height: ${formatWaveHeight(maxWaveHeight)} (${category.description})\n`;
+
+        const waveDirection = finiteAt(daily.wave_direction_dominant, i);
+        if (waveDirection !== undefined) {
+          output += `  • Wave Direction: ${formatDirection(waveDirection)}\n`;
+        }
+
+        const wavePeriod = finiteAt(daily.wave_period_max, i);
+        if (wavePeriod !== undefined) {
+          output += `  • Max Wave Period: ${formatWavePeriod(wavePeriod)}\n`;
+        }
+
+        // Show swell info if significant
+        const swellHeight = finiteAt(daily.swell_wave_height_max, i);
+        if (swellHeight !== undefined && swellHeight > 0.5) {
+          output += `  • Swell Height: ${formatWaveHeight(swellHeight)}\n`;
+
+          const swellDirection = finiteAt(daily.swell_wave_direction_dominant, i);
+          if (swellDirection !== undefined) {
+            output += `  • Swell Direction: ${formatDirection(swellDirection)}\n`;
+          }
+        }
+
+        output += `\n`;
+      }
+
+      if (lastIdx < requestedDays - 1) {
+        const missing = requestedDays - 1 - lastIdx;
+        output += `*The marine model provided no data for the final ${missing} requested day(s).*\n\n`;
+      }
     }
   }
 

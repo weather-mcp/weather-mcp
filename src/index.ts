@@ -454,15 +454,22 @@ const TOOL_DEFINITIONS = {
 
   get_marine_conditions: {
     name: 'get_marine_conditions' as const,
-    description: 'Get marine conditions including wave height, swell, ocean currents, and sea state for a location (global coverage). Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Returns current conditions and optional daily/hourly forecast. Includes significant wave height, wind waves, swell, wave period, and ocean currents. Shows safety assessment for maritime activities. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
+    description: 'Get marine conditions including wave height, swell, ocean currents, and sea state for a location (global coverage). Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Returns current conditions and an optional daily forecast (up to 16 days via forecast_days; the marine model typically provides ~10 days). Includes significant wave height, wind waves, swell, wave period, and ocean currents. Shows safety assessment for maritime activities. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         ...LOCATION_SCHEMA_PROPERTIES,
         forecast: {
           type: 'boolean' as const,
-          description: 'Include marine forecast for next 5 days (default: false, shows current only)',
+          description: 'Include daily marine forecast (default: false, shows current only). Number of days controlled by forecast_days.',
           default: false
+        },
+        forecast_days: {
+          type: 'number' as const,
+          description: 'Number of forecast days when forecast=true (1-16, default: 5). The marine model typically provides ~10 days of data; trailing days without data are omitted with a note.',
+          minimum: 1,
+          maximum: 16,
+          default: 5
         }
       },
       required: []
