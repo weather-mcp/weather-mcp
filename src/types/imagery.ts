@@ -69,7 +69,9 @@ export interface RainViewerResponse {
   host: string;
   radar: {
     past: RainViewerFrame[];
-    nowcast: RainViewerFrame[];
+    // Live checks (2026-07-16) found this empty and it may be absent
+    // entirely — treat missing/empty as the normal case, not an error.
+    nowcast?: RainViewerFrame[];
   };
   satellite?: {
     infrared: RainViewerFrame[];
