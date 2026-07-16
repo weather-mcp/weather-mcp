@@ -463,7 +463,7 @@ Monitor river levels and flood status using NOAA and USGS data sources.
 *Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
-Provides comprehensive river and streamflow monitoring for flood safety and recreation planning. Automatically finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Uses NOAA National Water Prediction Service (NWPS) for gauge locations and USGS Water Services for real-time streamflow data.
+Provides comprehensive river and streamflow monitoring for flood safety and recreation planning. Automatically finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Uses NOAA National Water Prediction Service (NWPS) for gauge locations, observations, and forecasts. Gauge IDs include the USGS site number where NWPS reports one, but streamflow data is not fetched from USGS Water Services.
 
 **Examples:**
 ```
@@ -483,7 +483,7 @@ Provides comprehensive river and streamflow monitoring for flood safety and recr
 - Safety assessment for recreation
 - Historical context (flood crests if available)
 
-**Note:** US coverage only. Data provided by NOAA National Water Prediction Service and USGS Water Services.
+**Note:** US coverage only. Data provided by NOAA National Water Prediction Service (NWPS).
 
 ### 13. get_wildfire_info
 Monitor active wildfires and fire perimeters for safety and evacuation planning.

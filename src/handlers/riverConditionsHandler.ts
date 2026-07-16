@@ -131,7 +131,7 @@ export async function handleGetRiverConditions(
   }
 
   output += `\n---\n`;
-  output += `*Data sources: NOAA National Water Prediction Service (NWPS), USGS Water Services*\n`;
+  output += `*Data source: NOAA National Water Prediction Service (NWPS)*\n`;
   output += `*River conditions are updated hourly. Always consult official sources for critical decisions.*\n`;
 
   return prependLocationLine({
