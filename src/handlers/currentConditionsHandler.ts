@@ -26,6 +26,8 @@ import {
   snowfallToPrecipUnit,
 } from '../utils/unitFormat.js';
 import { isInUS } from '../utils/geography.js';
+import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
+import { logger } from '../utils/logger.js';
 import { UnitPreferences } from '../config/units.js';
 import { DisplayThresholds } from '../config/displayThresholds.js';
 import {
@@ -49,6 +51,23 @@ interface CurrentConditionsArgs extends UnitArgs {
   include_fire_weather?: boolean;
   include_normals?: boolean;
   source?: 'auto' | 'noaa' | 'openmeteo';
+}
+
+/** Note shown when an auto-routed NOAA request falls back to Open-Meteo. */
+const NOAA_FALLBACK_NOTE =
+  '*NOAA does not cover this location; showing Open-Meteo model data instead.*';
+
+/**
+ * Insert a note line directly under the output's top heading (first line),
+ * keeping the heading itself as the first thing the client renders.
+ */
+function insertNoteAfterHeading(text: string, note: string): string {
+  const newline = text.indexOf('\n');
+  if (newline === -1) {
+    return `${text}\n\n${note}\n`;
+  }
+  // The remainder starts with the original newline(s), so no trailing \n here.
+  return `${text.slice(0, newline)}\n\n${note}${text.slice(newline)}`;
 }
 
 export async function handleGetCurrentConditions(
@@ -81,8 +100,10 @@ export async function handleGetCurrentConditions(
     ? isInUS(latitude, longitude)
     : requestedSource === 'noaa';
 
-  const output = useNOAA
-    ? await formatNOAACurrentConditions(
+  let output: string;
+  if (useNOAA) {
+    try {
+      output = await formatNOAACurrentConditions(
         noaaService,
         openMeteoService,
         nceiService,
@@ -91,16 +112,51 @@ export async function handleGetCurrentConditions(
         includeFireWeather,
         includeNormals,
         prefs
-      )
-    : await formatOpenMeteoCurrentConditions(
-        openMeteoService,
-        nceiService,
+      );
+    } catch (error) {
+      // The US bounding boxes overrun the border (Toronto, Vancouver, Windsor
+      // all sit inside them), so auto-routed points NOAA rejects fall back to
+      // Open-Meteo instead of erroring. NOAA maps the coverage 404 ("Unable to
+      // provide data for requested point") to DataNotFoundError and other 4xx
+      // to InvalidLocationError — both are non-retryable "NOAA can't serve
+      // this request" failures, so both fall back. Transient failures
+      // (RateLimitError, ServiceUnavailableError, network) still propagate,
+      // and explicit source="noaa" keeps its error contract.
+      if (
+        requestedSource !== 'auto' ||
+        !(error instanceof DataNotFoundError || error instanceof InvalidLocationError)
+      ) {
+        throw error;
+      }
+      logger.warn('NOAA rejected auto-routed location; falling back to Open-Meteo', {
         latitude,
         longitude,
-        includeFireWeather,
-        includeNormals,
-        prefs
+        fallback: true
+      });
+      output = insertNoteAfterHeading(
+        await formatOpenMeteoCurrentConditions(
+          openMeteoService,
+          nceiService,
+          latitude,
+          longitude,
+          includeFireWeather,
+          includeNormals,
+          prefs
+        ),
+        NOAA_FALLBACK_NOTE
       );
+    }
+  } else {
+    output = await formatOpenMeteoCurrentConditions(
+      openMeteoService,
+      nceiService,
+      latitude,
+      longitude,
+      includeFireWeather,
+      includeNormals,
+      prefs
+    );
+  }
 
   return prependLocationLine({
     content: [
