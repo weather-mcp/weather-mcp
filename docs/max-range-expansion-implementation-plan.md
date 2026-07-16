@@ -243,7 +243,7 @@ The design-sensitive core — the orchestrator does this one itself.
 
 ## Progress Tracker
 
-- [ ] T1 — Marine service: 16-day cap, drop dead hourly fetch (`sonnet`)
+- [x] T1 — Marine service: 16-day cap, drop dead hourly fetch (`sonnet`) — `1c71eb6`
 - [ ] T2 — Marine handler: forecast_days + full-range null-trimmed display (`opus`)
 - [ ] T3 — Marine forecast unit tests (`sonnet`)
 - [ ] T4 — Historical hourly limit ceiling 500 → 744 (`sonnet`)
