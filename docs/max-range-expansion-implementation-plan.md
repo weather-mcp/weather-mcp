@@ -1,6 +1,6 @@
 # Max-Range Expansion — Implementation Plan
 
-**Status:** READY (2026-07-16)
+**Status:** COMPLETE (2026-07-16) — all tasks landed on `feat/max-range-expansion`
 
 Execution plan for `docs/max-range-expansion-plan.md` (the WHAT/WHY);
 rules live in `docs/orchestration-playbook.md`.
@@ -249,7 +249,7 @@ The design-sensitive core — the orchestrator does this one itself.
 - [x] T4 — Historical hourly limit ceiling 500 → 744 (`sonnet`) — `9f7e9ec`
 - [x] T5 — detail="full" lists all animation frames (`sonnet`) — `8d8a54d`
 - [x] T6 — RainViewer nowcast appended defensively (`sonnet`) — `7c6e1db`
-- [ ] T7 — Live sweep + docs (`opus`)
+- [x] T7 — Live sweep + docs (`opus`) — `2955bb6`
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the design plan's
