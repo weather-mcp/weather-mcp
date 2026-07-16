@@ -222,8 +222,8 @@ The design-sensitive core — the orchestrator does this one itself.
 - [x] T2 — Current-conditions snowfall conversion + trace floor (`sonnet`) — `900f6bd`
 - [x] T3 — Historical snowfall conversion (`sonnet`) — `4a4f2c6`
 - [x] T4 — Auto-mode NOAA → Open-Meteo fallback (`opus`) — `cfeb314`
-- [ ] T5 — Fallback routing tests (`sonnet`)
-- [ ] T6 — Clean US-only alerts note in weather summary (`sonnet`)
+- [x] T5 — Fallback routing tests (`sonnet`) — `510c32f`
+- [x] T6 — Clean US-only alerts note in weather summary (`sonnet`) — `f25c634`
 - [ ] T7 — Docs (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
