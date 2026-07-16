@@ -294,7 +294,7 @@ const TOOL_DEFINITIONS = {
 
   get_current_conditions: {
     name: 'get_current_conditions' as const,
-    description: 'Get the most recent weather observation for a location (US only). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns the latest observation from the nearest weather station. Optionally includes fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) when requested. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get the most recent weather observation for a location (global coverage). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns NOAA station observations for US locations and Open-Meteo model data for international locations. Optionally includes fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) when requested. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -308,6 +308,12 @@ const TOOL_DEFINITIONS = {
           type: 'boolean' as const,
           description: 'Include climate normals (30-year averages) for comparison with current conditions (default: false). Shows normal high/low temperatures and precipitation, with departure from normal.',
           default: false
+        },
+        source: {
+          type: 'string' as const,
+          description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), or "openmeteo" (global)',
+          enum: ['auto', 'noaa', 'openmeteo'],
+          default: 'auto'
         },
         ...UNIT_SCHEMA_PROPERTIES
       },
