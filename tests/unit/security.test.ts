@@ -202,10 +202,10 @@ describe('Security Features - v1.0.0', () => {
       const service = new OpenMeteoService();
 
       // Too low
-      await expect(service.getMarine(40.7128, -74.0060, true, 0)).rejects.toThrow('between 1 and 7');
+      await expect(service.getMarine(40.7128, -74.0060, true, 0)).rejects.toThrow('between 1 and 16');
 
       // Too high
-      await expect(service.getMarine(40.7128, -74.0060, true, 8)).rejects.toThrow('between 1 and 7');
+      await expect(service.getMarine(40.7128, -74.0060, true, 17)).rejects.toThrow('between 1 and 16');
     });
   });
 

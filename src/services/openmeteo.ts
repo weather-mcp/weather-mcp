@@ -1067,8 +1067,10 @@ export class OpenMeteoService {
    *
    * @param latitude - Latitude coordinate (-90 to 90)
    * @param longitude - Longitude coordinate (-180 to 180)
-   * @param forecast - Whether to include hourly forecast (default: false, returns current only)
-   * @param forecastDays - Number of forecast days (1-7, default: 5)
+   * @param forecast - Whether to include daily forecast aggregates (default: false, returns current only)
+   * @param forecastDays - Number of forecast days (1-16, default: 5). The Marine API
+   *   accepts up to 16 days (verified live 2026-07-16), but the underlying model's
+   *   horizon is typically ~10 days — trailing days beyond that are null-padded.
    * @returns Marine conditions including waves, swell, and currents
    */
   async getMarine(
@@ -1082,10 +1084,10 @@ export class OpenMeteoService {
     validateLongitude(longitude);
 
     // Validate forecast days
-    if (forecastDays < 1 || forecastDays > 7) {
+    if (forecastDays < 1 || forecastDays > 16) {
       throw new InvalidLocationError(
         'OpenMeteo',
-        'Marine forecast days must be between 1 and 7'
+        'Marine forecast days must be between 1 and 16'
       );
     }
 
@@ -1148,26 +1150,9 @@ export class OpenMeteoService {
       'ocean_current_direction'
     ].join(',');
 
-    // Optionally include hourly forecast data
+    // Optionally include daily forecast aggregates
     if (forecast) {
       params.forecast_days = forecastDays;
-      params.hourly = [
-        'wave_height',
-        'wave_direction',
-        'wave_period',
-        'wind_wave_height',
-        'wind_wave_direction',
-        'wind_wave_period',
-        'wind_wave_peak_period',
-        'swell_wave_height',
-        'swell_wave_direction',
-        'swell_wave_period',
-        'swell_wave_peak_period',
-        'ocean_current_velocity',
-        'ocean_current_direction'
-      ].join(',');
-
-      // Also include daily aggregates
       params.daily = [
         'wave_height_max',
         'wave_direction_dominant',
@@ -1232,10 +1217,10 @@ export class OpenMeteoService {
       );
     }
 
-    if (forecast && (!response.hourly || !response.hourly.time || response.hourly.time.length === 0)) {
+    if (forecast && (!response.daily || !response.daily.time || response.daily.time.length === 0)) {
       throw new DataNotFoundError(
         'OpenMeteo',
-        'No hourly marine forecast data available for the specified location'
+        'No daily marine forecast data available for the specified location'
       );
     }
   }
