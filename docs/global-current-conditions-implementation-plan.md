@@ -26,6 +26,13 @@ npm test          # 100% pass, < 2s
 npm audit         # no high/critical
 ```
 
+**Gate caveat (observed during execution):** two files under `tests/integration/`
+make **live network calls** and flake independently of any change here —
+`visualization-lightning.test.ts` (Blitzortung MQTT, fails `ECONNRESET` during
+upstream hiccups) and `safety-hazards.test.ts` (live NOAA/USGS). Both were
+confirmed to fail on a clean tree and pass on retry. If the gate goes red in only
+those files, re-run before suspecting the diff.
+
 Read **Assumptions to confirm** below before starting T4 — two design details
 (the feels-like threshold in metric, and which error class malformed responses
 throw) resolve differently than a literal reading of the design plan suggests.
@@ -269,7 +276,7 @@ code contradicts it.
 - [x] T1 — Extract `isInUS` into geography utils (`sonnet`) — `987cf96`
 - [x] T2 — Open-Meteo current-weather response types (`haiku`) — `8de3593`
 - [x] T3 — `OpenMeteoService.getCurrentConditions()` (`sonnet`) — `824f2bd`
-- [ ] T4 — Route non-US current conditions to Open-Meteo (`opus`)
+- [x] T4 — Route non-US current conditions to Open-Meteo (`opus`) — `9df95ad`
 - [ ] T5 — Handler routing and formatter tests (`sonnet`)
 - [ ] T6 — Expose `source` on `get_current_conditions` (`sonnet`)
 - [ ] T7 — Docs and version (`opus`)
