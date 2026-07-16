@@ -12,6 +12,7 @@ import {
   validateHistoricalWeatherParams,
   validateDetail,
 } from '../../src/utils/validation.js';
+import { FormatConstants } from '../../src/config/displayThresholds.js';
 
 describe('Validation Utilities', () => {
   describe('validateLatitude', () => {
@@ -333,17 +334,49 @@ describe('Validation Utilities', () => {
         start_date: '2024-01-01',
         end_date: '2024-01-31',
         limit: 0,
-      })).toThrow('Must be between 1 and 500');
+      })).toThrow('Must be between 1 and 744');
     });
 
-    it('should reject limit > 500', () => {
+    it('should accept limit at the 744 ceiling (31 days x 24h)', () => {
+      const result = validateHistoricalWeatherParams({
+        latitude: 37,
+        longitude: -122,
+        start_date: '2024-01-01',
+        end_date: '2024-01-31',
+        limit: 744,
+      });
+
+      expect(result.limit).toBe(744);
+    });
+
+    it('should reject limit > 744', () => {
       expect(() => validateHistoricalWeatherParams({
         latitude: 37,
         longitude: -122,
         start_date: '2024-01-01',
         end_date: '2024-01-31',
-        limit: 501,
-      })).toThrow('Must be between 1 and 500');
+        limit: 745,
+      })).toThrow('Must be between 1 and 744');
+    });
+
+    it('should keep the default historical limit at 168 while the ceiling is 744', () => {
+      // FormatConstants.defaultHistoricalLimit feeds the handler's destructuring
+      // default; FormatConstants.maxHistoricalLimit is what validateHistoricalWeatherParams
+      // enforces via validatePositiveInteger above. Confirm raising the ceiling
+      // (500 -> 744) did not also move the unrelated default.
+      expect(FormatConstants.defaultHistoricalLimit).toBe(168);
+      expect(FormatConstants.maxHistoricalLimit).toBe(744);
+    });
+
+    it('should leave limit unset when omitted (handler applies the 168 default)', () => {
+      const result = validateHistoricalWeatherParams({
+        latitude: 37,
+        longitude: -122,
+        start_date: '2024-01-01',
+        end_date: '2024-01-31',
+      });
+
+      expect(result.limit).toBeUndefined();
     });
 
     it('should reject non-object args', () => {

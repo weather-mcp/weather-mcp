@@ -122,7 +122,9 @@ export async function handleGetHistoricalWeather(
 
       // Format the response based on data granularity
       if (useHourly && weatherData.hourly) {
-        // Format hourly observations
+        // Format hourly observations. `limit` (default 168, ceiling 744 = 31
+        // days x 24h) applies only to this hourly branch; the daily-summary
+        // branch below always renders the full range.
         const maxObservations = Math.min(limit, weatherData.hourly.time.length);
         let output = `# Historical Weather Observations (Hourly)\n\n`;
         // Use the requested date strings directly; constructing a Date and calling

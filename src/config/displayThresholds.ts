@@ -111,7 +111,10 @@ export const FormatConstants = {
   defaultHistoricalLimit: 168, // One week of hourly data
 
   /**
-   * Maximum observations to return
+   * Maximum observations to return.
+   * 744 = 31 days x 24 h — the largest hourly window
+   * ApiConstants.maxHourlyHistoricalDays allows, so a full 31-day hourly
+   * range can display without silent tail loss.
    */
-  maxHistoricalLimit: 500,
+  maxHistoricalLimit: 744,
 } as const;

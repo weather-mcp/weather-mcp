@@ -356,9 +356,9 @@ const TOOL_DEFINITIONS = {
         },
         limit: {
           type: 'number' as const,
-          description: 'Maximum number of observations to return (default: 168 for one week of hourly data)',
+          description: 'Maximum number of hourly observations to return (default: 168 = one week, max: 744 = full 31-day hourly window). Applies to hourly output only; daily-granularity output for ranges over 31 days always shows the full range.',
           minimum: 1,
-          maximum: 500,
+          maximum: 744,
           default: 168
         },
         ...UNIT_SCHEMA_PROPERTIES
