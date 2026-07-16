@@ -311,3 +311,20 @@ export function getCountryFromCoordinates(lat: number, lon: number): string {
   // Default to OTHER for privacy (intentionally vague)
   return 'OTHER';
 }
+
+/**
+ * Determine if coordinates are within the United States (including Alaska, Hawaii, and territories)
+ * Uses bounding box approach for simplicity
+ * @param latitude Latitude coordinate
+ * @param longitude Longitude coordinate
+ * @returns True if coordinates fall within US bounding boxes (CONUS, Alaska, Hawaii, Puerto Rico)
+ */
+export function isInUS(latitude: number, longitude: number): boolean {
+  // Continental US, Alaska, Hawaii, Puerto Rico, and territories
+  const inContinentalUS = latitude >= 24.5 && latitude <= 49.4 && longitude >= -125 && longitude <= -66.9;
+  const inAlaska = latitude >= 51 && latitude <= 71.4 && longitude >= -180 && longitude <= -129.9;
+  const inHawaii = latitude >= 18.9 && latitude <= 28.5 && longitude >= -178.4 && longitude <= -154.8;
+  const inPuertoRico = latitude >= 17.9 && latitude <= 18.5 && longitude >= -67.3 && longitude <= -65.2;
+
+  return inContinentalUS || inAlaska || inHawaii || inPuertoRico;
+}

@@ -10,7 +10,7 @@ Complete reference for all 17 MCP tools provided by the Weather MCP Server.
 
 **Core Weather**
 1. [get_forecast](#1-get_forecast) — Forecasts, global
-2. [get_current_conditions](#2-get_current_conditions) — Real-time observations, US
+2. [get_current_conditions](#2-get_current_conditions) — Current weather, global
 3. [get_alerts](#3-get_alerts) — Watches/warnings/advisories, US
 4. [get_historical_weather](#4-get_historical_weather) — 1940–present, global
 5. [get_weather_summary](#5-get_weather_summary) — One-call combined overview, global
@@ -83,25 +83,34 @@ Automatically selects the best data source: NOAA for US locations (more detailed
 - All timestamps in local timezone
 
 ### 2. get_current_conditions
-Get current weather conditions for a location (US only).
+Get current weather conditions for a location (global).
 
 **Parameters:**
 - `latitude` (required*): Latitude coordinate (-90 to 90)
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `include_fire_weather` (optional): Include fire weather indices (default: false)
+- `include_fire_weather` (optional): Include fire weather indices (default: false, US only)
 - `include_normals` (optional): Include climate normals for comparison (default: false)
+- `source` (optional): `"auto"` (default), `"noaa"`, or `"openmeteo"` — see Description
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
+**Description:**
+Automatically selects the best data source: NOAA for US locations (real station
+observations, richer detail) or Open-Meteo for international locations. Open-Meteo
+values are **model-interpolated, not station observations**, and the output footer
+says so. Use `source` to force a provider — `"openmeteo"` works anywhere including
+the US (useful for comparison), while `"noaa"` outside the US will error.
+
 **Example:**
 ```
 What are the current weather conditions in New York? (latitude: 40.7128, longitude: -74.0060)
+What's the weather right now in Tokyo?
 ```
 
-**Returns:**
+**Returns (US, via NOAA):**
 - Current temperature, humidity, wind, pressure
 - Heat index or wind chill (when applicable)
 - 24-hour temperature range
@@ -111,6 +120,17 @@ What are the current weather conditions in New York? (latitude: 40.7128, longitu
 - Climate normals comparison (when `include_normals=true`)
 - Fire weather indices (when `include_fire_weather=true`) — Haines Index, Grassland Fire Danger, Red Flag Threat, mixing height, transport winds
 - All timestamps in local timezone
+
+**Returns (international, via Open-Meteo):**
+- Current temperature and feels-like (when it diverges meaningfully from actual)
+- Today's high/low range
+- Dewpoint, humidity, wind with gusts, pressure, cloud cover percentage
+- Recent precipitation (broken out into rain/showers/snowfall when present)
+- Climate normals comparison (when `include_normals=true`)
+- All timestamps in the location's local timezone
+
+Visibility, snow depth, cloud layer detail, and fire weather indices are not
+available on the international path.
 
 ### 3. get_alerts
 Get active weather alerts, watches, warnings, and advisories for US locations.
@@ -153,7 +173,7 @@ Get historical weather observations for a location.
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `start_date` (required): Start date in ISO format (YYYY-MM-DD)
 - `end_date` (required): End date in ISO format (YYYY-MM-DD)
-- `limit` (optional): Max observations to return (1-500, default: 168)
+- `limit` (optional): Max hourly observations to return (1-744, default: 168; 744 = the full 31-day hourly window). Applies to hourly output only — daily-granularity output for ranges over 31 days always shows the full range.
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 
 *Coordinates not required when `location_name` or `city_name` is provided.
@@ -287,12 +307,13 @@ Get comprehensive air quality data for any location worldwide.
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `forecast` (optional): Include hourly forecast for next 5 days (default: false)
+- `forecast` (optional): Include an hourly AQI forecast grouped by day (default: false)
+- `forecast_days` (optional): Days of forecast when `forecast=true` (1-7, default: 5; 7 days / 168 hours is the model maximum)
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
-Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index.
+Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index. With `forecast=true`, the full forecast range is shown grouped by calendar day — each day gets a dated header with its peak AQI, plus 6-hour period ranges labeled by the period's peak AQI category. Hours already past are skipped.
 
 **Examples:**
 ```
@@ -317,7 +338,8 @@ Get marine weather conditions including wave height, swell, ocean currents, and 
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `forecast` (optional): Include 5-day marine forecast (default: false)
+- `forecast` (optional): Include daily marine forecast (default: false)
+- `forecast_days` (optional): Number of forecast days when `forecast=true` (1-16, default: 5). The marine model typically provides ~10 days of data — trailing days without data are omitted with a note.
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
@@ -344,7 +366,7 @@ Provides comprehensive marine weather data with intelligent dual-source support:
 - Sea state interpretation (Calm → Phenomenal based on Douglas Sea Scale)
 - Safety assessment for maritime activities
 - Wave period for planning and safety
-- Optional 5-day forecast with daily summaries
+- Optional daily forecast up to 16 days (`forecast_days`, default 5; days past the marine model's ~10-day horizon are trimmed with a note)
 
 ### 10. get_weather_imagery
 Get weather radar, precipitation, and satellite imagery for visual weather analysis.
@@ -356,7 +378,7 @@ Get weather radar, precipitation, and satellite imagery for visual weather analy
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `type` (optional): Imagery type - "precipitation" (default), "radar", or "satellite"
 - `animated` (optional): Return animated loop vs static image (default: false)
-- `detail` (optional): `summary`/`standard` (default) surface direct image URLs; `full` embeds Markdown images
+- `detail` (optional): `summary`/`standard` (default) surface direct image URLs and show 3 representative frames of longer animations; `full` embeds Markdown images and lists every animation frame
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 - `layers` (optional): Additional map layers (reserved for future use)

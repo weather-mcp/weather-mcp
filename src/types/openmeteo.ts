@@ -268,6 +268,52 @@ export interface OpenMeteoForecastDailyUnits {
 }
 
 /**
+ * Current weather data from Open-Meteo Weather API
+ */
+export interface OpenMeteoCurrentWeather {
+  time: string;
+  interval: number;
+  temperature_2m?: number;
+  relative_humidity_2m?: number;
+  apparent_temperature?: number;
+  dew_point_2m?: number;
+  is_day?: number;
+  precipitation?: number;
+  rain?: number;
+  showers?: number;
+  snowfall?: number;
+  weather_code?: number;
+  cloud_cover?: number;
+  pressure_msl?: number;
+  wind_speed_10m?: number;
+  wind_direction_10m?: number;
+  wind_gusts_10m?: number;
+}
+
+/**
+ * Units for current weather data
+ */
+export interface OpenMeteoCurrentWeatherUnits {
+  time?: string;
+  interval?: string;
+  temperature_2m?: string;
+  relative_humidity_2m?: string;
+  apparent_temperature?: string;
+  dew_point_2m?: string;
+  is_day?: string;
+  precipitation?: string;
+  rain?: string;
+  showers?: string;
+  snowfall?: string;
+  weather_code?: string;
+  cloud_cover?: string;
+  pressure_msl?: string;
+  wind_speed_10m?: string;
+  wind_direction_10m?: string;
+  wind_gusts_10m?: string;
+}
+
+/**
  * Complete API response from Open-Meteo Forecast API
  */
 export interface OpenMeteoForecastResponse {
@@ -278,6 +324,8 @@ export interface OpenMeteoForecastResponse {
   timezone: string;
   timezone_abbreviation: string;
   elevation: number;
+  current_units?: OpenMeteoCurrentWeatherUnits;
+  current?: OpenMeteoCurrentWeather;
   hourly_units?: OpenMeteoForecastHourlyUnits;
   hourly?: OpenMeteoForecastHourlyData;
   daily_units?: OpenMeteoForecastDailyUnits;

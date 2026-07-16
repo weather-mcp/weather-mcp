@@ -294,7 +294,7 @@ const TOOL_DEFINITIONS = {
 
   get_current_conditions: {
     name: 'get_current_conditions' as const,
-    description: 'Get the most recent weather observation for a location (US only). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns the latest observation from the nearest weather station. Optionally includes fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) when requested. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get the most recent weather observation for a location (global coverage). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns NOAA station observations for US locations and Open-Meteo model data for international locations. Optionally includes fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) when requested. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -308,6 +308,12 @@ const TOOL_DEFINITIONS = {
           type: 'boolean' as const,
           description: 'Include climate normals (30-year averages) for comparison with current conditions (default: false). Shows normal high/low temperatures and precipitation, with departure from normal.',
           default: false
+        },
+        source: {
+          type: 'string' as const,
+          description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), or "openmeteo" (global)',
+          enum: ['auto', 'noaa', 'openmeteo'],
+          default: 'auto'
         },
         ...UNIT_SCHEMA_PROPERTIES
       },
@@ -350,9 +356,9 @@ const TOOL_DEFINITIONS = {
         },
         limit: {
           type: 'number' as const,
-          description: 'Maximum number of observations to return (default: 168 for one week of hourly data)',
+          description: 'Maximum number of hourly observations to return (default: 168 = one week, max: 744 = full 31-day hourly window). Applies to hourly output only; daily-granularity output for ranges over 31 days always shows the full range.',
           minimum: 1,
-          maximum: 500,
+          maximum: 744,
           default: 168
         },
         ...UNIT_SCHEMA_PROPERTIES
@@ -424,15 +430,22 @@ const TOOL_DEFINITIONS = {
 
   get_air_quality: {
     name: 'get_air_quality' as const,
-    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", or health-related environmental conditions. Returns current conditions and optional hourly forecast. Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name.',
+    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", or health-related environmental conditions. Returns current conditions and an optional forecast grouped by day (up to 7 days / 168 hours via forecast_days). Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         ...LOCATION_SCHEMA_PROPERTIES,
         forecast: {
           type: 'boolean' as const,
-          description: 'Include hourly air quality forecast for next 5 days (default: false, shows current only)',
+          description: 'Include hourly air quality forecast grouped by day (default: false, shows current only). Number of days controlled by forecast_days.',
           default: false
+        },
+        forecast_days: {
+          type: 'number' as const,
+          description: 'Number of forecast days when forecast=true (1-7, default: 5). 7 days is the maximum the air quality model provides (168 hours).',
+          minimum: 1,
+          maximum: 7,
+          default: 5
         }
       },
       required: []
@@ -441,15 +454,22 @@ const TOOL_DEFINITIONS = {
 
   get_marine_conditions: {
     name: 'get_marine_conditions' as const,
-    description: 'Get marine conditions including wave height, swell, ocean currents, and sea state for a location (global coverage). Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Returns current conditions and optional daily/hourly forecast. Includes significant wave height, wind waves, swell, wave period, and ocean currents. Shows safety assessment for maritime activities. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
+    description: 'Get marine conditions including wave height, swell, ocean currents, and sea state for a location (global coverage). Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Returns current conditions and an optional daily forecast (up to 16 days via forecast_days; the marine model typically provides ~10 days). Includes significant wave height, wind waves, swell, wave period, and ocean currents. Shows safety assessment for maritime activities. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         ...LOCATION_SCHEMA_PROPERTIES,
         forecast: {
           type: 'boolean' as const,
-          description: 'Include marine forecast for next 5 days (default: false, shows current only)',
+          description: 'Include daily marine forecast (default: false, shows current only). Number of days controlled by forecast_days.',
           default: false
+        },
+        forecast_days: {
+          type: 'number' as const,
+          description: 'Number of forecast days when forecast=true (1-16, default: 5). The marine model typically provides ~10 days of data; trailing days without data are omitted with a note.',
+          minimum: 1,
+          maximum: 16,
+          default: 5
         }
       },
       required: []
@@ -458,7 +478,7 @@ const TOOL_DEFINITIONS = {
 
   get_weather_imagery: {
     name: 'get_weather_imagery' as const,
-    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization. Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. By default returns direct image URLs; use detail="full" to embed Markdown images. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For numerical forecast data, use get_forecast instead.',
+    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization. Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. By default returns direct image URLs; use detail="full" to embed Markdown images and list every animation frame (lower detail levels show 3 representative frames of longer animations). Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For numerical forecast data, use get_forecast instead.',
     inputSchema: {
       type: 'object' as const,
       properties: {

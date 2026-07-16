@@ -189,24 +189,23 @@ export function formatWeatherImageryResponse(
     lines.push(`## 🎬 Animation Frames (${response.frames.length} frames)`);
     lines.push('');
 
-    // Show first, middle, and last frames for brevity
-    const framesToShow = response.frames.length <= 5
-      ? response.frames
-      : [
-          response.frames[0],
-          response.frames[Math.floor(response.frames.length / 2)],
-          response.frames[response.frames.length - 1]
-        ];
+    // detail="full" lists every frame; summary/standard show first, middle,
+    // and last for brevity (all frames when there are 5 or fewer either way).
+    const showAllFrames = detail === 'full' || response.frames.length <= 5;
+    const indicesToShow = showAllFrames
+      ? response.frames.map((_, index) => index)
+      : [0, Math.floor(response.frames.length / 2), response.frames.length - 1];
 
-    framesToShow.forEach((frame) => {
-      const frameNumber = response.frames.indexOf(frame) + 1;
+    indicesToShow.forEach((index) => {
+      const frame = response.frames[index];
+      const frameNumber = index + 1;
       lines.push(`### Frame ${frameNumber} - ${frame.timestamp.toISOString()}`);
       lines.push(formatFrameLine(frame, detail));
       lines.push('');
     });
 
-    if (response.frames.length > 5) {
-      lines.push(`*Showing 3 of ${response.frames.length} frames for brevity*`);
+    if (!showAllFrames) {
+      lines.push(`*Showing 3 of ${response.frames.length} frames for brevity — use detail="full" for all frames*`);
       lines.push('');
     }
   } else if (response.frames.length > 0) {

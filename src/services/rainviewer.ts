@@ -125,6 +125,27 @@ export class RainViewerService {
   }
 
   /**
+   * Convert RainViewer nowcast frames to ImageryFrame format, labeling each
+   * as a forecast frame with its offset in minutes from the latest past frame.
+   */
+  convertNowcastFrames(
+    frames: RainViewerFrame[],
+    latestPastTime: number,
+    latitude: number,
+    longitude: number
+  ): ImageryFrame[] {
+    return frames.map(frame => {
+      const offsetMinutes = Math.round((frame.time - latestPastTime) / 60);
+      const offsetLabel = offsetMinutes >= 0 ? `+${offsetMinutes}` : `${offsetMinutes}`;
+      return {
+        url: this.buildCoordinateTileUrl(frame, latitude, longitude),
+        timestamp: new Date(frame.time * 1000),
+        description: `${offsetLabel} min forecast (precipitation radar at ${new Date(frame.time * 1000).toISOString()})`
+      };
+    });
+  }
+
+  /**
    * Get recent precipitation radar imagery (past 2 hours)
    */
   async getPrecipitationRadar(
@@ -139,13 +160,28 @@ export class RainViewerService {
       return [];
     }
 
-    // If animated, return all past frames
+    const latestFrame = data.radar.past[data.radar.past.length - 1];
+
+    // If animated, return all past frames plus any forecast (nowcast) frames.
+    // Missing/empty nowcast is the normal case — yields exactly today's behavior.
     if (animated) {
-      return this.convertFrames(data.radar.past, latitude, longitude);
+      const pastFrames = this.convertFrames(data.radar.past, latitude, longitude);
+
+      if (!data.radar.nowcast || data.radar.nowcast.length === 0) {
+        return pastFrames;
+      }
+
+      const forecastFrames = this.convertNowcastFrames(
+        data.radar.nowcast,
+        latestFrame.time,
+        latitude,
+        longitude
+      );
+
+      return [...pastFrames, ...forecastFrames];
     }
 
-    // Otherwise, return only the most recent frame
-    const latestFrame = data.radar.past[data.radar.past.length - 1];
+    // Otherwise, return only the most recent PAST frame (never nowcast)
     return this.convertFrames([latestFrame], latitude, longitude);
   }
 }

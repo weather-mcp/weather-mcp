@@ -17,8 +17,36 @@ import {
   formatTemperatureQV,
   formatWindSpeedQV,
   formatPressureFromPa,
+  snowfallToPrecipUnit,
 } from '../utils/unitFormat.js';
 import { ApiConstants, FormatConstants } from '../config/displayThresholds.js';
+import { isInUS } from '../utils/geography.js';
+import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
+import { logger } from '../utils/logger.js';
+
+/** Note shown when an auto-routed NOAA request falls back to Open-Meteo. */
+const NOAA_FALLBACK_NOTE =
+  '*NOAA does not cover this location; showing Open-Meteo model data instead.*';
+
+/**
+ * Insert a note line directly under the output's top heading (first line),
+ * keeping the heading itself as the first thing the client renders.
+ */
+function insertNoteAfterHeading(text: string, note: string): string {
+  const newline = text.indexOf('\n');
+  if (newline === -1) {
+    return `${text}\n\n${note}\n`;
+  }
+  // The remainder starts with the original newline(s), so no trailing \n here.
+  return `${text.slice(0, newline)}\n\n${note}${text.slice(newline)}`;
+}
+
+/** Format signed coordinates with hemisphere labels (e.g. "32.8647°S, 70.1714°W"). */
+function formatCoordinates(latitude: number, longitude: number): string {
+  const lat = `${Math.abs(latitude).toFixed(4)}°${latitude >= 0 ? 'N' : 'S'}`;
+  const lon = `${Math.abs(longitude).toFixed(4)}°${longitude >= 0 ? 'E' : 'W'}`;
+  return `${lat}, ${lon}`;
+}
 
 export async function handleGetHistoricalWeather(
   args: unknown,
@@ -54,12 +82,29 @@ export async function handleGetHistoricalWeather(
     throw new Error(`End date (${end_date}) cannot be in the future. Current date is ${now.toISOString().split('T')[0]}.`);
   }
 
+  // A date-only end_date parses to midnight UTC, which would make a same-day
+  // range (start_date === end_date) a zero-width observation window on the
+  // NOAA path. Extend date-only ends to cover the whole calendar day, clamped
+  // to now (NOAA rejects future end times). Open-Meteo receives the calendar
+  // dates directly and already treats them inclusively.
+  const noaaEndTime = end_date.includes('T')
+    ? endTime
+    : new Date(Math.min(endTime.getTime() + (24 * 60 * 60 * 1000 - 1), now.getTime()));
+
   // Determine which API to use based on date range
   // If start date is older than threshold, use archival API
   const thresholdDate = new Date(now.getTime() - ApiConstants.historicalDataThresholdDays * 24 * 60 * 60 * 1000);
   const useArchivalData = startTime < thresholdDate;
 
-  if (useArchivalData) {
+  // NOAA's observation API only covers US stations, so recent dates route
+  // there only for US points. Everywhere else uses the Open-Meteo archive,
+  // which serves data through yesterday (verified live 2026-07-16 — recent
+  // days blend ERA5T/model data, no 5-day gap).
+  const useNOAA = !useArchivalData && isInUS(latitude, longitude);
+
+  const fetchFromOpenMeteo = async (
+    fallbackNote?: string
+  ): Promise<{ content: Array<{ type: string; text: string }> }> => {
     // Use Open-Meteo API for historical/archival data
     try {
       // Determine whether to use hourly or daily data based on date range
@@ -77,13 +122,15 @@ export async function handleGetHistoricalWeather(
 
       // Format the response based on data granularity
       if (useHourly && weatherData.hourly) {
-        // Format hourly observations
+        // Format hourly observations. `limit` (default 168, ceiling 744 = 31
+        // days x 24h) applies only to this hourly branch; the daily-summary
+        // branch below always renders the full range.
         const maxObservations = Math.min(limit, weatherData.hourly.time.length);
         let output = `# Historical Weather Observations (Hourly)\n\n`;
         // Use the requested date strings directly; constructing a Date and calling
         // toLocaleDateString() would shift the displayed day in non-UTC server zones.
         output += `**Period:** ${start_date.split('T')[0]} to ${end_date.split('T')[0]}\n`;
-        output += `**Location:** ${weatherData.latitude.toFixed(4)}°N, ${Math.abs(weatherData.longitude).toFixed(4)}°${weatherData.longitude >= 0 ? 'E' : 'W'} (${formatElevationFromM(weatherData.elevation, prefs)} elevation)\n`;
+        output += `**Location:** ${formatCoordinates(weatherData.latitude, weatherData.longitude)} (${formatElevationFromM(weatherData.elevation, prefs)} elevation)\n`;
         output += `**Number of observations:** ${maxObservations}${maxObservations < weatherData.hourly.time.length ? ` (of ${weatherData.hourly.time.length} available)` : ''}\n`;
         output += `**Data source:** Open-Meteo Historical Weather API (Reanalysis)\n\n`;
 
@@ -108,7 +155,7 @@ export async function handleGetHistoricalWeather(
           }
 
           if (weatherData.hourly.snowfall?.[i] !== null && weatherData.hourly.snowfall?.[i] !== undefined && weatherData.hourly.snowfall[i] > 0) {
-            output += `- **Snowfall:** ${weatherData.hourly.snowfall[i].toFixed(1)} ${precipU}\n`;
+            output += `- **Snowfall:** ${snowfallToPrecipUnit(weatherData.hourly.snowfall[i], prefs).toFixed(1)} ${precipU}\n`;
           }
 
           if (weatherData.hourly.wind_speed_10m?.[i] !== null && weatherData.hourly.wind_speed_10m?.[i] !== undefined) {
@@ -139,7 +186,7 @@ export async function handleGetHistoricalWeather(
           content: [
             {
               type: 'text',
-              text: output
+              text: fallbackNote ? insertNoteAfterHeading(output, fallbackNote) : output
             }
           ]
         }, resolved);
@@ -147,7 +194,7 @@ export async function handleGetHistoricalWeather(
         // Format daily summaries
         let output = `# Historical Weather Data (Daily Summaries)\n\n`;
         output += `**Period:** ${start_date.split('T')[0]} to ${end_date.split('T')[0]}\n`;
-        output += `**Location:** ${weatherData.latitude.toFixed(4)}°N, ${Math.abs(weatherData.longitude).toFixed(4)}°${weatherData.longitude >= 0 ? 'E' : 'W'} (${formatElevationFromM(weatherData.elevation, prefs)} elevation)\n`;
+        output += `**Location:** ${formatCoordinates(weatherData.latitude, weatherData.longitude)} (${formatElevationFromM(weatherData.elevation, prefs)} elevation)\n`;
         output += `**Number of days:** ${weatherData.daily.time.length}\n`;
         output += `**Data source:** Open-Meteo Historical Weather API (Reanalysis)\n\n`;
 
@@ -176,7 +223,7 @@ export async function handleGetHistoricalWeather(
           }
 
           if (weatherData.daily.snowfall_sum?.[i] !== null && weatherData.daily.snowfall_sum?.[i] !== undefined && weatherData.daily.snowfall_sum[i] > 0) {
-            output += `- **Snowfall:** ${weatherData.daily.snowfall_sum[i].toFixed(1)} ${precipU}\n`;
+            output += `- **Snowfall:** ${snowfallToPrecipUnit(weatherData.daily.snowfall_sum[i], prefs).toFixed(1)} ${precipU}\n`;
           }
 
           if (weatherData.daily.wind_speed_10m_max?.[i] !== null && weatherData.daily.wind_speed_10m_max?.[i] !== undefined) {
@@ -190,7 +237,7 @@ export async function handleGetHistoricalWeather(
           content: [
             {
               type: 'text',
-              text: output
+              text: fallbackNote ? insertNoteAfterHeading(output, fallbackNote) : output
             }
           ]
         }, resolved);
@@ -202,13 +249,19 @@ export async function handleGetHistoricalWeather(
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Unable to retrieve historical data: ${errorMessage}`);
     }
-  } else {
-    // Use real-time NOAA API for recent data (last 7 days)
+  };
+
+  if (!useNOAA) {
+    return fetchFromOpenMeteo();
+  }
+
+  try {
+    // Use real-time NOAA API for recent US data (last 7 days)
     const observations = await noaaService.getHistoricalObservations(
       latitude,
       longitude,
       startTime,
-      endTime,
+      noaaEndTime,
       limit
     );
 
@@ -256,5 +309,22 @@ export async function handleGetHistoricalWeather(
         }
       ]
     }, resolved);
+  } catch (error) {
+    // The US bounding boxes overrun the border (Toronto, Vancouver, Windsor
+    // all sit inside them), so recent-date points NOAA rejects fall back to
+    // the Open-Meteo archive instead of erroring — the same contract as
+    // get_current_conditions/get_forecast. NOAA maps the coverage 404 to
+    // DataNotFoundError and other 4xx to InvalidLocationError; both are
+    // non-retryable "NOAA can't serve this request" failures. Transient
+    // failures (RateLimitError, ServiceUnavailableError, network) propagate.
+    if (!(error instanceof DataNotFoundError || error instanceof InvalidLocationError)) {
+      throw error;
+    }
+    logger.warn('NOAA rejected recent-date historical location; falling back to Open-Meteo', {
+      latitude,
+      longitude,
+      fallback: true
+    });
+    return fetchFromOpenMeteo(NOAA_FALLBACK_NOTE);
   }
 }

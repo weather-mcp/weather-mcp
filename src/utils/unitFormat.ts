@@ -128,6 +128,22 @@ export function withLabel(value: number, label: string, decimals = 0): string {
   return `${value.toFixed(decimals)} ${label}`;
 }
 
+/**
+ * Convert an Open-Meteo `snowfall` (or `snowfall_sum`) value to the
+ * preferred precipitation unit.
+ *
+ * Snowfall is the other field besides `pressure_msl` that does not follow
+ * `openMeteoUnitParams`'s `precipitation_unit` request: Open-Meteo converts
+ * `snowfall` to inches when `precipitation_unit=inch` is sent, but otherwise
+ * reports it in **cm** — not mm like `precipitation`/`rain`/`showers`. The
+ * API's own `current_units` metadata confirms this: `"snowfall": "cm"`
+ * alongside `"precipitation": "mm"`. Same class of trap as the
+ * `pressure_msl` conversion in `currentConditionsHandler.ts`.
+ */
+export function snowfallToPrecipUnit(value: number, prefs: UnitPreferences): number {
+  return prefs.precipitation === 'mm' ? value * 10 : value;
+}
+
 export function formatTemperatureFromC(celsius: number, prefs: UnitPreferences): string {
   return `${Math.round(convertTemperatureFromC(celsius, prefs))}${temperatureLabel(prefs)}`;
 }

@@ -651,6 +651,109 @@ export class OpenMeteoService {
   }
 
   /**
+   * Get current weather conditions from Open-Meteo Forecast API
+   *
+   * @param latitude - Latitude coordinate (-90 to 90)
+   * @param longitude - Longitude coordinate (-180 to 180)
+   * @param prefs - Unit preferences (default: imperial)
+   * @returns Forecast response populated with current conditions
+   */
+  async getCurrentConditions(
+    latitude: number,
+    longitude: number,
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES
+  ): Promise<OpenMeteoForecastResponse> {
+    // Validate coordinates
+    validateLatitude(latitude);
+    validateLongitude(longitude);
+
+    // Build parameters
+    const params = this.buildCurrentParams(latitude, longitude, prefs);
+
+    // Check cache first (unit signature keeps imperial/metric responses distinct)
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('openmeteo-current', latitude, longitude, unitSignature(prefs));
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as OpenMeteoForecastResponse;
+      }
+
+      const response = await this.makeRequestToForecast<OpenMeteoForecastResponse>('/forecast', params);
+      this.validateCurrentResponse(response);
+
+      // Cache for 15 minutes (current conditions update every 20-60 minutes)
+      this.cache.set(cacheKey, response, CacheConfig.ttl.currentConditions);
+
+      return response;
+    }
+
+    // No caching
+    const response = await this.makeRequestToForecast<OpenMeteoForecastResponse>('/forecast', params);
+    this.validateCurrentResponse(response);
+    return response;
+  }
+
+  /**
+   * Build request parameters for current conditions data
+   * @private
+   */
+  private buildCurrentParams(
+    latitude: number,
+    longitude: number,
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES
+  ): Record<string, string | number> {
+    const params: Record<string, string | number> = {
+      latitude,
+      longitude,
+      forecast_days: 1,
+      ...openMeteoUnitParams(prefs),
+      timezone: 'auto'
+    };
+
+    params.current = [
+      'temperature_2m',
+      'relative_humidity_2m',
+      'apparent_temperature',
+      'dew_point_2m',
+      'is_day',
+      'precipitation',
+      'rain',
+      'showers',
+      'snowfall',
+      'weather_code',
+      'cloud_cover',
+      'pressure_msl',
+      'wind_speed_10m',
+      'wind_direction_10m',
+      'wind_gusts_10m'
+    ].join(',');
+
+    params.daily = 'temperature_2m_max,temperature_2m_min';
+
+    return params;
+  }
+
+  /**
+   * Validate that the current conditions response contains the expected data
+   * @private
+   */
+  private validateCurrentResponse(response: OpenMeteoForecastResponse): void {
+    if (!response.current) {
+      throw new DataNotFoundError(
+        'OpenMeteo',
+        'No current conditions data available for the specified location'
+      );
+    }
+
+    if (!response.current_units) {
+      throw new DataNotFoundError(
+        'OpenMeteo',
+        'No current conditions data available for the specified location'
+      );
+    }
+  }
+
+  /**
    * Build request parameters for forecast data
    * @private
    */
@@ -964,8 +1067,10 @@ export class OpenMeteoService {
    *
    * @param latitude - Latitude coordinate (-90 to 90)
    * @param longitude - Longitude coordinate (-180 to 180)
-   * @param forecast - Whether to include hourly forecast (default: false, returns current only)
-   * @param forecastDays - Number of forecast days (1-7, default: 5)
+   * @param forecast - Whether to include daily forecast aggregates (default: false, returns current only)
+   * @param forecastDays - Number of forecast days (1-16, default: 5). The Marine API
+   *   accepts up to 16 days (verified live 2026-07-16), but the underlying model's
+   *   horizon is typically ~10 days — trailing days beyond that are null-padded.
    * @returns Marine conditions including waves, swell, and currents
    */
   async getMarine(
@@ -979,10 +1084,10 @@ export class OpenMeteoService {
     validateLongitude(longitude);
 
     // Validate forecast days
-    if (forecastDays < 1 || forecastDays > 7) {
+    if (forecastDays < 1 || forecastDays > 16) {
       throw new InvalidLocationError(
         'OpenMeteo',
-        'Marine forecast days must be between 1 and 7'
+        'Marine forecast days must be between 1 and 16'
       );
     }
 
@@ -1045,26 +1150,9 @@ export class OpenMeteoService {
       'ocean_current_direction'
     ].join(',');
 
-    // Optionally include hourly forecast data
+    // Optionally include daily forecast aggregates
     if (forecast) {
       params.forecast_days = forecastDays;
-      params.hourly = [
-        'wave_height',
-        'wave_direction',
-        'wave_period',
-        'wind_wave_height',
-        'wind_wave_direction',
-        'wind_wave_period',
-        'wind_wave_peak_period',
-        'swell_wave_height',
-        'swell_wave_direction',
-        'swell_wave_period',
-        'swell_wave_peak_period',
-        'ocean_current_velocity',
-        'ocean_current_direction'
-      ].join(',');
-
-      // Also include daily aggregates
       params.daily = [
         'wave_height_max',
         'wave_direction_dominant',
@@ -1129,10 +1217,10 @@ export class OpenMeteoService {
       );
     }
 
-    if (forecast && (!response.hourly || !response.hourly.time || response.hourly.time.length === 0)) {
+    if (forecast && (!response.daily || !response.daily.time || response.daily.time.length === 0)) {
       throw new DataNotFoundError(
         'OpenMeteo',
-        'No hourly marine forecast data available for the specified location'
+        'No daily marine forecast data available for the specified location'
       );
     }
   }

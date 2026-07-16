@@ -18,7 +18,17 @@ import {
   formatVisibilityQV,
   formatHeightFromFt,
   formatPrecipFromMm,
+  formatPressureFromPa,
+  temperatureLabel,
+  windSpeedLabel,
+  precipitationLabel,
+  withLabel,
+  snowfallToPrecipUnit,
 } from '../utils/unitFormat.js';
+import { isInUS } from '../utils/geography.js';
+import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
+import { logger } from '../utils/logger.js';
+import { UnitPreferences } from '../config/units.js';
 import { DisplayThresholds } from '../config/displayThresholds.js';
 import {
   getHainesCategory,
@@ -40,6 +50,24 @@ interface CurrentConditionsArgs extends UnitArgs {
   city_name?: string;
   include_fire_weather?: boolean;
   include_normals?: boolean;
+  source?: 'auto' | 'noaa' | 'openmeteo';
+}
+
+/** Note shown when an auto-routed NOAA request falls back to Open-Meteo. */
+const NOAA_FALLBACK_NOTE =
+  '*NOAA does not cover this location; showing Open-Meteo model data instead.*';
+
+/**
+ * Insert a note line directly under the output's top heading (first line),
+ * keeping the heading itself as the first thing the client renders.
+ */
+function insertNoteAfterHeading(text: string, note: string): string {
+  const newline = text.indexOf('\n');
+  if (newline === -1) {
+    return `${text}\n\n${note}\n`;
+  }
+  // The remainder starts with the original newline(s), so no trailing \n here.
+  return `${text.slice(0, newline)}\n\n${note}${text.slice(newline)}`;
 }
 
 export async function handleGetCurrentConditions(
@@ -65,6 +93,94 @@ export async function handleGetCurrentConditions(
   );
   const prefs = resolveUnitPreferences(args as CurrentConditionsArgs);
 
+  // Get source preference or auto-detect (US = NOAA station observations,
+  // elsewhere = Open-Meteo model data)
+  const requestedSource = (args as CurrentConditionsArgs)?.source || 'auto';
+  const useNOAA = requestedSource === 'auto'
+    ? isInUS(latitude, longitude)
+    : requestedSource === 'noaa';
+
+  let output: string;
+  if (useNOAA) {
+    try {
+      output = await formatNOAACurrentConditions(
+        noaaService,
+        openMeteoService,
+        nceiService,
+        latitude,
+        longitude,
+        includeFireWeather,
+        includeNormals,
+        prefs
+      );
+    } catch (error) {
+      // The US bounding boxes overrun the border (Toronto, Vancouver, Windsor
+      // all sit inside them), so auto-routed points NOAA rejects fall back to
+      // Open-Meteo instead of erroring. NOAA maps the coverage 404 ("Unable to
+      // provide data for requested point") to DataNotFoundError and other 4xx
+      // to InvalidLocationError — both are non-retryable "NOAA can't serve
+      // this request" failures, so both fall back. Transient failures
+      // (RateLimitError, ServiceUnavailableError, network) still propagate,
+      // and explicit source="noaa" keeps its error contract.
+      if (
+        requestedSource !== 'auto' ||
+        !(error instanceof DataNotFoundError || error instanceof InvalidLocationError)
+      ) {
+        throw error;
+      }
+      logger.warn('NOAA rejected auto-routed location; falling back to Open-Meteo', {
+        latitude,
+        longitude,
+        fallback: true
+      });
+      output = insertNoteAfterHeading(
+        await formatOpenMeteoCurrentConditions(
+          openMeteoService,
+          nceiService,
+          latitude,
+          longitude,
+          includeFireWeather,
+          includeNormals,
+          prefs
+        ),
+        NOAA_FALLBACK_NOTE
+      );
+    }
+  } else {
+    output = await formatOpenMeteoCurrentConditions(
+      openMeteoService,
+      nceiService,
+      latitude,
+      longitude,
+      includeFireWeather,
+      includeNormals,
+      prefs
+    );
+  }
+
+  return prependLocationLine({
+    content: [
+      {
+        type: 'text',
+        text: output
+      }
+    ]
+  }, resolved);
+}
+
+/**
+ * Format current conditions from NOAA station observations (US locations).
+ */
+async function formatNOAACurrentConditions(
+  noaaService: NOAAService,
+  openMeteoService: OpenMeteoService,
+  nceiService: NCEIService,
+  latitude: number,
+  longitude: number,
+  includeFireWeather: boolean,
+  includeNormals: boolean,
+  prefs: UnitPreferences
+): Promise<string> {
   // Get current observation
   const observation = await noaaService.getCurrentConditions(latitude, longitude);
   const props = observation.properties;
@@ -380,12 +496,163 @@ export async function handleGetCurrentConditions(
   output += `\n---\n`;
   output += `*Data source: NOAA National Weather Service*\n`;
 
-  return prependLocationLine({
-    content: [
-      {
-        type: 'text',
-        text: output
+  return output;
+}
+
+/**
+ * Format current conditions from Open-Meteo model data (non-US locations).
+ *
+ * Values arrive already in the caller's preferred units (Open-Meteo converts
+ * server-side), so they are formatted with the plain-number helpers rather than
+ * the NOAA QuantitativeValue helpers. There is no station: the data-source
+ * footer carries the model-interpolated caveat instead.
+ */
+async function formatOpenMeteoCurrentConditions(
+  openMeteoService: OpenMeteoService,
+  nceiService: NCEIService,
+  latitude: number,
+  longitude: number,
+  includeFireWeather: boolean,
+  includeNormals: boolean,
+  prefs: UnitPreferences
+): Promise<string> {
+  const tempU = temperatureLabel(prefs);
+  const windU = windSpeedLabel(prefs);
+  const precipU = precipitationLabel(prefs);
+
+  const response = await openMeteoService.getCurrentConditions(latitude, longitude, prefs);
+  // getCurrentConditions rejects responses without a `current` block.
+  const current = response.current!;
+  const timezone = response.timezone;
+
+  let output = `# Current Weather Conditions\n\n`;
+  output += `**Time:** ${formatInTimezone(current.time, timezone, 'medium', prefs.timeFormat)}\n\n`;
+
+  if (current.weather_code !== undefined) {
+    output += `**Conditions:** ${openMeteoService.getWeatherDescription(current.weather_code)}\n`;
+  }
+
+  if (current.temperature_2m !== undefined) {
+    output += `**Temperature:** ${Math.round(current.temperature_2m)}${tempU}\n`;
+
+    // Feels-like only earns a line when it diverges meaningfully from actual.
+    // The gap is unit-keyed: these values are already in the caller's unit.
+    if (current.apparent_temperature !== undefined) {
+      const gap = DisplayThresholds.temperature.feelsLikeGap[prefs.temperature];
+      if (Math.abs(current.apparent_temperature - current.temperature_2m) > gap) {
+        output += `**Feels Like:** ${Math.round(current.apparent_temperature)}${tempU}\n`;
       }
-    ]
-  }, resolved);
+    }
+  }
+
+  // Today's range from the single-day daily block
+  const high = response.daily?.temperature_2m_max?.[0];
+  const low = response.daily?.temperature_2m_min?.[0];
+  if (high !== undefined || low !== undefined) {
+    let range = `**Today's Range:**`;
+    if (high !== undefined) range += ` High ${Math.round(high)}${tempU}`;
+    if (high !== undefined && low !== undefined) range += ` /`;
+    if (low !== undefined) range += ` Low ${Math.round(low)}${tempU}`;
+    output += `${range}\n`;
+  }
+
+  if (current.dew_point_2m !== undefined) {
+    output += `**Dewpoint:** ${Math.round(current.dew_point_2m)}${tempU}\n`;
+  }
+
+  if (current.relative_humidity_2m !== undefined) {
+    output += `**Humidity:** ${Math.round(current.relative_humidity_2m)}%\n`;
+  }
+
+  if (current.wind_speed_10m !== undefined) {
+    output += `**Wind:** ${Math.round(current.wind_speed_10m)} ${windU}`;
+    if (current.wind_direction_10m !== undefined) {
+      output += ` from ${Math.round(current.wind_direction_10m)}°`;
+    }
+    if (
+      current.wind_gusts_10m !== undefined &&
+      current.wind_gusts_10m > current.wind_speed_10m * DisplayThresholds.wind.gustSignificanceRatio
+    ) {
+      output += `, gusting to ${Math.round(current.wind_gusts_10m)} ${windU}`;
+    }
+    output += `\n`;
+  }
+
+  if (current.pressure_msl !== undefined) {
+    // Pressure is the one field Open-Meteo does NOT convert: openMeteoUnitParams
+    // only carries temperature/wind/precipitation, so pressure_msl always comes
+    // back in hPa regardless of preference. Convert it here (hPa -> Pa -> prefs).
+    output += `**Pressure:** ${formatPressureFromPa(current.pressure_msl * 100, prefs)}\n`;
+  }
+
+  if (current.cloud_cover !== undefined) {
+    output += `**Cloud Cover:** ${Math.round(current.cloud_cover)}%\n`;
+  }
+
+  // Precipitation section (only when there is something worth reporting).
+  // Gated on a trace floor rather than `> 0`: raw drizzle otherwise renders
+  // an all-zero section at display precision (e.g. "**Current:** 0.00 in").
+  const precipDecimals = prefs.precipitation === 'mm' ? 1 : 2;
+  const traceFloor = DisplayThresholds.precipitation.traceFloor[prefs.precipitation];
+  // Snowfall is the other field (besides pressure_msl) that Open-Meteo does
+  // not convert to the caller's precipitation unit — it reports cm unless
+  // precipitation_unit=inch was requested. Convert before display/comparison
+  // so the label and the trace-floor check both operate on the shown value.
+  const snowfall = current.snowfall !== undefined
+    ? snowfallToPrecipUnit(current.snowfall, prefs)
+    : undefined;
+  if (current.precipitation !== undefined && current.precipitation >= traceFloor) {
+    output += `\n## Recent Precipitation\n`;
+    output += `**Current:** ${withLabel(current.precipitation, precipU, precipDecimals)}\n`;
+
+    if (current.rain !== undefined && current.rain >= traceFloor) {
+      output += `**Rain:** ${withLabel(current.rain, precipU, precipDecimals)}\n`;
+    }
+    if (current.showers !== undefined && current.showers >= traceFloor) {
+      output += `**Showers:** ${withLabel(current.showers, precipU, precipDecimals)}\n`;
+    }
+    if (snowfall !== undefined && snowfall >= traceFloor) {
+      output += `**Snowfall:** ${withLabel(snowfall, precipU, precipDecimals)}\n`;
+    }
+  }
+
+  // Fire Weather section (optional) — indices are US-only for now, so the
+  // non-US path makes no NOAA call at all.
+  if (includeFireWeather) {
+    output += `\n## Fire Weather\n\n`;
+    output += `Fire weather indices are currently available for US locations only.\n`;
+  }
+
+  // Climate Normals section (optional)
+  if (includeNormals) {
+    try {
+      const { month, day } = getDateComponents(current.time);
+
+      const normals = await getClimateNormals(
+        openMeteoService,
+        nceiService,
+        latitude,
+        longitude,
+        month,
+        day
+      );
+
+      // Daily values are already in the caller's units — no conversion needed.
+      const currentTemps = {
+        high: high !== undefined ? Math.round(high) : undefined,
+        low: low !== undefined ? Math.round(low) : undefined
+      };
+
+      output += formatNormals(normals, currentTemps, prefs);
+    } catch (error) {
+      // If normals fetch fails, just skip it (don't error the whole request)
+      output += `\n## Climate Normals\n\n`;
+      output += `⚠️ Climate normals data not available for this location.\n`;
+    }
+  }
+
+  output += `\n---\n`;
+  output += `*Data source: Open-Meteo (Global) — model-interpolated values, not station observations*\n`;
+
+  return output;
 }
