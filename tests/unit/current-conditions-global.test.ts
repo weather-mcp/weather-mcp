@@ -338,6 +338,32 @@ describe('handleGetCurrentConditions — Open-Meteo formatter', () => {
     });
   });
 
+  describe('pressure conversion', () => {
+    // Open-Meteo honours temperature/wind/precipitation unit params but NOT
+    // pressure: pressure_msl always comes back in hPa (verified against the live
+    // API, which reports "pressure_msl": "hPa" even under temperature_unit=
+    // fahrenheit). The formatter must convert rather than relabel.
+    it('converts hPa to inHg under imperial preferences', async () => {
+      const response = buildOpenMeteoCurrentResponse({ pressure_msl: 1012 });
+      const fakes = buildFakes(response);
+
+      const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, fakes);
+      const text = textOf(result);
+
+      // 1012 hPa ~= 29.88 inHg — NOT "1012 inHg".
+      expect(text).toContain('**Pressure:** 29.88 inHg');
+      expect(text).not.toContain('1012 inHg');
+    });
+
+    it('reports hPa unchanged under metric preferences', async () => {
+      const response = buildOpenMeteoCurrentResponse({ pressure_msl: 1012 });
+      const fakes = buildFakes(response);
+
+      const result = await callCurrentConditions({ ...LONDON, units: 'metric' }, fakes);
+      expect(textOf(result)).toContain('**Pressure:** 1012 hPa');
+    });
+  });
+
   describe('Recent Precipitation section', () => {
     it('is present when precipitation > 0', async () => {
       const response = buildOpenMeteoCurrentResponse({ precipitation: 0.5, rain: 0.5 });

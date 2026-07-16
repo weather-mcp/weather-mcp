@@ -18,10 +18,10 @@ import {
   formatVisibilityQV,
   formatHeightFromFt,
   formatPrecipFromMm,
+  formatPressureFromPa,
   temperatureLabel,
   windSpeedLabel,
   precipitationLabel,
-  pressureLabel,
   withLabel,
 } from '../utils/unitFormat.js';
 import { isInUS } from '../utils/geography.js';
@@ -522,9 +522,10 @@ async function formatOpenMeteoCurrentConditions(
   }
 
   if (current.pressure_msl !== undefined) {
-    // Decimals follow the same rule as the pressure QV formatter: inHg reads at
-    // two places, hPa at whole numbers.
-    output += `**Pressure:** ${withLabel(current.pressure_msl, pressureLabel(prefs), prefs.pressure === 'hPa' ? 0 : 2)}\n`;
+    // Pressure is the one field Open-Meteo does NOT convert: openMeteoUnitParams
+    // only carries temperature/wind/precipitation, so pressure_msl always comes
+    // back in hPa regardless of preference. Convert it here (hPa -> Pa -> prefs).
+    output += `**Pressure:** ${formatPressureFromPa(current.pressure_msl * 100, prefs)}\n`;
   }
 
   if (current.cloud_cover !== undefined) {
