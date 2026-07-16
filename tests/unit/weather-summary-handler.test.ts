@@ -110,16 +110,42 @@ describe('handleGetWeatherSummary', () => {
   });
 
   it('degrades gracefully when a section fails', async () => {
-    alertsMock.mockRejectedValue(new Error('alerts unavailable outside the US'));
+    // US location: alerts dispatches to the mocked handler (not short-circuited
+    // by the non-US pre-check below), so a thrown error still exercises the
+    // generic degrade-to-note path.
+    alertsMock.mockRejectedValue(new Error('alerts temporarily unavailable'));
 
-    const result = await callSummary({ latitude: 48.85, longitude: 2.35 });
+    const result = await callSummary({ latitude: 47.6062, longitude: -122.3321 });
     const text = result.content[0].text;
 
     expect(text).toContain('alerts (unavailable)');
-    expect(text).toContain('alerts unavailable outside the US');
+    expect(text).toContain('alerts temporarily unavailable');
     // Other sections still render
     expect(text).toContain('Current Weather Conditions');
     expect(text).toContain('Weather Forecast');
+  });
+
+  it('notes alerts are US-only for a non-US location without calling handleGetAlerts', async () => {
+    const result = await callSummary({ latitude: 51.5074, longitude: -0.1278 }); // London
+    const text = result.content[0].text;
+
+    expect(text).toContain('## Alerts');
+    expect(text).toContain('Weather alerts are currently available for US locations only.');
+    expect(text).not.toContain('⚠️');
+    expect(text).not.toContain('alerts (unavailable)');
+    expect(alertsMock).not.toHaveBeenCalled();
+    // Other sections still render normally
+    expect(text).toContain('Current Weather Conditions');
+    expect(text).toContain('Weather Forecast');
+  });
+
+  it('dispatches handleGetAlerts as before for a US location', async () => {
+    const result = await callSummary({ latitude: 47.6062, longitude: -122.3321 }); // Seattle
+    const text = result.content[0].text;
+
+    expect(alertsMock).toHaveBeenCalledTimes(1);
+    expect(text).toContain('Weather Alerts');
+    expect(text).not.toContain('Weather alerts are currently available for US locations only.');
   });
 
   it('rejects an invalid include entry', async () => {

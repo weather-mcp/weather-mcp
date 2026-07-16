@@ -15,6 +15,7 @@ import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, formatLocationLine } from '../utils/locationResolver.js';
 import { validateDetail, validateForecastDays, DetailLevel } from '../utils/validation.js';
+import { isInUS } from '../utils/geography.js';
 import { logger } from '../utils/logger.js';
 import { handleGetCurrentConditions } from './currentConditionsHandler.js';
 import { handleGetForecast } from './forecastHandler.js';
@@ -120,6 +121,16 @@ export async function handleGetWeatherSummary(
   // Run each requested section. A section failure (e.g. alerts outside the US)
   // degrades to a note instead of failing the whole summary.
   for (const section of include) {
+    // Alerts are US-only; skip the doomed NOAA round-trip for non-US locations
+    // and note that plainly instead of letting it degrade to the generic
+    // "(unavailable)" error block with a leaked NOAA message.
+    if (section === 'alerts' && !isInUS(resolved.latitude, resolved.longitude)) {
+      body += `## Alerts\n\n`;
+      body += `Weather alerts are currently available for US locations only.\n\n`;
+      body += `---\n\n`;
+      continue;
+    }
+
     try {
       let sectionResult: { content: Array<{ type: string; text: string }> };
       switch (section) {
