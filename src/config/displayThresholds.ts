@@ -13,6 +13,17 @@ export const DisplayThresholds = {
     showHeatIndex: 80,
     /** Show wind chill when temperature is below this value */
     showWindChill: 50,
+    /**
+     * Minimum apparent-vs-actual temperature gap before "Feels Like" is shown.
+     *
+     * Keyed by unit because Open-Meteo returns values already in the caller's
+     * unit — a single Fahrenheit gap would silently become a ~1.8x stricter
+     * rule in Celsius.
+     */
+    feelsLikeGap: {
+      F: 3,
+      C: 2,
+    },
   },
 
   /**

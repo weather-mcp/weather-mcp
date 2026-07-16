@@ -18,7 +18,14 @@ import {
   formatVisibilityQV,
   formatHeightFromFt,
   formatPrecipFromMm,
+  temperatureLabel,
+  windSpeedLabel,
+  precipitationLabel,
+  pressureLabel,
+  withLabel,
 } from '../utils/unitFormat.js';
+import { isInUS } from '../utils/geography.js';
+import { UnitPreferences } from '../config/units.js';
 import { DisplayThresholds } from '../config/displayThresholds.js';
 import {
   getHainesCategory,
@@ -40,6 +47,7 @@ interface CurrentConditionsArgs extends UnitArgs {
   city_name?: string;
   include_fire_weather?: boolean;
   include_normals?: boolean;
+  source?: 'auto' | 'noaa' | 'openmeteo';
 }
 
 export async function handleGetCurrentConditions(
@@ -65,6 +73,57 @@ export async function handleGetCurrentConditions(
   );
   const prefs = resolveUnitPreferences(args as CurrentConditionsArgs);
 
+  // Get source preference or auto-detect (US = NOAA station observations,
+  // elsewhere = Open-Meteo model data)
+  const requestedSource = (args as CurrentConditionsArgs)?.source || 'auto';
+  const useNOAA = requestedSource === 'auto'
+    ? isInUS(latitude, longitude)
+    : requestedSource === 'noaa';
+
+  const output = useNOAA
+    ? await formatNOAACurrentConditions(
+        noaaService,
+        openMeteoService,
+        nceiService,
+        latitude,
+        longitude,
+        includeFireWeather,
+        includeNormals,
+        prefs
+      )
+    : await formatOpenMeteoCurrentConditions(
+        openMeteoService,
+        nceiService,
+        latitude,
+        longitude,
+        includeFireWeather,
+        includeNormals,
+        prefs
+      );
+
+  return prependLocationLine({
+    content: [
+      {
+        type: 'text',
+        text: output
+      }
+    ]
+  }, resolved);
+}
+
+/**
+ * Format current conditions from NOAA station observations (US locations).
+ */
+async function formatNOAACurrentConditions(
+  noaaService: NOAAService,
+  openMeteoService: OpenMeteoService,
+  nceiService: NCEIService,
+  latitude: number,
+  longitude: number,
+  includeFireWeather: boolean,
+  includeNormals: boolean,
+  prefs: UnitPreferences
+): Promise<string> {
   // Get current observation
   const observation = await noaaService.getCurrentConditions(latitude, longitude);
   const props = observation.properties;
@@ -380,12 +439,152 @@ export async function handleGetCurrentConditions(
   output += `\n---\n`;
   output += `*Data source: NOAA National Weather Service*\n`;
 
-  return prependLocationLine({
-    content: [
-      {
-        type: 'text',
-        text: output
+  return output;
+}
+
+/**
+ * Format current conditions from Open-Meteo model data (non-US locations).
+ *
+ * Values arrive already in the caller's preferred units (Open-Meteo converts
+ * server-side), so they are formatted with the plain-number helpers rather than
+ * the NOAA QuantitativeValue helpers. There is no station: the data-source
+ * footer carries the model-interpolated caveat instead.
+ */
+async function formatOpenMeteoCurrentConditions(
+  openMeteoService: OpenMeteoService,
+  nceiService: NCEIService,
+  latitude: number,
+  longitude: number,
+  includeFireWeather: boolean,
+  includeNormals: boolean,
+  prefs: UnitPreferences
+): Promise<string> {
+  const tempU = temperatureLabel(prefs);
+  const windU = windSpeedLabel(prefs);
+  const precipU = precipitationLabel(prefs);
+
+  const response = await openMeteoService.getCurrentConditions(latitude, longitude, prefs);
+  // getCurrentConditions rejects responses without a `current` block.
+  const current = response.current!;
+  const timezone = response.timezone;
+
+  let output = `# Current Weather Conditions\n\n`;
+  output += `**Time:** ${formatInTimezone(current.time, timezone, 'medium', prefs.timeFormat)}\n\n`;
+
+  if (current.weather_code !== undefined) {
+    output += `**Conditions:** ${openMeteoService.getWeatherDescription(current.weather_code)}\n`;
+  }
+
+  if (current.temperature_2m !== undefined) {
+    output += `**Temperature:** ${Math.round(current.temperature_2m)}${tempU}\n`;
+
+    // Feels-like only earns a line when it diverges meaningfully from actual.
+    // The gap is unit-keyed: these values are already in the caller's unit.
+    if (current.apparent_temperature !== undefined) {
+      const gap = DisplayThresholds.temperature.feelsLikeGap[prefs.temperature];
+      if (Math.abs(current.apparent_temperature - current.temperature_2m) > gap) {
+        output += `**Feels Like:** ${Math.round(current.apparent_temperature)}${tempU}\n`;
       }
-    ]
-  }, resolved);
+    }
+  }
+
+  // Today's range from the single-day daily block
+  const high = response.daily?.temperature_2m_max?.[0];
+  const low = response.daily?.temperature_2m_min?.[0];
+  if (high !== undefined || low !== undefined) {
+    let range = `**Today's Range:**`;
+    if (high !== undefined) range += ` High ${Math.round(high)}${tempU}`;
+    if (high !== undefined && low !== undefined) range += ` /`;
+    if (low !== undefined) range += ` Low ${Math.round(low)}${tempU}`;
+    output += `${range}\n`;
+  }
+
+  if (current.dew_point_2m !== undefined) {
+    output += `**Dewpoint:** ${Math.round(current.dew_point_2m)}${tempU}\n`;
+  }
+
+  if (current.relative_humidity_2m !== undefined) {
+    output += `**Humidity:** ${Math.round(current.relative_humidity_2m)}%\n`;
+  }
+
+  if (current.wind_speed_10m !== undefined) {
+    output += `**Wind:** ${Math.round(current.wind_speed_10m)} ${windU}`;
+    if (current.wind_direction_10m !== undefined) {
+      output += ` from ${Math.round(current.wind_direction_10m)}°`;
+    }
+    if (
+      current.wind_gusts_10m !== undefined &&
+      current.wind_gusts_10m > current.wind_speed_10m * DisplayThresholds.wind.gustSignificanceRatio
+    ) {
+      output += `, gusting to ${Math.round(current.wind_gusts_10m)} ${windU}`;
+    }
+    output += `\n`;
+  }
+
+  if (current.pressure_msl !== undefined) {
+    // Decimals follow the same rule as the pressure QV formatter: inHg reads at
+    // two places, hPa at whole numbers.
+    output += `**Pressure:** ${withLabel(current.pressure_msl, pressureLabel(prefs), prefs.pressure === 'hPa' ? 0 : 2)}\n`;
+  }
+
+  if (current.cloud_cover !== undefined) {
+    output += `**Cloud Cover:** ${Math.round(current.cloud_cover)}%\n`;
+  }
+
+  // Precipitation section (only when there is something to report)
+  const precipDecimals = prefs.precipitation === 'mm' ? 1 : 2;
+  if (current.precipitation !== undefined && current.precipitation > 0) {
+    output += `\n## Recent Precipitation\n`;
+    output += `**Current:** ${withLabel(current.precipitation, precipU, precipDecimals)}\n`;
+
+    if (current.rain !== undefined && current.rain > 0) {
+      output += `**Rain:** ${withLabel(current.rain, precipU, precipDecimals)}\n`;
+    }
+    if (current.showers !== undefined && current.showers > 0) {
+      output += `**Showers:** ${withLabel(current.showers, precipU, precipDecimals)}\n`;
+    }
+    if (current.snowfall !== undefined && current.snowfall > 0) {
+      output += `**Snowfall:** ${withLabel(current.snowfall, precipU, precipDecimals)}\n`;
+    }
+  }
+
+  // Fire Weather section (optional) — indices are US-only for now, so the
+  // non-US path makes no NOAA call at all.
+  if (includeFireWeather) {
+    output += `\n## Fire Weather\n\n`;
+    output += `Fire weather indices are currently available for US locations only.\n`;
+  }
+
+  // Climate Normals section (optional)
+  if (includeNormals) {
+    try {
+      const { month, day } = getDateComponents(current.time);
+
+      const normals = await getClimateNormals(
+        openMeteoService,
+        nceiService,
+        latitude,
+        longitude,
+        month,
+        day
+      );
+
+      // Daily values are already in the caller's units — no conversion needed.
+      const currentTemps = {
+        high: high !== undefined ? Math.round(high) : undefined,
+        low: low !== undefined ? Math.round(low) : undefined
+      };
+
+      output += formatNormals(normals, currentTemps, prefs);
+    } catch (error) {
+      // If normals fetch fails, just skip it (don't error the whole request)
+      output += `\n## Climate Normals\n\n`;
+      output += `⚠️ Climate normals data not available for this location.\n`;
+    }
+  }
+
+  output += `\n---\n`;
+  output += `*Data source: Open-Meteo (Global) — model-interpolated values, not station observations*\n`;
+
+  return output;
 }
