@@ -218,7 +218,7 @@ The design-sensitive core — the orchestrator does this one itself.
 
 ## Progress Tracker
 
-- [ ] T1 — Snowfall unit helper (`sonnet`)
+- [x] T1 — Snowfall unit helper (`sonnet`) — `f2499c5`
 - [ ] T2 — Current-conditions snowfall conversion + trace floor (`sonnet`)
 - [ ] T3 — Historical snowfall conversion (`sonnet`)
 - [ ] T4 — Auto-mode NOAA → Open-Meteo fallback (`opus`)
