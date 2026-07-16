@@ -33,6 +33,7 @@ import {
   formatPressureQV,
   formatVisibilityQV,
   formatClockTime,
+  snowfallToPrecipUnit,
 } from '../../src/utils/unitFormat.js';
 
 describe('units config', () => {
@@ -164,6 +165,21 @@ describe('formatters from SI/canonical', () => {
     expect(formatVisibilityFromM(1000, METRIC_PREFERENCES)).toBe('1.0 km');
     expect(formatDistanceFromKm(1, IMPERIAL_PREFERENCES)).toBe('0.6 mi');
     expect(formatDistanceFromKm(1, METRIC_PREFERENCES)).toBe('1.0 km');
+  });
+});
+
+describe('snowfallToPrecipUnit', () => {
+  it('converts cm to mm under metric preferences', () => {
+    expect(snowfallToPrecipUnit(0.14, METRIC_PREFERENCES)).toBeCloseTo(1.4);
+  });
+
+  it('passes the value through unchanged under imperial preferences', () => {
+    expect(snowfallToPrecipUnit(0.14, IMPERIAL_PREFERENCES)).toBe(0.14);
+  });
+
+  it('handles zero under both unit systems', () => {
+    expect(snowfallToPrecipUnit(0, METRIC_PREFERENCES)).toBe(0);
+    expect(snowfallToPrecipUnit(0, IMPERIAL_PREFERENCES)).toBe(0);
   });
 });
 
