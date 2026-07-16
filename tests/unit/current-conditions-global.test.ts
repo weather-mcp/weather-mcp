@@ -23,6 +23,7 @@ import type { LocationStore } from '../../src/services/locationStore.js';
 import type { GeocodingService } from '../../src/services/geocoding.js';
 import type { OpenMeteoForecastResponse, ClimateNormals } from '../../src/types/openmeteo.js';
 import type { ObservationResponse, StationCollectionResponse, GridpointResponse } from '../../src/types/noaa.js';
+import { DataNotFoundError, InvalidLocationError, ServiceUnavailableError } from '../../src/errors/ApiError.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -36,6 +37,14 @@ const LONDON = { latitude: 51.5074, longitude: -0.1278 };
 const TOKYO = { latitude: 35.6762, longitude: 139.6503 };
 /** Sydney, Australia — outside the US routing boxes. */
 const SYDNEY = { latitude: -33.8688, longitude: 151.2093 };
+/** Toronto, Canada — falls INSIDE the continental-US routing box (the box
+ * overruns the border), so auto-routes to NOAA and is the fixture used to
+ * exercise the NOAA → Open-Meteo fallback (D2). */
+const TORONTO = { latitude: 43.6532, longitude: -79.3832 };
+
+/** Note text the fallback prepends under the output's top heading. */
+const NOAA_FALLBACK_NOTE =
+  '*NOAA does not cover this location; showing Open-Meteo model data instead.*';
 
 function buildNOAAObservation(overrides: Record<string, unknown> = {}): ObservationResponse {
   return {
@@ -510,5 +519,94 @@ describe('handleGetWeatherSummary — drives the real currentConditionsHandler (
     expect(fakes.noaa.getCurrentConditions).not.toHaveBeenCalled();
     // No section failure note.
     expect(text).not.toContain('current (unavailable)');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Auto-mode NOAA -> Open-Meteo fallback (D2 / T5)
+// ---------------------------------------------------------------------------
+//
+// Live verification (see docs/global-conditions-hardening-implementation-plan.md
+// T5) showed NOAA's coverage 404 ("Unable to provide data for requested point")
+// actually surfaces as DataNotFoundError, not InvalidLocationError as the design
+// plan originally assumed — InvalidLocationError is NOAA's generic non-coverage
+// 4xx class. The handler catches BOTH (see currentConditionsHandler.ts), so both
+// are covered here. Transient failures (ServiceUnavailableError, RateLimitError)
+// must propagate rather than trigger a fallback.
+
+describe('handleGetCurrentConditions — auto-mode NOAA -> Open-Meteo fallback (D2)', () => {
+  it('falls back to Open-Meteo when NOAA throws DataNotFoundError on an auto-routed border city', async () => {
+    const fakes = buildFakes();
+    fakes.noaa.getCurrentConditions.mockRejectedValue(
+      new DataNotFoundError('NOAA', 'Unable to provide data for requested point')
+    );
+
+    const result = await callCurrentConditions({ ...TORONTO }, fakes);
+    const text = textOf(result);
+
+    // Fallback actually happened: Open-Meteo was called, NOAA formatter output
+    // (Station line) never made it into the response.
+    expect(fakes.openMeteo.getCurrentConditions).toHaveBeenCalledTimes(1);
+    expect(text).not.toContain('**Station:**');
+
+    // Note is positioned directly under the top heading, before any other content.
+    expect(text.startsWith('# Current Weather Conditions')).toBe(true);
+    const headingEnd = '# Current Weather Conditions'.length;
+    const noteIndex = text.indexOf(NOAA_FALLBACK_NOTE);
+    expect(noteIndex).toBeGreaterThan(headingEnd);
+    expect(text.slice(headingEnd, noteIndex).trim()).toBe('');
+
+    // Open-Meteo-formatted output, including its data-source footer.
+    expect(text).toContain(
+      '*Data source: Open-Meteo (Global) — model-interpolated values, not station observations*'
+    );
+  });
+
+  it('falls back to Open-Meteo when NOAA throws InvalidLocationError on an auto-routed border city', async () => {
+    const fakes = buildFakes();
+    fakes.noaa.getCurrentConditions.mockRejectedValue(
+      new InvalidLocationError('NOAA', 'Coordinates outside NOAA coverage')
+    );
+
+    const result = await callCurrentConditions({ ...TORONTO }, fakes);
+    const text = textOf(result);
+
+    expect(fakes.openMeteo.getCurrentConditions).toHaveBeenCalledTimes(1);
+    expect(text).toContain(NOAA_FALLBACK_NOTE);
+    expect(text).toContain(
+      '*Data source: Open-Meteo (Global) — model-interpolated values, not station observations*'
+    );
+  });
+
+  it('does NOT fall back and rejects when NOAA throws ServiceUnavailableError', async () => {
+    const fakes = buildFakes();
+    fakes.noaa.getCurrentConditions.mockRejectedValue(
+      new ServiceUnavailableError('NOAA', 'NOAA API is currently unavailable')
+    );
+
+    await expect(callCurrentConditions({ ...TORONTO }, fakes)).rejects.toThrow(ServiceUnavailableError);
+    expect(fakes.openMeteo.getCurrentConditions).not.toHaveBeenCalled();
+  });
+
+  it('does NOT fall back when source is explicitly "noaa", even for DataNotFoundError', async () => {
+    const fakes = buildFakes();
+    fakes.noaa.getCurrentConditions.mockRejectedValue(
+      new DataNotFoundError('NOAA', 'Unable to provide data for requested point')
+    );
+
+    await expect(
+      callCurrentConditions({ ...TORONTO, source: 'noaa' }, fakes)
+    ).rejects.toThrow(DataNotFoundError);
+    expect(fakes.openMeteo.getCurrentConditions).not.toHaveBeenCalled();
+  });
+
+  it('does not show the fallback note for a normal non-US call (no NOAA error involved)', async () => {
+    const fakes = buildFakes();
+
+    const result = await callCurrentConditions({ ...LONDON }, fakes);
+    const text = textOf(result);
+
+    expect(text).not.toContain(NOAA_FALLBACK_NOTE);
+    expect(fakes.noaa.getCurrentConditions).not.toHaveBeenCalled();
   });
 });
