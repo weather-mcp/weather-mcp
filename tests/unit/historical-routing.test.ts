@@ -1,6 +1,6 @@
 /**
  * Routing and fallback tests for get_historical_weather (v1.12.0 hardening,
- * verification findings N1/N2).
+ * verification findings N1/N2/N3).
  *
  * N1: recent-date requests (inside the NOAA threshold window) used to route
  * to NOAA unconditionally, hard-failing for every international location.
@@ -10,6 +10,10 @@
  *
  * N2: the Open-Meteo location line hardcoded °N for latitude; southern
  * latitudes now render °S.
+ *
+ * N3: a date-only end_date parses to midnight UTC, so a same-day range
+ * (start_date === end_date) was a zero-width observation window on the NOAA
+ * path. Date-only ends are now extended to end-of-day, clamped to now.
  *
  * See docs/global-conditions-hardening-verification.md.
  */
@@ -186,6 +190,56 @@ describe('handleGetHistoricalWeather — recent-date routing (N1)', () => {
 
     expect(fakes.openMeteo.getHistoricalWeather).toHaveBeenCalledOnce();
     expect(fakes.noaa.getHistoricalObservations).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleGetHistoricalWeather — same-day NOAA window (N3)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  function noaaWindow(fakes: ReturnType<typeof buildFakes>): { start: Date; end: Date } {
+    const [, , start, end] = fakes.noaa.getHistoricalObservations.mock.calls[0];
+    return { start, end };
+  }
+
+  it('extends a same-day date-only range to cover the full calendar day', async () => {
+    const fakes = buildFakes();
+    const yesterday = recentDate(1);
+
+    await callHistorical(
+      { ...SEATTLE, start_date: yesterday, end_date: yesterday },
+      fakes
+    );
+
+    const { start, end } = noaaWindow(fakes);
+    expect(end.getTime() - start.getTime()).toBe(DAY_MS - 1);
+  });
+
+  it('clamps the extended end to now when end_date is today', async () => {
+    const fakes = buildFakes();
+    const today = recentDate(0);
+
+    await callHistorical(
+      { ...SEATTLE, start_date: recentDate(1), end_date: today },
+      fakes
+    );
+
+    const { start, end } = noaaWindow(fakes);
+    expect(end.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(end.getTime()).toBeGreaterThan(start.getTime());
+  });
+
+  it('leaves an explicit datetime end untouched', async () => {
+    const fakes = buildFakes();
+    const day = recentDate(1);
+    const explicitEnd = `${day}T12:00:00Z`;
+
+    await callHistorical(
+      { ...SEATTLE, start_date: `${day}T00:00:00Z`, end_date: explicitEnd },
+      fakes
+    );
+
+    const { end } = noaaWindow(fakes);
+    expect(end.getTime()).toBe(new Date(explicitEnd).getTime());
   });
 });
 

@@ -82,6 +82,15 @@ export async function handleGetHistoricalWeather(
     throw new Error(`End date (${end_date}) cannot be in the future. Current date is ${now.toISOString().split('T')[0]}.`);
   }
 
+  // A date-only end_date parses to midnight UTC, which would make a same-day
+  // range (start_date === end_date) a zero-width observation window on the
+  // NOAA path. Extend date-only ends to cover the whole calendar day, clamped
+  // to now (NOAA rejects future end times). Open-Meteo receives the calendar
+  // dates directly and already treats them inclusively.
+  const noaaEndTime = end_date.includes('T')
+    ? endTime
+    : new Date(Math.min(endTime.getTime() + (24 * 60 * 60 * 1000 - 1), now.getTime()));
+
   // Determine which API to use based on date range
   // If start date is older than threshold, use archival API
   const thresholdDate = new Date(now.getTime() - ApiConstants.historicalDataThresholdDays * 24 * 60 * 60 * 1000);
@@ -250,7 +259,7 @@ export async function handleGetHistoricalWeather(
       latitude,
       longitude,
       startTime,
-      endTime,
+      noaaEndTime,
       limit
     );
 
