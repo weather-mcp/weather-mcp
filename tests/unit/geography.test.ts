@@ -9,7 +9,8 @@ import {
   shouldUseNOAAMarine,
   getMarineRegionDescription,
   getGreatLakesRegions,
-  getMajorCoastalBayRegions
+  getMajorCoastalBayRegions,
+  isInUS
 } from '../../src/utils/geography.js';
 
 describe('Geography Utilities', () => {
@@ -158,6 +159,48 @@ describe('Geography Utilities', () => {
         expect(region.bbox.minLon).toBeGreaterThanOrEqual(-180);
         expect(region.bbox.maxLon).toBeLessThanOrEqual(180);
       }
+    });
+  });
+
+  describe('isInUS', () => {
+    it('should detect CONUS location (Denver, CO)', () => {
+      expect(isInUS(39.7392, -104.9903)).toBe(true);
+    });
+
+    it('should detect Alaska (Anchorage)', () => {
+      expect(isInUS(61.2181, -149.9003)).toBe(true);
+    });
+
+    it('should detect Hawaii (Honolulu)', () => {
+      expect(isInUS(21.3069, -157.8583)).toBe(true);
+    });
+
+    it('should detect Puerto Rico (San Juan)', () => {
+      expect(isInUS(18.4655, -66.1057)).toBe(true);
+    });
+
+    it('should return false for London, UK', () => {
+      expect(isInUS(51.5074, -0.1278)).toBe(false);
+    });
+
+    it('should return false for Tokyo, Japan', () => {
+      expect(isInUS(35.6762, 139.6503)).toBe(false);
+    });
+
+    it('should return false for Sydney, Australia', () => {
+      expect(isInUS(-33.8688, 151.2093)).toBe(false);
+    });
+
+    it('should return false for a Canadian location well north of the CONUS box (Edmonton, AB)', () => {
+      // lat 53.5 exceeds the CONUS max (49.4) and the Alaska box's longitude
+      // range (<= -129.9) excludes Edmonton's -113.49, so neither box matches.
+      expect(isInUS(53.5461, -113.4938)).toBe(false);
+    });
+
+    it('should return false for a Mexican location well south of the CONUS box (Mexico City)', () => {
+      // lat 19.43 is well below the CONUS min (24.5); longitude keeps it out
+      // of the Hawaii box despite the latitude overlap.
+      expect(isInUS(19.4326, -99.1332)).toBe(false);
     });
   });
 

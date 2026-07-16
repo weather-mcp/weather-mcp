@@ -37,6 +37,7 @@ import {
 } from '../utils/snow.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
+import { isInUS } from '../utils/geography.js';
 
 interface ForecastArgs extends UnitArgs {
   latitude?: number;
@@ -67,20 +68,6 @@ function hourlyEntryCap(detail: DetailLevel, days: number): number {
   if (detail === 'full') return maxHours;
   if (detail === 'summary') return Math.min(24, maxHours);
   return Math.min(48, maxHours); // standard default
-}
-
-/**
- * Determine if coordinates are within the United States (including Alaska, Hawaii, and territories)
- * Uses bounding box approach for simplicity
- */
-function isInUS(latitude: number, longitude: number): boolean {
-  // Continental US, Alaska, Hawaii, Puerto Rico, and territories
-  const inContinentalUS = latitude >= 24.5 && latitude <= 49.4 && longitude >= -125 && longitude <= -66.9;
-  const inAlaska = latitude >= 51 && latitude <= 71.4 && longitude >= -180 && longitude <= -129.9;
-  const inHawaii = latitude >= 18.9 && latitude <= 28.5 && longitude >= -178.4 && longitude <= -154.8;
-  const inPuertoRico = latitude >= 17.9 && latitude <= 18.5 && longitude >= -67.3 && longitude <= -65.2;
-
-  return inContinentalUS || inAlaska || inHawaii || inPuertoRico;
 }
 
 /**
