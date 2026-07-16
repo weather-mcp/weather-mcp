@@ -280,6 +280,17 @@ code contradicts it.
 - [x] T5 — Handler routing and formatter tests (`sonnet`) — `cb82b03`
 - [x] T6 — Expose `source` on `get_current_conditions` (`sonnet`) — `b3af4d9`
 - [x] T7 — Docs and version (`opus`) — `4c30c1f`
+- [x] T8 — Fix Open-Meteo pressure unit handling (`opus`, unplanned) — `386fb57`
+
+**T8 (added during execution).** Driving the built handler against the **live**
+Open-Meteo API — the four mocked acceptance criteria all passed without catching
+this — showed London reporting `1021.90 inHg`, an hPa value wearing an inHg
+label. `openMeteoUnitParams` carries no pressure token, so `pressure_msl` is
+always hPa (the API's own `current_units` says so even under
+`temperature_unit=fahrenheit`). Pressure is now converted rather than relabelled;
+pressure is the only affected field. The mocked suite could not have caught it —
+the fixtures inherited the same wrong assumption from the design plan, which is
+now corrected in `docs/global-current-conditions-plan.md` D3.
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, all four design-plan

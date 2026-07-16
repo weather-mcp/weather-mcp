@@ -93,6 +93,13 @@ downstream consumers see a familiar shape:
 - Values arrive already in the caller's preferred units (Open-Meteo converts
   server-side) — format with the plain-number helpers in
   `src/utils/unitFormat.ts`, not the NOAA QV helpers.
+  - **Correction (found in implementation, 2026-07-15):** this is true for
+    temperature, wind, and precipitation but **not pressure**.
+    `openMeteoUnitParams` carries no pressure token, so `pressure_msl` always
+    returns hPa — the live API reports `"pressure_msl": "hPa"` even under
+    `temperature_unit=fahrenheit`. Pressure must be **converted**
+    (`formatPressureFromPa(hPa * 100, prefs)`), not relabelled. Every other
+    field we read does honour the unit params.
 - Timezone comes from the response's `timezone` field (no station lookup).
 - `prependLocationLine` behavior unchanged.
 
