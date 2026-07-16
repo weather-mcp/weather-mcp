@@ -1,6 +1,6 @@
 # Global Current Conditions — Implementation Plan
 
-**Status:** READY (2026-07-15)
+**Status:** COMPLETE (2026-07-15) — all tasks landed on `feat/global-current-conditions`
 
 Execution plan for `docs/global-current-conditions-plan.md` (the WHAT/WHY); rules
 live in `docs/orchestration-playbook.md`.
@@ -279,7 +279,7 @@ code contradicts it.
 - [x] T4 — Route non-US current conditions to Open-Meteo (`opus`) — `9df95ad`
 - [x] T5 — Handler routing and formatter tests (`sonnet`) — `cb82b03`
 - [x] T6 — Expose `source` on `get_current_conditions` (`sonnet`) — `b3af4d9`
-- [ ] T7 — Docs and version (`opus`)
+- [x] T7 — Docs and version (`opus`) — `4c30c1f`
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, all four design-plan
