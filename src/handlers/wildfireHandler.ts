@@ -6,6 +6,7 @@ import { NIFCService } from '../services/nifc.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { validateDetail } from '../utils/validation.js';
 import { guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
 import type { WildfireInfo } from '../types/wildfire.js';
@@ -16,6 +17,7 @@ interface WildfireArgs {
   location_name?: string;
   city_name?: string;
   radius?: number; // search radius in km (default: 100)
+  detail?: 'summary' | 'standard' | 'full';
 }
 
 export async function handleGetWildfireInfo(
@@ -27,6 +29,9 @@ export async function handleGetWildfireInfo(
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as WildfireArgs, locationStore, geocodingService);
   const { latitude, longitude } = resolved;
+
+  // Output verbosity: 'full' lifts the fire display cap to 25 (not unbounded).
+  const detail = validateDetail((args as WildfireArgs)?.detail);
 
   // Validate radius parameter
   let radius = (args as WildfireArgs)?.radius ?? 100; // default 100 km
@@ -60,6 +65,9 @@ export async function handleGetWildfireInfo(
 
     if (features.length === 0) {
       output += `✅ **No active wildfires found within ${radius} km**\n\n`;
+      if (response.exceededTransferLimit) {
+        output += `*Results may be incomplete — the fire data service truncated the response.*\n\n`;
+      }
       output += `The area is currently clear of reported wildfire activity.\n\n`;
       output += `**Note:** This data includes active wildfires and prescribed burns tracked by the National Interagency Fire Center. Small fires or very recent ignitions may not yet be included.\n`;
     } else {
@@ -123,10 +131,15 @@ export async function handleGetWildfireInfo(
       if (prescribedCount > 0) {
         output += `   - ${prescribedCount} prescribed burn${prescribedCount > 1 ? 's' : ''}\n`;
       }
+      if (response.exceededTransferLimit) {
+        output += `\n*Results may be incomplete — the fire data service truncated the response.*\n`;
+      }
       output += `\n`;
 
-      // Show details for nearest fires (limit to 5 to avoid overwhelming output)
-      const maxFiresToShow = 5;
+      // Show details for nearest fires. detail="full" lifts the cap to 25 (still
+      // capped, not unbounded — see D2 in docs/output-completeness-plan.md); the
+      // remainder note stays accurate at every level, including full.
+      const maxFiresToShow = detail === 'full' ? 25 : 5;
       const firesToShow = firesWithDistance.slice(0, maxFiresToShow);
 
       for (const { fire, distance } of firesToShow) {
@@ -134,7 +147,13 @@ export async function handleGetWildfireInfo(
       }
 
       if (firesWithDistance.length > maxFiresToShow) {
-        output += `\n*Note: ${firesWithDistance.length - maxFiresToShow} additional fire${firesWithDistance.length - maxFiresToShow > 1 ? 's' : ''} found within radius (showing nearest ${maxFiresToShow} only)*\n`;
+        const remaining = firesWithDistance.length - maxFiresToShow;
+        const plural = remaining > 1 ? 's' : '';
+        if (detail === 'full') {
+          output += `\n*Note: ${remaining} additional fire${plural} found within radius (showing nearest ${maxFiresToShow})*\n`;
+        } else {
+          output += `\n*Note: ${remaining} additional fire${plural} found within radius (showing nearest ${maxFiresToShow} only — use detail="full" for more)*\n`;
+        }
       }
 
       // Safety recommendations based on nearest wildfire
