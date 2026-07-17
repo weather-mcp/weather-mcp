@@ -1,6 +1,6 @@
 # Output Completeness — Implementation Plan
 
-**Status:** READY (2026-07-17)
+**Status:** COMPLETE (2026-07-17) — all tasks landed on `feat/output-completeness`
 
 Execution plan for `docs/output-completeness-plan.md` (the WHAT/WHY);
 rules live in `docs/orchestration-playbook.md`.
@@ -325,7 +325,8 @@ tolerance) — the orchestrator does this one itself.
 - [x] T5 — Lightning `detail` param, capped-25 `full` (`sonnet`) — `adec37f`
 - [x] T6 — River observed trend on all shown gauges (`opus`) — `e6e7a2f`
 - [x] T7 — River forecast series at `detail="full"` (`sonnet`) — `f44767f`
-- [ ] T8 — Live sweep + docs (`opus`)
+- [x] T8 — Live sweep + docs (`opus`) — `a44df6b` (plus `490117b`, an observed-placeholder
+  sentinel fix found during the sweep — see the verification doc)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the design plan's
