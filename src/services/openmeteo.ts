@@ -974,34 +974,15 @@ export class OpenMeteoService {
       'us_aqi_carbon_monoxide'
     ].join(',');
 
-    // Optionally include hourly forecast data
+    // Optionally include hourly forecast data. The forecast formatter reads only
+    // the two AQI composites and UV; the raw pollutant series were fetched but
+    // never displayed at any detail level, so they are deliberately not requested.
     if (forecast) {
       params.forecast_days = forecastDays;
       params.hourly = [
-        'pm10',
-        'pm2_5',
-        'carbon_monoxide',
-        'nitrogen_dioxide',
-        'sulphur_dioxide',
-        'ozone',
-        'aerosol_optical_depth',
-        'dust',
-        'uv_index',
-        'uv_index_clear_sky',
-        'ammonia',
-        'european_aqi',
-        'european_aqi_pm2_5',
-        'european_aqi_pm10',
-        'european_aqi_nitrogen_dioxide',
-        'european_aqi_ozone',
-        'european_aqi_sulphur_dioxide',
         'us_aqi',
-        'us_aqi_pm2_5',
-        'us_aqi_pm10',
-        'us_aqi_nitrogen_dioxide',
-        'us_aqi_ozone',
-        'us_aqi_sulphur_dioxide',
-        'us_aqi_carbon_monoxide'
+        'european_aqi',
+        'uv_index'
       ].join(',');
     }
 

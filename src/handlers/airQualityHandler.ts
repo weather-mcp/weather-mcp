@@ -221,6 +221,11 @@ function formatHourlyForecast(
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
   };
 
+  const uvAt = (i: number): number | undefined => {
+    const value = hourly.uv_index?.[i];
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  };
+
   // Skip hours already past. ISO local timestamps compare lexicographically.
   const nowHour = currentTime.slice(0, 13);
   let startIdx = times.findIndex((t) => t.slice(0, 13) >= nowHour);
@@ -257,10 +262,15 @@ function formatHourlyForecast(
     const indices = dayIndices.get(date)!;
 
     let dayPeak = -Infinity;
+    let dayPeakUV = -Infinity;
     for (const i of indices) {
       const value = aqiAt(i);
       if (value !== undefined) {
         dayPeak = Math.max(dayPeak, value);
+      }
+      const uv = uvAt(i);
+      if (uv !== undefined) {
+        dayPeakUV = Math.max(dayPeakUV, uv);
       }
     }
 
@@ -269,8 +279,13 @@ function formatHourlyForecast(
       continue;
     }
 
+    // A day with no real UV data omits the UV clause entirely — never "UV 0 (Low)".
+    const uvClause = dayPeakUV === -Infinity
+      ? ''
+      : ` · UV ${Math.round(dayPeakUV)} (${getUVIndexCategory(dayPeakUV).level})`;
+
     const peakCategory = useUSAQI ? getUSAQICategory(dayPeak) : getEuropeanAQICategory(dayPeak);
-    output += `### ${formatDayLabel(date)} — peak ${aqiScale} AQI ${Math.round(dayPeak)} (${peakCategory.level})\n\n`;
+    output += `### ${formatDayLabel(date)} — peak ${aqiScale} AQI ${Math.round(dayPeak)} (${peakCategory.level})${uvClause}\n\n`;
 
     // 6-hour periods aligned to the local clock (12 AM / 6 AM / 12 PM / 6 PM)
     const periods = new Map<number, number[]>();
