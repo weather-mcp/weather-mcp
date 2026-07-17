@@ -520,7 +520,8 @@ const TOOL_DEFINITIONS = {
           minimum: 5,
           maximum: 120,
           default: 60
-        }
+        },
+        ...DETAIL_SCHEMA_PROPERTY
       },
       required: []
     }

@@ -4,9 +4,60 @@
  */
 
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
-import { getLightningActivity, formatLightningActivityResponse } from '../../src/handlers/lightningHandler.js';
+import {
+  getLightningActivity,
+  formatLightningActivityResponse,
+  handleGetLightningActivity
+} from '../../src/handlers/lightningHandler.js';
 import { LightningStrike, LightningActivityResponse } from '../../src/types/lightning.js';
 import * as blitzortungModule from '../../src/services/blitzortung.js';
+
+/** Build a minimal-but-valid LightningActivityResponse with N strikes for cap/note tests. */
+function buildResponseWithStrikes(count: number): LightningActivityResponse {
+  const strikes: LightningStrike[] = Array.from({ length: count }, (_, i) => ({
+    timestamp: new Date(),
+    latitude: 40.8,
+    longitude: -74.0,
+    polarity: -1,
+    amplitude: 30,
+    distance: i + 1
+  }));
+
+  return {
+    location: { latitude: 40.7128, longitude: -74.006 },
+    searchRadius: 100,
+    timeWindow: 60,
+    searchPeriod: {
+      start: new Date(),
+      end: new Date()
+    },
+    strikes,
+    statistics: {
+      totalStrikes: count,
+      cloudToGroundStrikes: count,
+      intraCloudStrikes: 0,
+      averageDistance: 13,
+      nearestDistance: 1,
+      strikesPerMinute: 0.42,
+      densityPerSqKm: 0.0008
+    },
+    safety: {
+      level: 'safe',
+      message: 'Test',
+      recommendations: [],
+      nearestStrikeDistance: 1,
+      nearestStrikeTime: new Date(),
+      isActiveThunderstorm: false
+    },
+    coverage: {
+      monitoringSince: new Date('2024-01-01T10:00:00Z'),
+      coverageMinutes: 60,
+      isComplete: true
+    },
+    source: 'Blitzortung.org',
+    generatedAt: new Date()
+  };
+}
 
 // Mock the blitzortung service
 vi.mock('../../src/services/blitzortung.js', () => ({
@@ -667,57 +718,87 @@ describe('Lightning Activity Handler', () => {
       });
     });
 
-    it('should limit strike display to 10', () => {
-      const strikes: LightningStrike[] = Array.from({ length: 25 }, (_, i) => ({
-        timestamp: new Date(),
-        latitude: 40.8,
-        longitude: -74.0,
-        polarity: -1,
-        amplitude: 30,
-        distance: i + 1
-      }));
-
-      const response: LightningActivityResponse = {
-        location: { latitude: 40.7128, longitude: -74.006 },
-        searchRadius: 100,
-        timeWindow: 60,
-        searchPeriod: {
-          start: new Date(),
-          end: new Date()
-        },
-        strikes,
-        statistics: {
-          totalStrikes: 25,
-          cloudToGroundStrikes: 25,
-          intraCloudStrikes: 0,
-          averageDistance: 13,
-          nearestDistance: 1,
-          strikesPerMinute: 0.42,
-          densityPerSqKm: 0.0008
-        },
-        safety: {
-          level: 'safe',
-          message: 'Test',
-          recommendations: [],
-          nearestStrikeDistance: 1,
-          nearestStrikeTime: new Date(),
-          isActiveThunderstorm: false
-        },
-        coverage: {
-          monitoringSince: new Date('2024-01-01T10:00:00Z'),
-          coverageMinutes: 60,
-          isComplete: true
-        },
-        source: 'Blitzortung.org',
-        generatedAt: new Date()
-      };
+    it('should limit strike display to 10 by default, with a detail="full" pointer', () => {
+      const response = buildResponseWithStrikes(25);
 
       const formatted = formatLightningActivityResponse(response);
 
       expect(formatted).toContain('### Strike 1');
       expect(formatted).toContain('### Strike 10');
       expect(formatted).not.toContain('### Strike 11');
-      expect(formatted).toContain('Showing 10 of 25 strikes');
+      expect(formatted).toContain('*Showing 10 of 25 strikes detected — use detail="full" for more*');
+    });
+  });
+
+  describe('detail parameter (D2 escape hatch)', () => {
+    it('lists exactly 10 strikes at default detail, with the escape-hatch note', () => {
+      const response = buildResponseWithStrikes(30);
+
+      const formatted = formatLightningActivityResponse(response);
+      const strikeCount = (formatted.match(/### Strike /g) || []).length;
+
+      expect(strikeCount).toBe(10);
+      expect(formatted).toContain('*Showing 10 of 30 strikes detected — use detail="full" for more*');
+    });
+
+    it('lists exactly 10 strikes at detail="standard" (explicit), same as default', () => {
+      const response = buildResponseWithStrikes(30);
+
+      const formatted = formatLightningActivityResponse(response, 'standard');
+      const strikeCount = (formatted.match(/### Strike /g) || []).length;
+
+      expect(strikeCount).toBe(10);
+      expect(formatted).toContain('*Showing 10 of 30 strikes detected — use detail="full" for more*');
+    });
+
+    it('lists exactly 25 strikes at detail="full", with an accurate, pointer-free note', () => {
+      const response = buildResponseWithStrikes(30);
+
+      const formatted = formatLightningActivityResponse(response, 'full');
+      const strikeCount = (formatted.match(/### Strike /g) || []).length;
+
+      expect(strikeCount).toBe(25);
+      expect(formatted).toContain('*Showing 25 of 30 strikes detected*');
+      expect(formatted).not.toContain('use detail="full" for more');
+    });
+
+    it('lists all strikes with no remainder note when count is at or below the default cap', () => {
+      const response = buildResponseWithStrikes(7);
+
+      const defaultFormatted = formatLightningActivityResponse(response);
+      const fullFormatted = formatLightningActivityResponse(response, 'full');
+
+      const defaultCount = (defaultFormatted.match(/### Strike /g) || []).length;
+      const fullCount = (fullFormatted.match(/### Strike /g) || []).length;
+
+      expect(defaultCount).toBe(7);
+      expect(fullCount).toBe(7);
+      expect(defaultFormatted).not.toContain('strikes detected —');
+      expect(defaultFormatted).not.toContain('Showing');
+      expect(fullFormatted).not.toContain('Showing');
+    });
+
+    it('computes statistics over ALL strikes identically regardless of detail level', () => {
+      const response = buildResponseWithStrikes(30);
+
+      const defaultFormatted = formatLightningActivityResponse(response);
+      const fullFormatted = formatLightningActivityResponse(response, 'full');
+
+      const statLines = [
+        '**Total Strikes:** 30',
+        '**Cloud-to-Ground:** 30',
+        '**Intra-Cloud:** 0',
+        '**Nearest Strike:** 1.0 km away',
+        '**Average Distance:** 13.0 km',
+        '**Strike Rate:** 0.42 strikes/minute',
+        '**Density:** 0.0008 strikes/km²',
+        '**Active Thunderstorm:** No'
+      ];
+
+      for (const line of statLines) {
+        expect(defaultFormatted).toContain(line);
+        expect(fullFormatted).toContain(line);
+      }
     });
   });
 
@@ -759,6 +840,49 @@ describe('Lightning Activity Handler', () => {
 
       expect(result.searchRadius).toBe(500);
       expect(result.timeWindow).toBe(120);
+    });
+  });
+
+  describe('handleGetLightningActivity - detail validation', () => {
+    // Coordinates are passed directly so resolveLocationAsync short-circuits on the
+    // coordinate branch and never touches locationStore/geocodingService — both are
+    // inert stubs here, mirroring tests/unit/riverConditions.test.ts.
+    const locationStore = {} as never;
+    const geocodingService = {} as never;
+
+    it('rejects an invalid detail value', async () => {
+      mockGetLightningStrikes.mockResolvedValue([]);
+
+      await expect(
+        handleGetLightningActivity(
+          { latitude: 40.7128, longitude: -74.006, detail: 'bogus' },
+          locationStore,
+          geocodingService
+        )
+      ).rejects.toThrow('Invalid detail: "bogus". Must be one of "summary", "standard", or "full".');
+    });
+
+    it('lists 25 strikes end-to-end through the handler at detail="full"', async () => {
+      const strikes: LightningStrike[] = Array.from({ length: 30 }, (_, i) => ({
+        timestamp: new Date(),
+        latitude: 40.8,
+        longitude: -74.0,
+        polarity: -1,
+        amplitude: 30,
+        distance: i + 1
+      }));
+      mockGetLightningStrikes.mockResolvedValue(strikes);
+
+      const result = await handleGetLightningActivity(
+        { latitude: 40.7128, longitude: -74.006, detail: 'full' },
+        locationStore,
+        geocodingService
+      );
+      const text = result.content[0].text;
+      const strikeCount = (text.match(/### Strike /g) || []).length;
+
+      expect(strikeCount).toBe(25);
+      expect(text).toContain('*Showing 25 of 30 strikes detected*');
     });
   });
 
