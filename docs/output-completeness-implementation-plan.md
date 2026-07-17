@@ -322,8 +322,8 @@ tolerance) — the orchestrator does this one itself.
 - [x] T2 — AQI forecast UV unit tests (`sonnet`) — `6a56bbe`
 - [x] T3 — River `detail` param, capped-25 `full` (`sonnet`) — `033eed1`
 - [x] T4 — Wildfire `detail` param + ArcGIS truncation caveat (`sonnet`) — `6b32acc`
-- [ ] T5 — Lightning `detail` param, capped-25 `full` (`sonnet`)
-- [ ] T6 — River observed trend on all shown gauges (`opus`)
+- [x] T5 — Lightning `detail` param, capped-25 `full` (`sonnet`) — `adec37f`
+- [x] T6 — River observed trend on all shown gauges (`opus`) — `e6e7a2f`
 - [ ] T7 — River forecast series at `detail="full"` (`sonnet`)
 - [ ] T8 — Live sweep + docs (`opus`)
 
