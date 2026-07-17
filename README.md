@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1%2C129%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-1%2C332%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -45,7 +45,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
-- **Fully open source** — MIT licensed, readable TypeScript, 1,129 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 1,332 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -63,11 +63,11 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
 | `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
 | `search_location` | Geocode place names to coordinates ("Paris" → 48.85, 2.35) | 🌍 Global |
-| `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance | 🌍 Global |
-| `get_marine_conditions` | Wave height, swell, ocean currents, Douglas Sea Scale — includes Great Lakes and major US bays | 🌍 Global |
+| `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance; optional day-grouped forecast up to 7 days with per-day peak AQI and UV | 🌍 Global |
+| `get_marine_conditions` | Wave height, swell, ocean currents, Douglas Sea Scale — includes Great Lakes and major US bays; forecast up to 16 days | 🌍 Global |
 | `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery | 🌍 Global |
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
-| `get_river_conditions` | River gauge levels, flood stages, streamflow | 🇺🇸 US |
+| `get_river_conditions` | River gauge levels, flood stages, streamflow, rise/fall trends, NWPS forecast series | 🇺🇸 US |
 | `get_wildfire_info` | Active fires, containment, size, proximity-based safety guidance | 🇺🇸 US |
 | `check_service_status` | Health checks for all upstream APIs plus cache statistics | — |
 | `save_location` | Save places as aliases ("home", "cabin") with optional activity tags | — |
@@ -79,7 +79,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 > **Consistent location input:** every location-based tool accepts the same three forms — `latitude`+`longitude`, a saved `location_name` (e.g. `"home"`), or a free-text `city_name` (e.g. `"Bend, Oregon"`, geocoded automatically). When a name is used, the response echoes the resolved place and coordinates.
 
-> **Output verbosity:** high-volume tools (`get_forecast`, `get_alerts`, `get_weather_imagery`) accept `detail: "summary" | "standard" | "full"` (default `standard`) to trade completeness for token cost — e.g. `full` returns the complete alert text and uncapped hourly forecast.
+> **Output verbosity:** high-volume tools (`get_forecast`, `get_alerts`, `get_weather_imagery`, `get_river_conditions`, `get_wildfire_info`, `get_lightning_activity`) accept `detail: "summary" | "standard" | "full"` (default `standard`) to trade completeness for token cost — e.g. `full` returns the complete alert text, uncapped hourly forecast, every radar animation frame, and up to 25 nearby gauges/fires/strikes instead of the default 5-10.
 
 ## Feature highlights
 
@@ -262,7 +262,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 1,129 tests (~2 seconds)
+npm test               # Run all 1,332 tests (~2 seconds)
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-07-17
+
 ### Added
 - **`forecast_days` parameter on `get_air_quality`** - Request 1-7 days of AQI forecast (default: 5; 7 days / 168 hours is the Open-Meteo air quality model's maximum). Previously the service always fetched 5 days but the output silently showed only the first 24 hours. (`src/handlers/airQualityHandler.ts`, `src/index.ts`)
 - **`forecast_days` parameter on `get_marine_conditions`** - Request 1-16 days of daily marine forecast (default: 5; 16 is the Marine API's accepted maximum, verified live 2026-07-16). The marine model typically provides ~10 days of real data — trailing days it null-pads are trimmed from the output with a note saying how many requested days had no data. Previously the handler hardcoded a 5-day fetch with no override. (`src/handlers/marineConditionsHandler.ts`, `src/services/openmeteo.ts`, `src/index.ts`)

@@ -3,12 +3,12 @@
   "name": "io.github.dgahagan/weather-mcp",
   "title": "Weather Data MCP Server",
   "description": "17 weather tools, no API keys: a one-call weather summary plus forecasts, alerts, air quality, marine, radar, lightning, wildfires.",
-  "version": "1.11.1",
+  "version": "1.13.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@dangahagan/weather-mcp",
-      "version": "1.11.1",
+      "version": "1.13.0",
       "transport": {
         "type": "stdio"
       }

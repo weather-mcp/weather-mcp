@@ -4,7 +4,7 @@ Complete reference for all 17 MCP tools provided by the Weather MCP Server.
 
 > **Note on tool presets:** By default the server exposes the `basic` preset (6 tools, led by `get_weather_summary`). Set `ENABLED_TOOLS=all` to enable everything. See [Tool Selection](../README.md#tool-selection) in the README.
 
-> **Common parameters (all location-based tools):** Every weather tool accepts the location in one of three ways — `latitude`+`longitude`, a saved `location_name` (e.g. `"home"`), or a free-text `city_name` (e.g. `"Bend, Oregon"`, geocoded on demand). Precedence: coordinates > `location_name` > `city_name`. When a name is used, the response echoes the resolved place in a `**Location:**` header. The high-volume tools (`get_forecast`, `get_alerts`, `get_weather_imagery`) also accept `detail`: `summary` | `standard` (default) | `full`.
+> **Common parameters (all location-based tools):** Every weather tool accepts the location in one of three ways — `latitude`+`longitude`, a saved `location_name` (e.g. `"home"`), or a free-text `city_name` (e.g. `"Bend, Oregon"`, geocoded on demand). Precedence: coordinates > `location_name` > `city_name`. When a name is used, the response echoes the resolved place in a `**Location:**` header. The high-volume tools (`get_forecast`, `get_alerts`, `get_weather_imagery`, `get_river_conditions`, `get_wildfire_info`, `get_lightning_activity`) also accept `detail`: `summary` | `standard` (default) | `full`.
 
 ## Contents
 

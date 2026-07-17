@@ -116,9 +116,9 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 
 ## Version Information
 
-- **Current Version:** 1.8.2
+- **Current Version:** 1.13.0
 - **Security Posture:** A- (Excellent, 93/100)
-- **Test Coverage:** 1,084 tests, 100% pass rate
+- **Test Coverage:** 1,332 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
 - **Risk Level:** LOW
 
