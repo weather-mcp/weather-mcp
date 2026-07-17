@@ -8,6 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleGetAirQuality } from '../../src/handlers/airQualityHandler.js';
+import { OpenMeteoService } from '../../src/services/openmeteo.js';
 import type { OpenMeteoAirQualityResponse } from '../../src/types/openmeteo.js';
 
 const getAirQualityMock = vi.fn();
@@ -225,5 +226,133 @@ describe('get_air_quality forecast', () => {
       expect(text).not.toContain('## Air Quality Forecast');
       expect(getAirQualityMock).toHaveBeenCalledWith(43.8195, -84.7686, false, 5);
     });
+  });
+
+  describe('peak UV in day headers', () => {
+    it('shows the max UV over the day, not the first or last hour', async () => {
+      const response = buildResponse(1, '2026-07-16T00:00');
+      const hourly = response.hourly! as unknown as { uv_index: number[] };
+      // Low at the boundaries, high in the middle — a first/last selection
+      // would report 2 or 3 instead of the true peak of 9.
+      hourly.uv_index = new Array(24).fill(0);
+      hourly.uv_index[0] = 2;
+      hourly.uv_index[23] = 3;
+      hourly.uv_index[14] = 9;
+      getAirQualityMock.mockResolvedValue(response);
+
+      const result = await callHandler({ ...COORDS, forecast: true, forecast_days: 1 });
+      const text = result.content[0].text;
+
+      expect(text).toContain('UV 9 (Very High)');
+      expect(text).not.toContain('UV 2 (');
+      expect(text).not.toContain('UV 3 (');
+    });
+
+    it('omits the UV clause for a day whose UV values are all null', async () => {
+      const response = buildResponse(2, '2026-07-16T00:00');
+      const hourly = response.hourly! as unknown as { uv_index: (number | null)[] };
+      hourly.uv_index = new Array(48).fill(null);
+      // Day two (hours 24-47) has real UV data; day one does not.
+      for (let i = 24; i < 48; i++) {
+        hourly.uv_index[i] = 5;
+      }
+      getAirQualityMock.mockResolvedValue(response);
+
+      const result = await callHandler({ ...COORDS, forecast: true, forecast_days: 2 });
+      const text = result.content[0].text;
+
+      const dayOne = text.split('### Friday, Jul 17')[0];
+      expect(dayOne).toContain('### Thursday, Jul 16');
+      expect(dayOne).not.toContain(' · UV');
+
+      const dayTwo = text.split('### Friday, Jul 17')[1];
+      expect(dayTwo).toContain(' · UV 5 (Moderate)');
+    });
+
+    it('omits the UV clause for every day when the location has no UV data at all', async () => {
+      // buildResponse's fixture never sets hourly.uv_index — it's absent,
+      // matching a response where the field wasn't requested or returned.
+      const response = buildResponse(5);
+      getAirQualityMock.mockResolvedValue(response);
+
+      const result = await callHandler({ ...COORDS, forecast: true });
+      const text = result.content[0].text;
+
+      expect(text).not.toContain(' · UV');
+      expect(text).toContain('### Thursday, Jul 16');
+      expect(text).toContain('### Monday, Jul 20');
+    });
+
+    it('renders the exact combined AQI + UV header format', async () => {
+      const response = buildResponse(1, '2026-07-16T00:00');
+      const hourly = response.hourly! as unknown as { uv_index: number[] };
+      // Peak US AQI for this day is 40 + 23*5 = 155 (Unhealthy, see the
+      // existing "labels each day" test above for the same ramp).
+      hourly.uv_index = new Array(24).fill(1);
+      hourly.uv_index[15] = 9.4; // rounds to 9, Very High (8 <= 9.4 < 11)
+      getAirQualityMock.mockResolvedValue(response);
+
+      const result = await callHandler({ ...COORDS, forecast: true, forecast_days: 1 });
+      const text = result.content[0].text;
+
+      expect(text).toContain('### Thursday, Jul 16 — peak US AQI 155 (Unhealthy) · UV 9 (Very High)');
+    });
+
+    it('takes the max of only the real UV values when null and real values are mixed', async () => {
+      const response = buildResponse(1, '2026-07-16T00:00');
+      const hourly = response.hourly! as unknown as { uv_index: (number | null)[] };
+      hourly.uv_index = new Array(24).fill(null);
+      hourly.uv_index[10] = 6.7; // rounds to 7, High (6 <= 7 < 8)
+      getAirQualityMock.mockResolvedValue(response);
+
+      const result = await callHandler({ ...COORDS, forecast: true, forecast_days: 1 });
+      const text = result.content[0].text;
+
+      expect(text).toContain(' · UV 7 (High)');
+    });
+  });
+});
+
+describe('OpenMeteoService.getAirQuality() hourly params', () => {
+  function buildMinimalResponse(): OpenMeteoAirQualityResponse {
+    return {
+      latitude: 43.8195,
+      longitude: -84.7686,
+      generationtime_ms: 0.1,
+      utc_offset_seconds: -14400,
+      timezone: 'America/Detroit',
+      timezone_abbreviation: 'EDT',
+      elevation: 258,
+      current_units: { time: 'iso8601', interval: 'seconds', us_aqi: '' },
+      current: { time: '2026-07-16T11:00', interval: 3600, us_aqi: 69 },
+      hourly_units: { time: 'iso8601', us_aqi: '' },
+      hourly: { time: ['2026-07-16T00:00'], us_aqi: [40], european_aqi: [20], uv_index: [1] }
+    } as OpenMeteoAirQualityResponse;
+  }
+
+  it('requests exactly the three hourly variables the forecast formatter needs', async () => {
+    const service = new OpenMeteoService();
+    service.clearCache();
+    const spy = vi
+      .spyOn(service as any, 'makeRequestToAirQuality')
+      .mockResolvedValue(buildMinimalResponse());
+
+    await service.getAirQuality(43.8195, -84.7686, true, 5);
+
+    const params = spy.mock.calls[0][1] as Record<string, string | number>;
+    expect(params.hourly).toBe('us_aqi,european_aqi,uv_index');
+  });
+
+  it('omits the hourly param entirely when forecast is not requested', async () => {
+    const service = new OpenMeteoService();
+    service.clearCache();
+    const spy = vi
+      .spyOn(service as any, 'makeRequestToAirQuality')
+      .mockResolvedValue(buildMinimalResponse());
+
+    await service.getAirQuality(43.8195, -84.7686, false, 5);
+
+    const params = spy.mock.calls[0][1] as Record<string, string | number>;
+    expect(params.hourly).toBeUndefined();
   });
 });

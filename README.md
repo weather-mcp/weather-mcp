@@ -101,7 +101,7 @@ All free, all public, no authentication required:
 |--------|----------|----------|
 | [NOAA Weather API](https://www.weather.gov/documentation/services-web-api) | US forecasts, current conditions, alerts, fire weather | US |
 | [Open-Meteo](https://open-meteo.com/) | Global forecasts, historical data (1940+), air quality, marine, geocoding, climate normals | Global |
-| [USGS Water Services](https://waterservices.usgs.gov/) + [NOAA NWPS](https://water.noaa.gov/) | River levels, streamflow, flood stages | US |
+| [NOAA NWPS](https://water.noaa.gov/) | River levels, streamflow, flood stages | US |
 | [NIFC WFIGS](https://data-nifc.opendata.arcgis.com/) | Active wildfire perimeters and incidents | US |
 | [RainViewer](https://www.rainviewer.com/api.html) | Precipitation radar imagery | Global |
 | [NASA GIBS](https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api) | GOES GeoColor satellite imagery | Western Hemisphere |

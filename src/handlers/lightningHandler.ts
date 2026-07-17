@@ -16,7 +16,7 @@ import { blitzortungService } from '../services/blitzortung.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
-import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import { validateLatitude, validateLongitude, validateDetail, DetailLevel } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { ValidationError } from '../errors/ApiError.js';
 
@@ -27,6 +27,7 @@ interface LightningActivityArgs {
   city_name?: string;
   radius?: number;
   timeWindow?: number;
+  detail?: 'summary' | 'standard' | 'full';
 }
 
 /**
@@ -41,6 +42,10 @@ export async function handleGetLightningActivity(
   const typedArgs = (args ?? {}) as LightningActivityArgs;
   const resolved = await resolveLocationAsync(typedArgs, locationStore, geocodingService);
 
+  // Output verbosity: 'full' lifts the listed-strike cap to 25 (not unbounded).
+  // Statistics are computed over ALL strikes at every level — unaffected.
+  const detail = validateDetail(typedArgs.detail);
+
   const result = await getLightningActivity({
     latitude: resolved.latitude,
     longitude: resolved.longitude,
@@ -48,7 +53,7 @@ export async function handleGetLightningActivity(
     timeWindow: typedArgs.timeWindow
   });
 
-  const formatted = formatLightningActivityResponse(result);
+  const formatted = formatLightningActivityResponse(result, detail);
 
   return prependLocationLine({
     content: [
@@ -287,7 +292,10 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
 /**
  * Format lightning activity response for display
  */
-export function formatLightningActivityResponse(response: LightningActivityResponse): string {
+export function formatLightningActivityResponse(
+  response: LightningActivityResponse,
+  detail: DetailLevel = 'standard'
+): string {
   const lines: string[] = [];
 
   lines.push('# ⚡ Lightning Activity Report');
@@ -363,10 +371,14 @@ export function formatLightningActivityResponse(response: LightningActivityRespo
     lines.push(`**Active Thunderstorm:** ${response.safety.isActiveThunderstorm ? 'Yes' : 'No'}`);
     lines.push('');
 
-    // Recent strikes (show up to 10 nearest)
+    // Recent strikes. detail="full" lifts the cap to 25 (still capped, not
+    // unbounded — see D2 in docs/output-completeness-plan.md); the remainder
+    // note stays accurate at every level, including full. Statistics above are
+    // computed over ALL strikes regardless of detail level — unaffected here.
     lines.push('## 🌩️ Recent Strikes');
     lines.push('');
-    const strikesToShow = response.strikes.slice(0, 10);
+    const maxStrikesToShow = detail === 'full' ? 25 : 10;
+    const strikesToShow = response.strikes.slice(0, maxStrikesToShow);
 
     strikesToShow.forEach((strike, index) => {
       const ageMinutes = (response.generatedAt.getTime() - strike.timestamp.getTime()) / (1000 * 60);
@@ -383,8 +395,12 @@ export function formatLightningActivityResponse(response: LightningActivityRespo
       lines.push('');
     });
 
-    if (response.strikes.length > 10) {
-      lines.push(`*Showing 10 of ${response.strikes.length} strikes detected*`);
+    if (response.strikes.length > maxStrikesToShow) {
+      if (detail === 'full') {
+        lines.push(`*Showing ${maxStrikesToShow} of ${response.strikes.length} strikes detected*`);
+      } else {
+        lines.push(`*Showing ${maxStrikesToShow} of ${response.strikes.length} strikes detected — use detail="full" for more*`);
+      }
       lines.push('');
     }
   } else {

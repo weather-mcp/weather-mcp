@@ -6,9 +6,11 @@ import { NOAAService } from '../services/noaa.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { validateDetail } from '../utils/validation.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
-import type { NWPSGauge, GaugeStatus } from '../types/noaa.js';
+import { RateLimitError } from '../errors/ApiError.js';
+import type { NWPSGauge, GaugeStatus, NWPSStageFlowResponse, StageFlowDataPoint, FloodCategories } from '../types/noaa.js';
 
 /**
  * NWPS emits large negative sentinels (e.g. -999, -999999) for missing stage/flow
@@ -37,12 +39,86 @@ function hasPlausibleValidTime(validTime: string | undefined): boolean {
 }
 
 /**
- * A forecast is worth displaying only if it carries at least one real value AND a
- * plausible timestamp. Otherwise NWPS is returning a placeholder (-999 values, year-0001
- * time, "fcst_not_current" category) that should be suppressed rather than rendered raw.
+ * A status block (observed or forecast) is worth displaying only if it carries at
+ * least one real value AND a plausible timestamp. Otherwise NWPS is returning a
+ * placeholder (-999 values, year-0001 time, "fcst_not_current"/"obs_not_current"
+ * category) that should be suppressed rather than rendered raw.
  */
 export function isUsableForecast(status: GaugeStatus): boolean {
   return (isRealValue(status.primary) || isRealValue(status.secondary)) && hasPlausibleValidTime(status.validTime);
+}
+
+/** Below this stage change (ft) over the trend window, the river reads "steady". */
+const TREND_STEADY_THRESHOLD_FT = 0.05;
+/** Preferred lookback window for the observed trend, in hours. */
+const TREND_WINDOW_HOURS = 6;
+/** Stageflow fetches per batch — keeps request bursts small; NWPS rate-limits. */
+const TREND_FETCH_BATCH = 5;
+/**
+ * Max forecast-series points rendered at detail="full". Live NWPS forecast series run
+ * 20-72 points at ~6h intervals (docs/output-completeness-plan.md D4 probe); 80 is a
+ * defensive ceiling that should never bind in practice.
+ */
+const FORECAST_SERIES_CAP = 80;
+
+export interface StageTrend {
+  direction: 'rising' | 'falling' | 'steady';
+  delta: number; // ft, latest minus baseline
+  windowHours: number; // actual window used (may differ from TREND_WINDOW_HOURS)
+}
+
+/**
+ * Derive a rise/fall trend from an observed stage series: latest real reading
+ * vs. the earliest real reading inside the lookback window (or the nearest
+ * predecessor when the series is sparse, labeled with the actual window).
+ * Sentinel values (-999) and implausible timestamps are excluded per-point.
+ * Returns undefined when fewer than two real points exist.
+ */
+export function computeStageTrend(
+  points: StageFlowDataPoint[] | undefined,
+  windowHours: number = TREND_WINDOW_HOURS
+): StageTrend | undefined {
+  if (!points || points.length === 0) {
+    return undefined;
+  }
+
+  const usable = points
+    .filter(p => isRealValue(p.primary) && hasPlausibleValidTime(p.validTime))
+    .map(p => ({ time: Date.parse(p.validTime), stage: p.primary as number }))
+    .sort((a, b) => a.time - b.time);
+
+  if (usable.length < 2) {
+    return undefined;
+  }
+
+  const latest = usable[usable.length - 1];
+  const cutoff = latest.time - windowHours * 3600_000;
+  const inWindow = usable.filter(p => p.time >= cutoff && p.time < latest.time);
+  const baseline = inWindow.length > 0 ? inWindow[0] : usable[usable.length - 2];
+
+  if (baseline.time >= latest.time) {
+    return undefined;
+  }
+
+  const delta = latest.stage - baseline.stage;
+  const actualHours = Math.max(1, Math.round((latest.time - baseline.time) / 3600_000));
+  const direction: StageTrend['direction'] =
+    Math.abs(delta) < TREND_STEADY_THRESHOLD_FT ? 'steady' : delta > 0 ? 'rising' : 'falling';
+
+  return { direction, delta, windowHours: actualHours };
+}
+
+/**
+ * Render a trend as an inline clause, e.g. "↘ falling (-0.4 ft / 6h)".
+ * Steady trends omit the near-zero magnitude.
+ */
+export function formatStageTrend(trend: StageTrend): string {
+  if (trend.direction === 'steady') {
+    return `→ steady (last ${trend.windowHours}h)`;
+  }
+  const arrow = trend.direction === 'rising' ? '↗' : '↘';
+  const signed = `${trend.delta >= 0 ? '+' : ''}${trend.delta.toFixed(1)}`;
+  return `${arrow} ${trend.direction} (${signed} ft / ${trend.windowHours}h)`;
 }
 
 interface RiverConditionsArgs {
@@ -51,6 +127,7 @@ interface RiverConditionsArgs {
   location_name?: string;
   city_name?: string;
   radius?: number; // search radius in km (default: 50)
+  detail?: 'summary' | 'standard' | 'full';
 }
 
 export async function handleGetRiverConditions(
@@ -62,6 +139,9 @@ export async function handleGetRiverConditions(
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as RiverConditionsArgs, locationStore, geocodingService);
   const { latitude, longitude } = resolved;
+
+  // Output verbosity: 'full' lifts the gauge/crest display caps to 25 (not unbounded).
+  const detail = validateDetail((args as RiverConditionsArgs)?.detail);
 
   // Validate radius parameter
   let radius = (args as RiverConditionsArgs)?.radius ?? 50; // default 50 km
@@ -109,16 +189,53 @@ export async function handleGetRiverConditions(
     } else {
       output += `📊 **Found ${gaugesWithDistance.length} river gauge${gaugesWithDistance.length > 1 ? 's' : ''}**\n\n`;
 
-      // Show details for nearest gauges (limit to 5 to avoid overwhelming output)
-      const maxGaugesToShow = 5;
+      // Show details for nearest gauges. detail="full" lifts the cap to 25 (still
+      // capped, not unbounded — see D2 in docs/output-completeness-plan.md); the
+      // remainder note stays accurate at every level, including full.
+      const maxGaugesToShow = detail === 'full' ? 25 : 5;
+      const crestCap = detail === 'full' ? 25 : 3;
       const gaugesToShow = gaugesWithDistance.slice(0, maxGaugesToShow);
 
+      // Fetch each shown gauge's stage/flow series for the observed trend
+      // (30-min cache in the service). Nearest-first in small batches; NWPS
+      // rate-limits (429s observed live), so stop asking after the first
+      // rate-limit rejection — any gauge without a series just shows no trend.
+      const stageflowByLid = new Map<string, NWPSStageFlowResponse>();
+      for (let i = 0; i < gaugesToShow.length; i += TREND_FETCH_BATCH) {
+        const batch = gaugesToShow.slice(i, i + TREND_FETCH_BATCH);
+        const results = await Promise.allSettled(
+          batch.map(async ({ gauge }) => noaaService.getNWPSStageFlow(gauge.lid))
+        );
+        let rateLimited = false;
+        results.forEach((result, j) => {
+          if (result.status === 'fulfilled') {
+            stageflowByLid.set(batch[j].gauge.lid, result.value);
+          } else if (result.reason instanceof RateLimitError) {
+            rateLimited = true;
+          }
+        });
+        if (rateLimited) {
+          break;
+        }
+      }
+
       for (const { gauge, distance } of gaugesToShow) {
-        output += formatGaugeDetails(gauge, distance, timezone);
+        const trend = computeStageTrend(stageflowByLid.get(gauge.lid)?.observed?.data);
+        // Multi-point forecast series is a detail="full"-only addition (D4); at lower
+        // detail levels the existing single-point Forecast block is byte-identical to
+        // pre-T7 behavior.
+        const forecastSeries = detail === 'full' ? stageflowByLid.get(gauge.lid)?.forecast?.data : undefined;
+        output += formatGaugeDetails(gauge, distance, timezone, crestCap, trend, forecastSeries);
       }
 
       if (gaugesWithDistance.length > maxGaugesToShow) {
-        output += `\n*Note: ${gaugesWithDistance.length - maxGaugesToShow} additional gauge${gaugesWithDistance.length - maxGaugesToShow > 1 ? 's' : ''} found within radius (showing nearest ${maxGaugesToShow} only)*\n`;
+        const remaining = gaugesWithDistance.length - maxGaugesToShow;
+        const plural = remaining > 1 ? 's' : '';
+        if (detail === 'full') {
+          output += `\n*Note: ${remaining} additional gauge${plural} found within radius (showing nearest ${maxGaugesToShow})*\n`;
+        } else {
+          output += `\n*Note: ${remaining} additional gauge${plural} found within radius (showing nearest ${maxGaugesToShow} only — use detail="full" for more)*\n`;
+        }
       }
     }
   } catch (error) {
@@ -131,7 +248,7 @@ export async function handleGetRiverConditions(
   }
 
   output += `\n---\n`;
-  output += `*Data sources: NOAA National Water Prediction Service (NWPS), USGS Water Services*\n`;
+  output += `*Data source: NOAA National Water Prediction Service (NWPS)*\n`;
   output += `*River conditions are updated hourly. Always consult official sources for critical decisions.*\n`;
 
   return prependLocationLine({
@@ -147,7 +264,14 @@ export async function handleGetRiverConditions(
 /**
  * Format detailed information for a single river gauge
  */
-function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string): string {
+function formatGaugeDetails(
+  gauge: NWPSGauge,
+  distance: number,
+  timezone: string,
+  crestCap: number,
+  trend?: StageTrend,
+  forecastSeries?: StageFlowDataPoint[]
+): string {
   let output = `## ${gauge.name}\n\n`;
   output += `**Distance:** ${distance.toFixed(1)} km (${(distance * 0.621371).toFixed(1)} mi)\n`;
   output += `**Location:** ${gauge.state?.abbreviation ?? 'Unknown'}${gauge.county ? `, ${gauge.county} County` : ''}\n`;
@@ -157,14 +281,18 @@ function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string
   // by the bounding-box query are active by definition, so default to Active.
   output += `**Status:** ${gauge.inService === false ? '❌ Out of Service' : '✅ Active'}\n\n`;
 
-  // Current conditions
-  if (gauge.status.observed) {
+  // Current conditions. An observed status can be a placeholder too (year-0001
+  // validTime, no real values, "obs_not_current" category) — treat it exactly
+  // like an absent observation instead of rendering the raw sentinel row.
+  if (gauge.status.observed && isUsableForecast(gauge.status.observed)) {
     const obs = gauge.status.observed;
     output += `### Current Conditions\n`;
     output += `**Observed:** ${formatInTimezone(obs.validTime, timezone)}\n`;
 
     if (isRealValue(obs.primary)) {
-      output += `**River Stage:** ${obs.primary.toFixed(2)} ft\n`;
+      output += `**River Stage:** ${obs.primary.toFixed(2)} ft${trend ? `  ${formatStageTrend(trend)}` : ''}\n`;
+    } else if (trend) {
+      output += `**Trend:** ${formatStageTrend(trend)}\n`;
     }
 
     if (isRealValue(obs.secondary)) {
@@ -177,7 +305,11 @@ function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string
     output += `**Flood Category:** ${floodEmoji} ${floodText}\n\n`;
   } else {
     output += `### Current Conditions\n`;
-    output += `*No current observations available*\n\n`;
+    output += `*No current observations available*\n`;
+    if (trend) {
+      output += `**Trend:** ${formatStageTrend(trend)}\n`;
+    }
+    output += `\n`;
   }
 
   // Flood stages
@@ -217,10 +349,34 @@ function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string
     output += `**Forecasted Category:** ${forecastFloodEmoji} ${forecastFloodText}\n\n`;
   }
 
+  // Multi-point NWPS forecast series (detail="full" only — see D4). Most gauges have
+  // no forecast series at all (~4/5 in the live probe); when that's true, render
+  // nothing — no header, no empty section — so the vast majority of gauges are
+  // visually unchanged even at full detail.
+  if (forecastSeries && forecastSeries.length > 0) {
+    const usablePoints = forecastSeries.filter(
+      p => isRealValue(p.primary) && hasPlausibleValidTime(p.validTime)
+    );
+    if (usablePoints.length > 0) {
+      output += `### Forecast Series\n`;
+      const shown = usablePoints.slice(0, FORECAST_SERIES_CAP);
+      for (const point of shown) {
+        const stage = point.primary as number;
+        const category = gauge.flood?.categories ? deriveFloodCategory(stage, gauge.flood.categories) : null;
+        const categoryClause = category ? ` ${getFloodEmoji(category)} ${category.toUpperCase()}` : '';
+        output += `- **${formatInTimezone(point.validTime, timezone)}:** ${stage.toFixed(2)} ft${categoryClause}\n`;
+      }
+      if (usablePoints.length > FORECAST_SERIES_CAP) {
+        output += `*…${usablePoints.length - FORECAST_SERIES_CAP} more forecast points*\n`;
+      }
+      output += `\n`;
+    }
+  }
+
   // Historic crests (if available and significant)
   if (gauge.flood?.crests?.recent && gauge.flood.crests.recent.length > 0) {
     output += `### Recent Historic Crests\n`;
-    const recentCrests = gauge.flood.crests.recent.slice(0, 3); // Show top 3
+    const recentCrests = gauge.flood.crests.recent.slice(0, crestCap);
     for (const crest of recentCrests) {
       const crestDate = new Date(crest.date);
       output += `- **${crestDate.getFullYear()}:** ${crest.value.toFixed(2)} ft`;
@@ -237,6 +393,19 @@ function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string
 
   output += `---\n\n`;
   return output;
+}
+
+/**
+ * Derive a flood category label from a stage reading and the gauge's flood thresholds,
+ * for per-point classification of a forecast series. Returns null when the stage is
+ * below action stage (no flooding label needed inline).
+ */
+function deriveFloodCategory(stage: number, categories: FloodCategories): 'major' | 'moderate' | 'minor' | 'action' | null {
+  if (stage >= categories.major) return 'major';
+  if (stage >= categories.moderate) return 'moderate';
+  if (stage >= categories.minor) return 'minor';
+  if (stage >= categories.action) return 'action';
+  return null;
 }
 
 /**

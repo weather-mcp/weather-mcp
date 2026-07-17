@@ -1,6 +1,6 @@
 # Output Completeness (Range-Audit Follow-ups) — Design Plan
 
-**Status:** SETTLED (2026-07-16) — all four decisions made; ready for `/impl-plan`
+**Status:** IMPLEMENTED (2026-07-17) — all four decisions shipped on `feat/output-completeness`; see `docs/output-completeness-implementation-plan.md` (tracker) and `docs/output-completeness-verification.md` (live evidence)
 **Parent:** `docs/max-range-expansion-plan.md` (the 2026-07-16 full-codebase
 range audit; these are its Tier 2 findings, deferred by user decision
 2026-07-16 so the range-gap batch could proceed alone)

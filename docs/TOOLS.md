@@ -313,7 +313,7 @@ Get comprehensive air quality data for any location worldwide.
 *Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
-Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index. With `forecast=true`, the full forecast range is shown grouped by calendar day — each day gets a dated header with its peak AQI, plus 6-hour period ranges labeled by the period's peak AQI category. Hours already past are skipped.
+Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index. With `forecast=true`, the full forecast range is shown grouped by calendar day — each day gets a dated header with its peak AQI **and peak UV index** (e.g. `— peak US AQI 63 (Moderate) · UV 10 (Very High)`), plus 6-hour period ranges labeled by the period's peak AQI category. Hours already past are skipped; days with no UV data omit the UV clause.
 
 **Examples:**
 ```
@@ -415,6 +415,7 @@ Get real-time lightning strike detection and safety assessment for outdoor activ
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `radius` (optional): Search radius in kilometers (1-500, default: 100)
 - `timeWindow` (optional): Historical time window in minutes (1-180, default: 60)
+- `detail` (optional): `"summary"`, `"standard"` (default), or `"full"` — `full` lists up to 25 nearest strikes instead of 10; statistics always cover every detected strike regardless of level
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
@@ -451,7 +452,7 @@ Provides real-time lightning strike detection from the Blitzortung.org global li
 **Note:** Data provided by Blitzortung.org, a free community-operated lightning detection network. May have regional coverage variations.
 
 ### 12. get_river_conditions
-Monitor river levels and flood status using NOAA and USGS data sources.
+Monitor river levels and flood status using NOAA National Water Prediction Service data.
 
 **Parameters:**
 - `latitude` (required*): Latitude coordinate (-90 to 90)
@@ -459,11 +460,12 @@ Monitor river levels and flood status using NOAA and USGS data sources.
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `radius` (optional): Search radius in kilometers (1-500, default: 50)
+- `detail` (optional): `"summary"`, `"standard"` (default), or `"full"` — `full` shows up to 25 nearest gauges (instead of 5), up to 25 historic crests per gauge (instead of 3), and each gauge's multi-point NWPS forecast series where one exists
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
-Provides comprehensive river and streamflow monitoring for flood safety and recreation planning. Automatically finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Uses NOAA National Water Prediction Service (NWPS) for gauge locations and USGS Water Services for real-time streamflow data.
+Provides comprehensive river and streamflow monitoring for flood safety and recreation planning. Automatically finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Each shown gauge also gets an observed rise/fall trend derived from its stage history (e.g. `↗ rising (+0.5 ft / 6h)`); gauges whose stage series can't be fetched simply omit the trend. Uses NOAA National Water Prediction Service (NWPS) for gauge locations, observations, and forecasts. Gauge IDs include the USGS site number where NWPS reports one, but streamflow data is not fetched from USGS Water Services.
 
 **Examples:**
 ```
@@ -475,15 +477,16 @@ Provides comprehensive river and streamflow monitoring for flood safety and recr
 
 **Returns:**
 - Nearest river gauges with current water levels
+- Observed trend per gauge (rising/falling/steady with magnitude and window)
 - Flood stage thresholds (action, minor, moderate, major)
-- Current flood status and forecast
+- Current flood status and forecast (multi-point forecast series at `detail="full"` for gauges that have one — mostly tidal and major-river gauges)
 - Streamflow data (cubic feet per second)
 - Distance to each gauge from query location
 - River and location names
 - Safety assessment for recreation
 - Historical context (flood crests if available)
 
-**Note:** US coverage only. Data provided by NOAA National Water Prediction Service and USGS Water Services.
+**Note:** US coverage only. Data provided by NOAA National Water Prediction Service (NWPS).
 
 ### 13. get_wildfire_info
 Monitor active wildfires and fire perimeters for safety and evacuation planning.
@@ -494,11 +497,12 @@ Monitor active wildfires and fire perimeters for safety and evacuation planning.
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `radius` (optional): Search radius in kilometers (1-500, default: 100)
+- `detail` (optional): `"summary"`, `"standard"` (default), or `"full"` — `full` shows up to 25 nearest fires instead of 5
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
-Provides critical wildfire monitoring and safety information using NIFC (National Interagency Fire Center) data. Reports active wildfires and prescribed burns within the specified radius, including fire size, containment status, and proximity-based safety assessments. Essential for residents in fire-prone regions and outdoor activity planning.
+Provides critical wildfire monitoring and safety information using NIFC (National Interagency Fire Center) data. If the NIFC service truncates its response (ArcGIS transfer limit), the report says so explicitly at every detail level. Reports active wildfires and prescribed burns within the specified radius, including fire size, containment status, and proximity-based safety assessments. Essential for residents in fire-prone regions and outdoor activity planning.
 
 **Examples:**
 ```

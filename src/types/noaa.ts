@@ -482,7 +482,9 @@ export interface NWPSGaugesResponse {
 }
 
 /**
- * Stage/flow time series data point from NWPS stageflow endpoint
+ * Stage/flow time series data point from NWPS stageflow endpoint.
+ * primary/secondary may be null OR a -999-style sentinel — filter every
+ * point through the river handler's isRealValue guard before use.
  */
 export interface StageFlowDataPoint {
   validTime: string; // ISO 8601 datetime
@@ -492,17 +494,28 @@ export interface StageFlowDataPoint {
 }
 
 /**
- * Stage/flow time series response from NWPS
+ * One series (observed or forecast) from the NWPS stageflow endpoint.
+ * Shape verified live 2026-07-17 against /gauges/{lid}/stageflow.
+ */
+export interface StageFlowSeries {
+  pedts?: string;
+  issuedTime?: string; // ISO 8601 datetime
+  wfo?: string;
+  timeZone?: string;
+  primaryName?: string; // e.g. "Stage", "Tide Height"
+  primaryUnits?: string; // "ft"
+  secondaryName?: string; // "Flow"
+  secondaryUnits?: string; // "kcfs"
+  data?: StageFlowDataPoint[];
+}
+
+/**
+ * Stage/flow time series response from NWPS. Either series may be absent or
+ * empty — most small-river gauges carry an observed series but no forecast.
  */
 export interface NWPSStageFlowResponse {
-  lid: string;
-  issued: string; // ISO 8601 datetime
-  timeZone: string;
-  primaryName: string; // "Stage"
-  primaryUnits: string; // "ft"
-  secondaryName: string; // "Flow"
-  secondaryUnits: string; // "kcfs"
-  data: StageFlowDataPoint[];
+  observed?: StageFlowSeries;
+  forecast?: StageFlowSeries;
 }
 
 /**
