@@ -324,7 +324,7 @@ tolerance) — the orchestrator does this one itself.
 - [x] T4 — Wildfire `detail` param + ArcGIS truncation caveat (`sonnet`) — `6b32acc`
 - [x] T5 — Lightning `detail` param, capped-25 `full` (`sonnet`) — `adec37f`
 - [x] T6 — River observed trend on all shown gauges (`opus`) — `e6e7a2f`
-- [ ] T7 — River forecast series at `detail="full"` (`sonnet`)
+- [x] T7 — River forecast series at `detail="full"` (`sonnet`) — `f44767f`
 - [ ] T8 — Live sweep + docs (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
