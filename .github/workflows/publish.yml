@@ -23,9 +23,11 @@ jobs:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
 
-      # Trusted publishing (OIDC) requires npm >= 11.5.1
+      # Trusted publishing (OIDC) requires npm >= 11.5.1.
+      # Pinned to npm 11 for now — npm 12 changes install-time defaults
+      # (lifecycle scripts off by default); revisit when adopting v12.
       - name: Update npm
-        run: npm install -g npm@latest && npm --version
+        run: npm install -g npm@11 && npm --version
 
       - name: Verify version consistency
         run: |
