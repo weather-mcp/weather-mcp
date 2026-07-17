@@ -6,6 +6,7 @@ import { NOAAService } from '../services/noaa.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { validateDetail } from '../utils/validation.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
 import type { NWPSGauge, GaugeStatus } from '../types/noaa.js';
@@ -51,6 +52,7 @@ interface RiverConditionsArgs {
   location_name?: string;
   city_name?: string;
   radius?: number; // search radius in km (default: 50)
+  detail?: 'summary' | 'standard' | 'full';
 }
 
 export async function handleGetRiverConditions(
@@ -62,6 +64,9 @@ export async function handleGetRiverConditions(
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as RiverConditionsArgs, locationStore, geocodingService);
   const { latitude, longitude } = resolved;
+
+  // Output verbosity: 'full' lifts the gauge/crest display caps to 25 (not unbounded).
+  const detail = validateDetail((args as RiverConditionsArgs)?.detail);
 
   // Validate radius parameter
   let radius = (args as RiverConditionsArgs)?.radius ?? 50; // default 50 km
@@ -109,16 +114,25 @@ export async function handleGetRiverConditions(
     } else {
       output += `📊 **Found ${gaugesWithDistance.length} river gauge${gaugesWithDistance.length > 1 ? 's' : ''}**\n\n`;
 
-      // Show details for nearest gauges (limit to 5 to avoid overwhelming output)
-      const maxGaugesToShow = 5;
+      // Show details for nearest gauges. detail="full" lifts the cap to 25 (still
+      // capped, not unbounded — see D2 in docs/output-completeness-plan.md); the
+      // remainder note stays accurate at every level, including full.
+      const maxGaugesToShow = detail === 'full' ? 25 : 5;
+      const crestCap = detail === 'full' ? 25 : 3;
       const gaugesToShow = gaugesWithDistance.slice(0, maxGaugesToShow);
 
       for (const { gauge, distance } of gaugesToShow) {
-        output += formatGaugeDetails(gauge, distance, timezone);
+        output += formatGaugeDetails(gauge, distance, timezone, crestCap);
       }
 
       if (gaugesWithDistance.length > maxGaugesToShow) {
-        output += `\n*Note: ${gaugesWithDistance.length - maxGaugesToShow} additional gauge${gaugesWithDistance.length - maxGaugesToShow > 1 ? 's' : ''} found within radius (showing nearest ${maxGaugesToShow} only)*\n`;
+        const remaining = gaugesWithDistance.length - maxGaugesToShow;
+        const plural = remaining > 1 ? 's' : '';
+        if (detail === 'full') {
+          output += `\n*Note: ${remaining} additional gauge${plural} found within radius (showing nearest ${maxGaugesToShow})*\n`;
+        } else {
+          output += `\n*Note: ${remaining} additional gauge${plural} found within radius (showing nearest ${maxGaugesToShow} only — use detail="full" for more)*\n`;
+        }
       }
     }
   } catch (error) {
@@ -147,7 +161,7 @@ export async function handleGetRiverConditions(
 /**
  * Format detailed information for a single river gauge
  */
-function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string): string {
+function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string, crestCap: number): string {
   let output = `## ${gauge.name}\n\n`;
   output += `**Distance:** ${distance.toFixed(1)} km (${(distance * 0.621371).toFixed(1)} mi)\n`;
   output += `**Location:** ${gauge.state?.abbreviation ?? 'Unknown'}${gauge.county ? `, ${gauge.county} County` : ''}\n`;
@@ -220,7 +234,7 @@ function formatGaugeDetails(gauge: NWPSGauge, distance: number, timezone: string
   // Historic crests (if available and significant)
   if (gauge.flood?.crests?.recent && gauge.flood.crests.recent.length > 0) {
     output += `### Recent Historic Crests\n`;
-    const recentCrests = gauge.flood.crests.recent.slice(0, 3); // Show top 3
+    const recentCrests = gauge.flood.crests.recent.slice(0, crestCap);
     for (const crest of recentCrests) {
       const crestDate = new Date(crest.date);
       output += `- **${crestDate.getFullYear()}:** ${crest.value.toFixed(2)} ft`;
