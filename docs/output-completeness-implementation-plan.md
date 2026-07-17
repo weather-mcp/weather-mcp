@@ -319,8 +319,8 @@ tolerance) — the orchestrator does this one itself.
 
 - [x] T0 — D4 attribution one-liner (NWPS-only footer) (`opus`) — `4fae1f8` (pre-landed)
 - [x] T1 — AQI peak UV in day headers + hourly fetch trim (`opus`) — `6939347`
-- [ ] T2 — AQI forecast UV unit tests (`sonnet`)
-- [ ] T3 — River `detail` param, capped-25 `full` (`sonnet`)
+- [x] T2 — AQI forecast UV unit tests (`sonnet`) — `6a56bbe`
+- [x] T3 — River `detail` param, capped-25 `full` (`sonnet`) — `033eed1`
 - [ ] T4 — Wildfire `detail` param + ArcGIS truncation caveat (`sonnet`)
 - [ ] T5 — Lightning `detail` param, capped-25 `full` (`sonnet`)
 - [ ] T6 — River observed trend on all shown gauges (`opus`)
