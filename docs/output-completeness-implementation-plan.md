@@ -321,7 +321,7 @@ tolerance) — the orchestrator does this one itself.
 - [x] T1 — AQI peak UV in day headers + hourly fetch trim (`opus`) — `6939347`
 - [x] T2 — AQI forecast UV unit tests (`sonnet`) — `6a56bbe`
 - [x] T3 — River `detail` param, capped-25 `full` (`sonnet`) — `033eed1`
-- [ ] T4 — Wildfire `detail` param + ArcGIS truncation caveat (`sonnet`)
+- [x] T4 — Wildfire `detail` param + ArcGIS truncation caveat (`sonnet`) — `6b32acc`
 - [ ] T5 — Lightning `detail` param, capped-25 `full` (`sonnet`)
 - [ ] T6 — River observed trend on all shown gauges (`opus`)
 - [ ] T7 — River forecast series at `detail="full"` (`sonnet`)
