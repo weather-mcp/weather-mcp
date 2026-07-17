@@ -141,6 +141,22 @@ check_tool_count package.json '[0-9]+ weather tools'
 check_tool_count server.json '[0-9]+ weather tools'
 check_tool_count .github/social-preview.html '[0-9]+ weather tools'
 
+# Check MCP registry field constraints on server.json (enforced only at
+# `mcp-publisher publish` time, so a violation otherwise surfaces mid-publish).
+echo ""
+echo "📋 Checking server.json MCP registry constraints..."
+# The registry caps `description` at 100 characters.
+DESC_LEN=$(node -p "require('./server.json').description.length" 2>/dev/null)
+if [ -z "$DESC_LEN" ]; then
+  echo "❌ server.json description: ${RED}could not read${NC}"
+  ERRORS=$((ERRORS+1))
+elif [ "$DESC_LEN" -le 100 ]; then
+  echo "✅ server.json description length: ${GREEN}${DESC_LEN}${NC} (≤ 100)"
+else
+  echo "❌ server.json description length: ${RED}${DESC_LEN}${NC} (registry limit is 100)"
+  ERRORS=$((ERRORS+1))
+fi
+
 # Check for broken internal links
 echo ""
 echo "🔗 Checking for broken documentation links in README.md..."
