@@ -10,7 +10,7 @@ import { validateDetail } from '../utils/validation.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
 import { RateLimitError } from '../errors/ApiError.js';
-import type { NWPSGauge, GaugeStatus, NWPSStageFlowResponse, StageFlowDataPoint } from '../types/noaa.js';
+import type { NWPSGauge, GaugeStatus, NWPSStageFlowResponse, StageFlowDataPoint, FloodCategories } from '../types/noaa.js';
 
 /**
  * NWPS emits large negative sentinels (e.g. -999, -999999) for missing stage/flow
@@ -53,6 +53,12 @@ const TREND_STEADY_THRESHOLD_FT = 0.05;
 const TREND_WINDOW_HOURS = 6;
 /** Stageflow fetches per batch — keeps request bursts small; NWPS rate-limits. */
 const TREND_FETCH_BATCH = 5;
+/**
+ * Max forecast-series points rendered at detail="full". Live NWPS forecast series run
+ * 20-72 points at ~6h intervals (docs/output-completeness-plan.md D4 probe); 80 is a
+ * defensive ceiling that should never bind in practice.
+ */
+const FORECAST_SERIES_CAP = 80;
 
 export interface StageTrend {
   direction: 'rising' | 'falling' | 'steady';
@@ -214,7 +220,11 @@ export async function handleGetRiverConditions(
 
       for (const { gauge, distance } of gaugesToShow) {
         const trend = computeStageTrend(stageflowByLid.get(gauge.lid)?.observed?.data);
-        output += formatGaugeDetails(gauge, distance, timezone, crestCap, trend);
+        // Multi-point forecast series is a detail="full"-only addition (D4); at lower
+        // detail levels the existing single-point Forecast block is byte-identical to
+        // pre-T7 behavior.
+        const forecastSeries = detail === 'full' ? stageflowByLid.get(gauge.lid)?.forecast?.data : undefined;
+        output += formatGaugeDetails(gauge, distance, timezone, crestCap, trend, forecastSeries);
       }
 
       if (gaugesWithDistance.length > maxGaugesToShow) {
@@ -258,7 +268,8 @@ function formatGaugeDetails(
   distance: number,
   timezone: string,
   crestCap: number,
-  trend?: StageTrend
+  trend?: StageTrend,
+  forecastSeries?: StageFlowDataPoint[]
 ): string {
   let output = `## ${gauge.name}\n\n`;
   output += `**Distance:** ${distance.toFixed(1)} km (${(distance * 0.621371).toFixed(1)} mi)\n`;
@@ -335,6 +346,30 @@ function formatGaugeDetails(
     output += `**Forecasted Category:** ${forecastFloodEmoji} ${forecastFloodText}\n\n`;
   }
 
+  // Multi-point NWPS forecast series (detail="full" only — see D4). Most gauges have
+  // no forecast series at all (~4/5 in the live probe); when that's true, render
+  // nothing — no header, no empty section — so the vast majority of gauges are
+  // visually unchanged even at full detail.
+  if (forecastSeries && forecastSeries.length > 0) {
+    const usablePoints = forecastSeries.filter(
+      p => isRealValue(p.primary) && hasPlausibleValidTime(p.validTime)
+    );
+    if (usablePoints.length > 0) {
+      output += `### Forecast Series\n`;
+      const shown = usablePoints.slice(0, FORECAST_SERIES_CAP);
+      for (const point of shown) {
+        const stage = point.primary as number;
+        const category = gauge.flood?.categories ? deriveFloodCategory(stage, gauge.flood.categories) : null;
+        const categoryClause = category ? ` ${getFloodEmoji(category)} ${category.toUpperCase()}` : '';
+        output += `- **${formatInTimezone(point.validTime, timezone)}:** ${stage.toFixed(2)} ft${categoryClause}\n`;
+      }
+      if (usablePoints.length > FORECAST_SERIES_CAP) {
+        output += `*…${usablePoints.length - FORECAST_SERIES_CAP} more forecast points*\n`;
+      }
+      output += `\n`;
+    }
+  }
+
   // Historic crests (if available and significant)
   if (gauge.flood?.crests?.recent && gauge.flood.crests.recent.length > 0) {
     output += `### Recent Historic Crests\n`;
@@ -355,6 +390,19 @@ function formatGaugeDetails(
 
   output += `---\n\n`;
   return output;
+}
+
+/**
+ * Derive a flood category label from a stage reading and the gauge's flood thresholds,
+ * for per-point classification of a forecast series. Returns null when the stage is
+ * below action stage (no flooding label needed inline).
+ */
+function deriveFloodCategory(stage: number, categories: FloodCategories): 'major' | 'moderate' | 'minor' | 'action' | null {
+  if (stage >= categories.major) return 'major';
+  if (stage >= categories.moderate) return 'moderate';
+  if (stage >= categories.minor) return 'minor';
+  if (stage >= categories.action) return 'action';
+  return null;
 }
 
 /**

@@ -408,3 +408,178 @@ describe('handleGetRiverConditions observed trend', () => {
     expect(text).not.toContain('rising');
   });
 });
+
+/**
+ * Handler-level forecast-series tests (T7 / D4): detail="full" renders the multi-point
+ * NWPS forecast series for gauges that have one, with per-point sentinel filtering and
+ * flood-category derivation. Gauges without a forecast series (the ~4/5 majority per the
+ * live probe) must render nothing — no header, no empty section — and lower detail
+ * levels must never show the series at all.
+ */
+describe('handleGetRiverConditions forecast series (detail="full")', () => {
+  const BASE_LAT = 42.3601;
+  const BASE_LON = -71.0589;
+
+  const getNWPSGaugesInBoundingBoxMock = vi.fn();
+  const getNWPSStageFlowMock = vi.fn();
+  const noaaService = {
+    getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+    getNWPSStageFlow: getNWPSStageFlowMock
+  } as never;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function buildGaugeWithFlood(i: number): NWPSGauge {
+    return {
+      lid: `LID${i}`,
+      name: `Gauge ${i}`,
+      latitude: BASE_LAT + i * 0.001,
+      longitude: BASE_LON,
+      state: { abbreviation: 'MA', name: 'Massachusetts' },
+      status: {
+        observed: {
+          primary: 4.2,
+          secondary: 0.05,
+          floodCategory: null,
+          validTime: '2026-07-17T14:00:00Z'
+        }
+      },
+      flood: {
+        categories: { action: 8, minor: 10, moderate: 14, major: 18 }
+      }
+    };
+  }
+
+  function forecastPoint(validTime: string, primary: number | null): StageFlowDataPoint {
+    return { validTime, generatedTime: '2026-07-17T14:00:00Z', primary, secondary: null };
+  }
+
+  function callHandler(args: Record<string, unknown> = {}) {
+    return handleGetRiverConditions(
+      { latitude: BASE_LAT, longitude: BASE_LON, ...args },
+      noaaService,
+      {} as never,
+      {} as never
+    );
+  }
+
+  it('(a) renders one line per real forecast point with correct per-point flood category, at detail="full"', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([buildGaugeWithFlood(0)]);
+    getNWPSStageFlowMock.mockResolvedValue({
+      forecast: {
+        data: [
+          forecastPoint('2026-07-17T18:00:00Z', 6.0), // below action -> no category clause
+          forecastPoint('2026-07-18T00:00:00Z', 9.0), // action
+          forecastPoint('2026-07-18T06:00:00Z', 12.0), // minor
+          forecastPoint('2026-07-18T12:00:00Z', 15.0), // moderate
+          forecastPoint('2026-07-18T18:00:00Z', 20.0) // major
+        ]
+      }
+    });
+
+    const result = await callHandler({ detail: 'full' });
+    const text = result.content[0].text;
+
+    expect(text).toContain('### Forecast Series');
+    expect(text).toContain('9.00 ft 🟡 ACTION');
+    expect(text).toContain('12.00 ft 🟠 MINOR');
+    expect(text).toContain('15.00 ft 🔴 MODERATE');
+    expect(text).toContain('20.00 ft 🔴🔴 MAJOR');
+    expect(text).toMatch(/6\.00 ft\n/); // below action: stage only, no category clause
+
+    const seriesLines = text.split('\n').filter(l => l.startsWith('- **') && l.includes('ft'));
+    expect(seriesLines.length).toBe(5);
+  });
+
+  it('(b) renders no Forecast Series header for a gauge with no forecast series, or an empty one', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([buildGaugeWithFlood(0), buildGaugeWithFlood(1)]);
+    getNWPSStageFlowMock.mockImplementation((lid: string) => {
+      if (lid === 'LID0') return Promise.resolve({}); // no forecast key at all
+      return Promise.resolve({ forecast: { data: [] } }); // present but empty
+    });
+
+    const result = await callHandler({ detail: 'full' });
+    expect(result.content[0].text).not.toContain('### Forecast Series');
+  });
+
+  it('(c) drops -999/year-0001 sentinel points from the series, keeping the real ones', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([buildGaugeWithFlood(0)]);
+    getNWPSStageFlowMock.mockResolvedValue({
+      forecast: {
+        data: [
+          forecastPoint('2026-07-17T18:00:00Z', -999),
+          forecastPoint('0001-12-31T18:27:00Z', 12.0),
+          forecastPoint('2026-07-18T06:00:00Z', 9.5)
+        ]
+      }
+    });
+
+    const result = await callHandler({ detail: 'full' });
+    const text = result.content[0].text;
+
+    expect(text).toContain('### Forecast Series');
+    expect(text).toContain('9.50 ft 🟡 ACTION');
+    expect(text).not.toContain('-999');
+    expect(text).not.toContain('12.00 ft');
+  });
+
+  it('(d) renders no header at all when every point in the series is a sentinel', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([buildGaugeWithFlood(0)]);
+    getNWPSStageFlowMock.mockResolvedValue({
+      forecast: {
+        data: [
+          forecastPoint('2026-07-17T18:00:00Z', -999),
+          forecastPoint('0001-12-31T18:27:00Z', -999999)
+        ]
+      }
+    });
+
+    const result = await callHandler({ detail: 'full' });
+    expect(result.content[0].text).not.toContain('### Forecast Series');
+  });
+
+  it('(e) omits the Forecast Series block at default detail even when a forecast series exists', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([buildGaugeWithFlood(0)]);
+    getNWPSStageFlowMock.mockResolvedValue({
+      forecast: {
+        data: [
+          forecastPoint('2026-07-17T18:00:00Z', 9.0),
+          forecastPoint('2026-07-18T00:00:00Z', 12.0)
+        ]
+      }
+    });
+
+    const result = await callHandler();
+    expect(result.content[0].text).not.toContain('### Forecast Series');
+    // Stageflow is still fetched at every detail level (the trend needs it) —
+    // only the series rendering is full-only.
+    expect(getNWPSStageFlowMock).toHaveBeenCalledWith('LID0');
+  });
+
+  it('(f) leaves the existing single-point Forecast block untouched alongside the new series', async () => {
+    const gauge = buildGaugeWithFlood(0);
+    gauge.status.forecast = {
+      primary: 5.1,
+      secondary: 0.02,
+      floodCategory: 'no_flooding',
+      validTime: '2026-07-17T20:00:00Z'
+    };
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([gauge]);
+    getNWPSStageFlowMock.mockResolvedValue({
+      forecast: {
+        data: [forecastPoint('2026-07-18T00:00:00Z', 9.0)]
+      }
+    });
+
+    const result = await callHandler({ detail: 'full' });
+    const text = result.content[0].text;
+
+    expect(text).toContain('### Forecast\n');
+    expect(text).toContain('**Forecasted Stage:** 5.10 ft');
+    expect(text).toContain('### Forecast Series');
+    expect(text).toContain('9.00 ft 🟡 ACTION');
+    expect(text.indexOf('### Forecast\n')).toBeLessThan(text.indexOf('### Forecast Series'));
+  });
+});
