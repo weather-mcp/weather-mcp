@@ -204,6 +204,27 @@ describe('handleGetRiverConditions', () => {
       'Invalid detail: "bogus". Must be one of "summary", "standard", or "full".'
     );
   });
+
+  it('suppresses a placeholder observed status instead of rendering the year-0001 row', async () => {
+    // Live SCTM3 shape (2026-07-17): observed exists but is the NWPS "obs not
+    // current" placeholder — year-0001 validTime, sentinel/absent values.
+    const [gauge] = buildGauges(1);
+    gauge.status.observed = {
+      primary: -999,
+      secondary: -999,
+      floodCategory: 'obs_not_current',
+      validTime: '0001-12-31T19:03:00Z'
+    };
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([gauge]);
+
+    const result = await callHandler({});
+    const text = result.content[0].text;
+
+    expect(text).toContain('*No current observations available*');
+    expect(text).not.toContain('Dec 31, 1');
+    expect(text).not.toContain('OBS NOT CURRENT');
+    expect(text).not.toContain('-999');
+  });
 });
 
 /**

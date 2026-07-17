@@ -39,9 +39,10 @@ function hasPlausibleValidTime(validTime: string | undefined): boolean {
 }
 
 /**
- * A forecast is worth displaying only if it carries at least one real value AND a
- * plausible timestamp. Otherwise NWPS is returning a placeholder (-999 values, year-0001
- * time, "fcst_not_current" category) that should be suppressed rather than rendered raw.
+ * A status block (observed or forecast) is worth displaying only if it carries at
+ * least one real value AND a plausible timestamp. Otherwise NWPS is returning a
+ * placeholder (-999 values, year-0001 time, "fcst_not_current"/"obs_not_current"
+ * category) that should be suppressed rather than rendered raw.
  */
 export function isUsableForecast(status: GaugeStatus): boolean {
   return (isRealValue(status.primary) || isRealValue(status.secondary)) && hasPlausibleValidTime(status.validTime);
@@ -280,8 +281,10 @@ function formatGaugeDetails(
   // by the bounding-box query are active by definition, so default to Active.
   output += `**Status:** ${gauge.inService === false ? '❌ Out of Service' : '✅ Active'}\n\n`;
 
-  // Current conditions
-  if (gauge.status.observed) {
+  // Current conditions. An observed status can be a placeholder too (year-0001
+  // validTime, no real values, "obs_not_current" category) — treat it exactly
+  // like an absent observation instead of rendering the raw sentinel row.
+  if (gauge.status.observed && isUsableForecast(gauge.status.observed)) {
     const obs = gauge.status.observed;
     output += `### Current Conditions\n`;
     output += `**Observed:** ${formatInTimezone(obs.validTime, timezone)}\n`;
