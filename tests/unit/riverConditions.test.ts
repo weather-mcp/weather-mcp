@@ -7,8 +7,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { isRealValue, isUsableForecast, handleGetRiverConditions } from '../../src/handlers/riverConditionsHandler.js';
-import type { GaugeStatus, NWPSGauge, HistoricCrest } from '../../src/types/noaa.js';
+import {
+  isRealValue,
+  isUsableForecast,
+  handleGetRiverConditions,
+  computeStageTrend,
+  formatStageTrend
+} from '../../src/handlers/riverConditionsHandler.js';
+import { RateLimitError } from '../../src/errors/ApiError.js';
+import type { GaugeStatus, NWPSGauge, HistoricCrest, StageFlowDataPoint } from '../../src/types/noaa.js';
 
 function status(overrides: Partial<GaugeStatus> = {}): GaugeStatus {
   return {
@@ -196,5 +203,208 @@ describe('handleGetRiverConditions', () => {
     await expect(callHandler({ detail: 'bogus' })).rejects.toThrow(
       'Invalid detail: "bogus". Must be one of "summary", "standard", or "full".'
     );
+  });
+});
+
+/**
+ * Build an observed stage series at a 30-minute cadence ending at `end`,
+ * walking linearly from `startStage` to `endStage` over `hours`.
+ */
+function buildSeries(
+  hours: number,
+  startStage: number,
+  endStage: number,
+  end = Date.parse('2026-07-17T15:00:00Z')
+): StageFlowDataPoint[] {
+  const steps = hours * 2;
+  return Array.from({ length: steps + 1 }, (_, i) => ({
+    validTime: new Date(end - (steps - i) * 1800_000).toISOString(),
+    generatedTime: new Date(end).toISOString(),
+    primary: startStage + ((endStage - startStage) * i) / steps,
+    secondary: null
+  }));
+}
+
+describe('computeStageTrend', () => {
+  it('detects a rise over the 6-hour window', () => {
+    const trend = computeStageTrend(buildSeries(6, 3.0, 3.5));
+    expect(trend).toEqual({ direction: 'rising', delta: expect.closeTo(0.5, 5), windowHours: 6 });
+  });
+
+  it('detects a fall over the 6-hour window', () => {
+    const trend = computeStageTrend(buildSeries(6, 4.0, 3.6));
+    expect(trend?.direction).toBe('falling');
+    expect(trend?.delta).toBeCloseTo(-0.4, 5);
+    expect(trend?.windowHours).toBe(6);
+  });
+
+  it('uses only the last 6 hours of a longer series', () => {
+    // 30 days of history rising slowly, but flat over the final 6 hours
+    const old = buildSeries(720, 0.0, 3.0, Date.parse('2026-07-17T09:00:00Z'));
+    const recent = buildSeries(6, 3.0, 3.0);
+    const trend = computeStageTrend([...old, ...recent]);
+    expect(trend?.direction).toBe('steady');
+    expect(trend?.windowHours).toBe(6);
+  });
+
+  it('reads changes below the steady threshold as steady, above it as a trend', () => {
+    expect(computeStageTrend(buildSeries(6, 3.0, 3.04))?.direction).toBe('steady');
+    expect(computeStageTrend(buildSeries(6, 3.0, 3.06))?.direction).toBe('rising');
+    expect(computeStageTrend(buildSeries(6, 3.06, 3.0))?.direction).toBe('falling');
+  });
+
+  it('excludes sentinel points anywhere in the series', () => {
+    const series = buildSeries(6, 3.0, 3.5);
+    // Corrupt the latest point and one mid-series point with NWPS sentinels
+    series[series.length - 1].primary = -999;
+    series[4].primary = -999999;
+    const trend = computeStageTrend(series);
+    expect(trend?.direction).toBe('rising');
+    // Latest real point is the second-to-last (3.5 - one 30-min step)
+    expect(trend!.delta).toBeLessThan(0.5);
+    expect(trend!.delta).toBeGreaterThan(0.4);
+  });
+
+  it('excludes points with implausible timestamps', () => {
+    const series = buildSeries(6, 3.0, 3.5);
+    series[series.length - 1].validTime = '0001-12-31T18:27:00Z';
+    const trend = computeStageTrend(series);
+    expect(trend?.direction).toBe('rising');
+  });
+
+  it('returns undefined for missing, empty, all-sentinel, or single-point series', () => {
+    expect(computeStageTrend(undefined)).toBeUndefined();
+    expect(computeStageTrend([])).toBeUndefined();
+    expect(
+      computeStageTrend(buildSeries(6, 3.0, 3.5).map(p => ({ ...p, primary: -999 })))
+    ).toBeUndefined();
+    expect(computeStageTrend(buildSeries(6, 3.0, 3.5).slice(-1))).toBeUndefined();
+  });
+
+  it('falls back to the nearest predecessor for sparse series, labeling the actual window', () => {
+    const end = Date.parse('2026-07-17T15:00:00Z');
+    const sparse: StageFlowDataPoint[] = [
+      { validTime: new Date(end - 12 * 3600_000).toISOString(), generatedTime: '', primary: 2.0, secondary: null },
+      { validTime: new Date(end).toISOString(), generatedTime: '', primary: 2.6, secondary: null }
+    ];
+    const trend = computeStageTrend(sparse);
+    expect(trend).toEqual({ direction: 'rising', delta: expect.closeTo(0.6, 5), windowHours: 12 });
+  });
+
+  it('tolerates unsorted input', () => {
+    const series = buildSeries(6, 3.0, 3.5).reverse();
+    expect(computeStageTrend(series)?.direction).toBe('rising');
+  });
+});
+
+describe('formatStageTrend', () => {
+  it('renders rising, falling, and steady clauses', () => {
+    expect(formatStageTrend({ direction: 'rising', delta: 0.5, windowHours: 6 })).toBe(
+      '↗ rising (+0.5 ft / 6h)'
+    );
+    expect(formatStageTrend({ direction: 'falling', delta: -0.42, windowHours: 6 })).toBe(
+      '↘ falling (-0.4 ft / 6h)'
+    );
+    expect(formatStageTrend({ direction: 'steady', delta: 0.01, windowHours: 6 })).toBe(
+      '→ steady (last 6h)'
+    );
+  });
+});
+
+/**
+ * Handler-level trend tests (D4): the observed stageflow series drives an inline
+ * trend on each shown gauge; stageflow failures degrade to no-trend and a
+ * rate-limit rejection stops further stageflow fetches.
+ */
+describe('handleGetRiverConditions observed trend', () => {
+  const BASE_LAT = 42.3601;
+  const BASE_LON = -71.0589;
+
+  const getNWPSGaugesInBoundingBoxMock = vi.fn();
+  const getNWPSStageFlowMock = vi.fn();
+  const noaaService = {
+    getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+    getNWPSStageFlow: getNWPSStageFlowMock
+  } as never;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function buildGauge(i: number): NWPSGauge {
+    return {
+      lid: `LID${i}`,
+      name: `Gauge ${i}`,
+      latitude: BASE_LAT + i * 0.001,
+      longitude: BASE_LON,
+      state: { abbreviation: 'MA', name: 'Massachusetts' },
+      status: {
+        observed: {
+          primary: 4.2,
+          secondary: 0.05,
+          floodCategory: null,
+          validTime: '2026-07-17T14:00:00Z'
+        }
+      }
+    };
+  }
+
+  function callHandler(args: Record<string, unknown> = {}) {
+    return handleGetRiverConditions(
+      { latitude: BASE_LAT, longitude: BASE_LON, ...args },
+      noaaService,
+      {} as never,
+      {} as never
+    );
+  }
+
+  it('appends the observed trend to the stage line for gauges with a series', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([buildGauge(0)]);
+    getNWPSStageFlowMock.mockResolvedValue({ observed: { data: buildSeries(6, 3.7, 4.2) } });
+
+    const result = await callHandler();
+    const text = result.content[0].text;
+
+    expect(getNWPSStageFlowMock).toHaveBeenCalledWith('LID0');
+    expect(text).toContain('**River Stage:** 4.20 ft  ↗ rising (+0.5 ft / 6h)');
+  });
+
+  it('omits the trend silently when the stageflow fetch fails', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([buildGauge(0)]);
+    getNWPSStageFlowMock.mockRejectedValue(new Error('boom'));
+
+    const result = await callHandler();
+    const text = result.content[0].text;
+
+    expect(text).toContain('**River Stage:** 4.20 ft\n');
+    expect(text).not.toContain('rising');
+    expect(text).not.toContain('falling');
+    expect(text).not.toContain('Error retrieving river gauge data');
+  });
+
+  it('omits the trend when the observed series is all sentinels', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([buildGauge(0)]);
+    getNWPSStageFlowMock.mockResolvedValue({
+      observed: { data: buildSeries(6, 3.7, 4.2).map(p => ({ ...p, primary: -999 })) }
+    });
+
+    const result = await callHandler();
+    expect(result.content[0].text).toContain('**River Stage:** 4.20 ft\n');
+  });
+
+  it('stops fetching stageflow after a rate-limit rejection', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) => buildGauge(i))
+    );
+    getNWPSStageFlowMock.mockRejectedValue(new RateLimitError('NOAA'));
+
+    const result = await callHandler({ detail: 'full' });
+    const text = result.content[0].text;
+
+    // First batch of 5 attempted, rate-limited, no further batches for the
+    // remaining 20 shown gauges
+    expect(getNWPSStageFlowMock).toHaveBeenCalledTimes(5);
+    expect(text).toContain('Gauge 24'); // all 25 gauges still render
+    expect(text).not.toContain('rising');
   });
 });
