@@ -1,5 +1,7 @@
 # Weather MCP Server
 
+[![MCP Toplist](https://mcptoplist.com/badge/pulsemcp%2Fweather-mcp.svg)](https://mcptoplist.com/server/pulsemcp%2Fweather-mcp)
+
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
