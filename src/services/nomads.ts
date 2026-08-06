@@ -5,6 +5,7 @@ import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { guessTimezoneFromCoords } from '../utils/timezone.js';
+import { findNearestGridIndex, GridShape, GridLatLng } from '../utils/gribGrid.js';
 import {
   ApiError,
   DataNotFoundError,
@@ -26,14 +27,8 @@ interface GribMessage {
   varName?: string;
   units?: string;
   data: number[];
-  gridShape?: {
-    rows: number;
-    cols: number;
-  };
-  latlng?: {
-    latitude: number[];
-    longitude: number[];
-  };
+  gridShape?: GridShape;
+  latlng?: GridLatLng;
   referenceDate?: Date;
   forecastDate?: Date;
 }
@@ -325,37 +320,14 @@ export class NOMADSService {
   }
 
   private extractNearestValue(message: GribMessage, latitude: number, longitude: number): number | undefined {
-    const latitudes = message.latlng?.latitude;
-    const longitudes = message.latlng?.longitude;
-    const rows = message.gridShape?.rows;
-    const cols = message.gridShape?.cols;
+    const flatIndex = findNearestGridIndex(message.latlng, message.gridShape, latitude, longitude);
 
-    if (!latitudes || !longitudes || !rows || !cols || rows < 1 || cols < 1) {
+    if (flatIndex === undefined) {
       return undefined;
     }
 
-    const targetLon = longitude < 0 ? longitude + 360 : longitude;
-    const nearestLatIndex = this.findNearestIndex(latitudes, latitude);
-    const nearestLonIndex = this.findNearestIndex(longitudes, targetLon);
-    const flatIndex = nearestLatIndex * cols + nearestLonIndex;
-
     const value = message.data[flatIndex];
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-  }
-
-  private findNearestIndex(values: number[], target: number): number {
-    let bestIndex = 0;
-    let bestDistance = Number.POSITIVE_INFINITY;
-
-    for (let i = 0; i < values.length; i++) {
-      const distance = Math.abs(values[i] - target);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestIndex = i;
-      }
-    }
-
-    return bestIndex;
   }
 
   private aggregateDaily(points: TimeStepData[], timezone: string, days: number): NomadsForecastResponse['daily'] {

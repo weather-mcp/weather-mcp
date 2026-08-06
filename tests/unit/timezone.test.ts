@@ -187,21 +187,38 @@ describe('Timezone Utilities', () => {
       expect(result).toBe('America/New_York');
     });
 
-    it('should guess timezone from Central US coords', () => {
-      // Note: guessTimezoneFromCoords uses simple longitude boundaries
-      // Chicago at -87.6298 falls into Denver zone due to >= -104 check
+    it('should guess Chicago timezone from Central US coords', () => {
       const result = guessTimezoneFromCoords(41.8781, -87.6298); // Chicago coords
 
-      // Should return a valid US timezone
-      expect(result).toMatch(/America\/(New_York|Chicago|Denver|Los_Angeles)/);
+      expect(result).toBe('America/Chicago');
     });
 
-    it('should guess timezone from Mountain coords', () => {
-      // Denver at -104.9903 falls into Los Angeles zone due to >= -125 check
+    it('should guess Denver timezone from Mountain coords', () => {
       const result = guessTimezoneFromCoords(39.7392, -104.9903); // Denver coords
 
-      // Should return a valid US timezone
-      expect(result).toMatch(/America\/(Denver|Los_Angeles)/);
+      expect(result).toBe('America/Denver');
+    });
+
+    it('should guess Chicago timezone for wide Central-time landmass', () => {
+      // The Central time zone spans much further west than a naive even split of
+      // the continent would suggest — these are all genuinely Central time despite
+      // longitudes well past -100.
+      expect(guessTimezoneFromCoords(39.0997, -94.5786)).toBe('America/Chicago'); // Kansas City, MO
+      expect(guessTimezoneFromCoords(41.2565, -95.9345)).toBe('America/Chicago'); // Omaha, NE
+      expect(guessTimezoneFromCoords(35.4676, -97.5164)).toBe('America/Chicago'); // Oklahoma City, OK
+      expect(guessTimezoneFromCoords(32.7767, -96.7970)).toBe('America/Chicago'); // Dallas, TX
+    });
+
+    it('should guess Denver timezone for other Mountain-time cities', () => {
+      expect(guessTimezoneFromCoords(40.7608, -111.8910)).toBe('America/Denver'); // Salt Lake City, UT
+    });
+
+    it('should guess Los Angeles timezone for other Pacific-time cities', () => {
+      expect(guessTimezoneFromCoords(47.6062, -122.3321)).toBe('America/Los_Angeles'); // Seattle, WA
+    });
+
+    it('should guess New York timezone for other Eastern-time cities', () => {
+      expect(guessTimezoneFromCoords(33.7490, -84.3880)).toBe('America/New_York'); // Atlanta, GA
     });
 
     it('should guess Los Angeles timezone from West Coast coords', () => {
@@ -220,13 +237,14 @@ describe('Timezone Utilities', () => {
 
     it('should handle coordinates at timezone boundaries', () => {
       // The function uses simple longitude ranges:
-      // >= -75: New York, >= -87: Chicago, >= -104: Denver, >= -125: LA
-      const eastern = guessTimezoneFromCoords(40.0, -74.0); // East of -75
-      const central = guessTimezoneFromCoords(40.0, -86.0); // Between -75 and -87
+      // >= -85: New York, >= -101: Chicago, >= -115: Denver, >= -125: LA
+      const eastern = guessTimezoneFromCoords(40.0, -74.0); // East of -85
+      const central = guessTimezoneFromCoords(40.0, -95.0); // Between -85 and -101
+      const mountain = guessTimezoneFromCoords(40.0, -110.0); // Between -101 and -115
 
       expect(eastern).toBe('America/New_York');
-      // -86 is >= -87, so returns Chicago
       expect(central).toBe('America/Chicago');
+      expect(mountain).toBe('America/Denver');
     });
 
     it('should return UTC as ultimate fallback', () => {

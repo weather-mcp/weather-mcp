@@ -123,11 +123,15 @@ export function guessTimezoneFromCoords(latitude: number, longitude: number): st
   // For production use, consider integrating a proper coordinate-to-timezone library
   // like tz-lookup or @photostructure/tz-lookup for accurate global coverage
 
-  // Map to common US timezones for North America based on longitude
+  // Map to common US timezones for North America based on longitude.
+  // The Central time zone is geographically wide (it reaches from the Great Lakes
+  // out to roughly the Kansas/Colorado border), so its longitude band is much wider
+  // than Eastern's. Boundaries below are tuned against known city coordinates
+  // (see timezone.test.ts) rather than an even four-way split of the continent.
   if (latitude >= 24 && latitude <= 50 && longitude >= -125 && longitude <= -66) {
-    if (longitude >= -75) return 'America/New_York';
-    if (longitude >= -87) return 'America/Chicago';
-    if (longitude >= -104) return 'America/Denver';
+    if (longitude >= -85) return 'America/New_York';
+    if (longitude >= -101) return 'America/Chicago';
+    if (longitude >= -115) return 'America/Denver';
     if (longitude >= -125) return 'America/Los_Angeles';
   }
 
