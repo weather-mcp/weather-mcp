@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1%2C342%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-1%2C348%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -45,7 +45,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
-- **Fully open source** — MIT licensed, readable TypeScript, 1,342 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 1,348 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -223,24 +223,11 @@ Or per call — the AI can honor "in Celsius" on the fly:
 
 Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weather`. Wind accepts `mph`/`kmh`/`ms`/`kn`; pressure `inHg`/`hPa`. Domain-specialized readings (fire-weather heights, river gauge stage, and the marine tool's dual-unit wave output) keep their conventional units.
 
-### Default Location
-
-Set `WEATHER_DEFAULT_LOCATION` and weather tools work with no location argument at all — useful when your assistant already knows where you are, so "what's the weather?" just works:
-
-```bash
-WEATHER_DEFAULT_LOCATION="Christchurch, New Zealand"   # free-text (geocoded once, then cached)
-WEATHER_DEFAULT_LOCATION="home"                        # a saved location alias
-WEATHER_DEFAULT_LOCATION="-43.5321,172.6362"           # exact coordinates
-```
-
-An explicit location in the request always wins — the default only applies when no coordinates, `location_name`, or `city_name` are provided. Responses using the default disclose it with a `**Location:** … — server default` header.
-
 ### Other settings
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `ENABLED_TOOLS` | `basic` | Tool preset or list (see above) |
-| `WEATHER_DEFAULT_LOCATION` | — | Fallback location when a tool call has none: a saved alias, `"lat,lon"`, or a free-text place name (see above) |
 | `WEATHER_UNITS` | `imperial` | Default unit system: `imperial` or `metric` |
 | `WEATHER_TEMPERATURE_UNIT` … | — | Per-unit overrides: `_TEMPERATURE_`(F/C), `_WIND_SPEED_`(mph/kmh/ms/kn), `_PRECIPITATION_`(inch/mm), `_PRESSURE_`(inHg/hPa), `_DISTANCE_`(mi/km), `_TIME_FORMAT`(12h/24h) |
 | `CACHE_ENABLED` | `true` | Enable/disable response caching |
@@ -275,7 +262,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 1,342 tests (~2 seconds)
+npm test               # Run all 1,348 tests (~2 seconds)
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```
