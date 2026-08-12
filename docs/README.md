@@ -17,6 +17,7 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 - **[IMPLEMENTATION_PLAN.md](./planning/IMPLEMENTATION_PLAN.md)** - Project implementation roadmap
 - **[ROADMAP.md](./planning/ROADMAP.md)** - Project roadmap and future plans
 - **[FUTURE_ENHANCEMENTS.md](./planning/FUTURE_ENHANCEMENTS.md)** - Planned enhancements and features
+- **[FORK_DERIVED_IDEAS.md](./planning/FORK_DERIVED_IDEAS.md)** - Larger feature ideas surfaced by reviewing public forks (2026-08)
 
 ### 📁 Testing (`testing/`)
 - **[TESTING_GUIDE.md](./testing/TESTING_GUIDE.md)** - Manual testing procedures and test cases
