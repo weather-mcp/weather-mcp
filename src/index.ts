@@ -24,6 +24,7 @@ import { LocationStore } from './services/locationStore.js';
 import { blitzortungService } from './services/blitzortung.js';
 import { CacheConfig } from './config/cache.js';
 import { toolConfig } from './config/tools.js';
+import { getDefaultLocation } from './config/defaultLocation.js';
 import { logger } from './utils/logger.js';
 import { formatErrorForUser } from './errors/ApiError.js';
 import { handleGetForecast } from './handlers/forecastHandler.js';
@@ -204,12 +205,19 @@ const UNIT_SCHEMA_PROPERTIES = {
  * the AI can provide a location in ONE of three consistent ways: coordinates,
  * a saved location name, or a free-text city name (geocoded on demand). Tools
  * using this fragment must declare `required: []` — resolveLocationAsync enforces
- * that at least one usable form is present at call time.
+ * that at least one usable form is present at call time (falling back to
+ * WEATHER_DEFAULT_LOCATION when the operator has configured one; the hint below
+ * is only added to the schema in that case, so models don't omit locations on
+ * servers with no default).
  */
+const DEFAULT_LOCATION_HINT = getDefaultLocation()
+  ? ` If the user does not specify a location, omit all location parameters — the server's configured default location ("${getDefaultLocation()}") is used.`
+  : '';
+
 const LOCATION_SCHEMA_PROPERTIES = {
   latitude: {
     type: 'number' as const,
-    description: 'Latitude of the location (-90 to 90). Not required if location_name or city_name is provided.',
+    description: `Latitude of the location (-90 to 90). Not required if location_name or city_name is provided.${DEFAULT_LOCATION_HINT}`,
     minimum: -90,
     maximum: 90
   },

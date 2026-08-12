@@ -7,6 +7,7 @@ import { GeocodingService } from '../services/geocoding.js';
 import { validateLatitude, validateLongitude } from './validation.js';
 import { Cache } from './cache.js';
 import { CacheConfig } from '../config/cache.js';
+import { getDefaultLocation } from '../config/defaultLocation.js';
 
 export interface LocationInput {
   latitude?: number;
@@ -18,7 +19,7 @@ export interface LocationInput {
 export interface ResolvedLocation {
   latitude: number;
   longitude: number;
-  source: 'coordinates' | 'saved_location' | 'geocoded';
+  source: 'coordinates' | 'saved_location' | 'geocoded' | 'default';
   location_name?: string;
 }
 
@@ -34,11 +35,19 @@ export interface ResolvedLocation {
  * @returns Markdown line (with trailing blank line) or '' for coordinate input
  */
 export function formatLocationLine(resolved: ResolvedLocation): string {
+  const coords = `${resolved.latitude.toFixed(4)}, ${resolved.longitude.toFixed(4)}`;
+
+  // A server-default location is always disclosed — the caller supplied no
+  // location at all, so the reader must be able to see what was assumed.
+  if (resolved.source === 'default') {
+    const label = resolved.location_name ? `${resolved.location_name} (${coords})` : coords;
+    return `**Location:** ${label} — server default\n\n`;
+  }
+
   if (resolved.source === 'coordinates' || !resolved.location_name) {
     return '';
   }
 
-  const coords = `${resolved.latitude.toFixed(4)}, ${resolved.longitude.toFixed(4)}`;
   return `**Location:** ${resolved.location_name} (${coords})\n\n`;
 }
 
@@ -181,15 +190,17 @@ export function resolveLocation(
  * Resolve location coordinates from direct coordinates, a saved location name,
  * or a free-text city name that is geocoded on demand.
  *
- * Resolution precedence: coordinates > location_name (saved) > city_name (geocoded).
- * Geocoded city lookups are cached (see cityGeocodeCache) so repeated requests for
- * the same place do not re-hit the geocoding providers.
+ * Resolution precedence: coordinates > location_name (saved) > city_name (geocoded)
+ * > server default (WEATHER_DEFAULT_LOCATION, when configured). Geocoded city
+ * lookups are cached (see cityGeocodeCache) so repeated requests for the same
+ * place do not re-hit the geocoding providers.
  *
  * @param args - Arguments containing coordinates, a saved location_name, or a city_name
  * @param locationStore - Location store instance (for saved locations)
  * @param geocodingService - Geocoding service (for city_name lookups)
  * @returns Resolved coordinates and metadata
- * @throws Error if nothing usable is provided, validation fails, or geocoding finds no match
+ * @throws Error if nothing usable is provided (and no default is configured),
+ *   validation fails, or geocoding finds no match
  */
 export async function resolveLocationAsync(
   args: LocationInput,
@@ -267,6 +278,12 @@ export async function resolveLocationAsync(
     };
   }
 
+  // 4. Nothing provided -> configured server default, if any
+  const defaultLocation = getDefaultLocation();
+  if (defaultLocation) {
+    return resolveDefaultLocation(defaultLocation, locationStore, geocodingService);
+  }
+
   // Nothing usable provided
   throw new Error(
     'Provide one of: coordinates (latitude + longitude), a saved location_name, or a city_name.\n\n' +
@@ -274,6 +291,62 @@ export async function resolveLocationAsync(
     '  - Using coordinates: latitude=47.6062, longitude=-122.3321\n' +
     '  - Using saved location: location_name="home"\n' +
     '  - Using a city name: city_name="Paris, France"\n\n' +
-    'Use save_location to save frequently used locations.'
+    'Use save_location to save frequently used locations. The server operator can ' +
+    'also set the WEATHER_DEFAULT_LOCATION environment variable to supply a ' +
+    'fallback location for calls like this one.'
   );
+}
+
+/**
+ * Resolve the WEATHER_DEFAULT_LOCATION value to coordinates.
+ *
+ * The value may be a "lat,lon" coordinate pair, a saved location alias (or
+ * alternate name), or a free-text place name — tried in that order. Free-text
+ * lookups reuse the city geocode path, so they hit the same cache and only
+ * geocode once per process. Whatever matches is reported with
+ * source: 'default' so output always discloses that the location was assumed.
+ *
+ * @throws Error naming WEATHER_DEFAULT_LOCATION when the value cannot be resolved
+ */
+async function resolveDefaultLocation(
+  raw: string,
+  locationStore: LocationStore,
+  geocodingService: GeocodingService
+): Promise<ResolvedLocation> {
+  // "lat,lon" coordinate pair
+  const coordMatch = raw.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if (coordMatch) {
+    const latitude = Number(coordMatch[1]);
+    const longitude = Number(coordMatch[2]);
+    try {
+      validateLatitude(latitude);
+      validateLongitude(longitude);
+    } catch (error) {
+      throw new Error(
+        `Invalid WEATHER_DEFAULT_LOCATION coordinates "${raw}": ` +
+        `${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    return { latitude, longitude, source: 'default' };
+  }
+
+  // Saved location alias (including alternate names)
+  try {
+    const saved = resolveLocation({ location_name: raw }, locationStore);
+    return { ...saved, source: 'default' };
+  } catch {
+    // Not a saved alias — treat it as a free-text place name below.
+  }
+
+  // Free-text place name -> geocode (shares the city_name cache)
+  try {
+    const geocoded = await resolveLocationAsync({ city_name: raw }, locationStore, geocodingService);
+    return { ...geocoded, source: 'default' };
+  } catch (error) {
+    throw new Error(
+      `Could not resolve WEATHER_DEFAULT_LOCATION="${raw}" — it is not a saved ` +
+      `location alias, a "lat,lon" pair, or a geocodable place name.\n\n` +
+      `${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
