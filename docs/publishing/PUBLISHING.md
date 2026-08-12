@@ -476,7 +476,6 @@ You may skip full documentation workflow if:
 ### Reference Documentation
 
 - **Complete Guide:** [docs/development/DOCUMENTATION_MAINTENANCE.md](../development/DOCUMENTATION_MAINTENANCE.md)
-- **Quick Summary:** [docs/development/DOCUMENTATION_MAINTENANCE_SUMMARY.md](../development/DOCUMENTATION_MAINTENANCE_SUMMARY.md)
 - **Automation Scripts:** `scripts/check-doc-versions.sh`, `scripts/update-docs-for-release.sh`
 
 ---
@@ -1162,7 +1161,6 @@ See section 5.6 "Common Issues" above for detailed solutions.
 
 **Documentation:**
 - **Full Maintenance Guide**: [docs/development/DOCUMENTATION_MAINTENANCE.md](../development/DOCUMENTATION_MAINTENANCE.md)
-- **Quick Summary**: [docs/development/DOCUMENTATION_MAINTENANCE_SUMMARY.md](../development/DOCUMENTATION_MAINTENANCE_SUMMARY.md)
 - **Version Check Script**: `./scripts/check-doc-versions.sh`
 - **Release Update Script**: `./scripts/update-docs-for-release.sh`
 
@@ -1190,7 +1188,6 @@ The complete publishing workflow:
 
 **Documentation Resources:**
 - **Full Guide:** [docs/development/DOCUMENTATION_MAINTENANCE.md](../development/DOCUMENTATION_MAINTENANCE.md)
-- **Quick Summary:** [docs/development/DOCUMENTATION_MAINTENANCE_SUMMARY.md](../development/DOCUMENTATION_MAINTENANCE_SUMMARY.md)
 - **Scripts:** `./scripts/check-doc-versions.sh`, `./scripts/update-docs-for-release.sh`
 
 Happy publishing! 🚀

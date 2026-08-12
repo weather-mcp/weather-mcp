@@ -15,38 +15,10 @@ This document catalogs potential future enhancements for the Weather MCP Server 
 
 ## 📋 Implementation Status
 
-**Tier 1 Features - MOVED TO ACTIVE ROADMAP:**
-The following high-value features have been moved from this research document to [ROADMAP.md](./ROADMAP.md) for active implementation:
-
-### v1.2.0 - Context & Intelligence ✅ COMPLETE
-- ✅ **Climate Normals** → Implemented as `include_normals` parameter for get_forecast/get_current_conditions
-- ✅ **Snow Depth & Snowfall Details** → Implemented as output enhancement (extract from existing NOAA data)
-- ✅ **Timezone-Aware Time Display** → Implemented as output enhancement for all time displays
-
-### v1.3.0 - Version Management & Updates ✅ COMPLETE
-- ✅ **Version Information** → Implemented in check_service_status and startup logging
-- ✅ **Automatic Update Recommendations** → Implemented via @latest tag
-
-### v1.4.0 - Tool Configuration System ✅ COMPLETE
-- ✅ **Configurable Tool Loading** → Implemented with presets and flexible syntax
-- ✅ **Reduced Context Overhead** → Implemented with tool filtering
-
-### v1.5.0 - Visualization & Lightning Safety ✅ COMPLETE
-- ✅ **Weather Imagery (Section 12.1)** → Implemented as `get_weather_imagery` tool with RainViewer precipitation radar
-- ✅ **Real-Time Lightning Data (Section 8.1)** → Implemented as `get_lightning_activity` tool with Blitzortung.org
-
-### Future Considerations (v1.6.0+)
-- 📋 **River/Flood Data (Section 5.1)** → Planned for future version as `get_river_conditions` tool
-- 📋 **Wildfire & Smoke Integration (Section 7.1)** → Planned for future version as `get_wildfire_info` tool
-
-**Status:** v1.5.0 features are now complete. See [ROADMAP.md](./ROADMAP.md) for implementation details and future planning.
-
-**This Document's Purpose Going Forward:**
-This document will continue to serve as a research and ideation catalog for:
-- Tier 2 and Tier 3 enhancements (future consideration)
-- Features that may be better suited for separate MCP servers
-- Ideas requiring further data source research
-- Long-term vision for weather data capabilities
+**Status is tracked in the [planning index](./README.md), not here.** This
+document is the raw idea pool: research notes, data-source evaluations, and
+pros/cons for each idea. Sections for ideas that have since shipped are marked
+✅ in their headings with the release version, but the index is authoritative.
 
 ---
 
@@ -124,7 +96,7 @@ This document will continue to serve as a research and ideation catalog for:
 
 ### 2. Climatology & Historical Context
 
-#### 2.1 Climate Normals (30-Year Averages)
+#### 2.1 Climate Normals (30-Year Averages) ✅ IMPLEMENTED IN v1.2.0 (US only — global normals is a live idea, see [INTERNATIONAL_COVERAGE_ROADMAP](./INTERNATIONAL_COVERAGE_ROADMAP.md) Phase 5)
 **Description:** Compare current/forecast conditions to historical normals (1991-2020 averages).
 
 **Use Cases:**
@@ -193,7 +165,7 @@ This document will continue to serve as a research and ideation catalog for:
 
 ### 3. Winter Weather & Precipitation Detail
 
-#### 3.1 Snow Depth and Snowfall Forecasts
+#### 3.1 Snow Depth and Snowfall Forecasts ✅ IMPLEMENTED IN v1.2.0
 **Description:** Current snow depth on ground, forecasted snowfall amounts, snow water equivalent.
 
 **Use Cases:**
@@ -314,7 +286,7 @@ This document will continue to serve as a research and ideation catalog for:
 
 ### 5. Hydrological & Water Data
 
-#### 5.1 River Levels & Flood Data
+#### 5.1 River Levels & Flood Data ✅ IMPLEMENTED IN v1.6.0 (US — global coverage is a live idea, see [INTERNATIONAL_COVERAGE_ROADMAP](./INTERNATIONAL_COVERAGE_ROADMAP.md) Phase 2)
 **Description:** Current river levels, flood stage information, streamflow data.
 
 **Use Cases:**
@@ -449,7 +421,7 @@ This document will continue to serve as a research and ideation catalog for:
 
 ### 7. Wildfire & Smoke
 
-#### 7.1 Wildfire Perimeters & Active Fires
+#### 7.1 Wildfire Perimeters & Active Fires ✅ IMPLEMENTED IN v1.6.0 (US/NIFC — global via NASA FIRMS is a live idea, see [INTERNATIONAL_COVERAGE_ROADMAP](./INTERNATIONAL_COVERAGE_ROADMAP.md) Phase 4)
 **Description:** Active wildfire locations, fire perimeters, containment status.
 
 **Use Cases:**
@@ -644,7 +616,7 @@ This document will continue to serve as a research and ideation catalog for:
 
 ### 10. Enhanced Location Intelligence
 
-#### 10.1 Timezone & Local Time Integration
+#### 10.1 Timezone & Local Time Integration ✅ IMPLEMENTED IN v1.2.0
 **Description:** Show forecast times in local timezone, handle DST transitions.
 
 **Use Cases:**
@@ -1033,9 +1005,10 @@ This document will continue to serve as a research and ideation catalog for:
 
 ## Prioritized Recommendations
 
-### Tier 1: High Value, Aligned with Philosophy (v1.1 - v1.2)
+### Tier 1: High Value, Aligned with Philosophy (v1.1 - v1.2) ✅ ALL SHIPPED
 
-**Strong candidates for implementation:**
+**All five shipped:** climate normals + snow depth + timezone display in
+v1.2.0, river/flood and wildfire in v1.6.0. Kept for the original evaluations:
 
 1. **Climate Normals** (30-year averages)
    - **Value:** HIGH - Adds critical context ("is this unusual?")
@@ -1107,12 +1080,12 @@ This document will continue to serve as a research and ideation catalog for:
 
 **Not recommended for near-term:**
 
-10. **Real-time Lightning** - Blocked by lack of free API
+10. ~~**Real-time Lightning** - Blocked by lack of free API~~ → shipped in v1.5.0 via Blitzortung.org
 11. **Storm Reports** - Low value, overlaps with alerts
 12. **Road Weather** - Can be inferred from forecasts
 13. **Earthquake Data** - Outside weather scope
 14. **Solar Radiation** - Too specialized
-15. **Radar/Satellite URLs** - Limited value for text AI
+15. ~~**Radar/Satellite URLs** - Limited value for text AI~~ → precipitation radar shipped in v1.5.0 via RainViewer; satellite imagery still open
 16. **Multi-language Support** - AI handles translation
 17. **Agricultural Indices** - Better suited for separate MCP
 
@@ -1173,9 +1146,7 @@ This document will continue to serve as a research and ideation catalog for:
    - PlantNet
    - Open pollen databases
 
-2. **Lightning Data:**
-   - Blitzortung.org (crowdsourced, free?)
-   - Check if NOAA has public real-time endpoint
+2. ~~**Lightning Data**~~ — resolved: Blitzortung.org, shipped v1.5.0
 
 3. **Road Conditions:**
    - Survey state DOT APIs
@@ -1189,16 +1160,9 @@ This document will continue to serve as a research and ideation catalog for:
 
 ## Rejected Enhancements (Do Not Implement)
 
-**These are intentionally excluded per design philosophy:**
-
-❌ **Alert Subscriptions / Webhooks** - Requires persistent state
-❌ **Multi-Model Forecast Comparison** - Too complex, specialized
-❌ **Climate Trend Analysis** - Better suited for separate MCP
-❌ **Earthquake/Tsunami Primary Focus** - Outside meteorological scope
-❌ **Agricultural Tools Suite** - Specialized audience, separate MCP recommended
-❌ **Personal Weather Stations** - Data quality concerns
-❌ **Social Weather Sharing** - Outside scope
-❌ **Custom Alert Thresholds** - Requires persistent state
+The consolidated rejected list — with reasons, and including items later
+revisited (e.g. multi-model comparison, reconsidered 2026-08 via Open-Meteo's
+`models` parameter) — lives in the [planning index](./README.md#rejected).
 
 ---
 
@@ -1277,7 +1241,5 @@ All other enhancements should be evaluated based on:
 
 ---
 
-*Document Version: 1.0*
 *Created: 2025-11-07*
-*Last Updated: 2025-11-07*
-*Status: Draft for Review*
+*Last Updated: 2026-08-12 — statuses reconciled against v1.14.0; status tracking moved to [README.md](./README.md)*

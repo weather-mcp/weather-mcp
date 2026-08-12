@@ -1,7 +1,8 @@
 # International Coverage Roadmap
 
 **Created:** 2026-07-15
-**Status:** In progress — Phase 1 shipped in v1.12.0 (2026-07-15); Phases 2–5 proposed
+**Status:** In progress — Phase 1 shipped in v1.12.0 (2026-07-15); Phases 2–5 proposed. Per-idea status is tracked in the [planning index](./README.md).
+**See also:** [FORK_DERIVED_IDEAS.md](./FORK_DERIVED_IDEAS.md) — the 2026-08 fork review independently surfaced Phases 2 and 4 (global rivers, NASA FIRMS wildfire).
 **Goal:** Extend the remaining US-only tools (`get_alerts`, `get_river_conditions`, `get_wildfire_info`) to worldwide coverage using free, open APIs, preserving the project's zero-cost model.
 
 ## Current Coverage Inventory
@@ -33,7 +34,7 @@ The auto-select pattern to replicate everywhere: `forecastHandler.ts:235` (US �
 
 ## Priority 1 — Global current conditions (no new provider) ✅ DONE (v1.12.0)
 
-**Design plan:** `docs/global-current-conditions-plan.md` (implemented 2026-07-15)
+**Design plan:** `docs/plans/global-current-conditions-plan.md` (implemented 2026-07-15)
 
 **Shipped:** `OpenMeteoService.getCurrentConditions()` plus US/non-US auto-select in
 `currentConditionsHandler.ts`, routed by the shared `isInUS` helper in

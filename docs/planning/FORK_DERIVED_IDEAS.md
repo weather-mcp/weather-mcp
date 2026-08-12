@@ -7,8 +7,8 @@ fork code is directly mergeable, but the ideas are sound.
 
 **Review date:** 2026-08-12 (8 forks reviewed)
 
-For the broader enhancement backlog, see [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.md)
-and [ROADMAP.md](./ROADMAP.md).
+Status for these ideas is tracked in the [planning index](./README.md); the
+broader idea pool is [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.md).
 
 ---
 
@@ -20,6 +20,8 @@ and [ROADMAP.md](./ROADMAP.md).
 provides global river discharge data (GloFAS — ensemble river discharge forecasts,
 ~5 km resolution, no API key) and could back an international fallback, the same
 pattern `get_current_conditions` uses (NOAA in the US, Open-Meteo elsewhere).
+Same idea as [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMAP.md)
+Phase 2, which has the fuller API notes.
 
 - **Value:** removes a US-only limitation on an existing safety tool; fits the
   established auto-routing pattern (`isInUS` helper).
@@ -34,7 +36,8 @@ pattern `get_current_conditions` uses (NOAA in the US, Open-Meteo elsewhere).
 
 `get_wildfire_info` is US-only (NIFC ArcGIS). [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/)
 provides global satellite fire detections (VIIRS/MODIS hotspots, updated multiple
-times daily). Same auto-routing pattern as above.
+times daily). Same auto-routing pattern as above, and the same idea as
+[INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMAP.md) Phase 4.
 
 - **Value:** wildfire is a global hazard; this is the second of the two remaining
   US-only safety tools.

@@ -1,5 +1,13 @@
 # Weather MCP Roadmap
 
+> **📁 ARCHIVED 2026-08-12.** Historical record of the v0.3.0–v1.6.0 planning
+> era (last substantively updated 2025-11; "current version" references below
+> are frozen at v1.6.0). Live idea status is tracked in
+> [../README.md](../README.md); the design principles and the
+> still-relevant unshipped ideas were extracted there. Note the "Features NOT
+> in Roadmap" list below is superseded — flood monitoring later shipped
+> (v1.6.0) and multi-model comparison was reconsidered in 2026-08.
+
 This document outlines planned enhancements for future versions of the Weather MCP server.
 
 ## Design Philosophy: Lean & Efficient

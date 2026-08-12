@@ -1,5 +1,10 @@
 # Weather MCP Server - Project Status
 
+> **📁 ARCHIVED 2026-08-12.** A November-2025 completion snapshot (v1.0 era).
+> For current status see the main [README.md](../../README.md), 
+> [CLAUDE.md](../../CLAUDE.md) §Project Status, and
+> [CHANGELOG.md](../../CHANGELOG.md).
+
 ## 🎉 Project Complete!
 
 All core phases of the Weather MCP Server have been successfully completed. The project is fully functional, tested, documented, and ready for GitHub publication.

@@ -572,6 +572,7 @@ npm audit             # No critical vulnerabilities
 - **Project Docs:**
   - `README.md` - User-facing documentation
   - `CHANGELOG.md` - Version history
+  - `docs/planning/README.md` - Planning status index — single source of truth for feature-idea status (idea/planned/shipped/rejected); update it whenever an idea changes state
   - `docs/development/CODE_REVIEW.md` - Code quality assessment
   - `docs/development/SECURITY_AUDIT.md` - Security analysis
   - `TEST_COVERAGE_REPORT_V1.0.md` - Test coverage details

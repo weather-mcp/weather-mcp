@@ -106,9 +106,9 @@ weather-mcp/
 │   ├── test_openmeteo.ts  # Open-Meteo API test script
 │   └── test_historical_mcp.ts  # Historical weather MCP test
 ├── docs/                  # Documentation
-│   ├── TESTING_GUIDE.md
+│   ├── TOOLS.md
 │   ├── NOAA_API_RESEARCH.md
-│   └── PROJECT_STATUS.md
+│   └── planning/          # Feature-idea backlog (README.md = status index)
 └── dist/                  # Compiled output (generated)
 ```
 
@@ -148,9 +148,9 @@ Update documentation when you:
 ### Which Files to Update
 
 - `README.md` - For user-facing changes
-- `docs/TESTING_GUIDE.md` - For new test scenarios
+- `docs/testing/TESTING_GUIDE.md` - For new test scenarios
 - `docs/NOAA_API_RESEARCH.md` - For API discoveries
-- `docs/PROJECT_STATUS.md` - For tracking progress
+- `docs/planning/README.md` - For feature-idea status (the status index)
 - Code comments - For implementation details
 
 ## Commit Messages

@@ -1,5 +1,9 @@
 # Documentation Maintenance Plan - Implementation Summary
 
+> **📁 ARCHIVED 2026-08-12.** Meta-summary of creating the (now also archived)
+> 2025-11 maintenance guide. Current guide:
+> [docs/development/DOCUMENTATION_MAINTENANCE.md](../development/DOCUMENTATION_MAINTENANCE.md).
+
 **Date Created:** 2025-11-07
 **Purpose:** Summary of documentation maintenance plan creation and current state
 

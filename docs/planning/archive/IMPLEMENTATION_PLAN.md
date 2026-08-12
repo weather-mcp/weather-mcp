@@ -1,5 +1,13 @@
 # Weather MCP Server - Implementation Plan
 
+> **📁 ARCHIVED 2026-08-12.** The original project build plan — all core
+> phases completed by v1.0. Kept for the technical-decision history. The two
+> items that never shipped as written: the `geocode_location` tool (Phase 3.4,
+> Census.gov + Nominatim fallback) was superseded by the Nominatim-only
+> `search_location` tool, and the analytics work (Phase 6.3) moved to the
+> separate analytics-server repository. Live idea status:
+> [../README.md](../README.md).
+
 ## Project Overview
 Build an MCP (Model Context Protocol) server that provides weather data from NOAA's API to AI systems, with primary focus on Claude Code integration.
 

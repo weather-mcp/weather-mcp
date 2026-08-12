@@ -1,5 +1,10 @@
 # Historical Weather Data Implementation Plan
 
+> **📁 ARCHIVED 2026-08-12.** The November-2025 plan for the NOAA CDO →
+> Open-Meteo historical-data migration, completed that same month.
+> `get_historical_weather` has been Open-Meteo-backed (global, 1940–present)
+> ever since.
+
 ## Current Status (November 4, 2025)
 
 ### What Works ✓

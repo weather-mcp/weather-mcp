@@ -14,10 +14,11 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 - **[LOCAL_ANALYTICS_GUIDE.md](./analytics/LOCAL_ANALYTICS_GUIDE.md)** - Local analytics setup and usage
 
 ### 📁 Planning (`planning/`)
-- **[IMPLEMENTATION_PLAN.md](./planning/IMPLEMENTATION_PLAN.md)** - Project implementation roadmap
-- **[ROADMAP.md](./planning/ROADMAP.md)** - Project roadmap and future plans
-- **[FUTURE_ENHANCEMENTS.md](./planning/FUTURE_ENHANCEMENTS.md)** - Planned enhancements and features
+- **[README.md](./planning/README.md)** - **Status index** — single source of truth for feature-idea status (idea/planned/shipped/rejected)
+- **[INTERNATIONAL_COVERAGE_ROADMAP.md](./planning/INTERNATIONAL_COVERAGE_ROADMAP.md)** - Sequenced plan for taking US-only tools global
+- **[FUTURE_ENHANCEMENTS.md](./planning/FUTURE_ENHANCEMENTS.md)** - Raw idea pool with research notes and data sources
 - **[FORK_DERIVED_IDEAS.md](./planning/FORK_DERIVED_IDEAS.md)** - Larger feature ideas surfaced by reviewing public forks (2026-08)
+- **[archive/](./planning/archive/)** - Historical docs: original implementation plan, v0.x–v1.6 roadmap
 
 ### 📁 Testing (`testing/`)
 - **[TESTING_GUIDE.md](./testing/TESTING_GUIDE.md)** - Manual testing procedures and test cases
@@ -34,8 +35,7 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 - **[TEST_QUALITY_ASSESSMENT_V1.2.md](./development/TEST_QUALITY_ASSESSMENT_V1.2.md)** - Test quality assessment
 - **[TEST_GAPS_CRITICAL.md](./development/TEST_GAPS_CRITICAL.md)** - Critical test gaps analysis
 - **[CLIMATE_NORMALS_PLAN.md](./development/CLIMATE_NORMALS_PLAN.md)** - Climate normals implementation plan
-- **[DOCUMENTATION_MAINTENANCE.md](./development/DOCUMENTATION_MAINTENANCE.md)** - Documentation maintenance guide
-- **[DOCUMENTATION_MAINTENANCE_SUMMARY.md](./development/DOCUMENTATION_MAINTENANCE_SUMMARY.md)** - Documentation maintenance summary
+- **[DOCUMENTATION_MAINTENANCE.md](./development/DOCUMENTATION_MAINTENANCE.md)** - Documentation maintenance guide (source-of-truth map, release flow, archiving)
 
 ### 📁 Publishing (`publishing/`)
 - **[PUBLISHING.md](./publishing/PUBLISHING.md)** - Publishing guide for npm and MCP registry
@@ -50,10 +50,17 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 - **[MCP_BEST_PRACTICES.md](./MCP_BEST_PRACTICES.md)** - Guide for service status communication
 
 ### 📁 Technical Documentation
+- **[TOOLS.md](./TOOLS.md)** - Complete MCP tool reference
 - **[NOAA_API_RESEARCH.md](./NOAA_API_RESEARCH.md)** - NOAA API research and integration details
-- **[HISTORICAL_DATA_PLAN.md](./HISTORICAL_DATA_PLAN.md)** - Historical weather data implementation plan
-- **[PROJECT_STATUS.md](./PROJECT_STATUS.md)** - Current project status
-- **[PROJECT_DESCRIPTION.md](./PROJECT_DESCRIPTION.md)** - Detailed project description
+- **[orchestration-playbook.md](./orchestration-playbook.md)** - How design plans are written and executed (`/impl-plan`, `/run-plan`)
+
+### 📁 Design Plans (`plans/`)
+Shipped features' design plans, implementation plans, and verification
+reports. In-flight plans live at the docs root until they ship.
+- **[plans/](./plans/)** - e.g. `global-current-conditions-*`, `max-range-expansion-*`, `output-completeness-*`
+
+### 📁 Archive (`archive/`)
+- **[archive/](./archive/)** - Historical docs: original project status/description, superseded plans and guides
 
 ### 📁 Root Level Documentation
 - **[../CLAUDE.md](../CLAUDE.md)** - AI assistant development guide
@@ -73,13 +80,13 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 - [Contributing Guidelines](../CONTRIBUTING.md)
 - [Code Review](./development/CODE_REVIEW.md)
 - [Security Policy](../SECURITY.md)
-- [Development Plan](./planning/IMPLEMENTATION_PLAN.md)
+- [Planning Status Index](./planning/README.md)
 
 ### For Maintainers
 - [Publishing Guide](./publishing/PUBLISHING.md)
 - [Changelog](../CHANGELOG.md)
 - [Security Audit](./development/SECURITY_AUDIT_V1.6.md)
-- [Roadmap](./planning/ROADMAP.md)
+- [Planning Status Index](./planning/README.md)
 
 ### For Testing
 - [Test Suite Overview](./testing/TEST_SUITE_README.md)
@@ -106,8 +113,8 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 - [Test Gaps Analysis](./development/TEST_GAPS_CRITICAL.md)
 
 ### 📋 Planning & Roadmap
-- [Implementation Plan](./planning/IMPLEMENTATION_PLAN.md)
-- [Roadmap](./planning/ROADMAP.md)
+- [Planning Status Index](./planning/README.md)
+- [International Coverage Roadmap](./planning/INTERNATIONAL_COVERAGE_ROADMAP.md)
 - [Future Enhancements](./planning/FUTURE_ENHANCEMENTS.md)
 
 ### 🔧 Development

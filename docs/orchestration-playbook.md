@@ -5,6 +5,11 @@ How orchestrated implementation plans are written (`/impl-plan`) and executed
 implementation plans at `docs/<name>-implementation-plan.md`, work happens on
 `feat/<name>`.
 
+Once a feature ships in a release, move its whole plan set (design plan,
+implementation plan, verification/review docs) to `docs/plans/` — the docs
+root holds only in-flight plans. Update the idea's row in
+`docs/planning/README.md` (the status index) at the same time.
+
 ## Project bindings
 
 **Verification gate** (run after every task, from `weather-mcp/`):
