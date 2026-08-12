@@ -75,7 +75,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_saved_location` | Details for one saved location | — |
 | `remove_saved_location` | Delete a saved location | — |
 
-> **Default preset:** with no configuration, the server exposes 6 tools led by `get_weather_summary` (one call covers most "what's the weather?" questions), plus `forecast`, `current_conditions`, `alerts`, `search_location`, and `check_service_status`. Enable everything with one environment variable — see [Tool Selection](#tool-selection).
+> **Default preset:** with no configuration, the server exposes 17 tools led by `get_weather_summary` (one call covers most "what's the weather?" questions), plus `forecast`, `current_conditions`, `alerts`, `search_location`, and `check_service_status`. Enable everything with one environment variable — see [Tool Selection](#tool-selection).
 
 > **Consistent location input:** every location-based tool accepts the same three forms — `latitude`+`longitude`, a saved `location_name` (e.g. `"home"`), or a free-text `city_name` (e.g. `"Bend, Oregon"`, geocoded automatically). When a name is used, the response echoes the resolved place and coordinates.
 

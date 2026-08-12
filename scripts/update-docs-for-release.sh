@@ -95,7 +95,11 @@ EOF
 
 # --- 4. Test count (also confirms the suite passes) ---------------------------
 echo "🧪 Running tests to get current count..."
-TEST_COUNT=$(npm test 2>&1 | grep -E "Tests.*[0-9]+ passed" | grep -oE '[0-9]+' | head -1)
+# The trailing `|| true` guards against `set -o pipefail` + `head -1` closing
+# the pipe early (SIGPIPE makes the pipeline "fail" and silently killed the
+# script here during v1.14.0 prep). The empty-count check below still catches
+# a genuinely failed test run.
+TEST_COUNT=$(npm test 2>&1 | grep -E "Tests.*[0-9]+ passed" | grep -oE '[0-9]+' | head -1 || true)
 if [ -z "$TEST_COUNT" ]; then
   echo "❌ Could not determine test count — did npm test fail?"
   exit 1
@@ -117,9 +121,13 @@ SUMMARY_TEXT=${SUMMARY:-"See CHANGELOG.md"}
 # Escape sed-replacement metacharacters (/ & \) so summaries can contain paths
 SUMMARY_SED=$(printf '%s' "$SUMMARY_TEXT" | sed -e 's/[\/&\\]/\\&/g')
 
+# Insert a new "New in" history line above the first existing one (first match
+# only — an unanchored substitution here would rewrite every older release's
+# line to the new summary, which is exactly what happened on v1.14.0 prep).
+sed -i "0,/^- \*\*New in v[0-9]/s//- **New in v${NEW_VERSION}:** ${SUMMARY_SED}\n&/" CLAUDE.md
+
 sed -i -E \
   -e "s/\*\*Version:\*\* [0-9]+\.[0-9]+\.[0-9]+/**Version:** ${NEW_VERSION}/g" \
-  -e "s/- \*\*New in v[0-9]+\.[0-9]+\.[0-9]+:\*\* .*/- **New in v${NEW_VERSION}:** ${SUMMARY_SED}/" \
   -e "s/\*\*Test Coverage:\*\* [0-9,]+ tests/**Test Coverage:** ${TEST_COUNT_FMT} tests/" \
   -e "s/[0-9]+ MCP Tools/${TOOL_COUNT} MCP Tools/" \
   -e "s/^\*\*Last Updated:\*\* .*/**Last Updated:** ${TODAY} (v${NEW_VERSION})/" \

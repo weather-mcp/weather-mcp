@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA and Open-Meteo APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, and severe weather alerts.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.13.0 (Production Ready)
+- **Version:** 1.14.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** @modelcontextprotocol/sdk v1.21.0
 
@@ -551,8 +551,9 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.13.0
+- **Version:** 1.14.0
 - **Status:** Production Ready ✅
+- **New in v1.14.0:** Configurable default location (WEATHER_DEFAULT_LOCATION) with server-default disclosure, CI workflow for PRs, US timezone fallback band fix
 - **New in v1.13.0:** Max-range expansion — `get_air_quality` and `get_marine_conditions` gain `forecast_days` (1-7 and 1-16 respectively, day-grouped/null-trimmed full-range output), the historical hourly `limit` ceiling rises to 744 (the full 31-day hourly window; hourly-only semantics documented), `get_weather_imagery` `detail="full"` lists every animation frame, and RainViewer nowcast frames are appended defensively when the feed provides them. Output completeness — AQI forecast day headers add peak UV (hourly fetch trimmed to 3 variables); `detail="full"` on river/wildfire/lightning lifts display caps to 25 with disclosed remainders; wildfire surfaces the ArcGIS truncation caveat; river gauges show an observed rise/fall trend (NWPS stageflow, rate-limit tolerant) plus a multi-point forecast series at `full`; NWPS placeholder observed statuses are suppressed; river footer credits NWPS alone
 - **New in v1.12.0:** Global `get_current_conditions` — NOAA station observations in the US (unchanged), Open-Meteo model data elsewhere, auto-selected by the shared `isInUS` helper and overridable with a `source` parameter (`auto`/`noaa`/`openmeteo`). When NOAA rejects an auto-routed point (the US routing boxes overrun the border — Toronto, Vancouver), `get_current_conditions`, `get_forecast`, and `get_historical_weather` fall back to Open-Meteo with a note instead of erroring. `get_historical_weather` also routes recent dates (last 7 days) to NOAA only for US coordinates — international recent dates use the Open-Meteo archive directly. Fixes the `current` section of `get_weather_summary` outside the US. Fire weather indices remain US-only; `get_alerts`, rivers, and wildfire are still US-only (non-US summaries note this cleanly instead of surfacing a NOAA error).
 - **New in v1.11.1:** Geocoding fix — `city_name`/`search_location` lookups no longer fail at low result limits (RFC 3986 `%20` encoding + result floor); river forecast no longer prints NWPS `-999`/year-0001 placeholder sentinels; lightning monitoring is pre-warmed for saved locations at startup (`WEATHER_LIGHTNING_PREWARM`)
@@ -583,6 +584,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2026-07-17 (v1.13.0)
+**Last Updated:** 2026-08-12 (v1.14.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.
