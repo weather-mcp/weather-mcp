@@ -142,10 +142,14 @@ export function guessTimezoneFromCoords(latitude: number, longitude: number): st
   }
 
   // Fallback: coarse US longitude bands, then UTC for everything else.
+  // The Central zone is geographically wide (Great Lakes to roughly the
+  // Kansas/Colorado border), so its band is much wider than Eastern's —
+  // boundaries are tuned against known city coordinates (see
+  // timezone-fallback.test.ts), not an even four-way split of the continent.
   if (latitude >= 24 && latitude <= 50 && longitude >= -125 && longitude <= -66) {
-    if (longitude >= -75) return 'America/New_York';
-    if (longitude >= -87) return 'America/Chicago';
-    if (longitude >= -104) return 'America/Denver';
+    if (longitude >= -85) return 'America/New_York';
+    if (longitude >= -101) return 'America/Chicago';
+    if (longitude >= -115) return 'America/Denver';
     return 'America/Los_Angeles';
   }
 

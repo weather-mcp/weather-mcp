@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CI workflow** - GitHub Actions now builds and runs the unit test suite on every push to `main` and every pull request, so PRs (including Dependabot's) get real check runs. Integration tests stay out of CI — they hit live weather APIs and are too flaky for every push. Idea adapted from the `quinnmacro/weather-mcp` fork. (`.github/workflows/ci.yml`)
+
+### Fixed
+- **Coarse US timezone fallback mis-bucketed Eastern/Central cities** - The longitude bands `guessTimezoneFromCoords` falls back to when `tz-lookup` fails split the continent evenly, putting Atlanta and Pittsburgh in Central time and Kansas City through Dallas in Mountain time. Bands retuned (`-85/-101/-115`) against known city coordinates, with a dedicated fallback test suite (tz-lookup mocked to fail). No effect on normal operation, where `tz-lookup` resolves coordinates accurately. Adapted from the `dapcook/weather-mcp` fork. (`src/utils/timezone.ts`, `tests/unit/timezone-fallback.test.ts`)
+
 ## [1.13.0] - 2026-07-17
 
 ### Added
