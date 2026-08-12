@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Unit tests only: tests/integration/ hits live weather APIs, which is
+      # too flaky (and too impolite to the free upstreams) for every PR push.
+      # The doc-consistency check (scripts/check-doc-versions.sh) also stays
+      # out of CI for the same reason — it runs the full suite internally.
+      - name: Test
+        run: npx vitest run tests/unit
