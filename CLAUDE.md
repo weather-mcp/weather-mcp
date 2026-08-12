@@ -274,6 +274,12 @@ CACHE_MAX_SIZE=1000            # Max cache entries (100-10000, default: 1000)
 # API Configuration
 API_TIMEOUT_MS=30000           # API timeout in milliseconds (5000-120000, default: 30000)
 
+# Default Location
+WEATHER_DEFAULT_LOCATION=      # Optional fallback when a tool call has no location:
+                               # a saved alias, "lat,lon", or a free-text place name
+                               # (geocoded once, cached). Explicit locations always win;
+                               # responses disclose the fallback as "server default".
+
 # Lightning
 WEATHER_LIGHTNING_PREWARM=true # Subscribe saved locations at startup so lightning
                                # coverage accumulates before the first query (default: true).
@@ -560,7 +566,7 @@ npm audit             # No critical vulnerabilities
 - **New in v1.10.0:** Unit localization — imperial/metric (plus per-unit overrides and 12h/24h) via `WEATHER_UNITS` env or a per-call `units` parameter on forecast/current/historical tools
 - **New in v1.9.0:** `city_name` parameter for `get_forecast` — request a forecast by free-text place name (geocoded on demand, with caching)
 - **Security Rating:** A- (Excellent, 93/100)
-- **Test Coverage:** 1,332 tests, 100% pass rate
+- **Test Coverage:** 1,342 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
 
 ## Useful References

@@ -5,7 +5,7 @@
  * coordinates, a saved location name, or a free-text city name (geocoded).
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   resolveLocationAsync,
   clearCityGeocodeCache,
@@ -232,6 +232,137 @@ describe('resolveLocationAsync', () => {
       );
     });
   });
+
+  describe('default location fallback (WEATHER_DEFAULT_LOCATION)', () => {
+    const ENV_KEY = 'WEATHER_DEFAULT_LOCATION';
+    let savedEnv: string | undefined;
+
+    beforeEach(() => {
+      savedEnv = process.env[ENV_KEY];
+      delete process.env[ENV_KEY];
+    });
+
+    afterEach(() => {
+      if (savedEnv === undefined) {
+        delete process.env[ENV_KEY];
+      } else {
+        process.env[ENV_KEY] = savedEnv;
+      }
+    });
+
+    it('resolves a "lat,lon" coordinate pair default', async () => {
+      process.env[ENV_KEY] = '-43.5321, 172.6362';
+      const store = makeLocationStore();
+      const { service, geocode } = makeGeocodingService([]);
+
+      const resolved = await resolveLocationAsync({}, store, service);
+
+      expect(resolved).toEqual({
+        latitude: -43.5321,
+        longitude: 172.6362,
+        source: 'default',
+      });
+      expect(geocode).not.toHaveBeenCalled();
+    });
+
+    it('resolves a saved location alias default', async () => {
+      process.env[ENV_KEY] = 'home';
+      const store = makeLocationStore({ home: makeSavedLocation() });
+      const { service, geocode } = makeGeocodingService([]);
+
+      const resolved = await resolveLocationAsync({}, store, service);
+
+      expect(resolved).toEqual({
+        latitude: 47.6062,
+        longitude: -122.3321,
+        source: 'default',
+        location_name: 'home',
+      });
+      expect(geocode).not.toHaveBeenCalled();
+    });
+
+    it('resolves a saved location alternate-name default', async () => {
+      process.env[ENV_KEY] = 'my house';
+      const store = makeLocationStore({
+        home: makeSavedLocation({ alternateNames: ['my house'] } as Partial<SavedLocation>),
+      });
+      const { service, geocode } = makeGeocodingService([]);
+
+      const resolved = await resolveLocationAsync({}, store, service);
+
+      expect(resolved.source).toBe('default');
+      expect(resolved.location_name).toBe('home');
+      expect(geocode).not.toHaveBeenCalled();
+    });
+
+    it('geocodes a free-text place name default', async () => {
+      process.env[ENV_KEY] = 'Christchurch, New Zealand';
+      const store = makeLocationStore();
+      const { service, geocode } = makeGeocodingService([
+        makeGeocodingResult({
+          display_name: 'Christchurch, Canterbury, New Zealand',
+          latitude: -43.531,
+          longitude: 172.6365,
+        }),
+      ]);
+
+      const resolved = await resolveLocationAsync({}, store, service);
+
+      expect(resolved).toEqual({
+        latitude: -43.531,
+        longitude: 172.6365,
+        source: 'default',
+        location_name: 'Christchurch, Canterbury, New Zealand',
+      });
+      expect(geocode).toHaveBeenCalledWith('Christchurch, New Zealand', 1);
+    });
+
+    it('never applies the default when an explicit location is provided', async () => {
+      process.env[ENV_KEY] = 'Christchurch, New Zealand';
+      const store = makeLocationStore({ home: makeSavedLocation() });
+      const { service, geocode } = makeGeocodingService([makeGeocodingResult()]);
+
+      const byCoords = await resolveLocationAsync({ latitude: 10, longitude: 20 }, store, service);
+      const bySaved = await resolveLocationAsync({ location_name: 'home' }, store, service);
+      const byCity = await resolveLocationAsync({ city_name: 'Paris' }, store, service);
+
+      expect(byCoords.source).toBe('coordinates');
+      expect(bySaved.source).toBe('saved_location');
+      expect(byCity.source).toBe('geocoded');
+      expect(geocode).toHaveBeenCalledTimes(1); // only the explicit city_name lookup
+      expect(geocode).toHaveBeenCalledWith('Paris', 1);
+    });
+
+    it('throws a WEATHER_DEFAULT_LOCATION-specific error for out-of-range coordinates', async () => {
+      process.env[ENV_KEY] = '999, 0';
+      const store = makeLocationStore();
+      const { service } = makeGeocodingService([]);
+
+      await expect(resolveLocationAsync({}, store, service)).rejects.toThrow(
+        /WEATHER_DEFAULT_LOCATION/
+      );
+    });
+
+    it('throws a WEATHER_DEFAULT_LOCATION-specific error when nothing matches', async () => {
+      process.env[ENV_KEY] = 'Nonexistentville';
+      const store = makeLocationStore();
+      const { service } = makeGeocodingService([]);
+
+      await expect(resolveLocationAsync({}, store, service)).rejects.toThrow(
+        /WEATHER_DEFAULT_LOCATION/
+      );
+    });
+
+    it('ignores a blank default and keeps the standard no-input error', async () => {
+      process.env[ENV_KEY] = '   ';
+      const store = makeLocationStore();
+      const { service } = makeGeocodingService([]);
+
+      await expect(resolveLocationAsync({}, store, service)).rejects.toThrow(
+        /Provide one of/i
+      );
+    });
+  });
 });
 
 describe('formatLocationLine', () => {
@@ -263,6 +394,29 @@ describe('formatLocationLine', () => {
     };
     expect(formatLocationLine(resolved)).toContain('Paris, Île-de-France, France');
     expect(formatLocationLine(resolved)).toContain('48.8566, 2.3522');
+  });
+
+  it('discloses a named server default with a "server default" marker', () => {
+    const resolved: ResolvedLocation = {
+      latitude: -43.531,
+      longitude: 172.6365,
+      source: 'default',
+      location_name: 'Christchurch, Canterbury, New Zealand',
+    };
+    expect(formatLocationLine(resolved)).toBe(
+      '**Location:** Christchurch, Canterbury, New Zealand (-43.5310, 172.6365) — server default\n\n'
+    );
+  });
+
+  it('discloses a coordinate-only server default', () => {
+    const resolved: ResolvedLocation = {
+      latitude: -43.5321,
+      longitude: 172.6362,
+      source: 'default',
+    };
+    expect(formatLocationLine(resolved)).toBe(
+      '**Location:** -43.5321, 172.6362 — server default\n\n'
+    );
   });
 });
 

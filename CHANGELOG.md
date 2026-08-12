@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Configurable default location (`WEATHER_DEFAULT_LOCATION`)** - Optional server-wide fallback used when a location-based tool is called with no location at all, so clients whose users have a known home location can ask "what's the weather?" without passing coordinates every time. Accepts a saved location alias (including alternate names), a `"lat,lon"` coordinate pair, or a free-text place name (geocoded through the existing city-name cache, so it resolves at most once per process). An explicit `latitude`/`longitude`, `location_name`, or `city_name` in the call always takes precedence. Responses that used the fallback disclose it with a `**Location:** … — server default` header, and when a default is configured the tool schemas tell the model it may omit location parameters. Requested in [#46](https://github.com/weather-mcp/weather-mcp/issues/46). (`src/config/defaultLocation.ts`, `src/utils/locationResolver.ts`, `src/index.ts`)
+
 ## [1.13.0] - 2026-07-17
 
 ### Added
