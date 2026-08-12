@@ -73,7 +73,7 @@
     "dotenv": "^17.2.3",
     "luxon": "^3.7.2",
     "mqtt": "^5.14.1",
-    "ngeohash": "^0.6.3",
+    "ngeohash": "^0.6.4",
     "tz-lookup": "^6.1.25"
   },
   "devDependencies": {
