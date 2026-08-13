@@ -19,7 +19,7 @@ import {
   formatPressureFromPa,
   snowfallToPrecipUnit,
 } from '../utils/unitFormat.js';
-import { ApiConstants, FormatConstants } from '../config/displayThresholds.js';
+import { ApiConstants, FormatConstants, DisplayThresholds } from '../config/displayThresholds.js';
 import { isInUS } from '../utils/geography.js';
 import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
 import { logger } from '../utils/logger.js';
@@ -299,6 +299,22 @@ export async function handleGetHistoricalWeather(
       }
 
       output += `\n`;
+    }
+
+    // NOAA's response gives no indication when the reporting station stopped
+    // updating mid-window — the observations simply stop. Find the newest
+    // timestamp across ALL features (the API does not guarantee sort order)
+    // and flag a gap against the requested (already-now-capped) end time.
+    let newestTimestamp = new Date(observations.features[0].properties.timestamp);
+    for (const obs of observations.features) {
+      const obsTime = new Date(obs.properties.timestamp);
+      if (obsTime.getTime() > newestTimestamp.getTime()) {
+        newestTimestamp = obsTime;
+      }
+    }
+    const gapMinutes = (noaaEndTime.getTime() - newestTimestamp.getTime()) / (60 * 1000);
+    if (gapMinutes > DisplayThresholds.currentConditions.staleWarningMinutes) {
+      output += `*Observations end ${newestTimestamp.toLocaleString()}; the reporting station may have gone offline.*\n\n`;
     }
 
     return prependLocationLine({
