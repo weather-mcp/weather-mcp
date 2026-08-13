@@ -371,10 +371,10 @@ Spot-checks against the code, reconciled into the tasks below:
 
 - [x] T1 — Staleness thresholds + shared observation-age helper (`sonnet`) — `a7a9d56`
 - [x] T2 — Preserve saved-location metadata on updates (`sonnet`) — `e5d2c6b`
-- [ ] T3 — Observation age, stale warning, fresher-station retry (`opus`)
-- [ ] T4 — Early-end note on NOAA recent historical (`sonnet`)
-- [ ] T5 — Containment-aware wildfire assessment (`sonnet`)
-- [ ] T6 — Water-body disclosure on NOAA marine path (`haiku`)
+- [x] T3 — Observation age, stale warning, fresher-station retry (`opus`) — `0d1586f`
+- [x] T4 — Early-end note on NOAA recent historical (`sonnet`) — `36c5efa`
+- [x] T5 — Containment-aware wildfire assessment (`sonnet`) — `cc11237`
+- [x] T6 — Water-body disclosure on NOAA marine path (`haiku`) — `def8646`
 - [ ] T7 — Document UTC date bounds for historical weather (`haiku`)
 - [ ] T8 — Docs, changelog, spot-check, plan closure (`opus`)
 
