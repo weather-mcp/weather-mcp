@@ -1,6 +1,8 @@
 # Global River Conditions — Implementation Plan
 
-**Status:** READY (2026-08-12)
+**Status:** COMPLETE (2026-08-12) — all eight tasks committed on
+`feat/global-rivers`; gate green (build 0 errors, 1451 tests, 0 vulnerabilities).
+Opening the PR / merging is the human's call.
 
 Execution plan for `docs/global-rivers-plan.md` (the WHAT/WHY); rules live in
 `docs/orchestration-playbook.md`.
@@ -367,7 +369,7 @@ The load-bearing design decision — the orchestrator does this one itself.
 - [x] T5 — Ensemble forecast section and detail levels (`opus`) — `89dd619`
 - [x] T6 — Global river handler unit tests (`sonnet`) — `0f042e2`
 - [x] T7 — Flood integration test (mocked + live smoke) (`sonnet`) — `0e7f9a0`
-- [ ] T8 — Live sweep + documentation checklist (`opus`)
+- [x] T8 — Live sweep + documentation checklist (`opus`) — `ddfaa33`
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the design plan's D1–D6
