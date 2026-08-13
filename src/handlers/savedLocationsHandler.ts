@@ -104,6 +104,58 @@ export async function handleSaveLocation(
     // If empty array provided, activities stays undefined but activitiesProvided is true
   }
 
+  // Validate description if provided
+  let description: string | undefined;
+  let descriptionProvided = false;
+  if (saveArgs.description !== undefined) {
+    descriptionProvided = true;
+    if (typeof saveArgs.description !== 'string') {
+      throw new Error('description must be a string');
+    }
+    const trimmed = saveArgs.description.trim();
+    // If empty string provided, description stays undefined but descriptionProvided is true
+    description = trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  // Validate alternateNames if provided
+  let alternateNames: string[] | undefined;
+  let alternateNamesProvided = false;
+  if (saveArgs.alternateNames !== undefined) {
+    alternateNamesProvided = true;
+    if (!Array.isArray(saveArgs.alternateNames)) {
+      throw new Error('alternateNames must be an array of strings');
+    }
+
+    const validatedAlternateNames: string[] = [];
+    for (const altName of saveArgs.alternateNames) {
+      if (typeof altName !== 'string') {
+        throw new Error('Each alternate name must be a string');
+      }
+      const trimmed = altName.trim();
+      if (trimmed.length === 0) {
+        continue; // Skip empty strings
+      }
+      validatedAlternateNames.push(trimmed);
+    }
+
+    // If empty array provided (or all entries were empty), alternateNames stays
+    // undefined but alternateNamesProvided is true
+    alternateNames = validatedAlternateNames.length > 0 ? validatedAlternateNames : undefined;
+  }
+
+  // Validate notes if provided
+  let notes: string | undefined;
+  let notesProvided = false;
+  if (saveArgs.notes !== undefined) {
+    notesProvided = true;
+    if (typeof saveArgs.notes !== 'string') {
+      throw new Error('notes must be a string');
+    }
+    const trimmed = saveArgs.notes.trim();
+    // If empty string provided, notes stays undefined but notesProvided is true
+    notes = trimmed.length > 0 ? trimmed : undefined;
+  }
+
   // Check for partial update mode (updating existing location without re-specifying coordinates)
   const hasLocationDetails = saveArgs.location_query ||
     (typeof saveArgs.latitude === 'number' && typeof saveArgs.longitude === 'number');
@@ -177,6 +229,22 @@ export async function handleSaveLocation(
     );
   }
 
+  // Preserve description/alternateNames/notes when omitted on ANY update to an
+  // existing alias (partial update OR full re-save with new coordinates).
+  // Omitted (undefined) -> keep the stored value. Explicitly cleared ("" / [])
+  // was already normalized to undefined above by the *Provided validation blocks.
+  if (existingLocation) {
+    if (!descriptionProvided) {
+      description = existingLocation.description;
+    }
+    if (!alternateNamesProvided) {
+      alternateNames = existingLocation.alternateNames;
+    }
+    if (!notesProvided) {
+      notes = existingLocation.notes;
+    }
+  }
+
   // Check if this is an update or new location
   const isUpdate = locationStore.has(alias);
 
@@ -189,9 +257,9 @@ export async function handleSaveLocation(
     country_code,
     admin1,
     admin2,
-    description: saveArgs.description,
-    alternateNames: saveArgs.alternateNames,
-    notes: saveArgs.notes,
+    description,
+    alternateNames,
+    notes,
     activities
   });
 
@@ -220,16 +288,16 @@ export async function handleSaveLocation(
     output += `**Region:** ${escapeMarkdown(admin1)}\n`;
   }
 
-  if (saveArgs.description) {
-    output += `**Description:** ${escapeMarkdown(saveArgs.description)}\n`;
+  if (description) {
+    output += `**Description:** ${escapeMarkdown(description)}\n`;
   }
 
-  if (saveArgs.alternateNames && saveArgs.alternateNames.length > 0) {
-    output += `**Alternate Names:** ${saveArgs.alternateNames.map(escapeMarkdown).join(', ')}\n`;
+  if (alternateNames && alternateNames.length > 0) {
+    output += `**Alternate Names:** ${alternateNames.map(escapeMarkdown).join(', ')}\n`;
   }
 
-  if (saveArgs.notes) {
-    output += `**Notes:** ${escapeMarkdown(saveArgs.notes)}\n`;
+  if (notes) {
+    output += `**Notes:** ${escapeMarkdown(notes)}\n`;
   }
 
   if (activities && activities.length > 0) {
