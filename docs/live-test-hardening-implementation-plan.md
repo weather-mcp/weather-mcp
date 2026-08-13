@@ -369,8 +369,8 @@ Spot-checks against the code, reconciled into the tasks below:
 
 ## Progress Tracker
 
-- [ ] T1 — Staleness thresholds + shared observation-age helper (`sonnet`)
-- [ ] T2 — Preserve saved-location metadata on updates (`sonnet`)
+- [x] T1 — Staleness thresholds + shared observation-age helper (`sonnet`) — `a7a9d56`
+- [x] T2 — Preserve saved-location metadata on updates (`sonnet`) — `e5d2c6b`
 - [ ] T3 — Observation age, stale warning, fresher-station retry (`opus`)
 - [ ] T4 — Early-end note on NOAA recent historical (`sonnet`)
 - [ ] T5 — Containment-aware wildfire assessment (`sonnet`)
