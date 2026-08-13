@@ -94,7 +94,7 @@ Get current weather conditions for a location (global).
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `include_fire_weather` (optional): Include fire weather indices (default: false, US only)
 - `include_normals` (optional): Include climate normals for comparison (default: false). For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
-- `source` (optional): `"auto"` (default), `"noaa"`, or `"openmeteo"` — see Description
+- `source` (optional): `"auto"` (default), `"noaa"`, `"openmeteo"`, or `"metar"` — see Description
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 
 *Coordinates not required when `location_name` or `city_name` is provided.
@@ -105,6 +105,40 @@ observations, richer detail) or Open-Meteo for international locations. Open-Met
 values are **model-interpolated, not station observations**, and the output footer
 says so. Use `source` to force a provider — `"openmeteo"` works anywhere including
 the US (useful for comparison), while `"noaa"` outside the US will error.
+
+**`source="metar"` — real station observations worldwide.** A METAR is the
+routine observation an airport issues, usually near :53 past the hour, with
+off-cycle `SPECI` reports when conditions change sharply. It is a genuine
+instrument reading rather than a model estimate, and it is the only way this
+tool returns an observation outside the US. Sourced from NOAA's Aviation
+Weather Center (keyless), it works globally — including inside the US, where
+it is a useful second opinion carrying flight category and the raw METAR text.
+
+The tradeoff is deliberate and visible, which is why `"metar"` is never
+selected automatically: Open-Meteo estimates conditions *at your exact
+coordinates*, while a METAR measures them *at an airport* that may be tens of
+kilometers away. Neither strictly wins, so the choice stays yours. Every
+response names the station, its distance and 16-point bearing from the
+requested point, its elevation, and the observation time with its age.
+
+Caveats are surfaced, not buried:
+- **Far station** — the nearest reporting station is 100–250 km away.
+- **Stale observation** — nothing nearby has reported in the last 90 minutes
+  (accepted up to 6 hours; beyond that the station is not used).
+- **SPECI** — the report was issued off the hourly cycle.
+- **No station** — nothing within 250 km yields a friendly message, not an
+  error, and never a silent fallback to model data.
+
+Sparse reports are normal: wind gusts appear in ~14% of observations and
+present-weather in ~8%, so absent fields are omitted rather than rendered
+blank. A visibility of `"10+"` keeps its qualifier (`+10 mi`) because "at
+least 10" is a floor, not a measurement of exactly 10.
+
+Limits on this source: `include_normals` works as usual, but
+`include_fire_weather` renders a one-line note instead of indices — Haines
+and transport wind need NOAA gridpoint data a METAR does not carry. TAF
+(aerodrome forecasts) and a dedicated aviation tool are out of scope;
+`get_weather_summary` does not pass this source through.
 
 **Example:**
 ```
@@ -133,6 +167,23 @@ What's the weather right now in Tokyo?
 
 Visibility, snow depth, cloud layer detail, and fire weather indices are not
 available on the international path.
+
+**Returns (worldwide, via `source="metar"`):**
+- Station name, ICAO identifier, distance and bearing from the requested
+  point, and station elevation
+- Observation time in the station's local zone, with its age
+- Temperature with dew point and computed relative humidity
+- Wind direction (or "Variable") and speed, with gusts when reported
+- Visibility, preserving a `"10+"` qualifier
+- Sky condition layers with cloud bases
+- Present weather, decoded (e.g. `BCFG` → "Patches fog")
+- Pressure (altimeter setting, plus sea level when reported)
+- Flight category (VFR / MVFR / IFR / LIFR)
+- The raw METAR text, as the observation of record
+- Climate normals and US records (when `include_normals=true`)
+
+Any field the station did not report is omitted. Fire weather indices are not
+available on this source.
 
 ### 3. get_alerts
 Get active weather alerts, watches, warnings, and advisories for US locations.

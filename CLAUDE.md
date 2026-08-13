@@ -37,10 +37,12 @@ src/
 │   ├── locationStore.ts    # Saved locations storage service (v1.7.0)
 │   ├── nifc.ts             # NIFC wildfire API client
 │   ├── acis.ts             # RCC ACIS client — US daily temperature records (v1.16.0)
+│   ├── aviationWeather.ts  # aviationweather.gov METAR client — worldwide station obs (v1.17.0)
 │   └── usgs.ts             # USGS water services client
 ├── types/                   # TypeScript type definitions
 │   ├── noaa.ts
 │   ├── openmeteo.ts
+│   ├── aviationWeather.ts  # METAR observation shape (v1.17.0)
 │   ├── nominatim.ts        # Nominatim API types (v1.7.0)
 │   └── savedLocations.ts   # Saved locations types (v1.7.0)
 ├── utils/                   # Shared utilities
@@ -51,6 +53,7 @@ src/
 │   ├── locationResolver.ts # Location name/coordinate resolution (v1.7.0)
 │   ├── astronomy.ts        # Moon phase, rise/set, twilight — pure local math (v1.16.0)
 │   ├── records.ts          # US record high/low line orchestration (v1.16.0)
+│   ├── metarStation.ts     # METAR station picker + field parsers — pure, no I/O (v1.17.0)
 │   ├── airQuality.ts       # AQI calculations
 │   ├── marine.ts           # Wave/ocean utilities
 │   ├── fireWeather.ts      # Fire weather indices
@@ -77,7 +80,7 @@ All location-based tools accept coordinates, a saved `location_name`, or a
 free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
 
 1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); `detail` output control
-2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere; auto-select via `source`); fire weather indices are US-only
+2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere, or worldwide METAR airport observations via `source="metar"`; auto-select via `source`); fire weather indices are US-only
 3. **get_alerts** - Weather alerts/warnings (NOAA, US only); `detail` output control
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo, global)
 5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning) (NEW in v1.11.0)
@@ -554,8 +557,9 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.14.0 (unreleased: `feat/global-rivers` content targets v1.15.0; `feat/almanac` targets v1.16.0)
+- **Version:** 1.14.0 (unreleased: `feat/global-rivers` content targets v1.15.0; almanac content, now merged to `main`, targets v1.16.0; `feat/metar` targets v1.17.0)
 - **Status:** Production Ready ✅
+- **New in v1.17.0 (unreleased):** Worldwide station observations — `source: 'metar'` on `get_current_conditions` returns real airport instrument readings anywhere on earth, from NOAA's keyless Aviation Weather Center METAR feed (`src/services/aviationWeather.ts`). This closes the server's largest data-quality gap: outside the US the tool previously returned only model-interpolated values. **`auto` is byte-for-byte unchanged** (verified by diffing built-dist output against `main` for a US and a non-US point) — a METAR measures conditions *at an airport* while Open-Meteo estimates them *at the caller's coordinates*, so the two answer different questions and the choice stays explicit, mirroring the global-rivers no-cross-fallback precedent. Station selection is an isolated pure module (`src/utils/metarStation.ts`): freshness gates first (≤90 min preferred, ≤6 h accepted with a `stale` flag), then nearest wins, with banding at 100 km (`far` caveat) and 250 km (no usable station). The handler drives the ±0.5°/±2.0°/±5.0° bbox tier ladder the module exports, keeping the picker I/O-free. Output always states station, distance, 16-point bearing, elevation, and observation age, since those are what make the reading interpretable; absent fields are omitted (gusts appear in 14% of reports, present-weather in 8%) and `visib: "10+"` keeps its qualifier. Units convert from METAR-native knots/hPa/statute miles. `include_normals` is supported; `include_fire_weather` renders an unavailable note (Haines needs NOAA gridpoint inputs). TAF, a dedicated aviation tool, and `get_weather_summary` pass-through are out of scope. Attribution: "NOAA Aviation Weather Center (aviationweather.gov) — METAR station observation".
 - **New in v1.16.0 (unreleased):** Almanac — `include_astronomy` on `get_forecast` adds per-day moon phase/illumination/moonrise/moonset and civil/nautical/astronomical twilight, plus one next-full/new-moon line per response; computed locally by `src/utils/astronomy.ts` on top of `astronomy-engine` (the project's **first computational runtime dependency** — MIT, zero transitive deps, ±1 arcminute; it is not a data source, so the zero-cost/zero-key data model is preserved). Works on both provider paths (NOAA: one block per calendar date, "Tonight"-first safe; Open-Meteo: after the Sunset line); polar cases render "none (polar day)"/"none (polar night)"; daily-only like `include_normals`. US records — for US locations, `include_normals` on `get_forecast` (day 1) and `get_current_conditions` also appends `**Records for <date>:** High/Low (year) — records since <year>` from the keyless RCC ACIS API (`src/services/acis.ts`: bbox station search widened once on empty, longest period-of-record preferring threaded `…thr` ids; one POST fetches the full 366-slot leap-calendar table; cached 7d/30d). Records are garnish — any ACIS failure warns and omits the line, independent of the normals fetch (either can render without the other); non-US makes no ACIS request. Attribution: "Records: NOAA Regional Climate Centers (ACIS)".
 - **New in v1.15.0 (unreleased):** Global `get_river_conditions` — NOAA NWPS gauges in the US (unchanged), Open-Meteo Flood API (GloFAS v4) modeled discharge elsewhere, auto-selected by `isInUS` and overridable with `source` (`auto`/`noaa`/`openmeteo`); no cross-fallback, since gauge observations and model discharge are different claims. Because GloFAS discharge is per ~0.05° cell and an off-channel cell reports runoff rather than the river (Memphis: 0.63 vs 11,640 m³/s one cell apart), each request probes a 3×3 neighborhood in one multi-coordinate call and snaps to the highest past-31-day mean, disclosing the move when the winner is not the requested point (`src/utils/riverDischarge.ts`). Model output is framed against its own history and ensemble rather than flood categories (GloFAS publishes none): trend, 31-day-mean ratio, and a median/p25–p75 forecast, with `forecast_days` (1-210, default 7) and `detail="full"` for the min/max envelope and full range. `radius` stays NOAA-only. Alerts and wildfire remain US-only.
 - **New in v1.14.0:** Configurable default location (WEATHER_DEFAULT_LOCATION) with server-default disclosure, CI workflow for PRs, US timezone fallback band fix
@@ -566,7 +570,7 @@ npm audit             # No critical vulnerabilities
 - **New in v1.10.0:** Unit localization — imperial/metric (plus per-unit overrides and 12h/24h) via `WEATHER_UNITS` env or a per-call `units` parameter on forecast/current/historical tools
 - **New in v1.9.0:** `city_name` parameter for `get_forecast` — request a forecast by free-text place name (geocoded on demand, with caching)
 - **Security Rating:** A- (Excellent, 93/100)
-- **Test Coverage:** 1,348 tests, 100% pass rate
+- **Test Coverage:** 1,628 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
 
 ## Useful References
