@@ -978,6 +978,16 @@ export class OpenMeteoService {
       'uv_index',
       'uv_index_clear_sky',
       'ammonia',
+      // Pollen (CAMS European model): real values in Europe, all-null elsewhere
+      // (HTTP 200 either way — verified live 2026-08-13). Current block only;
+      // the hourly fetch stays trimmed to the three variables the forecast
+      // formatter reads (v1.13).
+      'alder_pollen',
+      'birch_pollen',
+      'grass_pollen',
+      'mugwort_pollen',
+      'olive_pollen',
+      'ragweed_pollen',
       'european_aqi',
       'european_aqi_pm2_5',
       'european_aqi_pm10',
