@@ -1,14 +1,16 @@
 # Composited Weather Imagery (MCP image content) — Design Plan
 
-**Status:** DRAFT (2026-08-13) — design only; not yet scheduled.
+**Status:** SETTLED (2026-08-13) — all design decisions resolved and
+upstream-verified; see "Settled decisions & verification results" below.
+Execution plan: `docs/composited-imagery-implementation-plan.md`.
 **Parent:** user request (2026-08-13, examples/imagery discussion); planning
 index row "Composited imagery via MCP image content blocks".
 **Target release:** TBD
 **Branch (for /impl-plan):** `feat/composited-imagery`
-**Upstream verification:** partially verified 2026-08-13 (see below) —
-RainViewer overlay tiles, OSM tile stitching, and pure-JS PNG compositing are
-proven working in `scripts/capture-examples.mjs`; the open items are the MCP
-image-content client survey and the base-layer licensing decision.
+**Upstream verification:** fully verified 2026-08-13 —
+RainViewer overlay tiles, tile stitching, and pure-JS PNG compositing proven
+in `scripts/capture-examples.mjs`; GIBS base layers, licensing, payload sizes,
+and the MCP image-content client survey verified live (see below).
 
 ## What / Why
 
@@ -47,7 +49,7 @@ The compositing pipeline is already demonstrated working offline, pure-JS:
   blending is ~10 lines; output re-encodes to PNG. A 512px composite lands
   around 280 KB (≈370 KB base64).
 
-## Design decisions to settle (D1–D7)
+## Design decisions to settle (D1–D7) — RESOLVED, see "Settled decisions" below
 
 - **D1 — Opt-in surface.** A new parameter (`render: "composite"`? reuse
   `detail: "full"`?) vs. always-on. Leaning: explicit opt-in parameter;
@@ -83,7 +85,7 @@ The compositing pipeline is already demonstrated working offline, pure-JS:
   image-content return for consistency; decide in review. Lightning/wildfire
   overlay maps are explicitly out (different feature).
 
-## Open verification items (before /impl-plan)
+## Open verification items (before /impl-plan) — ALL VERIFIED 2026-08-13, see below
 
 1. Survey MCP image-content support in target clients (Claude Code, Claude
    Desktop, Cursor, others from `docs/CLIENT_SETUP.md`) — confirm image blocks
@@ -91,6 +93,66 @@ The compositing pipeline is already demonstrated working offline, pure-JS:
 2. Settle D2 with a live terms/availability check of the chosen base provider.
 3. Measure real payload sizes across a few weather situations; confirm client
    token/size ceilings.
+
+## Settled decisions & verification results (2026-08-13)
+
+All D1–D7 decisions and the three open verification items were resolved in a
+live verification session (maintainer sign-off on the two judgment calls):
+
+- **D1 — Opt-in surface → settled:** new boolean parameter `composite`
+  (default `false`) on `get_weather_imagery`, valid for `radar`/`precipitation`
+  only. Schema description states the assistant can always *see* the image and
+  describe it; inline display depends on the client.
+- **D2 — Base layer → settled: NASA GIBS.** Verified live:
+  - **OSM ruled out** — the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/)
+    prohibits distributed apps / bulk-proxied use.
+  - **Carto ruled out** — tiles serve openly, but the
+    [basemap-styles license](https://github.com/CartoDB/basemap-styles/blob/master/LICENSE.md)
+    restricts the CDN to CARTO enterprise customers and non-profit grants.
+  - **GIBS confirmed** — keyless, no formal rate limits, imagery freely usable
+    with the GIBS acknowledgment line; EPSG:3857 WMTS REST tiles
+    (`gibs.earthdata.nasa.gov/wmts/epsg3857/best/…`). Fits the zero-key model,
+    and the repo already ships a GIBS client (`src/services/gibs.ts`).
+  - **Base composition (maintainer-approved):** `OSM_Land_Water_Map`
+    (PNG, `GoogleMapsCompatible_Level9`) as the opaque base, plus
+    `Reference_Features_15m` (PNG, `GoogleMapsCompatible_Level13`)
+    coastline/border outlines blended over it. `Reference_Labels_15m` is dead
+    upstream (404s at every probed tile) — no labels layer.
+  - **Location marker (maintainer-approved scope addition):** a small
+    high-contrast crosshair drawn at the requested coordinates in the
+    composite utility (pure pixel work).
+- **D3 — Payload budget → settled:** latest frame only; animation stays
+  URL-based. Live-measured composites at radar zoom 6 (base + features +
+  radar): **24–91 KB PNG / 32–121 KB base64** across Seattle, Miami, London,
+  Kansas City (echo-free), and Tokyo — ~5–10× below the plan's 370 KB estimate
+  (the GIBS land/water layer compresses far better than street tiles), and far
+  under the ~3.75 MB base64 API image ceiling. A defensive size cap with
+  URL-only fallback still applies.
+- **D4 — Content shape → settled:** `[text, image]` mixed content array.
+  Attribution (radar © RainViewer; NASA GIBS acknowledgment) lives in the text
+  block only — drawing text into the image margin would require a font
+  rasterizer dependency, rejected as against the lightweight posture.
+- **D5 — Dependency posture → settled:** promote `pngjs` (already a
+  devDependency for the capture script) to a runtime dependency. Both GIBS
+  layers serve PNG, so **no JPEG decoder is needed**.
+- **D6 — Caching → settled:** base/feature tiles 24 h TTL (near-static);
+  composite output keyed on (frame path, z/x/y, marker pixel), short TTL
+  (frames are immutable per timestamp; a 10-minute TTL matches the radar
+  cadence).
+- **D7 — Scope → settled:** radar/precipitation only. Satellite image-content
+  return deferred as a follow-up idea.
+- **Client survey (verification item 1):** MCP image content blocks are
+  protocol-standard; `[text, image]` degrades gracefully in text-only clients.
+  The model always receives the image (it can describe the actual weather
+  pattern). User-facing inline rendering varies: Claude Code renders it;
+  Claude Desktop currently collapses tool results behind an expander
+  ([claude-code#53256](https://github.com/anthropics/claude-code/issues/53256));
+  claude.ai web does not inline it in the final response. The schema
+  description must not promise inline display.
+- **Legibility check:** sample composites (Miami storm) visually verified —
+  storm cells, Florida coastline, Keys, and Cuba's outline all clearly
+  readable; the features layer materially improves geographic context for
+  ~30 KB.
 
 ## Rough shape (post-decisions)
 
