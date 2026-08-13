@@ -56,7 +56,12 @@ import {
   getFireWeatherContext
 } from '../utils/fireWeather.js';
 import { extractSnowDepth, formatSnowData, hasWinterWeather } from '../utils/snow.js';
-import { formatInTimezone, guessTimezoneFromCoords, getTimezoneAbbreviation } from '../utils/timezone.js';
+import {
+  formatInTimezone,
+  guessTimezoneFromCoords,
+  getTimezoneAbbreviation,
+  formatObservationAge
+} from '../utils/timezone.js';
 import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
 import { getRecordsLine } from '../utils/records.js';
 
@@ -900,11 +905,7 @@ async function formatMetarCurrentConditions(
   output += `**Station:** ${obs.name} (${obs.icaoId}) — ${distance} ${pick.bearing} `;
   output += `of the requested point, elev ${formatElevationFromM(obs.elev, prefs)}\n`;
 
-  const age = pick.ageMinutes === 0
-    ? 'just now'
-    : pick.ageMinutes < 60
-      ? `${pick.ageMinutes} minute${pick.ageMinutes === 1 ? '' : 's'} ago`
-      : `${Math.round(pick.ageMinutes / 60 * 10) / 10} hours ago`;
+  const age = formatObservationAge(pick.ageMinutes);
   // The zone abbreviation is spelled out here, unlike the other two paths,
   // because this clock is the *station's* rather than the requested point's —
   // an unlabeled time would be ambiguous exactly where the station is distant.
