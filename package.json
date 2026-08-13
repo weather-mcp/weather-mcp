@@ -69,6 +69,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "astronomy-engine": "^2.1.19",
     "axios": "^1.19.0",
     "dotenv": "^17.2.3",
     "luxon": "^3.7.2",
