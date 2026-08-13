@@ -352,8 +352,8 @@ Spot-checks against the code and live endpoints, reconciled into the tasks:
       94.7 KB / 126 KB base64, visually verified — storm cells, Florida
       coastline, Keys, Cuba outline, marker. `imagery-handler.test.ts` and
       `gibs.test.ts` passed unedited, so A7 holds.)
-- [ ] T5 — Handler unit tests for the composite branch (`sonnet`)
-- [ ] T6 — Integration tests: mocked end-to-end + tolerant live smoke (`sonnet`)
+- [x] T5 — Handler unit tests for the composite branch (`sonnet`) — `aab3034`
+- [x] T6 — Integration tests: mocked end-to-end + tolerant live smoke (`sonnet`) — `b4a57bf`
 - [ ] T7 — Live sweep + documentation checklist (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
