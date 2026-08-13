@@ -376,7 +376,7 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T5 — Containment-aware wildfire assessment (`sonnet`) — `cc11237`
 - [x] T6 — Water-body disclosure on NOAA marine path (`haiku`) — `def8646`
 - [x] T7 — Document UTC date bounds for historical weather (`haiku`) — `2ccbbef`
-- [x] T8 — Docs, changelog, spot-check, plan closure (`opus`) — SHA in the tracker-tick commit
+- [x] T8 — Docs, changelog, spot-check, plan closure (`opus`) — `ffa52e8`
 
 ### T8 live spot-check (2026-08-13, built dist via MCP stdio client)
 
