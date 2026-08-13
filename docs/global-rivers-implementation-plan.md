@@ -364,7 +364,7 @@ The load-bearing design decision — the orchestrator does this one itself.
 - [x] T2 — Discharge unit conversion (`haiku`) — `0cfdd38`
 - [x] T3 — riverDischarge pure logic + unit tests (`opus`) — `318a466`
 - [x] T4 — Route by isInUS, source/forecast_days, global output core (`opus`) — `cb6dd6e`
-- [ ] T5 — Ensemble forecast section and detail levels (`opus`)
+- [x] T5 — Ensemble forecast section and detail levels (`opus`) — `89dd619`
 - [ ] T6 — Global river handler unit tests (`sonnet`)
 - [ ] T7 — Flood integration test (mocked + live smoke) (`sonnet`)
 - [ ] T8 — Live sweep + documentation checklist (`opus`)
