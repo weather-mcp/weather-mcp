@@ -113,6 +113,7 @@ function buildNoaaFake() {
   return {
     getCurrentConditions: vi.fn().mockRejectedValue(new Error('NOAA not expected on the METAR path')),
     getStations: vi.fn().mockRejectedValue(new Error('NOAA not expected on the METAR path')),
+    getLatestObservation: vi.fn().mockRejectedValue(new Error('NOAA not expected on the METAR path')),
     getGridpointDataByCoordinates: vi.fn().mockRejectedValue(new Error('NOAA not expected on the METAR path')),
   };
 }
@@ -272,8 +273,23 @@ describe('handleGetCurrentConditions — source: "metar" routing', () => {
 describe('handleGetCurrentConditions — D1 no-change guarantee (auto never routes to METAR)', () => {
   it('makes zero aviation calls for a US point on auto', async () => {
     const fakes = buildFakes();
+    // The NOAA path drives getStations + getLatestObservation directly
+    // (F2/D2c retry loop) — the fake mirrors that call graph. The
+    // getCurrentConditions wrapper is public API but no longer handler-called.
     fakes.noaa = {
-      getCurrentConditions: vi.fn().mockResolvedValue({
+      getCurrentConditions: vi.fn().mockRejectedValue(new Error('wrapper no longer called')),
+      getStations: vi.fn().mockResolvedValue({
+        features: [
+          {
+            properties: {
+              stationIdentifier: 'KDCA',
+              name: 'Test Station',
+              timeZone: 'America/New_York',
+            },
+          },
+        ],
+      }),
+      getLatestObservation: vi.fn().mockResolvedValue({
         properties: {
           station: 'https://api.weather.gov/stations/KDCA',
           timestamp: '2024-01-01T12:00:00+00:00',
@@ -283,7 +299,6 @@ describe('handleGetCurrentConditions — D1 no-change guarantee (auto never rout
           relativeHumidity: { unitCode: 'wmoUnit:percent', value: 50 },
         },
       }),
-      getStations: vi.fn().mockResolvedValue({ features: [] }),
       getGridpointDataByCoordinates: vi.fn().mockRejectedValue(new Error('not requested')),
     };
     const aviation = buildAviationFake([buildMetarObservation()]);
@@ -291,7 +306,7 @@ describe('handleGetCurrentConditions — D1 no-change guarantee (auto never rout
     await callCurrentConditions({ ...SEATTLE }, fakes, undefined, aviation);
 
     expect(aviation.getMetarsInBoundingBox).not.toHaveBeenCalled();
-    expect(fakes.noaa.getCurrentConditions).toHaveBeenCalledTimes(1);
+    expect(fakes.noaa.getLatestObservation).toHaveBeenCalledTimes(1);
   });
 
   it('makes zero aviation calls for a non-US point on auto', async () => {

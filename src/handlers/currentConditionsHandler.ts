@@ -64,6 +64,7 @@ import {
 } from '../utils/timezone.js';
 import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
 import { getRecordsLine } from '../utils/records.js';
+import type { ObservationResponse, StationResponse } from '../types/noaa.js';
 
 interface CurrentConditionsArgs extends UnitArgs {
   latitude?: number;
@@ -234,29 +235,105 @@ async function formatNOAACurrentConditions(
   prefs: UnitPreferences,
   acisService?: AcisService
 ): Promise<string> {
-  // Get current observation
-  const observation = await noaaService.getCurrentConditions(latitude, longitude);
-  const props = observation.properties;
+  // One station-list fetch drives the freshness loop, the substitution note,
+  // and the timezone — replacing the old getCurrentConditions wrapper call
+  // plus a separate stations re-fetch for the clock (F2/D2).
+  const stations = await noaaService.getStations(latitude, longitude);
+  if (!stations.features || stations.features.length === 0) {
+    throw new Error('No weather stations found near the specified location.');
+  }
 
-  // Get timezone for proper time formatting
-  let timezone = guessTimezoneFromCoords(latitude, longitude); // fallback
-  try {
-    // Try to get timezone from station (preferred)
-    const stations = await noaaService.getStations(latitude, longitude);
-    if (stations.features && stations.features.length > 0) {
-      const stationTimezone = stations.features[0].properties.timeZone;
-      if (stationTimezone) {
-        timezone = stationTimezone;
-      }
+  const { staleWarningMinutes, staleAcceptanceMinutes, maxStationAttempts } =
+    DisplayThresholds.currentConditions;
+  const now = Date.now();
+
+  interface ObservationCandidate {
+    observation: ObservationResponse;
+    station: StationResponse;
+    ageMinutes: number;
+  }
+
+  // Walk the gridpoint's stations (nearest first). A fetch error skips to the
+  // next station without consuming a retry attempt — the pre-existing error
+  // tolerance covered the whole list, and capping it would let this path error
+  // where it used to succeed. Only successfully fetched observations count
+  // toward maxStationAttempts; the first success (the nearest that answered)
+  // is kept as the fallback when nothing fresh turns up.
+  let chosen: ObservationCandidate | null = null;
+  let fallback: ObservationCandidate | null = null;
+  let fetched = 0;
+  for (const station of stations.features) {
+    if (fetched >= maxStationAttempts) {
+      break;
     }
-  } catch (error) {
-    // Use fallback timezone
+    let obs: ObservationResponse;
+    try {
+      obs = await noaaService.getLatestObservation(station.properties.stationIdentifier);
+    } catch (error) {
+      continue; // Today's behavior: a dead station is silently skipped.
+    }
+    fetched++;
+    // Future-dated observations (clock skew) are treated as current.
+    const ageMinutes = Math.max(0, Math.round((now - Date.parse(obs.properties.timestamp)) / 60000));
+    const candidate: ObservationCandidate = { observation: obs, station, ageMinutes };
+    if (fallback === null) {
+      fallback = candidate;
+    }
+    if (ageMinutes <= staleAcceptanceMinutes) {
+      chosen = candidate;
+      break;
+    }
+    logger.warn('Stale NOAA observation; trying next station', {
+      station: station.properties.stationIdentifier,
+      ageMinutes
+    });
+  }
+
+  const picked = chosen ?? fallback;
+  if (!picked) {
+    // Every station fetch failed — exactly today's terminal error.
+    throw new Error('Unable to retrieve current conditions from nearby stations.');
+  }
+
+  const props = picked.observation.properties;
+
+  // Timezone from the chosen station (preferred), else a coordinate guess.
+  const timezone = picked.station.properties.timeZone || guessTimezoneFromCoords(latitude, longitude);
+
+  // D2c: a fresh observation from a non-nearest station means the nearest one
+  // answered with stale data (it became the fallback candidate) — disclose the
+  // substitution. When the literal nearest station's fetch errored instead,
+  // there is no timestamp to show, so degrade to "recently". A pure error-skip
+  // with no staleness involved stays silent, as today.
+  let substitutionNote = '';
+  if (chosen && fallback && chosen !== fallback) {
+    const nearest = stations.features[0];
+    const nearestId = nearest.properties.stationIdentifier;
+    const chosenName = `${picked.station.properties.name} (${picked.station.properties.stationIdentifier})`;
+    if (fallback.station === nearest) {
+      const lastReport = formatInTimezone(
+        fallback.observation.properties.timestamp, timezone, 'medium', prefs.timeFormat
+      );
+      substitutionNote = `*Nearest station (${nearestId}) has not reported since ${lastReport}; showing ${chosenName} instead.*`;
+    } else {
+      substitutionNote = `*Nearest station (${nearestId}) has not reported recently; showing ${chosenName} instead.*`;
+    }
   }
 
   // Format current conditions
   let output = `# Current Weather Conditions\n\n`;
   output += `**Station:** ${props.station}\n`;
-  output += `**Time:** ${formatInTimezone(props.timestamp, timezone, 'medium', prefs.timeFormat)}\n\n`;
+  // D2a: always show the observation's age beside its timestamp.
+  output += `**Time:** ${formatInTimezone(props.timestamp, timezone, 'medium', prefs.timeFormat)} (${formatObservationAge(picked.ageMinutes)})\n`;
+  if (substitutionNote) {
+    output += `\n${substitutionNote}\n`;
+  }
+  // D2b: warn when even the best available observation is stale.
+  if (picked.ageMinutes > staleWarningMinutes) {
+    const duration = formatObservationAge(picked.ageMinutes).replace(/ ago$/, '');
+    output += `\n⚠️ **This observation is ${duration} old** — the station may have stopped reporting. Conditions may have changed substantially.\n`;
+  }
+  output += `\n`;
 
   // Main conditions
   if (props.textDescription) {
