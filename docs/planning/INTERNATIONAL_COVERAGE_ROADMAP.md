@@ -113,3 +113,61 @@ All options preserve the zero-cost model; only FIRMS breaks the zero-key model (
 | 5 | Polish: met.no fallback, global normals/FWI, UK gauges | Yes (keyless) | Small each |
 
 Each phase is independently shippable as a minor release, following the existing pattern: types → validation → service → handler → registration in `src/index.ts` → tests → docs.
+
+## Live verification notes (2026-08-12)
+
+All APIs above were verified with real requests (summary table in the
+[planning index](./README.md)). Corrections to what this document previously
+claimed:
+
+- **Phase 2 (Open-Meteo Flood):** works as described, **but** discharge is per
+  ~5 km GloFAS grid cell and a cell that misses the river channel returns
+  runoff noise, not the river (Memphis 35.125,-90.075 → 0.63 m³/s; one cell
+  west → 11,640 m³/s). Any implementation must probe neighboring cells and
+  snap to the max-discharge cell. Ocean/no-river points return HTTP 200 with
+  all-null `river_discharge` arrays — detect and message, don't error-handle.
+  Live API accepted `forecast_days` up to 366 (docs say 210; treat 210 as the
+  contract).
+- **Phase 3 (MeteoAlarm):** the keyless endpoint is
+  `https://feeds.meteoalarm.org/api/v1/warnings/feeds-<country>` (JSON, full
+  CAP fields, one fetch per country — no pan-Europe aggregate).
+  `api.meteoalarm.org` (EDR + metadata/geocode APIs) returns 401 without a
+  MeteoGate registration token. Keyless feeds carry geocodes (NUTS3/EMMA)
+  but **no polygons** — sub-country lat/lon matching needs bundled geometry
+  data or country-level granularity. `info[]` is duplicated per language
+  (filter by `language`); `AllClear`/cancellation messages appear in-feed.
+  Terms: display unmodified, attribute "EUMETNET – MeteoAlarm" (or the
+  national service for single-country), include time of issue.
+- **Phase 3 (MSC GeoMet):** the collection is **`weather-alerts`**, not
+  `alerts`. Native `bbox=` filtering works; features carry real polygons and
+  bilingual `_en`/`_fr` fields but are **not CAP-shaped** (no
+  severity/urgency/certainty — closest: `alert_type`, `risk_colour_en`,
+  `confidence_en`). ECCC licence: attribution required, alert content must
+  not be altered.
+- **Phase 3 (rest of world):** WMO SWIC's `wmo_all.json` + per-alert CAP XML
+  are fetchable but self-labeled "Demo", undocumented, geometry-free, with
+  no redistribution grant — **not production-usable**. Ship US+Canada+Europe
+  with a clean "not yet covered" message elsewhere.
+- **Phase 4 (NASA FIRMS):** area API verified live with a real MAP_KEY. The
+  **country API is down** (docs say "currently not available") — build on
+  area/bbox only. Day range max is **5**, not 10. Key errors are inconsistent
+  (400/401, text body `Invalid MAP_KEY.`). Area-API CSV adds an `instrument`
+  column and abbreviates `confidence` to `l/n/h` (flat files spell them out) —
+  normalize both forms. **Keyless fallback exists:** flat 24h/48h/7d CSVs
+  under `/data/active_fire/` (global ~12 MB, regional cuts much smaller,
+  Range-request capable) — the optional key buys targeted bbox queries, not
+  access itself.
+- **Phase 5 (met.no):** confirmed global (not Nordic-only), ~9.5-day horizon,
+  hourly → 6-hourly after ~3 days. ToS obligations are real: identifying
+  User-Agent, `If-Modified-Since` conditional requests, coordinates truncated
+  to 4 decimals, 20 req/s ceiling, CC-BY 4.0.
+- **Phase 5 (global normals):** a single 30-year daily archive pull returns in
+  ~1.2 s (~300–500 KB) **but counts as hundreds of weighted API calls** under
+  Open-Meteo's pricing rules — two consecutive pulls hit the 600/min limit
+  live. Cache computed normals permanently (TTL Infinity) and serialize
+  first-time pulls with 429 backoff.
+- **Phase 5 (global FWI):** all Fosberg inputs (temp, RH, wind, gusts) are in
+  Open-Meteo hourly globally, zero nulls observed, plus `soil_moisture_0_to_1cm`
+  and `vapour_pressure_deficit` as dryness context. No direct fire-weather
+  variable exists on any Open-Meteo endpoint. Open-Meteo winds are **km/h**;
+  the Fosberg formula expects mph — convert.

@@ -35,10 +35,15 @@ pros/cons for each idea. Sections for ideas that have since shipped are marked
 - "When does the moon rise tonight?"
 - Tidal prediction context (with marine conditions)
 
-**Data Sources:**
-- Open-Meteo: No direct moon phase API
-- USNO (US Naval Observatory): Free API, no auth required
-- Calculation-based: Astronomical algorithms (can compute locally)
+**Data Sources:** *(re-verified live 2026-08-12)*
+- Open-Meteo: **now provides** `moonrise`, `moonset`, `moon_phase` daily variables
+  (phase is a 0–1 cycle fraction, not illumination — derive illumination as
+  `(1 − cos(2π·phase))/2`); rise/set matched USNO within 1 minute
+- USNO (US Naval Observatory): works keyless (`aa.usno.navy.mil/api/rstt/oneday`),
+  adds named phase + next-phase date, but has a history of extended outages
+- Calculation-based: `astronomy-engine` npm (MIT, zero-dep, typed, ±1 min,
+  includes next-quarter search) — preferred; `suncalc` is more popular but less
+  accurate and its registry license metadata is missing
 
 **Implementation Options:**
 - **Option A:** Enhance `get_forecast` with optional `include_astronomy` parameter

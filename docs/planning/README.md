@@ -31,7 +31,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 
 | Idea | Status | Detail |
 |------|--------|--------|
-| Global river/flood via Open-Meteo Flood API | 💡 | ICR Phase 2; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #1 |
+| Global river/flood via Open-Meteo Flood API | 📝 | [`docs/global-rivers-plan.md`](../global-rivers-plan.md) (target v1.15.0); ICR Phase 2; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #1 |
 | International alerts (MeteoAlarm, MSC GeoMet, WMO CAP) | 💡 | ICR Phase 3 |
 | Global wildfire via NASA FIRMS (optional MAP_KEY) | 💡 | ICR Phase 4; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #2 |
 | met.no Locationforecast as fallback/second-opinion source | 💡 | ICR Phase 5 |
@@ -57,9 +57,9 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Idea | Status | Detail |
 |------|--------|--------|
 | Satellite imagery in `get_weather_imagery` | 💡 | FE §12.1 (deferred from v1.5.0) |
-| Moon phase / astronomy (`include_astronomy` on forecast) | 💡 | FE §1.1 |
-| Extended twilight times (civil/nautical/astronomical) | 💡 | FE §1.2 |
-| Record highs/lows for date (with normals) | 💡 | FE §2.2 |
+| Moon phase / astronomy (`include_astronomy` on forecast) | 📝 | [`docs/almanac-plan.md`](../almanac-plan.md) (target v1.16.0); FE §1.1 |
+| Extended twilight times (civil/nautical/astronomical) | 📝 | [`docs/almanac-plan.md`](../almanac-plan.md); FE §1.2 |
+| Record highs/lows for date (with normals) | 📝 | [`docs/almanac-plan.md`](../almanac-plan.md); FE §2.2 |
 | Better precipitation-type parsing (rain/snow/freezing rain) | 💡 | FE §3.2 |
 | Aviation weather tool (METAR/TAF) | 💡 | FE §4 |
 | Drought indices (US Drought Monitor) | 💡 | FE §5.2 |
@@ -71,6 +71,26 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Solar radiation / solar power forecasts | 💡 | FE §18.1 |
 | Heating/cooling degree days | 💡 | FE §18.2 |
 | Pollen & allergen forecasts | ⛔ | FE §6.1 — blocked: no free, reliable API found |
+
+---
+
+## Upstream API viability check (verified live 2026-08-12)
+
+All candidate bundles' upstream APIs were verified with real requests (response
+shapes, limits, licensing, error behavior). Corrections discovered in this pass
+have been applied to
+[INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMAP.md)
+(§Live verification notes). Re-verify before writing a design doc if
+significant time has passed.
+
+| Bundle | Verdict | Load-bearing findings |
+|--------|---------|----------------------|
+| **global-rivers** (Open-Meteo Flood + UK EA) | ✅ Viable, one design risk | Flood API works incl. ensemble percentiles (`_min/_max/_p25/_p75`), 210-day horizon, `past_days`. **Discharge is per ~5 km grid cell — a cell off the channel is garbage** (Memphis: 0.63 vs 11,640 m³/s one cell apart); design must snap to the max-discharge neighboring cell. Ocean points return HTTP 200 with all-null series. UK EA API: keyless, OGL v3 (fixed attribution string), 15-min real-time, England-only, no deprecation announced. |
+| **almanac** (moon, twilight, US records) | ✅ Viable | Open-Meteo **now has** `moonrise`/`moonset`/`moon_phase` daily vars (FE §1.1's "no moon API" is stale); `moon_phase` is a cycle fraction, not illumination. Best route: local computation via `astronomy-engine` (MIT, zero-dep, typed, ±1 min; also does all three twilight pairs + next-quarter dates). US records: RCC ACIS keyless — record + year for all 366 days in one cacheable `StnData` call, `StnMeta` bbox for station discovery; no published ToS/rate limit, so cache hard. |
+| **international-alerts** (MeteoAlarm, MSC GeoMet) | ✅ Viable for EU+CA; ⛔ rest-of-world | MeteoAlarm: keyless JSON is `feeds.meteoalarm.org/api/v1/warnings/feeds-<country>` (per-country only; `api.meteoalarm.org` needs registration); no polygons keyless — country-level matching only; strict terms (unmodified display, "EUMETNET – MeteoAlarm" attribution, time of issue). GeoMet: collection is **`weather-alerts`**, native bbox works, real polygons, bilingual `_en`/`_fr`, not CAP-shaped, ECCC licence forbids altering alert content. WMO SWIC/Alert-Hub: undocumented demo feeds, no geometry, unclear rights — blocked for production. |
+| **global-wildfire** (NASA FIRMS) | ✅ Viable (key in hand) | Area API verified live with real MAP_KEY (200, VIIRS detections; extra `instrument` column; `confidence` abbreviated `l/n/h`). Country API is down — use area/bbox only. Day range max 5. Rate limit 5,000 tx/10 min. **Keyless fallback exists**: flat 24h/48h/7d CSVs (global ~12 MB, regional cuts smaller) — key becomes an optimization, not a gate. |
+| **aviation-weather** (aviationweather.gov) | ✅ Viable | Keyless v4.0 NWS API, worldwide METAR/TAF confirmed live (EGLL/YSSY/SBGR/FAOR), bbox geo-query on metar/taf/stationinfo, decoded JSON with pre-computed flight category. 100 req/min documented; custom User-Agent advised. Type gotchas: string `visib` ("10+"), mixed epoch/ISO timestamps, most fields optional. |
+| **coverage-polish** (met.no, global normals, global FWI) | ✅ Viable with obligations | met.no: global (9.5-day horizon), keyless, but ToS mandates identifying User-Agent + `If-Modified-Since` caching + ≤4-decimal coords; coarser than Open-Meteo outside Nordics. Global normals: one 30-year archive pull works (~1.2 s) but is **weighted as hundreds of API calls** — two pulls tripped the 600/min limit; needs permanent cache + serialized backoff. Global FWI: all Fosberg inputs in Open-Meteo hourly (km/h → mph conversion required); no direct FWI variable exists — keep computing in-house. |
 
 ---
 
