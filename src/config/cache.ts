@@ -121,6 +121,12 @@ export const CacheConfig = {
     // US daily temperature records — station selection (RCC ACIS StnMeta).
     // A location's nearest qualifying station essentially never changes.
     recordsStation: 30 * DAY,
+
+    // Worldwide METAR station observations (aviationweather.gov). METARs are
+    // issued hourly near :53, with SPECIs between; 10 minutes collapses a
+    // burst of calls into one fetch without ever serving a response across a
+    // reporting cycle.
+    metarObservations: 10 * MINUTE,
   },
 } as const;
 

@@ -142,16 +142,23 @@ export function formatPercentage(qv: QuantitativeValue | undefined): string {
 }
 
 /**
+ * Reduce a bearing in degrees to one of sixteen compass points.
+ */
+export function windDirectionFromDegrees(deg: number): string {
+  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                      'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const index = Math.round(deg / 22.5) % 16;
+  return directions[index];
+}
+
+/**
  * Format wind direction from degrees to cardinal direction
  */
 export function formatWindDirection(qv: QuantitativeValue | undefined): string {
   const degrees = extractValue(qv);
   if (degrees === null) return 'Variable';
 
-  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-                      'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-  const index = Math.round(degrees / 22.5) % 16;
-  return directions[index];
+  return windDirectionFromDegrees(degrees);
 }
 
 /**
@@ -180,4 +187,17 @@ export function formatDate(isoString: string): string {
     day: 'numeric',
     year: 'numeric'
   });
+}
+
+/**
+ * Relative humidity from temperature and dew point, via the Magnus formula.
+ * METAR carries no humidity field; this restores it from the two it does
+ * report. Returns whole percent, clamped to 0-100.
+ */
+export function relativeHumidityFromDewpoint(tempC: number, dewpC: number): number {
+  const a = 17.625;
+  const b = 243.04;
+  const gamma = (a * dewpC) / (b + dewpC) - (a * tempC) / (b + tempC);
+  const rh = 100 * Math.exp(gamma);
+  return Math.min(100, Math.max(0, Math.round(rh)));
 }

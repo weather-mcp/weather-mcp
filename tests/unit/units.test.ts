@@ -17,6 +17,8 @@ import {
   formatWindDirection,
   formatDateTime,
   formatDate,
+  windDirectionFromDegrees,
+  relativeHumidityFromDewpoint,
 } from '../../src/utils/units.js';
 
 describe('Unit Conversions', () => {
@@ -308,6 +310,46 @@ describe('Unit Conversions', () => {
       it('should handle 360 degrees (wraps to N)', () => {
         const qv = { value: 360, unitCode: 'wmoUnit:degree_(angle)' };
         expect(formatWindDirection(qv)).toBe('N');
+      });
+    });
+
+    describe('windDirectionFromDegrees', () => {
+      it('should sit at N for 0 degrees', () => {
+        expect(windDirectionFromDegrees(0)).toBe('N');
+      });
+
+      it('should stay at N just below the NNE boundary', () => {
+        expect(windDirectionFromDegrees(11.24)).toBe('N');
+      });
+
+      it('should cross into NNE just above the boundary', () => {
+        expect(windDirectionFromDegrees(11.26)).toBe('NNE');
+      });
+
+      it('should stay at N just below the wraparound boundary', () => {
+        expect(windDirectionFromDegrees(348.75)).toBe('N');
+      });
+
+      it('should wrap 360 degrees back to N', () => {
+        expect(windDirectionFromDegrees(360)).toBe('N');
+      });
+    });
+
+    describe('relativeHumidityFromDewpoint', () => {
+      it('should return 100% when temperature equals dew point', () => {
+        expect(relativeHumidityFromDewpoint(20, 20)).toBe(100);
+        expect(relativeHumidityFromDewpoint(13, 13)).toBe(100);
+      });
+
+      it('should return roughly 53% for a 10-degree spread at 20C', () => {
+        const rh = relativeHumidityFromDewpoint(20, 10);
+        expect(rh).toBeGreaterThanOrEqual(52);
+        expect(rh).toBeLessThanOrEqual(54);
+      });
+
+      it('should clamp to 100 when dew point exceeds temperature', () => {
+        expect(relativeHumidityFromDewpoint(10, 20)).toBeLessThanOrEqual(100);
+        expect(relativeHumidityFromDewpoint(10, 20)).toBe(100);
       });
     });
 

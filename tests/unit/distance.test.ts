@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateDistance, kmToMiles, milesToKm } from '../../src/utils/distance.js';
+import { calculateDistance, kmToMiles, milesToKm, bearingDegrees } from '../../src/utils/distance.js';
 
 describe('Distance Calculation Utilities', () => {
   describe('calculateDistance (Haversine Formula)', () => {
@@ -270,6 +270,30 @@ describe('Distance Calculation Utilities', () => {
 
     it('should handle small values', () => {
       expect(milesToKm(0.1)).toBeCloseTo(0.160934, 5);
+    });
+  });
+
+  describe('bearingDegrees', () => {
+    it('returns cardinal bearings from a reference point on the equator', () => {
+      // Reference: (0, 0). Each target is 1 degree away in a single cardinal direction.
+      expect(bearingDegrees(0, 0, 1, 0)).toBeCloseTo(0, 0); // due north
+      expect(bearingDegrees(0, 0, 0, 1)).toBeCloseTo(90, 0); // due east
+      expect(bearingDegrees(0, 0, -1, 0)).toBeCloseTo(180, 0); // due south
+      expect(bearingDegrees(0, 0, 0, -1)).toBeCloseTo(270, 0); // due west
+    });
+
+    it('stays finite and in [0, 360) for antipodal points', () => {
+      const bearing = bearingDegrees(0, 0, 0, 180);
+      expect(Number.isNaN(bearing)).toBe(false);
+      expect(bearing).toBeGreaterThanOrEqual(0);
+      expect(bearing).toBeLessThan(360);
+    });
+
+    it('stays finite and in [0, 360) for near-antipodal points', () => {
+      const bearing = bearingDegrees(10, 10, -9.999, -169.999);
+      expect(Number.isNaN(bearing)).toBe(false);
+      expect(bearing).toBeGreaterThanOrEqual(0);
+      expect(bearing).toBeLessThan(360);
     });
   });
 

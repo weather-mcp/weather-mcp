@@ -8,7 +8,6 @@ import {
   findTodayIndex,
   pastWindowValues,
   recentWindowValues,
-  compassPoint,
   pickChannelCell,
   describeMinorDrainage,
   classifyDischargeTrend,
@@ -16,6 +15,7 @@ import {
   classifyAgainstRecentMean,
   formatSnapNote
 } from '../../src/utils/riverDischarge.js';
+import { compassPoint } from '../../src/utils/distance.js';
 import type { OpenMeteoFloodResponse } from '../../src/types/openmeteo.js';
 
 /**
