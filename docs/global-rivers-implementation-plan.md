@@ -363,7 +363,7 @@ The load-bearing design decision — the orchestrator does this one itself.
 - [x] T1 — Open-Meteo Flood client, types, cache TTL (`sonnet`) — `1b25201`
 - [x] T2 — Discharge unit conversion (`haiku`) — `0cfdd38`
 - [x] T3 — riverDischarge pure logic + unit tests (`opus`) — `318a466`
-- [ ] T4 — Route by isInUS, source/forecast_days, global output core (`opus`)
+- [x] T4 — Route by isInUS, source/forecast_days, global output core (`opus`) — `cb6dd6e`
 - [ ] T5 — Ensemble forecast section and detail levels (`opus`)
 - [ ] T6 — Global river handler unit tests (`sonnet`)
 - [ ] T7 — Flood integration test (mocked + live smoke) (`sonnet`)
