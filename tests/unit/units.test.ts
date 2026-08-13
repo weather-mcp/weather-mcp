@@ -7,6 +7,7 @@ import {
   pascalsToMb,
   metersToMiles,
   mpsToMph,
+  cubicMetersPerSecondToCubicFeetPerSecond,
   extractValue,
   formatTemperature,
   formatWindSpeed,
@@ -73,6 +74,22 @@ describe('Unit Conversions', () => {
       });
     });
 
+  });
+
+  describe('Flow Rate Conversions', () => {
+    describe('cubicMetersPerSecondToCubicFeetPerSecond', () => {
+      it('should convert 0 m³/s to 0 ft³/s', () => {
+        expect(cubicMetersPerSecondToCubicFeetPerSecond(0)).toBe(0);
+      });
+
+      it('should convert 1 m³/s to approximately 35.31 ft³/s', () => {
+        expect(cubicMetersPerSecondToCubicFeetPerSecond(1)).toBeCloseTo(35.3147, 4);
+      });
+
+      it('should handle large values', () => {
+        expect(cubicMetersPerSecondToCubicFeetPerSecond(11640)).toBeCloseTo(411063.1, 0);
+      });
+    });
   });
 
   describe('Speed Conversions', () => {
