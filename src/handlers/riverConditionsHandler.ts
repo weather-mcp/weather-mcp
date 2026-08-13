@@ -471,7 +471,7 @@ async function formatOpenMeteoRiverConditions(
     output += `\n`;
   }
 
-  output += formatEnsembleForecast(cell, todayIndex, forecastDays, detail, prefs);
+  output += formatEnsembleForecast(cell, todayIndex, detail, prefs);
 
   return output + formatOpenMeteoFooter();
 }
@@ -489,18 +489,138 @@ function meanOfSeries(values: Array<number | null>): number | undefined {
   return count === 0 ? undefined : sum / count;
 }
 
+/** Forecast rows rendered below detail="full". */
+const FORECAST_SUMMARY_DAYS = 7;
+
+/** True for a real, present numeric reading in a nullable model series. */
+function isRealNumber(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/** Discharge in whichever unit the resolved preferences call for. */
+function dischargeInPrefUnit(cms: number, prefs: UnitPreferences): number {
+  return prefs.distance === 'mi' ? cubicMetersPerSecondToCubicFeetPerSecond(cms) : cms;
+}
+
+/** Label for the unit `dischargeInPrefUnit` returns. */
+function dischargeUnitLabel(prefs: UnitPreferences): string {
+  return prefs.distance === 'mi' ? 'ft³/s' : 'm³/s';
+}
+
+/** Render one value in the preferred unit, without repeating the unit label. */
+function forecastValue(cms: number, prefs: UnitPreferences): string {
+  return formatDischargeValue(dischargeInPrefUnit(cms, prefs));
+}
+
+/** "2026-08-13" -> "Aug 13", without dragging the local timezone into it. */
+function formatDayLabel(iso: string): string {
+  const parts = iso.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) {
+    return iso;
+  }
+  const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
 /**
- * Ensemble forecast section — added in T5. Present as a seam here so the
- * current-conditions block above is complete on its own.
+ * The GloFAS ensemble forecast (design D4). There are no flood categories to
+ * report, so the forecast is expressed as a daily median inside its p25-p75
+ * band. Ensemble members stay tightly clustered for the first few days and only
+ * diverge from about day 4 — the band is shown from day 1 regardless, with the
+ * section wording carrying the caveat rather than hiding the early rows.
+ *
+ * Rows use a single unit (the resolved preference, named once in the header):
+ * repeating a dual-unit parenthetical on every median, band, and envelope value
+ * would be unreadable. The headline Current Discharge line keeps both.
  */
 function formatEnsembleForecast(
-  _cell: OpenMeteoFloodResponse,
-  _todayIndex: number,
-  _forecastDays: number,
-  _detail: DetailLevel,
-  _prefs: UnitPreferences
+  cell: OpenMeteoFloodResponse,
+  todayIndex: number,
+  detail: DetailLevel,
+  prefs: UnitPreferences
 ): string {
-  return '';
+  const daily = cell.daily;
+  const time = daily?.time;
+  const median = daily?.river_discharge_median ?? daily?.river_discharge;
+  if (!time || !median) {
+    return '';
+  }
+
+  const p25 = daily?.river_discharge_p25;
+  const p75 = daily?.river_discharge_p75;
+  const low = daily?.river_discharge_min;
+  const high = daily?.river_discharge_max;
+
+  // `forecast_days=N` returns N days starting with the location's local today
+  // (live-verified: forecast_days=1 returns today and nothing else), so day 1
+  // of the ensemble is today. Today therefore appears both here and under
+  // Current Discharge — and legitimately differs, since the current level is
+  // the deterministic run while this row is the ensemble median.
+  const start = todayIndex;
+
+  // Trim trailing days the model returned as null rather than rendering them as
+  // 0 m³/s (same null-horizon handling as the marine and air-quality paths).
+  let end = Math.min(time.length, median.length);
+  while (end > start && !isRealNumber(median[end - 1])) {
+    end--;
+  }
+  const trimmedDays = Math.min(time.length, median.length) - end;
+
+  const rows: string[] = [];
+  for (let i = start; i < end; i++) {
+    const value = median[i];
+    if (!isRealNumber(value)) {
+      continue; // interior gap — skip the day rather than invent a zero
+    }
+
+    let row = `- **${formatDayLabel(time[i])}:** ${forecastValue(value, prefs)}`;
+
+    if (isRealNumber(p25?.[i]) && isRealNumber(p75?.[i])) {
+      row += ` · p25–p75 ${forecastValue(p25[i] as number, prefs)}–${forecastValue(p75[i] as number, prefs)}`;
+    }
+
+    // The full min/max envelope is detail="full" only — it is much wider than
+    // the interquartile band and would swamp the summary view.
+    if (detail === 'full' && isRealNumber(low?.[i]) && isRealNumber(high?.[i])) {
+      row += ` · range ${forecastValue(low[i] as number, prefs)}–${forecastValue(high[i] as number, prefs)}`;
+    }
+
+    rows.push(row);
+  }
+
+  if (rows.length === 0) {
+    // Reachable when the whole horizon is null, or when local "today" has
+    // rolled past the model run's issue date and consumed a short horizon.
+    // Say so rather than dropping the section without explanation.
+    let empty = `## Ensemble Forecast\n\n`;
+    empty += trimmedDays > 0
+      ? `*The model returned no values for the ${trimmedDays} requested forecast day${trimmedDays > 1 ? 's' : ''}.*\n`
+      : `*No modeled forecast days were returned for this location.*\n`;
+    return empty;
+  }
+
+  const cap = detail === 'full' ? rows.length : FORECAST_SUMMARY_DAYS;
+  const shown = rows.slice(0, cap);
+
+  let output = `## Ensemble Forecast\n\n`;
+  output += `Daily median with the p25–p75 ensemble band, in ${dischargeUnitLabel(prefs)}, starting today. `;
+  output += `Members stay tightly clustered for the first few days and diverge from about `;
+  output += `day 4, so a near-zero band early on reflects that clustering, not certainty.\n\n`;
+  output += `${shown.join('\n')}\n`;
+
+  if (rows.length > shown.length) {
+    const remaining = rows.length - shown.length;
+    output += `\n*Note: ${remaining} more forecast day${remaining > 1 ? 's' : ''} available — use detail="full" for the full range and the min/max envelope*\n`;
+  }
+
+  if (trimmedDays > 0) {
+    output += `\n*Note: ${trimmedDays} further day${trimmedDays > 1 ? 's' : ''} returned no modeled values and ${trimmedDays > 1 ? 'were' : 'was'} omitted*\n`;
+  }
+
+  return output;
 }
 
 /**
