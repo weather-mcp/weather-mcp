@@ -48,3 +48,23 @@ export function kmToMiles(km: number): number {
 export function milesToKm(miles: number): number {
   return miles / 0.621371;
 }
+
+/** Initial bearing from one point to another, in degrees clockwise from north. */
+export function bearingDegrees(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = Math.PI / 180;
+  const phi1 = lat1 * toRad;
+  const phi2 = lat2 * toRad;
+  const deltaLambda = (lon2 - lon1) * toRad;
+
+  const y = Math.sin(deltaLambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+const COMPASS_POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
+
+/** Reduce a bearing to one of eight compass points. */
+export function compassPoint(degrees: number): string {
+  return COMPASS_POINTS[Math.round(degrees / 45) % 8];
+}
