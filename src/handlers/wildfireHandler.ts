@@ -156,28 +156,47 @@ export async function handleGetWildfireInfo(
         }
       }
 
-      // Safety recommendations based on nearest wildfire
-      const nearestWildfire = firesWithDistance.find(f => f.fire.type === 'Wildfire');
-      if (nearestWildfire) {
-        output += `\n## Safety Assessment\n\n`;
-        const dist = nearestWildfire.distance;
+      // Safety recommendations based on the nearest ACTIVE (uncontained) wildfire.
+      // A fully-contained fire — however close — no longer drives the escalation
+      // tier (F3: a 100%-contained fire was producing EXTREME DANGER wording).
+      const wildfires = firesWithDistance.filter(f => f.fire.type === 'Wildfire');
+      const nearestWildfire = wildfires.find(f => f.fire.containment < 100);
 
-        if (dist < 5) {
-          output += `⚠️ **EXTREME DANGER** - Wildfire within 5 km\n`;
-          output += `- Evacuate immediately if advised by authorities\n`;
-          output += `- Monitor local emergency alerts\n`;
-          output += `- Have evacuation plan ready\n`;
-        } else if (dist < 25) {
-          output += `🟠 **HIGH ALERT** - Wildfire within 25 km\n`;
-          output += `- Monitor fire conditions closely\n`;
-          output += `- Prepare for possible evacuation\n`;
-          output += `- Watch for smoke and changing conditions\n`;
-        } else if (dist < 50) {
-          output += `🟡 **CAUTION** - Wildfire within 50 km\n`;
-          output += `- Be aware of smoke and air quality impacts\n`;
-          output += `- Monitor local news and fire updates\n`;
+      if (wildfires.length > 0) {
+        output += `\n## Safety Assessment\n\n`;
+
+        if (nearestWildfire) {
+          const dist = nearestWildfire.distance;
+          const nearestOverall = wildfires[0];
+          if (nearestOverall !== nearestWildfire) {
+            output += `ℹ️ Nearest fire (${nearestOverall.fire.name}, ${nearestOverall.distance.toFixed(1)} km) is 100% contained and excluded from the danger assessment.\n\n`;
+          }
+
+          if (dist < 5) {
+            output += `⚠️ **EXTREME DANGER** - Wildfire within 5 km\n`;
+            output += `- Evacuate immediately if advised by authorities\n`;
+            output += `- Monitor local emergency alerts\n`;
+            output += `- Have evacuation plan ready\n`;
+          } else if (dist < 25) {
+            output += `🟠 **HIGH ALERT** - Wildfire within 25 km\n`;
+            output += `- Monitor fire conditions closely\n`;
+            output += `- Prepare for possible evacuation\n`;
+            output += `- Watch for smoke and changing conditions\n`;
+          } else if (dist < 50) {
+            output += `🟡 **CAUTION** - Wildfire within 50 km\n`;
+            output += `- Be aware of smoke and air quality impacts\n`;
+            output += `- Monitor local news and fire updates\n`;
+          } else {
+            output += `ℹ️ **AWARENESS** - Wildfire detected within ${radius} km\n`;
+            output += `- Stay informed about fire progression\n`;
+            output += `- Air quality may be affected by smoke\n`;
+          }
         } else {
-          output += `ℹ️ **AWARENESS** - Wildfire detected within ${radius} km\n`;
+          // Wildfires are present but every one is 100% contained. Still
+          // surface the section — omitting it would hide that fires exist
+          // nearby — pinned at the lowest (AWARENESS) tier.
+          output += `ℹ️ **AWARENESS**\n`;
+          output += `ℹ️ All fires within radius are 100% contained.\n`;
           output += `- Stay informed about fire progression\n`;
           output += `- Air quality may be affected by smoke\n`;
         }
