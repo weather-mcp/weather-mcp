@@ -3,11 +3,22 @@
  */
 
 /**
+ * Closed set of services that can raise a sanitized ApiError
+ */
+export type ApiServiceName =
+  | 'NOAA'
+  | 'OpenMeteo'
+  | 'NCEI'
+  | 'RainViewer'
+  | 'Nominatim'
+  | 'AviationWeather';
+
+/**
  * Base error class for API-related errors
  */
 export class ApiError extends Error {
   public readonly statusCode: number;
-  public readonly service: 'NOAA' | 'OpenMeteo' | 'NCEI' | 'RainViewer' | 'Nominatim';
+  public readonly service: ApiServiceName;
   public readonly userMessage: string;
   public readonly helpLinks: string[];
   public readonly isRetryable: boolean;
@@ -15,7 +26,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     statusCode: number,
-    service: 'NOAA' | 'OpenMeteo' | 'NCEI' | 'RainViewer' | 'Nominatim',
+    service: ApiServiceName,
     userMessage: string,
     helpLinks: string[] = [],
     isRetryable: boolean = false
@@ -57,7 +68,7 @@ export class ApiError extends Error {
 export class RateLimitError extends ApiError {
   public readonly retryAfter?: number;
 
-  constructor(service: 'NOAA' | 'OpenMeteo' | 'NCEI' | 'RainViewer' | 'Nominatim', messageOrRetryAfter?: string | number, retryAfter?: number) {
+  constructor(service: ApiServiceName, messageOrRetryAfter?: string | number, retryAfter?: number) {
     // Handle backwards compatibility: if second param is number, treat it as retryAfter
     let message: string | undefined;
     let retry: number | undefined;
@@ -96,7 +107,7 @@ export class RateLimitError extends ApiError {
  * Service unavailable error - API is down or timing out
  */
 export class ServiceUnavailableError extends ApiError {
-  constructor(service: 'NOAA' | 'OpenMeteo' | 'NCEI' | 'RainViewer' | 'Nominatim', messageOrError?: string | Error, originalError?: Error) {
+  constructor(service: ApiServiceName, messageOrError?: string | Error, originalError?: Error) {
     // Handle backwards compatibility: if second param is Error, treat it as originalError
     let message: string | undefined;
     let error: Error | undefined;
@@ -140,7 +151,7 @@ export class InvalidLocationError extends ApiError {
   public readonly longitude?: number;
 
   constructor(
-    service: 'NOAA' | 'OpenMeteo' | 'NCEI' | 'RainViewer' | 'Nominatim',
+    service: ApiServiceName,
     message: string,
     latitude?: number,
     longitude?: number
@@ -164,7 +175,7 @@ export class InvalidLocationError extends ApiError {
  * Data not found error - requested data doesn't exist
  */
 export class DataNotFoundError extends ApiError {
-  constructor(service: 'NOAA' | 'OpenMeteo' | 'NCEI' | 'RainViewer' | 'Nominatim', message: string) {
+  constructor(service: ApiServiceName, message: string) {
     super(
       message,
       404,
