@@ -372,7 +372,7 @@ Spot-checks against the code, reconciled into the tasks below:
 
 - [x] T1 — astronomy-engine dep + pure astronomy utility (`opus`) — `73b3ab6`
 - [ ] T2 — include_astronomy on get_forecast, both paths + schema (`opus`)
-- [ ] T3 — ACIS types, service, cache TTLs, records formatting (`sonnet`)
+- [x] T3 — ACIS types, service, cache TTLs, records formatting (`sonnet`) — `c7cb23f`
 - [ ] T4 — Wire records into the four include_normals sites (`sonnet`)
 - [ ] T5 — Handler unit tests for astronomy and records gating (`sonnet`)
 - [ ] T6 — Integration tests: mocked ACIS + tolerant live smoke (`sonnet`)
