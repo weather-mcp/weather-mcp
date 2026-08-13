@@ -354,7 +354,7 @@ Spot-checks against the code and live endpoints, reconciled into the tasks:
       `gibs.test.ts` passed unedited, so A7 holds.)
 - [x] T5 — Handler unit tests for the composite branch (`sonnet`) — `aab3034`
 - [x] T6 — Integration tests: mocked end-to-end + tolerant live smoke (`sonnet`) — `b4a57bf`
-- [x] T7 — Live sweep + documentation checklist (`opus`) — see the sweep record below
+- [x] T7 — Live sweep + documentation checklist (`opus`) — `6978f4a` — see the sweep record below
 
 ## T7 live sweep record (2026-08-13, built dist, run serially)
 
