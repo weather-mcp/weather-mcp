@@ -360,8 +360,8 @@ The load-bearing design decision — the orchestrator does this one itself.
 
 ## Progress Tracker
 
-- [ ] T1 — Open-Meteo Flood client, types, cache TTL (`sonnet`)
-- [ ] T2 — Discharge unit conversion (`haiku`)
+- [x] T1 — Open-Meteo Flood client, types, cache TTL (`sonnet`) — `1b25201`
+- [x] T2 — Discharge unit conversion (`haiku`) — `0cfdd38`
 - [ ] T3 — riverDischarge pure logic + unit tests (`opus`)
 - [ ] T4 — Route by isInUS, source/forecast_days, global output core (`opus`)
 - [ ] T5 — Ensemble forecast section and detail levels (`opus`)
