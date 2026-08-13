@@ -111,6 +111,16 @@ export const CacheConfig = {
     // the 9-point channel-snapping probe (a single lookup fans out to 9
     // grid cells in one request, so caching keeps repeat queries cheap).
     floodDischarge: 6 * HOUR,
+
+    // US daily temperature records (RCC ACIS) — the full 366-slot per-station
+    // table. ACIS publishes no rate limits or ToS, so be a good citizen and
+    // cache hard: a record changes at most when it is broken, so a stale
+    // week is acceptable for trivia context.
+    records: 7 * DAY,
+
+    // US daily temperature records — station selection (RCC ACIS StnMeta).
+    // A location's nearest qualifying station essentially never changes.
+    recordsStation: 30 * DAY,
   },
 } as const;
 

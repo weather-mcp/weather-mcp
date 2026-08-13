@@ -33,6 +33,8 @@ Then just ask:
 > *"Is there any lightning near the lake right now?"*
 > *"How does today compare to normal for this time of year?"*
 > *"Are there wildfires within 50 miles of my cabin?"*
+> *"Will there be a full moon this weekend?"*
+> *"Is this a record high for today?"*
 > *"What was the weather in Paris on June 6, 1944?"*
 
 📦 Listed in the [Official MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp) as `io.github.dgahagan/weather-mcp`.
@@ -57,7 +59,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 | Tool | What it does | Coverage |
 |------|-------------|----------|
-| `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name; sunrise/sunset, UV, precipitation probability, optional climate-normals comparison | 🌍 Global |
+| `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name; sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac | 🌍 Global |
 | `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional fire-weather indices), Open-Meteo model data elsewhere | 🌍 Global |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity | 🇺🇸 US |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
@@ -85,7 +87,8 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 - **Smart source selection** — US queries use NOAA (detailed, includes forecaster narratives); everywhere else uses Open-Meteo. You never pick; it just works.
 - **Saved locations** — save "home", "work", or "cabin" once, then ask *"what's the weather at home?"* Locations persist in `~/.weather-mcp/locations.json` and can be tagged with activities ("boating", "skiing") so the AI highlights what matters to you.
-- **Climate context** — optional 30-year climate normals show how today compares: *"10°F warmer than normal for this date."*
+- **Climate context** — optional 30-year climate normals show how today compares: *"10°F warmer than normal for this date."* For US locations the normals also carry the record high/low for the date and the year it was set: *"is this a record high?"*
+- **Astronomy almanac** — opt-in moon phase, illumination, moonrise/moonset, civil/nautical/astronomical twilight, and next full/new moon dates on daily forecasts (`include_astronomy`). Computed locally — accurate to the arcminute, works at the poles, costs zero API calls: *"when does it get fully dark?"*
 - **Safety-aware output** — lightning, wildfire, flood, and marine tools include graded safety assessments and plain-language recommendations, not just raw numbers.
 - **Winter weather** — snow depth, snowfall accumulation, and ice accumulation forecasts with sensible trace-amount filtering.
 - **Timezone-aware** — every timestamp is rendered in the location's local time with DST handled correctly.
@@ -102,6 +105,7 @@ All free, all public, no authentication required:
 | [NOAA Weather API](https://www.weather.gov/documentation/services-web-api) | US forecasts, current conditions, alerts, fire weather | US |
 | [Open-Meteo](https://open-meteo.com/) | Global forecasts, historical data (1940+), air quality, marine, geocoding, climate normals | Global |
 | [NOAA NWPS](https://water.noaa.gov/) | River levels, streamflow, flood stages | US |
+| [RCC ACIS](https://www.rcc-acis.org/) | Daily record high/low temperatures | US |
 | [NIFC WFIGS](https://data-nifc.opendata.arcgis.com/) | Active wildfire perimeters and incidents | US |
 | [RainViewer](https://www.rainviewer.com/api.html) | Precipitation radar imagery | Global |
 | [NASA GIBS](https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api) | GOES GeoColor satellite imagery | Western Hemisphere |
