@@ -46,6 +46,14 @@ verification passed; run it yourself.
 
 **Branch:** `feat/metar`. Target release: **v1.17.0**.
 
+✅ **Base-commit decision (Assumption A1) — RESOLVED 2026-08-13:** `feat/almanac`
+was merged to `main` via PR #53 (merge commit `8c323d8`) and `feat/metar` was cut
+from the updated `main`. The collision risk below does not apply; CHANGELOG
+`[Unreleased]` on this branch still carries the unreleased global-rivers
+(v1.15.0) and almanac (v1.16.0) content, and T8 appends METAR beneath it.
+
+Original text:
+
 ⚠️ **Base-commit decision (Assumption A1):** `feat/almanac` (v1.16.0) is
 complete but **unmerged and unreleased**, and CHANGELOG `[Unreleased]` currently
 holds *both* the global-rivers (v1.15.0) and almanac (v1.16.0) content. Cut
@@ -431,7 +439,7 @@ Spot-checks against the code, reconciled into the tasks below:
 
 ## Progress Tracker
 
-- [ ] T1 — Widen the ApiError service union (`haiku`)
+- [x] T1 — Widen the ApiError service union (`haiku`) — `b2e57c4`
 - [ ] T2 — Move bearing/compass geometry; add compass + humidity helpers (`sonnet`)
 - [ ] T3 — METAR types, AviationWeatherService, cache TTL (`sonnet`)
 - [ ] T4 — Station picker and METAR parsing helpers (`opus`)
