@@ -347,7 +347,11 @@ Spot-checks against the code and live endpoints, reconciled into the tasks:
       declarations and strict-mode `src/` now consumes it; `composite.ts`
       re-exports `PNG` as the single import site for T3/T4)
 - [x] T3 — GIBS basemap service + cache TTLs (`sonnet`) — `53b05c8`
-- [ ] T4 — `composite` parameter returning `[text, image]` (`opus`)
+- [x] T4 — `composite` parameter returning `[text, image]` (`opus`) — `a17f3da`
+      (dist spot-check: Miami `composite: true` → `[text, image]`, 512×512 PNG,
+      94.7 KB / 126 KB base64, visually verified — storm cells, Florida
+      coastline, Keys, Cuba outline, marker. `imagery-handler.test.ts` and
+      `gibs.test.ts` passed unedited, so A7 holds.)
 - [ ] T5 — Handler unit tests for the composite branch (`sonnet`)
 - [ ] T6 — Integration tests: mocked end-to-end + tolerant live smoke (`sonnet`)
 - [ ] T7 — Live sweep + documentation checklist (`opus`)
