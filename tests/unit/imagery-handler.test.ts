@@ -289,6 +289,58 @@ describe('Weather Imagery Handler', () => {
       expect(full).toContain('![Precipitation radar](https://example.com/frame.png)');
     });
 
+    it('should include a RainViewer interactive-map link for radar/precipitation', () => {
+      const response: WeatherImageryResponse = {
+        type: 'radar',
+        location: { latitude: 40.7128, longitude: -74.006 },
+        coverage: 'Global',
+        resolution: 'Latest snapshot',
+        source: 'RainViewer',
+        animated: false,
+        frames: [
+          {
+            url: 'https://example.com/frame.png',
+            timestamp: new Date('2024-01-01T12:00:00Z'),
+            description: 'Radar'
+          }
+        ],
+        generatedAt: new Date('2024-01-01T12:00:00Z')
+      };
+
+      const formatted = formatWeatherImageryResponse(response);
+      expect(formatted).toContain(
+        '**Interactive map:** https://www.rainviewer.com/map.html?loc=40.7128,-74.0060,7'
+      );
+      // Present at every detail level (it is metadata, not a frame)
+      const full = formatWeatherImageryResponse(response, 'full');
+      expect(full).toContain('https://www.rainviewer.com/map.html?loc=40.7128,-74.0060,7');
+    });
+
+    it('should include a NASA Worldview link for satellite, with latitude clamped at the poles', () => {
+      const response: WeatherImageryResponse = {
+        type: 'satellite',
+        location: { latitude: 88, longitude: -74.006 },
+        coverage: 'Western Hemisphere (Americas / eastern Pacific)',
+        resolution: 'Latest snapshot',
+        source: 'NASA GIBS (NOAA GOES GeoColor)',
+        animated: false,
+        frames: [
+          {
+            url: 'https://example.com/sat.png',
+            timestamp: new Date('2024-01-01T12:00:00Z'),
+            description: 'Satellite'
+          }
+        ],
+        generatedAt: new Date('2024-01-01T12:00:00Z')
+      };
+
+      const formatted = formatWeatherImageryResponse(response);
+      // v = minLon,minLat,maxLon,maxLat; north edge clamped to 90
+      expect(formatted).toContain(
+        '**Interactive map:** https://worldview.earthdata.nasa.gov/?v=-81.01,83.00,-67.01,90.00'
+      );
+    });
+
     it('should format response with multiple frames (animated)', () => {
       const frames: ImageryFrame[] = Array.from({ length: 12 }, (_, i) => ({
         url: `https://example.com/frame${i}.png`,

@@ -222,6 +222,23 @@ export function formatWeatherImageryResponse(
     lines.push('');
   }
 
+  // Interactive-map link: a raw tile is a transparent overlay with no base map,
+  // so point at a first-party browser viewer that layers it properly (URL
+  // formats verified live 2026-08-13: RainViewer's own embed pages use
+  // map.html?loc=lat,lon,zoom; NASA Worldview docs use v=minLon,minLat,maxLon,maxLat).
+  const { latitude, longitude } = response.location;
+  if (response.type === 'radar' || response.type === 'precipitation') {
+    lines.push(`**Interactive map:** https://www.rainviewer.com/map.html?loc=${latitude.toFixed(4)},${longitude.toFixed(4)},7`);
+    lines.push('*Opens live animated radar over a base map in the browser — the frame URLs above are transparent overlay tiles (blank where dry) and expire within about two hours.*');
+    lines.push('');
+  } else if (response.type === 'satellite') {
+    const south = Math.max(latitude - 5, -90).toFixed(2);
+    const north = Math.min(latitude + 5, 90).toFixed(2);
+    lines.push(`**Interactive map:** https://worldview.earthdata.nasa.gov/?v=${(longitude - 7).toFixed(2)},${south},${(longitude + 7).toFixed(2)},${north}`);
+    lines.push('*Opens NASA Worldview centered on this area — pan, zoom, and layer satellite imagery in the browser.*');
+    lines.push('');
+  }
+
   // Add disclaimer if present
   if (response.disclaimer) {
     lines.push('---');

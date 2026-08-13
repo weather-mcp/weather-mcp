@@ -455,8 +455,9 @@ Provides access to weather imagery from two sources: precipitation/radar tiles f
 - Coverage area and resolution information
 - Automatic coordinate-to-tile calculation
 - Up to 2 hours of historical radar frames when animated
+- An interactive-map link (RainViewer's live map for radar/precipitation, NASA Worldview for satellite) for viewing the imagery layered over a base map in the browser
 
-**Note:** Precipitation/radar coverage is global (RainViewer). Satellite coverage is Western Hemisphere only (GOES GeoColor via NASA GIBS).
+**Note:** Precipitation/radar coverage is global (RainViewer). Satellite coverage is Western Hemisphere only (GOES GeoColor via NASA GIBS). Tile URLs are transparent overlays (blank where there is no precipitation) and RainViewer frames expire after roughly 2 hours — for a durable, human-viewable picture, use the interactive-map link.
 
 ### 11. get_lightning_activity
 Get real-time lightning strike detection and safety assessment for outdoor activity planning.
