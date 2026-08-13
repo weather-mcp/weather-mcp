@@ -127,6 +127,22 @@ export const CacheConfig = {
     // burst of calls into one fetch without ever serving a response across a
     // reporting cycle.
     metarObservations: 10 * MINUTE,
+
+    // NASA GIBS basemap tiles (OSM_Land_Water_Map, Reference_Features_15m),
+    // cached individually by raw tile buffer. These are near-static
+    // reference layers — land/water boundaries and coastline/border outlines
+    // don't move on any timescale that matters to a weather query — so cache
+    // aggressively; 24h balances that staticness against not holding stale
+    // tiles indefinitely if a layer is ever revised upstream.
+    basemapTiles: 24 * HOUR,
+
+    // Composited radar-on-basemap output, keyed on frame path + tile +
+    // marker pixel. Radar frames are immutable once published under their
+    // timestamp, so this isn't about staleness — it's about not re-fetching
+    // and re-compositing on every call within a feed cycle; RainViewer's
+    // nowcast cadence is ~10 minutes, so a repeat call inside that window is
+    // still looking at the same latest frame.
+    compositeImage: 10 * MINUTE,
   },
 } as const;
 
