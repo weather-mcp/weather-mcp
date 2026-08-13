@@ -50,6 +50,13 @@ export function metersToFeet(meters: number): number {
 }
 
 /**
+ * Convert cubic meters per second to cubic feet per second
+ */
+export function cubicMetersPerSecondToCubicFeetPerSecond(cms: number): number {
+  return cms * 35.3147;
+}
+
+/**
  * Convert Pascals to inches of mercury
  */
 export function pascalsToInHg(pa: number): number {

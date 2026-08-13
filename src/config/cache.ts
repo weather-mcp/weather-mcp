@@ -105,6 +105,12 @@ export const CacheConfig = {
     // Service health check status
     // Check freshness periodically
     serviceStatus: 5 * MINUTE,
+
+    // River discharge (Open-Meteo Flood API / GloFAS v4)
+    // GloFAS updates once daily; 6h balances freshness against the cost of
+    // the 9-point channel-snapping probe (a single lookup fans out to 9
+    // grid cells in one request, so caching keeps repeat queries cheap).
+    floodDischarge: 6 * HOUR,
   },
 } as const;
 

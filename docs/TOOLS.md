@@ -23,7 +23,7 @@ Complete reference for all 17 MCP tools provided by the Weather MCP Server.
 9. [get_marine_conditions](#9-get_marine_conditions) — Waves/swell/currents, global
 10. [get_weather_imagery](#10-get_weather_imagery) — Radar, precipitation, and satellite imagery
 11. [get_lightning_activity](#11-get_lightning_activity) — Strike detection, global
-12. [get_river_conditions](#12-get_river_conditions) — River levels/flooding, US
+12. [get_river_conditions](#12-get_river_conditions) — River levels/flooding, global
 13. [get_wildfire_info](#13-get_wildfire_info) — Active fires, US
 
 **Saved Locations**
@@ -452,41 +452,55 @@ Provides real-time lightning strike detection from the Blitzortung.org global li
 **Note:** Data provided by Blitzortung.org, a free community-operated lightning detection network. May have regional coverage variations.
 
 ### 12. get_river_conditions
-Monitor river levels and flood status using NOAA National Water Prediction Service data.
+Monitor river levels and flood status worldwide — NOAA gauge observations in the US, GloFAS modeled discharge elsewhere.
 
 **Parameters:**
 - `latitude` (required*): Latitude coordinate (-90 to 90)
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `radius` (optional): Search radius in kilometers (1-500, default: 50)
-- `detail` (optional): `"summary"`, `"standard"` (default), or `"full"` — `full` shows up to 25 nearest gauges (instead of 5), up to 25 historic crests per gauge (instead of 3), and each gauge's multi-point NWPS forecast series where one exists
+- `radius` (optional): US gauge search radius in kilometers (1-500, default: 50). Ignored on the global model path, which has no gauges to search
+- `source` (optional): `"auto"` (default — NOAA for US coordinates, Open-Meteo elsewhere), `"noaa"` (US only), or `"openmeteo"` (global)
+- `forecast_days` (optional): Discharge forecast days, 1-210 (default: 7). Global model path only; ignored for US gauge data
+- `detail` (optional): `"summary"`, `"standard"` (default), or `"full"`
+  - US path: `full` shows up to 25 nearest gauges (instead of 5), up to 25 historic crests per gauge (instead of 3), and each gauge's multi-point NWPS forecast series where one exists
+  - Global path: `full` adds the min/max ensemble envelope and the full requested day range (lower levels cap the forecast at 7 days)
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
-Provides comprehensive river and streamflow monitoring for flood safety and recreation planning. Automatically finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Each shown gauge also gets an observed rise/fall trend derived from its stage history (e.g. `↗ rising (+0.5 ft / 6h)`); gauges whose stage series can't be fetched simply omit the trend. Uses NOAA National Water Prediction Service (NWPS) for gauge locations, observations, and forecasts. Gauge IDs include the USGS site number where NWPS reports one, but streamflow data is not fetched from USGS Water Services.
+
+*US locations (NOAA NWPS):* Finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Each shown gauge also gets an observed rise/fall trend derived from its stage history (e.g. `↗ rising (+0.5 ft / 6h)`); gauges whose stage series can't be fetched simply omit the trend. Gauge IDs include the USGS site number where NWPS reports one, but streamflow data is not fetched from USGS Water Services.
+
+*Everywhere else (Open-Meteo Flood API, GloFAS v4):* Returns modeled river discharge in m³/s (with ft³/s under imperial units) on a ~5km grid. Because a grid cell that misses the river channel reports local runoff rather than the river, each request probes a 3×3 neighborhood in one call and selects the cell with the highest mean discharge over the past 31 days; when the selected cell is not the requested point, the output discloses it ("Nearest modeled river channel: ~5 km W of requested point"). GloFAS publishes no flood-stage thresholds, so discharge is presented against its own recent history and the forecast ensemble instead of flood categories. Points with no modeled channel — open ocean, arid regions — return a plain "no river data" result rather than an error.
 
 **Examples:**
 ```
 "What are the river conditions near St. Louis?" (latitude: 38.6270, longitude: -90.1994)
 "Check for flooding on the Mississippi River"
 "Is the river level safe for kayaking?"
-"Show me nearby river gauge readings"
+"How high is the Rhine at Cologne?" (city_name: "Cologne, Germany")
+"What's the Thames discharge forecast for the next month?" (forecast_days: 30, detail: "full")
 ```
 
-**Returns:**
+**Returns (US path):**
 - Nearest river gauges with current water levels
 - Observed trend per gauge (rising/falling/steady with magnitude and window)
 - Flood stage thresholds (action, minor, moderate, major)
 - Current flood status and forecast (multi-point forecast series at `detail="full"` for gauges that have one — mostly tidal and major-river gauges)
 - Streamflow data (cubic feet per second)
 - Distance to each gauge from query location
-- River and location names
-- Safety assessment for recreation
+- River and location names, safety assessment for recreation
 - Historical context (flood crests if available)
 
-**Note:** US coverage only. Data provided by NOAA National Water Prediction Service (NWPS).
+**Returns (global model path):**
+- Current modeled discharge with a rise/fall trend over the past 7 days (relative ±10% threshold)
+- Context against the past-31-day mean ("~2.1× the recent average" / "near the recent average" / "well below the recent average")
+- Snap disclosure when the reported channel is not the requested point
+- Ensemble forecast: daily median with the p25–p75 band, plus the min/max envelope at `detail="full"`
+- A "minor local drainage" label when the best cell is under 0.1 m³/s
+
+**Note:** US data provided by NOAA National Water Prediction Service (NWPS). Non-US data provided by the Open-Meteo Flood API (GloFAS v4), licensed CC-BY 4.0 and credited in the output as *"River discharge data by Open-Meteo.com (CC-BY 4.0)"*. Model discharge is **not** a gauge observation and carries no official flood-stage thresholds — do not substitute it for national flood warnings. Border cities that fall inside the US routing boxes (Toronto, Vancouver) route to NOAA and find no gauges; pass `source: "openmeteo"` explicitly for model data there.
 
 ### 13. get_wildfire_info
 Monitor active wildfires and fire perimeters for safety and evacuation planning.

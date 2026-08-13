@@ -67,7 +67,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_marine_conditions` | Wave height, swell, ocean currents, Douglas Sea Scale — includes Great Lakes and major US bays; forecast up to 16 days | 🌍 Global |
 | `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery | 🌍 Global |
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
-| `get_river_conditions` | River gauge levels, flood stages, streamflow, rise/fall trends, NWPS forecast series | 🇺🇸 US |
+| `get_river_conditions` | US: NWPS gauge levels, flood stages, streamflow, rise/fall trends, forecast series. Elsewhere: GloFAS modeled discharge snapped to the nearest river channel, with ensemble forecast | 🌍 Global |
 | `get_wildfire_info` | Active fires, containment, size, proximity-based safety guidance | 🇺🇸 US |
 | `check_service_status` | Health checks for all upstream APIs plus cache statistics | — |
 | `save_location` | Save places as aliases ("home", "cabin") with optional activity tags | — |
@@ -250,9 +250,11 @@ Being honest about what free public data can and can't do:
 | Air quality, marine, radar, lightning | ✅ | — |
 | Current conditions | ✅ | Station observations via NOAA (richer detail) |
 | Weather alerts | ❌ | ✅ |
-| River conditions, wildfires | ❌ | ✅ |
+| River conditions | ✅ (GloFAS modeled discharge) | Gauge observations + official flood stages via NWPS |
+| Wildfires | ❌ | ✅ |
 
 - Historical data older than 7 days comes from reanalysis models (9–25km grid), not direct station observations, and trails real time by ~5 days.
+- Non-US river discharge is **modeled**, not observed, and has no official flood-stage thresholds — levels are shown relative to recent history and the forecast ensemble. The ~5km model grid means the reported channel may be a few km from the requested point; the output says so when it is.
 - Marine data has limited coastal accuracy and is **not suitable for navigation**.
 - Lightning coverage varies by region (community-operated detector network).
 - Open-Meteo's fair-use limit is 10,000 requests/day; the built-in cache makes this hard to hit in normal use.

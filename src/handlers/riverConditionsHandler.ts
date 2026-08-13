@@ -3,14 +3,34 @@
  */
 
 import { NOAAService } from '../services/noaa.js';
+import { OpenMeteoService } from '../services/openmeteo.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
-import { validateDetail } from '../utils/validation.js';
+import { validateDetail, validatePositiveInteger } from '../utils/validation.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
+import { isInUS } from '../utils/geography.js';
+import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
+import { cubicMetersPerSecondToCubicFeetPerSecond } from '../utils/units.js';
+import { UnitPreferences } from '../config/units.js';
+import {
+  buildProbeGrid,
+  pickChannelCell,
+  findTodayIndex,
+  pastWindowValues,
+  recentWindowValues,
+  classifyDischargeTrend,
+  formatDischargeTrend,
+  classifyAgainstRecentMean,
+  describeMinorDrainage,
+  formatSnapNote,
+  PROBE_GRID_CENTER_INDEX
+} from '../utils/riverDischarge.js';
 import { RateLimitError } from '../errors/ApiError.js';
 import type { NWPSGauge, GaugeStatus, NWPSStageFlowResponse, StageFlowDataPoint, FloodCategories } from '../types/noaa.js';
+import type { OpenMeteoFloodResponse } from '../types/openmeteo.js';
+import type { DetailLevel } from '../utils/validation.js';
 
 /**
  * NWPS emits large negative sentinels (e.g. -999, -999999) for missing stage/flow
@@ -121,20 +141,33 @@ export function formatStageTrend(trend: StageTrend): string {
   return `${arrow} ${trend.direction} (${signed} ft / ${trend.windowHours}h)`;
 }
 
-interface RiverConditionsArgs {
+interface RiverConditionsArgs extends UnitArgs {
   latitude?: number;
   longitude?: number;
   location_name?: string;
   city_name?: string;
-  radius?: number; // search radius in km (default: 50)
+  radius?: number; // search radius in km (default: 50) — NOAA path only
   detail?: 'summary' | 'standard' | 'full';
+  source?: 'auto' | 'noaa' | 'openmeteo';
+  forecast_days?: number; // 1-210, default 7 — Open-Meteo path only
 }
 
+/**
+ * Route a river request to gauge observations or to the global discharge model.
+ *
+ * `auto` sends US coordinates to NOAA's NWPS gauge network (unchanged) and
+ * everywhere else to the Open-Meteo Flood API. An explicit `source` forces the
+ * branch. There is deliberately no cross-fallback: an observed river stage in
+ * feet against official flood categories and a modeled discharge in m³/s
+ * against its own history are different claims, and silently swapping one for
+ * the other would misrepresent the data (design D1).
+ */
 export async function handleGetRiverConditions(
   args: unknown,
   noaaService: NOAAService,
   locationStore: LocationStore,
-  geocodingService: GeocodingService
+  geocodingService: GeocodingService,
+  openMeteoService?: OpenMeteoService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as RiverConditionsArgs, locationStore, geocodingService);
@@ -143,6 +176,37 @@ export async function handleGetRiverConditions(
   // Output verbosity: 'full' lifts the gauge/crest display caps to 25 (not unbounded).
   const detail = validateDetail((args as RiverConditionsArgs)?.detail);
 
+  const requestedSource = (args as RiverConditionsArgs)?.source || 'auto';
+  const useNOAA = requestedSource === 'auto'
+    ? isInUS(latitude, longitude)
+    : requestedSource === 'noaa';
+
+  const output = useNOAA
+    ? await formatNOAARiverConditions(noaaService, latitude, longitude, args, detail)
+    : await formatOpenMeteoRiverConditions(openMeteoService, latitude, longitude, args, detail);
+
+  return prependLocationLine({
+    content: [
+      {
+        type: 'text',
+        text: output
+      }
+    ]
+  }, resolved);
+}
+
+/**
+ * The US path: NWPS gauge observations, flood categories, and crest history.
+ * Byte-identical to the pre-global behavior — `radius` and the Search Radius
+ * line belong to this path only.
+ */
+async function formatNOAARiverConditions(
+  noaaService: NOAAService,
+  latitude: number,
+  longitude: number,
+  args: unknown,
+  detail: DetailLevel
+): Promise<string> {
   // Validate radius parameter
   let radius = (args as RiverConditionsArgs)?.radius ?? 50; // default 50 km
   if (typeof radius !== 'number' || isNaN(radius) || !isFinite(radius)) {
@@ -251,14 +315,323 @@ export async function handleGetRiverConditions(
   output += `*Data source: NOAA National Water Prediction Service (NWPS)*\n`;
   output += `*River conditions are updated hourly. Always consult official sources for critical decisions.*\n`;
 
-  return prependLocationLine({
-    content: [
-      {
-        type: 'text',
-        text: output
-      }
-    ]
-  }, resolved);
+  return output;
+}
+
+/** Header line naming the model behind the global path. */
+const OPENMETEO_SOURCE_LINE =
+  '**Source:** Open-Meteo Flood API (GloFAS v4, ~5 km model grid)';
+
+/**
+ * The caveat that has to lead this path: GloFAS publishes no flood-stage
+ * thresholds, so there is no "minor/moderate/major" to report and nothing here
+ * should be read as a gauge reading.
+ */
+const OPENMETEO_MODEL_CAVEAT =
+  '⚠️ Model-estimated river discharge — not gauge observations. No official ' +
+  'flood-stage thresholds exist for this data; levels are shown relative to ' +
+  'recent history and the forecast ensemble.';
+
+/**
+ * Render a discharge value at a sensible precision for its magnitude — large
+ * rivers run to five figures, minor drainage to two decimal places.
+ */
+function formatDischargeValue(cms: number): string {
+  if (cms >= 100) {
+    return Math.round(cms).toLocaleString('en-US');
+  }
+  if (cms >= 1) {
+    return cms.toFixed(1);
+  }
+  return cms.toFixed(2);
+}
+
+/**
+ * Discharge in the API's native m³/s, with ft³/s alongside under imperial
+ * preferences. Discharge takes no per-call unit parameter (design D5); it
+ * follows WEATHER_UNITS, using the same imperial/metric resolution as distance.
+ */
+function formatDischarge(cms: number, prefs: UnitPreferences): string {
+  const metric = `${formatDischargeValue(cms)} m³/s`;
+  if (prefs.distance !== 'mi') {
+    return metric;
+  }
+  const cfs = cubicMetersPerSecondToCubicFeetPerSecond(cms);
+  return `${metric} (${formatDischargeValue(cfs)} ft³/s)`;
+}
+
+/**
+ * Locate the most recent real reading at or before today, so a null value for
+ * today falls back to the latest actual observation rather than reading as zero.
+ */
+function findLatestRealValue(
+  series: Array<number | null> | undefined,
+  todayIndex: number
+): { value: number; index: number } | undefined {
+  if (!series) {
+    return undefined;
+  }
+  for (let i = Math.min(todayIndex, series.length - 1); i >= 0; i--) {
+    const value = series[i];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return { value, index: i };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The global path: GloFAS modeled discharge, snapped to the river channel and
+ * presented against its own recent history (design D3/D4/D6).
+ */
+async function formatOpenMeteoRiverConditions(
+  openMeteoService: OpenMeteoService | undefined,
+  latitude: number,
+  longitude: number,
+  args: unknown,
+  detail: DetailLevel
+): Promise<string> {
+  if (!openMeteoService) {
+    throw new Error('Open-Meteo service is required for river conditions outside the US');
+  }
+
+  // Validation errors propagate — this path has no try/catch swallowing them.
+  const rawForecastDays = (args as RiverConditionsArgs)?.forecast_days;
+  const forecastDays = rawForecastDays === undefined
+    ? 7
+    : validatePositiveInteger(rawForecastDays, 'forecast_days', 1, 210);
+
+  const prefs = resolveUnitPreferences(args as UnitArgs);
+
+  // One multi-point request covers the whole 3x3 neighborhood (design D3).
+  const grid = buildProbeGrid(latitude, longitude);
+  const cells = await openMeteoService.getRiverDischarge(
+    grid.map(p => p.latitude),
+    grid.map(p => p.longitude),
+    forecastDays
+  );
+
+  let output = `# River Conditions Report\n\n`;
+  output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
+  output += `${OPENMETEO_SOURCE_LINE}\n\n`;
+  output += `${OPENMETEO_MODEL_CAVEAT}\n\n`;
+
+  const pick = pickChannelCell(cells, PROBE_GRID_CENTER_INDEX);
+
+  if (!pick) {
+    // Ocean, desert, or anywhere else GloFAS models no channel. The API returns
+    // HTTP 200 with null-filled arrays here, so this is a result, not an error.
+    output += `ℹ️ **No river data for this location**\n\n`;
+    output += `The flood model has no river channel within ~8 km of this point. `;
+    output += `This is expected over open ocean, arid regions, and small islands.\n\n`;
+    output += `**Tip:** Try a point closer to a named river, or use `;
+    output += `get_marine_conditions for coastal and open-water conditions.\n`;
+    return output + formatOpenMeteoFooter();
+  }
+
+  const cell = cells[pick.index];
+  const daily = cell.daily;
+  const series = daily?.river_discharge;
+  const todayIndex = findTodayIndex(daily?.time, cell.utc_offset_seconds);
+
+  const snapNote = formatSnapNote(pick.snapDistanceKm, pick.snapBearing);
+  if (snapNote) {
+    output += `${snapNote}\n\n`;
+  }
+
+  const minorDrainage = describeMinorDrainage(pick.meanDischarge);
+  if (minorDrainage) {
+    output += `⚠️ **${minorDrainage}**\n\n`;
+  }
+
+  output += `## Current Discharge\n\n`;
+
+  const latest = findLatestRealValue(series, todayIndex);
+  if (!latest) {
+    output += `*No current discharge value available for this cell.*\n\n`;
+  } else {
+    const trend = classifyDischargeTrend(recentWindowValues(series, todayIndex, 7));
+    const trendClause = trend ? `  ${formatDischargeTrend(trend)}` : '';
+    output += `**Discharge:** ${formatDischarge(latest.value, prefs)}${trendClause}\n`;
+
+    // A null value for today falls back to the latest real day — say which.
+    const latestDate = daily?.time?.[latest.index];
+    if (latest.index !== todayIndex && latestDate) {
+      output += `**As of:** ${latestDate} (most recent modeled day)\n`;
+    }
+
+    const mean31 = meanOfSeries(pastWindowValues(series, todayIndex));
+    const context = classifyAgainstRecentMean(latest.value, mean31);
+    if (context && mean31 !== undefined) {
+      // Em-dash rather than parentheses: the discharge value already carries its
+      // own imperial parenthetical, and nesting them reads badly.
+      output += `**vs. recent history:** ${context.label} `;
+      output += `— 31-day mean ${formatDischarge(mean31, prefs)}\n`;
+    }
+    output += `\n`;
+  }
+
+  output += formatEnsembleForecast(cell, todayIndex, detail, prefs);
+
+  return output + formatOpenMeteoFooter();
+}
+
+/** Mean of the real values in a series, or undefined when there are none. */
+function meanOfSeries(values: Array<number | null>): number | undefined {
+  let sum = 0;
+  let count = 0;
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      sum += value;
+      count++;
+    }
+  }
+  return count === 0 ? undefined : sum / count;
+}
+
+/** Forecast rows rendered below detail="full". */
+const FORECAST_SUMMARY_DAYS = 7;
+
+/** True for a real, present numeric reading in a nullable model series. */
+function isRealNumber(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/** Discharge in whichever unit the resolved preferences call for. */
+function dischargeInPrefUnit(cms: number, prefs: UnitPreferences): number {
+  return prefs.distance === 'mi' ? cubicMetersPerSecondToCubicFeetPerSecond(cms) : cms;
+}
+
+/** Label for the unit `dischargeInPrefUnit` returns. */
+function dischargeUnitLabel(prefs: UnitPreferences): string {
+  return prefs.distance === 'mi' ? 'ft³/s' : 'm³/s';
+}
+
+/** Render one value in the preferred unit, without repeating the unit label. */
+function forecastValue(cms: number, prefs: UnitPreferences): string {
+  return formatDischargeValue(dischargeInPrefUnit(cms, prefs));
+}
+
+/** "2026-08-13" -> "Aug 13", without dragging the local timezone into it. */
+function formatDayLabel(iso: string): string {
+  const parts = iso.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) {
+    return iso;
+  }
+  const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+/**
+ * The GloFAS ensemble forecast (design D4). There are no flood categories to
+ * report, so the forecast is expressed as a daily median inside its p25-p75
+ * band. Ensemble members stay tightly clustered for the first few days and only
+ * diverge from about day 4 — the band is shown from day 1 regardless, with the
+ * section wording carrying the caveat rather than hiding the early rows.
+ *
+ * Rows use a single unit (the resolved preference, named once in the header):
+ * repeating a dual-unit parenthetical on every median, band, and envelope value
+ * would be unreadable. The headline Current Discharge line keeps both.
+ */
+function formatEnsembleForecast(
+  cell: OpenMeteoFloodResponse,
+  todayIndex: number,
+  detail: DetailLevel,
+  prefs: UnitPreferences
+): string {
+  const daily = cell.daily;
+  const time = daily?.time;
+  const median = daily?.river_discharge_median ?? daily?.river_discharge;
+  if (!time || !median) {
+    return '';
+  }
+
+  const p25 = daily?.river_discharge_p25;
+  const p75 = daily?.river_discharge_p75;
+  const low = daily?.river_discharge_min;
+  const high = daily?.river_discharge_max;
+
+  // `forecast_days=N` returns N days starting with the location's local today
+  // (live-verified: forecast_days=1 returns today and nothing else), so day 1
+  // of the ensemble is today. Today therefore appears both here and under
+  // Current Discharge — and legitimately differs, since the current level is
+  // the deterministic run while this row is the ensemble median.
+  const start = todayIndex;
+
+  // Trim trailing days the model returned as null rather than rendering them as
+  // 0 m³/s (same null-horizon handling as the marine and air-quality paths).
+  let end = Math.min(time.length, median.length);
+  while (end > start && !isRealNumber(median[end - 1])) {
+    end--;
+  }
+  const trimmedDays = Math.min(time.length, median.length) - end;
+
+  const rows: string[] = [];
+  for (let i = start; i < end; i++) {
+    const value = median[i];
+    if (!isRealNumber(value)) {
+      continue; // interior gap — skip the day rather than invent a zero
+    }
+
+    let row = `- **${formatDayLabel(time[i])}:** ${forecastValue(value, prefs)}`;
+
+    if (isRealNumber(p25?.[i]) && isRealNumber(p75?.[i])) {
+      row += ` · p25–p75 ${forecastValue(p25[i] as number, prefs)}–${forecastValue(p75[i] as number, prefs)}`;
+    }
+
+    // The full min/max envelope is detail="full" only — it is much wider than
+    // the interquartile band and would swamp the summary view.
+    if (detail === 'full' && isRealNumber(low?.[i]) && isRealNumber(high?.[i])) {
+      row += ` · range ${forecastValue(low[i] as number, prefs)}–${forecastValue(high[i] as number, prefs)}`;
+    }
+
+    rows.push(row);
+  }
+
+  if (rows.length === 0) {
+    // Reachable when the whole horizon is null, or when local "today" has
+    // rolled past the model run's issue date and consumed a short horizon.
+    // Say so rather than dropping the section without explanation.
+    let empty = `## Ensemble Forecast\n\n`;
+    empty += trimmedDays > 0
+      ? `*The model returned no values for the ${trimmedDays} requested forecast day${trimmedDays > 1 ? 's' : ''}.*\n`
+      : `*No modeled forecast days were returned for this location.*\n`;
+    return empty;
+  }
+
+  const cap = detail === 'full' ? rows.length : FORECAST_SUMMARY_DAYS;
+  const shown = rows.slice(0, cap);
+
+  let output = `## Ensemble Forecast\n\n`;
+  output += `Daily median with the p25–p75 ensemble band, in ${dischargeUnitLabel(prefs)}, starting today. `;
+  output += `Members stay tightly clustered for the first few days and diverge from about `;
+  output += `day 4, so a near-zero band early on reflects that clustering, not certainty.\n\n`;
+  output += `${shown.join('\n')}\n`;
+
+  if (rows.length > shown.length) {
+    const remaining = rows.length - shown.length;
+    output += `\n*Note: ${remaining} more forecast day${remaining > 1 ? 's' : ''} available — use detail="full" for the full range and the min/max envelope*\n`;
+  }
+
+  if (trimmedDays > 0) {
+    output += `\n*Note: ${trimmedDays} further day${trimmedDays > 1 ? 's' : ''} returned no modeled values and ${trimmedDays > 1 ? 'were' : 'was'} omitted*\n`;
+  }
+
+  return output;
+}
+
+/**
+ * Footer for the global path. The CC-BY credit replaces the NWPS credit here
+ * and only here — the US path keeps its own attribution.
+ */
+function formatOpenMeteoFooter(): string {
+  let output = `\n---\n`;
+  output += `*River discharge data by Open-Meteo.com (CC-BY 4.0)*\n`;
+  output += `*Always consult official sources for flood-critical decisions.*\n`;
+  return output;
 }
 
 /**

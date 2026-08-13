@@ -537,17 +537,30 @@ const TOOL_DEFINITIONS = {
 
   get_river_conditions: {
     name: 'get_river_conditions' as const,
-    description: 'Monitor river levels and flood status for a location (US only). Use this when asked about "river flooding", "river level", "flood stage", "streamflow", "safe to kayak", or "river conditions". Returns current river gauge data within specified radius including river stage, flow rate, flood category levels (action/minor/moderate/major), and forecasted conditions. Provides safety assessment based on flood stages. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for flood-prone areas and water recreation.',
+    description: 'Monitor river levels and flood status for a location (global coverage). Use this when asked about "river flooding", "river level", "flood stage", "streamflow", "safe to kayak", or "river conditions". Two data modes: for US locations, returns NOAA NWPS gauge observations within the search radius — river stage, flow rate, official flood categories (action/minor/moderate/major), crest history, and forecasts. Everywhere else, returns Open-Meteo Flood API (GloFAS v4) modeled river discharge in m³/s, snapped to the nearest modeled river channel and presented against its own recent history and forecast ensemble; no official flood-stage thresholds exist for model data. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for flood-prone areas and water recreation.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         ...LOCATION_SCHEMA_PROPERTIES,
         radius: {
           type: 'number' as const,
-          description: 'Search radius in kilometers (1-500, default: 50)',
+          description: 'US gauge search radius in kilometers (1-500, default: 50); ignored for the global model path',
           minimum: 1,
           maximum: 500,
           default: 50
+        },
+        source: {
+          type: 'string' as const,
+          description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), or "openmeteo" (global)',
+          enum: ['auto', 'noaa', 'openmeteo'],
+          default: 'auto'
+        },
+        forecast_days: {
+          type: 'number' as const,
+          description: 'Number of discharge forecast days (1-210, default: 7); global model path only, ignored for US gauge data',
+          minimum: 1,
+          maximum: 210,
+          default: 7
         },
         ...DETAIL_SCHEMA_PROPERTY
       },
@@ -758,7 +771,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_river_conditions':
         return await withAnalytics('get_river_conditions', async () =>
-          handleGetRiverConditions(args, noaaService, locationStore, geocodingService)
+          handleGetRiverConditions(args, noaaService, locationStore, geocodingService, openMeteoService)
         );
 
       case 'get_wildfire_info':

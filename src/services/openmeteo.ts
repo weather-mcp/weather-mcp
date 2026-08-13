@@ -16,6 +16,7 @@ import type {
   OpenMeteoForecastResponse,
   OpenMeteoAirQualityResponse,
   OpenMeteoMarineResponse,
+  OpenMeteoFloodResponse,
   ClimateNormals
 } from '../types/openmeteo.js';
 import { Cache } from '../utils/cache.js';
@@ -48,6 +49,7 @@ export interface OpenMeteoServiceConfig {
   forecastURL?: string;
   airQualityURL?: string;
   marineURL?: string;
+  floodURL?: string;
   timeout?: number;
   maxRetries?: number;
 }
@@ -58,6 +60,7 @@ export class OpenMeteoService {
   private forecastClient: AxiosInstance;
   private airQualityClient: AxiosInstance;
   private marineClient: AxiosInstance;
+  private floodClient: AxiosInstance;
   private maxRetries: number;
   private cache: Cache;
 
@@ -68,6 +71,7 @@ export class OpenMeteoService {
       forecastURL = 'https://api.open-meteo.com/v1',
       airQualityURL = 'https://air-quality-api.open-meteo.com/v1',
       marineURL = 'https://marine-api.open-meteo.com/v1',
+      floodURL = 'https://flood-api.open-meteo.com/v1',
       timeout = CacheConfig.apiTimeoutMs,
       maxRetries = 3
     } = config;
@@ -125,6 +129,16 @@ export class OpenMeteoService {
       }
     });
 
+    // Flood client (river discharge / GloFAS)
+    this.floodClient = axios.create({
+      baseURL: floodURL,
+      timeout,
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': getUserAgent()
+      }
+    });
+
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       response => response,
@@ -147,6 +161,11 @@ export class OpenMeteoService {
     );
 
     this.marineClient.interceptors.response.use(
+      response => response,
+      error => this.handleError(error)
+    );
+
+    this.floodClient.interceptors.response.use(
       response => response,
       error => this.handleError(error)
     );
@@ -1203,6 +1222,146 @@ export class OpenMeteoService {
         'OpenMeteo',
         'No daily marine forecast data available for the specified location'
       );
+    }
+  }
+
+  /**
+   * Get river discharge data from the Open-Meteo Flood API (GloFAS v4 model)
+   *
+   * Accepts one or more coordinate pairs in a single request — this is what
+   * lets the channel-snapping probe (a 3x3 grid around a target point) fetch
+   * its whole neighborhood as one HTTP call instead of nine.
+   *
+   * Does NOT validate that any returned series is non-null: a location with
+   * no river running through its grid cell (ocean, desert) legitimately
+   * returns HTTP 200 with null-filled arrays, and that must reach the
+   * caller rather than being treated as an error.
+   *
+   * @param latitudes - Latitude coordinates (-90 to 90), one per point
+   * @param longitudes - Longitude coordinates (-180 to 180), one per point,
+   *   same length and order as `latitudes`
+   * @param forecastDays - Number of forecast days (1-210, default: 7). The
+   *   live API accepts up to 366, but 210 is the documented contract.
+   * @returns One response per requested coordinate, always as an array —
+   *   Open-Meteo returns a bare object for a single-coordinate request and
+   *   an array for a multi-point request, and this normalizes both shapes.
+   */
+  async getRiverDischarge(
+    latitudes: number[],
+    longitudes: number[],
+    forecastDays: number = 7
+  ): Promise<OpenMeteoFloodResponse[]> {
+    if (latitudes.length === 0 || longitudes.length === 0) {
+      throw new InvalidLocationError(
+        'OpenMeteo',
+        'At least one coordinate pair is required for river discharge lookup'
+      );
+    }
+
+    if (latitudes.length !== longitudes.length) {
+      throw new InvalidLocationError(
+        'OpenMeteo',
+        'Latitude and longitude arrays must have the same length'
+      );
+    }
+
+    // Validate every coordinate
+    latitudes.forEach(lat => validateLatitude(lat));
+    longitudes.forEach(lon => validateLongitude(lon));
+
+    // Validate forecast days
+    if (forecastDays < 1 || forecastDays > 210) {
+      throw new InvalidLocationError(
+        'OpenMeteo',
+        'River discharge forecast days must be between 1 and 210'
+      );
+    }
+
+    // Build parameters
+    const params = this.buildFloodParams(latitudes, longitudes, forecastDays);
+
+    // Rounded coordinates for the cache key: 2 decimals stays finer than
+    // the 0.05-degree probe pitch, so distinct probe grids never collide.
+    const roundedCoords = latitudes
+      .map((lat, i) => `${lat.toFixed(2)},${longitudes[i].toFixed(2)}`)
+      .join('|');
+
+    // Check cache first
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('openmeteo-flood', roundedCoords, forecastDays);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as OpenMeteoFloodResponse[];
+      }
+
+      const response = await this.makeRequestToFlood<OpenMeteoFloodResponse | OpenMeteoFloodResponse[]>('/flood', params);
+      const normalized = Array.isArray(response) ? response : [response];
+
+      this.cache.set(cacheKey, normalized, CacheConfig.ttl.floodDischarge);
+
+      return normalized;
+    }
+
+    // No caching
+    const response = await this.makeRequestToFlood<OpenMeteoFloodResponse | OpenMeteoFloodResponse[]>('/flood', params);
+    return Array.isArray(response) ? response : [response];
+  }
+
+  /**
+   * Build request parameters for river discharge data
+   * @private
+   */
+  private buildFloodParams(
+    latitudes: number[],
+    longitudes: number[],
+    forecastDays: number
+  ): Record<string, string | number> {
+    return {
+      latitude: latitudes.join(','),
+      longitude: longitudes.join(','),
+      daily: [
+        'river_discharge',
+        'river_discharge_mean',
+        'river_discharge_median',
+        'river_discharge_max',
+        'river_discharge_min',
+        'river_discharge_p25',
+        'river_discharge_p75'
+      ].join(','),
+      past_days: 31,
+      forecast_days: forecastDays,
+      timezone: 'auto'
+    };
+  }
+
+  /**
+   * Make request to flood API with retry logic
+   * @private
+   */
+  private async makeRequestToFlood<T>(
+    url: string,
+    params: Record<string, string | number>,
+    retries = 0
+  ): Promise<T> {
+    try {
+      const response = await this.floodClient.get<T>(url, { params });
+      return response.data;
+    } catch (error) {
+      // Retry on rate limit or server errors
+      if (retries < this.maxRetries) {
+        const shouldRetry =
+          (error as Error).message.includes('rate limit') ||
+          (error as Error).message.includes('server error') ||
+          (error as Error).message.includes('timed out');
+
+        if (shouldRetry) {
+          const baseDelay = Math.pow(2, retries) * 1000;
+          const delay = baseDelay * (0.5 + Math.random() * 0.5);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return this.makeRequestToFlood<T>(url, params, retries + 1);
+        }
+      }
+      throw error;
     }
   }
 

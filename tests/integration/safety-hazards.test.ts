@@ -7,15 +7,20 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { handleGetRiverConditions } from '../../src/handlers/riverConditionsHandler.js';
 import { handleGetWildfireInfo } from '../../src/handlers/wildfireHandler.js';
 import { NOAAService } from '../../src/services/noaa.js';
+import { OpenMeteoService } from '../../src/services/openmeteo.js';
 import { NIFCService } from '../../src/services/nifc.js';
 
 describe('River Conditions (v1.6.0)', () => {
   let noaaService: NOAAService;
+  // These are all US coordinates, so they route to NOAA and never consult
+  // Open-Meteo — it is supplied only to satisfy the handler signature.
+  let openMeteoService: OpenMeteoService;
 
   beforeAll(() => {
     noaaService = new NOAAService({
       userAgent: 'weather-mcp-test/1.6.0'
     });
+    openMeteoService = new OpenMeteoService();
   });
 
   describe('River Gauge Queries', () => {
@@ -27,7 +32,10 @@ describe('River Conditions (v1.6.0)', () => {
           longitude: -90.1994,
           radius: 50
         },
-        noaaService
+        noaaService,
+        undefined as never,
+        undefined as never,
+        openMeteoService
       );
 
       expect(result).toBeDefined();
@@ -50,7 +58,10 @@ describe('River Conditions (v1.6.0)', () => {
           longitude: -95.3698,
           radius: 75
         },
-        noaaService
+        noaaService,
+        undefined as never,
+        undefined as never,
+        openMeteoService
       );
 
       expect(result).toBeDefined();
@@ -72,7 +83,10 @@ describe('River Conditions (v1.6.0)', () => {
           longitude: -117.0, // Death Valley
           radius: 10  // Small radius to ensure no gauges
         },
-        noaaService
+        noaaService,
+        undefined as never,
+        undefined as never,
+        openMeteoService
       );
 
       expect(result).toBeDefined();
@@ -94,7 +108,10 @@ describe('River Conditions (v1.6.0)', () => {
           longitude: -74.0060,
           radius: 100 // Larger radius
         },
-        noaaService
+        noaaService,
+        undefined as never,
+        undefined as never,
+        openMeteoService
       );
 
       expect(result).toBeDefined();
@@ -112,14 +129,17 @@ describe('River Conditions (v1.6.0)', () => {
             latitude: 100, // Invalid
             longitude: -90
           },
-          noaaService
+          noaaService,
+          undefined as never,
+          undefined as never,
+          openMeteoService
         )
       ).rejects.toThrow();
     });
 
     it('should handle missing coordinates', async () => {
       await expect(
-        handleGetRiverConditions({}, noaaService)
+        handleGetRiverConditions({}, noaaService, undefined as never, undefined as never, openMeteoService)
       ).rejects.toThrow();
     });
 
@@ -131,7 +151,10 @@ describe('River Conditions (v1.6.0)', () => {
           longitude: -90.1994,
           radius: 1000 // Should be clamped to 500
         },
-        noaaService
+        noaaService,
+        undefined as never,
+        undefined as never,
+        openMeteoService
       );
 
       expect(result).toBeDefined();

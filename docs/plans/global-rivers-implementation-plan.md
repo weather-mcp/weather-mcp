@@ -1,8 +1,10 @@
 # Global River Conditions — Implementation Plan
 
-**Status:** READY (2026-08-12)
+**Status:** COMPLETE (2026-08-12) — all eight tasks committed on
+`feat/global-rivers`; gate green (build 0 errors, 1451 tests, 0 vulnerabilities).
+Opening the PR / merging is the human's call.
 
-Execution plan for `docs/global-rivers-plan.md` (the WHAT/WHY); rules live in
+Execution plan for `docs/plans/global-rivers-plan.md` (the WHAT/WHY); rules live in
 `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +12,10 @@ Execution plan for `docs/global-rivers-plan.md` (the WHAT/WHY); rules live in
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/global-rivers-implementation-plan.md
+/run-plan docs/plans/global-rivers-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/global-rivers-plan.md` (design),
+Or, equivalently: read `docs/plans/global-rivers-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review the
 diff, run the gate yourself, commit, tick the tracker, push.
@@ -318,7 +320,7 @@ The load-bearing design decision — the orchestrator does this one itself.
 
 - Files: `CHANGELOG.md`, `README.md`, `docs/TOOLS.md`, `CLAUDE.md`,
   `docs/planning/README.md`, `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md`,
-  `docs/global-rivers-plan.md`
+  `docs/plans/global-rivers-plan.md`
 - **Live sweep against the built dist**, re-verifying T4 and T5's acceptance
   lists end to end plus a US regression pass (St. Louis / Mississippi output
   identical to pre-branch behavior) and one saved-location + one `city_name`
@@ -332,9 +334,11 @@ The load-bearing design decision — the orchestrator does this one itself.
   flipped to ✅ (the orchestrator may flip it to 🚧 at kickoff) with the viability
   row left as historical record; ICR Phase 2 marked shipped for the Flood API
   half, with the UK EA supplement explicitly still open. Mark
-  `docs/global-rivers-plan.md` status `IMPLEMENTED`.
-- Leave the plan set in `docs/` — per the playbook, the move to `docs/plans/`
-  happens when v1.15.0 actually ships.
+  `docs/plans/global-rivers-plan.md` status `IMPLEMENTED`.
+- ~~Leave the plan set in `docs/` — per the playbook, the move to `docs/plans/`
+  happens when v1.15.0 actually ships.~~ **Superseded:** the plan set was moved
+  to `docs/plans/` at implementation completion, ahead of the v1.15.0 release,
+  at the maintainer's request. All references were updated with it.
 - Acceptance: live sweep recorded in the commit message or a short note; full
   gate green; every checklist box in the design plan's "Documentation /
   registration checklist" satisfied.
@@ -360,17 +364,17 @@ The load-bearing design decision — the orchestrator does this one itself.
 
 ## Progress Tracker
 
-- [ ] T1 — Open-Meteo Flood client, types, cache TTL (`sonnet`)
-- [ ] T2 — Discharge unit conversion (`haiku`)
-- [ ] T3 — riverDischarge pure logic + unit tests (`opus`)
-- [ ] T4 — Route by isInUS, source/forecast_days, global output core (`opus`)
-- [ ] T5 — Ensemble forecast section and detail levels (`opus`)
-- [ ] T6 — Global river handler unit tests (`sonnet`)
-- [ ] T7 — Flood integration test (mocked + live smoke) (`sonnet`)
-- [ ] T8 — Live sweep + documentation checklist (`opus`)
+- [x] T1 — Open-Meteo Flood client, types, cache TTL (`sonnet`) — `1b25201`
+- [x] T2 — Discharge unit conversion (`haiku`) — `0cfdd38`
+- [x] T3 — riverDischarge pure logic + unit tests (`opus`) — `318a466`
+- [x] T4 — Route by isInUS, source/forecast_days, global output core (`opus`) — `cb6dd6e`
+- [x] T5 — Ensemble forecast section and detail levels (`opus`) — `89dd619`
+- [x] T6 — Global river handler unit tests (`sonnet`) — `0f042e2`
+- [x] T7 — Flood integration test (mocked + live smoke) (`sonnet`) — `0e7f9a0`
+- [x] T8 — Live sweep + documentation checklist (`opus`) — `ddfaa33`
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the design plan's D1–D6
 acceptance (including the live Memphis snap check) is demonstrably met, existing
-US river output is unchanged, and `docs/global-rivers-plan.md` is marked
+US river output is unchanged, and `docs/plans/global-rivers-plan.md` is marked
 `IMPLEMENTED`. Opening the PR is the human's call.

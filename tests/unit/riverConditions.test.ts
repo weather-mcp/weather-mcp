@@ -86,6 +86,8 @@ describe('handleGetRiverConditions', () => {
   const noaaService = { getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock } as never;
   const locationStore = {} as never;
   const geocodingService = {} as never;
+  // US coordinates route to NOAA, so the Open-Meteo service is never consulted here.
+  const openMeteoService = {} as never;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -134,7 +136,8 @@ describe('handleGetRiverConditions', () => {
       { latitude: BASE_LAT, longitude: BASE_LON, ...args },
       noaaService,
       locationStore,
-      geocodingService
+      geocodingService,
+      openMeteoService
     );
   }
 
@@ -375,6 +378,7 @@ describe('handleGetRiverConditions observed trend', () => {
       { latitude: BASE_LAT, longitude: BASE_LON, ...args },
       noaaService,
       {} as never,
+      {} as never,
       {} as never
     );
   }
@@ -481,6 +485,7 @@ describe('handleGetRiverConditions forecast series (detail="full")', () => {
     return handleGetRiverConditions(
       { latitude: BASE_LAT, longitude: BASE_LON, ...args },
       noaaService,
+      {} as never,
       {} as never,
       {} as never
     );

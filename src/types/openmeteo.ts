@@ -637,6 +637,57 @@ export interface OpenMeteoMarineResponse {
 }
 
 /**
+ * Units for daily river discharge data (Open-Meteo Flood API).
+ * Unit strings may contain the Unicode "³" character (e.g. "m³/s") — treat
+ * these as opaque display strings, never parse them.
+ */
+export interface OpenMeteoFloodDailyUnits {
+  time?: string;
+  river_discharge?: string;
+  river_discharge_mean?: string;
+  river_discharge_median?: string;
+  river_discharge_max?: string;
+  river_discharge_min?: string;
+  river_discharge_p25?: string;
+  river_discharge_p75?: string;
+}
+
+/**
+ * Daily river discharge series from the Open-Meteo Flood API (GloFAS v4
+ * model). Each series is nullable per-day: a grid cell with no river
+ * running through it returns null values rather than an error (a
+ * legitimate ocean/desert response), so entries are `number | null`.
+ */
+export interface OpenMeteoFloodDailyData {
+  time: string[];
+  river_discharge?: Array<number | null>;
+  river_discharge_mean?: Array<number | null>;
+  river_discharge_median?: Array<number | null>;
+  river_discharge_max?: Array<number | null>;
+  river_discharge_min?: Array<number | null>;
+  river_discharge_p25?: Array<number | null>;
+  river_discharge_p75?: Array<number | null>;
+}
+
+/**
+ * Complete API response from the Open-Meteo Flood API (GloFAS v4 river
+ * discharge model, ~5km grid). Open-Meteo returns a bare object for a
+ * single-coordinate request and an array of these for a multi-point
+ * request — OpenMeteoService.getRiverDischarge always normalizes the
+ * response to an array regardless of how many coordinates were requested.
+ */
+export interface OpenMeteoFloodResponse {
+  latitude: number;
+  longitude: number;
+  generationtime_ms: number;
+  utc_offset_seconds: number;
+  timezone: string;
+  timezone_abbreviation: string;
+  daily_units?: OpenMeteoFloodDailyUnits;
+  daily?: OpenMeteoFloodDailyData;
+}
+
+/**
  * Climate normals data (30-year averages)
  * Used for comparing current/forecast conditions to historical averages
  */
