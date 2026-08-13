@@ -342,7 +342,10 @@ Spot-checks against the code and live endpoints, reconciled into the tasks:
 ## Progress Tracker
 
 - [x] T1 — Promote pngjs to a runtime dependency (`haiku`) — `9217379`
-- [ ] T2 — Pure PNG compositing utilities (`sonnet`)
+- [x] T2 — Pure PNG compositing utilities (`sonnet`) — `6f34a84`
+      (also added the `@types/pngjs` devDependency — pngjs ships no
+      declarations and strict-mode `src/` now consumes it; `composite.ts`
+      re-exports `PNG` as the single import site for T3/T4)
 - [ ] T3 — GIBS basemap service + cache TTLs (`sonnet`)
 - [ ] T4 — `composite` parameter returning `[text, image]` (`opus`)
 - [ ] T5 — Handler unit tests for the composite branch (`sonnet`)
