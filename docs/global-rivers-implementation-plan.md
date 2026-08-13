@@ -365,8 +365,8 @@ The load-bearing design decision — the orchestrator does this one itself.
 - [x] T3 — riverDischarge pure logic + unit tests (`opus`) — `318a466`
 - [x] T4 — Route by isInUS, source/forecast_days, global output core (`opus`) — `cb6dd6e`
 - [x] T5 — Ensemble forecast section and detail levels (`opus`) — `89dd619`
-- [ ] T6 — Global river handler unit tests (`sonnet`)
-- [ ] T7 — Flood integration test (mocked + live smoke) (`sonnet`)
+- [x] T6 — Global river handler unit tests (`sonnet`) — `0f042e2`
+- [x] T7 — Flood integration test (mocked + live smoke) (`sonnet`) — `0e7f9a0`
 - [ ] T8 — Live sweep + documentation checklist (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
