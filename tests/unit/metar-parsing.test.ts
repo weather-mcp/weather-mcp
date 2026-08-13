@@ -128,7 +128,7 @@ describe('METAR field parsing', () => {
       receiptTime: '2026-08-13T14:14:20Z',
       rawOb: 'METAR HKJK 131413Z 12008KT 9999 SCT025 22/12 Q1021',
       metarType: 'METAR',
-      qcField: '0',
+      qcField: 0,
       temp: 22,
       dewp: 12,
       wdir: 120,

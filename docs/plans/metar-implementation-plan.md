@@ -1,8 +1,8 @@
 # Worldwide Station Observations (METAR) — Implementation Plan
 
-**Status:** READY (2026-08-13)
+**Status:** COMPLETE (2026-08-13) — all eight tasks landed on `feat/metar`.
 
-Execution plan for `docs/metar-plan.md` (the WHAT/WHY); rules live in
+Execution plan for `docs/plans/metar-plan.md` (the WHAT/WHY); rules live in
 `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ Execution plan for `docs/metar-plan.md` (the WHAT/WHY); rules live in
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/metar-implementation-plan.md
+/run-plan docs/plans/metar-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/metar-plan.md` (design),
+Or, equivalently: read `docs/plans/metar-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review the
 diff, run the gate yourself, commit, tick the tracker, push.
@@ -367,7 +367,7 @@ Spot-checks against the code, reconciled into the tasks below:
 
 - Files: `CHANGELOG.md`, `README.md`, `docs/TOOLS.md`, `CLAUDE.md`,
   `docs/planning/README.md`,
-  `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md`, `docs/metar-plan.md`
+  `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md`, `docs/plans/metar-plan.md`
 - **Live sweep against the built dist**, re-running T5's acceptance list end to
   end, plus: a no-`source` call byte-identical to pre-branch output; a
   `location_name` and a `city_name` call with `source: 'metar'` (the
@@ -388,8 +388,8 @@ Spot-checks against the code, reconciled into the tasks below:
     half is closed and only TAF + a pilot-facing tool remain 💡; mark the ICR
     Phase 1 leftover closed in
     `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md`.
-  - Mark `docs/metar-plan.md` status `IMPLEMENTED`, then **move the plan set
-    (`docs/metar-plan.md` + this file) to `docs/plans/`** and update every
+  - Mark `docs/plans/metar-plan.md` status `IMPLEMENTED`, then **move the plan set
+    (`docs/plans/metar-plan.md` + this file) to `docs/plans/`** and update every
     reference — matching what the maintainer asked for on almanac.
 - Acceptance: live sweep recorded in the commit message or a short note; full
   gate green; every box of the design plan's "Documentation / registration
@@ -443,15 +443,38 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T2 — Move bearing/compass geometry; add compass + humidity helpers (`sonnet`) — `07f0bc1`
 - [x] T3 — METAR types, AviationWeatherService, cache TTL (`sonnet`) — `24ab7cf`
 - [x] T4 — Station picker and METAR parsing helpers (`opus`) — `1475f31`
-- [ ] T5 — `source: 'metar'` on get_current_conditions + schema (`opus`)
-- [ ] T6 — Handler unit tests for METAR routing and rendering (`sonnet`)
-- [ ] T7 — Integration tests: captured shapes + tolerant live smoke (`sonnet`)
-- [ ] T8 — Live sweep + documentation checklist (`opus`)
+- [x] T5 — `source: 'metar'` on get_current_conditions + schema (`opus`) — `f3ddaab`
+  - Live: KBFI (Seattle), EGLC (London), HKNW (Nairobi), YSSY (Sydney, metric),
+    mid-Pacific no-station message, normals + US records on the METAR path.
+  - The live `auto`-vs-`main` byte comparison was deferred to T8 and is now
+    **done and byte-identical** — see the T8 sweep record below.
+- [x] T6 — Handler unit tests for METAR routing and rendering (`sonnet`) — `fb21d1a`
+- [x] T7 — Integration tests: captured shapes + tolerant live smoke (`sonnet`) — `e42749a`
+- [x] T8 — Live sweep + documentation checklist (`opus`) — see below
+
+### T8 live sweep record (2026-08-13, against the built dist)
+
+| Acceptance point | Result |
+|---|---|
+| US point with `source: 'metar'` | ✅ KBFI (Seattle/Boeing Fld), 4 mi S, SPECI, raw METAR present |
+| Non-US points return a real station | ✅ EGLC (London), HKNW (Nairobi), YSSY (Sydney), BIRK (Reykjavik) |
+| Mid-ocean → friendly message | ✅ 25°S 140°W → "No reporting station near this location", no error |
+| **`auto` byte-identical to `main`** | ✅ **diff of built-dist output for a US and a non-US point: byte-identical** |
+| Metric and imperial both render | ✅ Sydney metric (°C/km/h/hPa/m); Seattle imperial (°F/mph/inHg/ft) |
+| `location_name` with `source: 'metar'` | ✅ `home` → KGDW; `**Location:**` header leads, above `**Station:**` |
+| `city_name` with `source: 'metar'` | ✅ `Reykjavik` → BIRK; `**Location:**` header leads |
+| 10-minute cache serves a repeat call | ✅ second identical call logged a cache hit, no second upstream fetch |
+| 502/retry degrades to a sanitized error | ⚠️ **not reproduced live** — a 15-request concurrent burst returned 15/15 success, so the gateway did not fail. No raw HTML in any message. The path stays covered deterministically by `tests/unit/metar-service.test.ts` and `tests/integration/metar.test.ts`. |
+
+Real-world bonus: BIRK's METAR (`BIRK 131600Z 24003KT 9999 BCFG …`) genuinely
+carries **no temperature group**, so the live sweep exercised the sparse-field
+omission path on real data — the temperature line was correctly omitted and
+`BCFG` decoded to "Patches fog".
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the design plan's five live
 acceptance points are demonstrably met against the built dist (US station,
 non-US station, mid-ocean friendly message, unchanged `auto` output, both unit
 systems), `tests/unit/current-conditions-global.test.ts` still passes unedited,
-and `docs/metar-plan.md` is marked `IMPLEMENTED` and moved to `docs/plans/`.
+and `docs/plans/metar-plan.md` is marked `IMPLEMENTED` and moved to `docs/plans/`.
 Opening the PR is the human's call.

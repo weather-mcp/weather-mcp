@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1%2C348%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-1%2C628%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -47,7 +47,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
-- **Fully open source** — MIT licensed, readable TypeScript, 1,348 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 1,628 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -60,7 +60,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | Tool | What it does | Coverage |
 |------|-------------|----------|
 | `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name; sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac | 🌍 Global |
-| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional fire-weather indices), Open-Meteo model data elsewhere | 🌍 Global |
+| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional fire-weather indices), Open-Meteo model data elsewhere, or real airport station observations worldwide with `source="metar"` | 🌍 Global |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity | 🇺🇸 US |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
 | `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
@@ -86,6 +86,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 ## Feature highlights
 
 - **Smart source selection** — US queries use NOAA (detailed, includes forecaster narratives); everywhere else uses Open-Meteo. You never pick; it just works.
+- **Real observations worldwide** — ask for what a station is *actually reporting* and `get_current_conditions` will read the nearest airport's METAR (`source="metar"`): a genuine instrument reading anywhere on earth, with the station, its distance, and the observation age always stated. Outside the US this is the difference between a measurement and a model estimate.
 - **Saved locations** — save "home", "work", or "cabin" once, then ask *"what's the weather at home?"* Locations persist in `~/.weather-mcp/locations.json` and can be tagged with activities ("boating", "skiing") so the AI highlights what matters to you.
 - **Climate context** — optional 30-year climate normals show how today compares: *"10°F warmer than normal for this date."* For US locations the normals also carry the record high/low for the date and the year it was set: *"is this a record high?"*
 - **Astronomy almanac** — opt-in moon phase, illumination, moonrise/moonset, civil/nautical/astronomical twilight, and next full/new moon dates on daily forecasts (`include_astronomy`). Computed locally — accurate to the arcminute, works at the poles, costs zero API calls: *"when does it get fully dark?"*
@@ -252,11 +253,12 @@ Being honest about what free public data can and can't do:
 | Forecasts (up to 16 days) | ✅ | Richer detail via NOAA |
 | Historical weather (1940+) | ✅ (>7 days old) | Station-level detail for last 7 days |
 | Air quality, marine, radar, lightning | ✅ | — |
-| Current conditions | ✅ | Station observations via NOAA (richer detail) |
+| Current conditions | ✅ (model data, or real station observations via `source="metar"`) | Station observations via NOAA (richer detail) |
 | Weather alerts | ❌ | ✅ |
 | River conditions | ✅ (GloFAS modeled discharge) | Gauge observations + official flood stages via NWPS |
 | Wildfires | ❌ | ✅ |
 
+- International current conditions default to **model-interpolated** values at the exact coordinates. `source="metar"` returns a **real instrument reading** instead — but from the nearest airport, which may be tens of km away and up to an hour old. The output always names the station, its distance and bearing, and the observation age, so the tradeoff is visible rather than assumed. METAR coverage follows airports, so remote land and open ocean have real gaps.
 - Historical data older than 7 days comes from reanalysis models (9–25km grid), not direct station observations, and trails real time by ~5 days.
 - Non-US river discharge is **modeled**, not observed, and has no official flood-stage thresholds — levels are shown relative to recent history and the forecast ensemble. The ~5km model grid means the reported channel may be a few km from the requested point; the output says so when it is.
 - Marine data has limited coastal accuracy and is **not suitable for navigation**.
@@ -268,7 +270,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 1,348 tests (~2 seconds)
+npm test               # Run all 1,628 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

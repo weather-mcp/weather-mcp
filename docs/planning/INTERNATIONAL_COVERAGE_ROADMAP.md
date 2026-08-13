@@ -38,15 +38,22 @@ The auto-select pattern to replicate everywhere: `forecastHandler.ts:235` (US �
 
 **Shipped:** `OpenMeteoService.getCurrentConditions()` plus US/non-US auto-select in
 `currentConditionsHandler.ts`, routed by the shared `isInUS` helper in
-`src/utils/geography.ts` and overridable with a `source` parameter. The
-aviationweather.gov METAR supplement below was **not** taken up and remains
-available as a future option.
+`src/utils/geography.ts` and overridable with a `source` parameter.
+
+**Leftover now closed (v1.17.0):** the aviationweather.gov METAR supplement
+below — carried as "not taken up, remains available as a future option" since
+2026-07-15 — shipped on `feat/metar` as `source: 'metar'` on
+`get_current_conditions`. See [`docs/plans/metar-plan.md`](../plans/metar-plan.md).
+Non-US current conditions can now be **real station observations** rather than
+only model-interpolated values, though `auto` still defaults to Open-Meteo
+because a METAR measures at an airport while the model estimates at the
+caller's exact coordinates. Phase 1 is complete.
 
 **API:** Open-Meteo forecast API `current=` parameters (temperature, humidity, apparent temperature, wind, gusts, pressure, precipitation, cloud cover, weather code).
 
 - Effort: Small. `OpenMeteoService` already exists; add a `getCurrentConditions()` method and the US/non-US auto-select fallback in `currentConditionsHandler.ts`.
 - Output note: model-interpolated values, not station observations — label the data source accordingly (as the forecast handler does).
-- Optional supplement: real station observations worldwide via the aviationweather.gov data API (global METARs by ICAO station, JSON, no key, 100 req/min): https://aviationweather.gov/data/api/
+- ~~Optional supplement: real station observations worldwide via the aviationweather.gov data API (global METARs by ICAO station, JSON, no key, 100 req/min): https://aviationweather.gov/data/api/~~ — **shipped in v1.17.0** (see the note above); implemented via bbox search rather than by ICAO id, since the caller supplies coordinates, not a station.
 - License: Open-Meteo free for non-commercial use, CC-BY attribution.
 
 ## Priority 2 — Global river/flood data (no new provider)

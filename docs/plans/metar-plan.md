@@ -1,6 +1,7 @@
 # Worldwide Station Observations (METAR) — Design Plan
 
-**Status:** PLANNED (2026-08-13)
+**Status:** IMPLEMENTED (2026-08-13) — shipped on `feat/metar` for v1.17.0.
+Execution record: [`metar-implementation-plan.md`](./metar-implementation-plan.md).
 **Parent:** `docs/planning/FUTURE_ENHANCEMENTS.md` §4 (aviation weather);
 `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md` Phase 1 leftover
 **Target release:** v1.17.0
@@ -297,14 +298,15 @@ respects the caller's resolved `UnitPreferences`:
 
 ## Documentation / registration checklist
 
-- [ ] `src/index.ts`: `'metar'` added to the `source` enum and the description
+- [x] `src/index.ts`: `'metar'` added to the `source` enum and the description
       rewritten with D1's semantic triggers
-- [ ] README.md: tool table and coverage notes — international current
-      conditions can now be real observations
-- [ ] CHANGELOG.md under `[Unreleased]` (repo convention; the version bump is a
+- [x] README.md: tool table, coverage notes, feature highlight, test-count badge
+- [x] CHANGELOG.md under `[Unreleased]` (repo convention; the version bump is a
       separate release step)
-- [ ] `docs/TOOLS.md` §2 — the third source and what it means
-- [ ] `docs/planning/README.md`: flip the METAR/aviation rows 📝 → ✅, add the
-      Shipped row, mark the ICR Phase 1 leftover closed
-- [ ] CLAUDE.md: new service in the architecture tree, v1.17.0 status blurb
-- [ ] Move this plan set to `docs/plans/` at completion
+- [x] `docs/TOOLS.md` §2 — the third source, what a METAR means, the caveats,
+      and a "Returns (worldwide, via `source="metar"`)" block
+- [x] `docs/planning/README.md`: METAR row 📝 → ✅, aviation-tool row updated to
+      note only TAF and a pilot-facing tool remain; ICR Phase 1 leftover closed
+- [x] CLAUDE.md: new service, types, and utility in the architecture tree,
+      v1.17.0 status blurb, tool-list line
+- [x] Move this plan set to `docs/plans/` at completion
