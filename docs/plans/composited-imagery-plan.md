@@ -1,8 +1,10 @@
 # Composited Weather Imagery (MCP image content) — Design Plan
 
-**Status:** SETTLED (2026-08-13) — all design decisions resolved and
-upstream-verified; see "Settled decisions & verification results" below.
-Execution plan: `docs/composited-imagery-implementation-plan.md`.
+**Status:** IMPLEMENTED (2026-08-13) — shipped as `composite: true` on
+`get_weather_imagery`, in `[Unreleased]` (release version TBD). All design
+decisions were resolved and upstream-verified before implementation; see
+"Settled decisions & verification results" below. Execution plan and its
+recorded live sweep: `docs/plans/composited-imagery-implementation-plan.md`.
 **Parent:** user request (2026-08-13, examples/imagery discussion); planning
 index row "Composited imagery via MCP image content blocks".
 **Target release:** TBD

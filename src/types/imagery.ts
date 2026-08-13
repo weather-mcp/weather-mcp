@@ -30,7 +30,7 @@ export interface WeatherImageryParams {
    * Opt in to a finished picture: the radar overlay composited onto a NASA
    * GIBS base map with a location marker, returned as an MCP image content
    * block alongside the text. Radar/precipitation only, latest frame only —
-   * see docs/composited-imagery-plan.md (D1, D3).
+   * see docs/plans/composited-imagery-plan.md (D1, D3).
    */
   composite?: boolean;
 }

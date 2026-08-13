@@ -5,8 +5,8 @@
  * offline in `scripts/capture-examples.mjs` (`fetchOsmBase` / `blendOnto`,
  * ~lines 314-358) for server-side use: stitching four 256px WMTS tiles into a
  * 512px image, blending a semi-transparent overlay onto a base, and drawing a
- * location marker. See `docs/composited-imagery-plan.md` (D2, D3) and
- * `docs/composited-imagery-implementation-plan.md` ("Findings that shape the
+ * location marker. See `docs/plans/composited-imagery-plan.md` (D2, D3) and
+ * `docs/plans/composited-imagery-implementation-plan.md` ("Findings that shape the
  * graph") for why this shape: the base map is two GIBS layers (an opaque
  * land/water layer and a transparent coastline/border outline layer) blended
  * together, then the radar overlay is blended on top, then a marker is drawn
@@ -256,7 +256,7 @@ export function encodePng(png: PNG): Buffer {
 /**
  * Defense-in-depth cap on an encoded composite's size, in bytes. Live-measured
  * real-world composites (base + features + radar, 512×512) run 24-91 KB
- * (`docs/composited-imagery-plan.md`); this cap sits roughly an order of
+ * (`docs/plans/composited-imagery-plan.md`); this cap sits roughly an order of
  * magnitude above that measured maximum, so it never constrains normal
  * output but still catches a pathological encode before it's base64'd and
  * returned as an MCP image content block.

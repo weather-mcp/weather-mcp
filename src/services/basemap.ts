@@ -3,8 +3,8 @@
  * land/water base plus a transparent coastline/border outline layer, fetched
  * and stitched into one 512px composite for the radar-imagery overlay path.
  *
- * See `docs/composited-imagery-plan.md` (D2, D6) and
- * `docs/composited-imagery-implementation-plan.md` ("Findings that shape the
+ * See `docs/plans/composited-imagery-plan.md` (D2, D6) and
+ * `docs/plans/composited-imagery-implementation-plan.md` ("Findings that shape the
  * graph") for why this shape:
  *
  *   - **GIBS tile matrix sets are layer-specific.** `src/services/gibs.ts`

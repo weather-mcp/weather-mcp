@@ -2,7 +2,7 @@
 
 **Status:** READY (2026-08-13)
 
-Execution plan for `docs/composited-imagery-plan.md` (the WHAT/WHY); rules live
+Execution plan for `docs/plans/composited-imagery-plan.md` (the WHAT/WHY); rules live
 in `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ in `docs/orchestration-playbook.md`.
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/composited-imagery-implementation-plan.md
+/run-plan docs/plans/composited-imagery-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/composited-imagery-plan.md` (design — especially
+Or, equivalently: read `docs/plans/composited-imagery-plan.md` (design — especially
 its "Settled decisions & verification results" section, which resolves D1–D7),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review
@@ -282,7 +282,7 @@ Spot-checks against the code and live endpoints, reconciled into the tasks:
 **T7 — Live sweep + documentation checklist** (`opus`)
 
 - Files: `CHANGELOG.md`, `README.md`, `docs/TOOLS.md`, `CLAUDE.md`,
-  `docs/planning/README.md`, `docs/composited-imagery-plan.md` (→ moved),
+  `docs/planning/README.md`, `docs/plans/composited-imagery-plan.md` (→ moved),
   this file (→ moved)
 - **Live sweep against the built dist** (drivers need `process.exit(0)` — see
   repo memory; run serially, not in parallel):
@@ -310,7 +310,7 @@ Spot-checks against the code and live endpoints, reconciled into the tasks:
   - `docs/planning/README.md`: flip the "Composited imagery via MCP image
     content blocks" row to ✅ shipped; add a 💡 follow-up row for the
     satellite image-content return (deferred D7).
-  - Mark `docs/composited-imagery-plan.md` status `IMPLEMENTED`, then **move
+  - Mark `docs/plans/composited-imagery-plan.md` status `IMPLEMENTED`, then **move
     the plan set (design plan + this file) to `docs/plans/`** and update every
     reference (playbook convention).
 - Acceptance: live sweep recorded in the tracker (table like the METAR plan's
@@ -354,12 +354,30 @@ Spot-checks against the code and live endpoints, reconciled into the tasks:
       `gibs.test.ts` passed unedited, so A7 holds.)
 - [x] T5 — Handler unit tests for the composite branch (`sonnet`) — `aab3034`
 - [x] T6 — Integration tests: mocked end-to-end + tolerant live smoke (`sonnet`) — `b4a57bf`
-- [ ] T7 — Live sweep + documentation checklist (`opus`)
+- [x] T7 — Live sweep + documentation checklist (`opus`) — see the sweep record below
+
+## T7 live sweep record (2026-08-13, built dist, run serially)
+
+| # | Case | Result |
+|---|------|--------|
+| 1 | Active precipitation — Miami 25.7617,-80.1918 `type=radar composite=true` | `[text, image]`, 512×512, **96,847 B PNG / 129,132 B base64**, 1372 ms. Visually inspected: south Florida peninsula, the Keys and Cuba's outline, storm cells over Miami/the Everglades, crosshair at the requested point. |
+| 2 | Echo-free — central Sahara 25.0,15.0 | `[text, image]`, 512×512, **29,922 B / 39,896 B**. Visually inspected: land base plus national borders render, crosshair clearly visible — no blank square. |
+| 3 | `animated=true` + `composite` — Miami | `[text, image]`; frames stay URL-based (3 listed at `standard` detail), exactly one image attached, "*The animation frames above stay URL-based*" note present. Composited the latest **observed** frame, not a nowcast frame. |
+| 4 | `type=satellite` + `composite` — Miami | `[text]` only, no image block; note rendered: "*composite rendering is available for radar/precipitation only…*" |
+| 5 | Repeat of #1 (composite cache) | Identical base64 to #1, **114 ms vs 1372 ms** — served from `CacheConfig.ttl.compositeImage`, no second upstream round. |
+| 6 | No-`composite` call vs `main` | Byte-identical apart from the `*Generated: <ISO>*` wall-clock line (frame timestamp and every tile URL matched exactly). Compared against a `main` worktree built from `89d47ae`. |
+
+Payload range across the sweep: **30–97 KB PNG / 40–129 KB base64** — consistent
+with the design plan's live-measured 24–91 KB, and ~10× under
+`MAX_COMPOSITE_BYTES` (1 MB).
+
+`tests/unit/imagery-handler.test.ts` and `tests/unit/gibs.test.ts` passed
+unedited throughout (A7).
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T7 live sweep is
 recorded (including the visual inspection of a real composite and the
 no-`composite` no-change check), `tests/unit/imagery-handler.test.ts` and
 `tests/unit/gibs.test.ts` still pass unedited, and
-`docs/composited-imagery-plan.md` is marked `IMPLEMENTED` and the plan set
+`docs/plans/composited-imagery-plan.md` is marked `IMPLEMENTED` and the plan set
 moved to `docs/plans/`. Opening the PR is the human's call.

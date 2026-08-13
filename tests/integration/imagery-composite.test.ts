@@ -1,12 +1,12 @@
 /**
  * Integration tests for composited weather imagery (`composite: true` on
- * `get_weather_imagery`), per docs/composited-imagery-implementation-plan.md
+ * `get_weather_imagery`), per docs/plans/composited-imagery-implementation-plan.md
  * T6.
  *
  * *** THIS FILE MAKES LIVE NETWORK CALLS in its second `describe` block
  * (real RainViewer + real NASA GIBS fetches) and can flake independently of
  * any code change — see the "Gate caveat (standing)" note in
- * docs/composited-imagery-implementation-plan.md and the project's "Flaky
+ * docs/plans/composited-imagery-implementation-plan.md and the project's "Flaky
  * live-network tests" memory. If the gate goes red only in this file's live
  * block, re-run once before suspecting the diff. This is now the **seventh**
  * live-network integration file — joining visualization-lightning.test.ts,

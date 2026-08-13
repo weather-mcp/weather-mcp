@@ -60,7 +60,7 @@ const COMPOSITE_USER_AGENT = `weather-mcp/${VERSION} (+https://github.com/weathe
  * Appended when compositing was requested but couldn't be produced. The tool
  * call itself never fails because the composite failed — the imagery the
  * caller asked for still arrives as URLs (garnish precedent, see
- * docs/composited-imagery-implementation-plan.md "Findings").
+ * docs/plans/composited-imagery-implementation-plan.md "Findings").
  */
 const COMPOSITE_UNAVAILABLE_NOTE =
   '\n*Composite map unavailable for this request — the tile URLs and interactive-map link above still apply.*\n';
