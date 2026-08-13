@@ -1,6 +1,6 @@
 # Almanac (Moon, Twilight, Records) — Implementation Plan
 
-**Status:** READY (2026-08-12)
+**Status:** COMPLETE (2026-08-12) — all tasks ticked; see Progress Tracker
 
 Execution plan for `docs/almanac-plan.md` (the WHAT/WHY); rules live in
 `docs/orchestration-playbook.md`.
@@ -376,7 +376,7 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T4 — Wire records into the four include_normals sites (`sonnet`) — `8475499`
 - [x] T5 — Handler unit tests for astronomy and records gating (`sonnet`) — `c862225`
 - [x] T6 — Integration tests: mocked ACIS + tolerant live smoke (`sonnet`) — `475a3eb`
-- [ ] T7 — Live sweep + documentation checklist (`opus`)
+- [x] T7 — Live sweep + documentation checklist (`opus`) — `d23a82f`
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the design plan's D1–D4
