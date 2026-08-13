@@ -31,7 +31,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 
 | Idea | Status | Detail |
 |------|--------|--------|
-| Global river/flood via Open-Meteo Flood API | ✅ | Implemented on `feat/global-rivers` for v1.15.0; [`docs/plans/global-rivers-plan.md`](../plans/global-rivers-plan.md); ICR Phase 2; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #1 |
+| Global river/flood via Open-Meteo Flood API | ✅ | Shipped in v1.18.0 (developed on `feat/global-rivers` as the v1.15.0 milestone); [`docs/plans/global-rivers-plan.md`](../plans/global-rivers-plan.md); ICR Phase 2; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #1 |
 | UK Environment Agency gauge supplement | 💡 | Descoped from the global-rivers work (2026-08-12) to keep v1.15.0 to one provider; England-only, keyless, OGL v3, 15-min real-time observations |
 | International alerts (MeteoAlarm, MSC GeoMet, WMO CAP) | 💡 | ICR Phase 3 |
 | Global wildfire via NASA FIRMS (optional MAP_KEY) | 💡 | ICR Phase 4; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #2 |
@@ -39,7 +39,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 | Global climate normals (Open-Meteo archive outside US) | 💡 | ICR Phase 5 |
 | Global fire weather indices (Open-Meteo hourly outside US) | 💡 | ICR Phase 5 |
 | UK river gauges (Environment Agency flood-monitoring API) | 💡 | ICR Phase 2 supplement |
-| Real station observations worldwide (aviationweather.gov METARs) | ✅ | Implemented on `feat/metar` for v1.17.0; [`docs/plans/metar-plan.md`](../plans/metar-plan.md). Shipped as `source: 'metar'` on `get_current_conditions` — not a new tool — with `auto` byte-for-byte unchanged. Closes the ICR Phase 1 leftover and the observation half of [FUTURE_ENHANCEMENTS](./FUTURE_ENHANCEMENTS.md) §4 |
+| Real station observations worldwide (aviationweather.gov METARs) | ✅ | Shipped in v1.18.0 (developed on `feat/metar` as the v1.17.0 milestone); [`docs/plans/metar-plan.md`](../plans/metar-plan.md). Shipped as `source: 'metar'` on `get_current_conditions` — not a new tool — with `auto` byte-for-byte unchanged. Closes the ICR Phase 1 leftover and the observation half of [FUTURE_ENHANCEMENTS](./FUTURE_ENHANCEMENTS.md) §4 |
 
 ### Architecture & tooling
 
@@ -58,9 +58,9 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Idea | Status | Detail |
 |------|--------|--------|
 | Satellite imagery in `get_weather_imagery` | 💡 | FE §12.1 (deferred from v1.5.0) |
-| Moon phase / astronomy (`include_astronomy` on forecast) | ✅ | Implemented on `feat/almanac` for v1.16.0; [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §1.1 |
-| Extended twilight times (civil/nautical/astronomical) | ✅ | Implemented on `feat/almanac` for v1.16.0; [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §1.2 |
-| Record highs/lows for date (with normals) | ✅ | Implemented on `feat/almanac` for v1.16.0 (US, RCC ACIS); [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §2.2 |
+| Moon phase / astronomy (`include_astronomy` on forecast) | ✅ | Shipped in v1.18.0 (developed on `feat/almanac` as the v1.16.0 milestone); [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §1.1 |
+| Extended twilight times (civil/nautical/astronomical) | ✅ | Shipped in v1.18.0 (developed on `feat/almanac` as the v1.16.0 milestone); [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §1.2 |
+| Record highs/lows for date (with normals) | ✅ | Shipped in v1.18.0 (developed on `feat/almanac` as the v1.16.0 milestone; US, RCC ACIS); [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §2.2 |
 | Better precipitation-type parsing (rain/snow/freezing rain) | 💡 | FE §3.2 |
 | Aviation weather tool (METAR/TAF) | 💡 | FE §4 — **observation half closed:** shipped as `source: 'metar'` on `get_current_conditions` in v1.17.0 ([`docs/plans/metar-plan.md`](../plans/metar-plan.md)), and the raw METAR text is in the output. What remains open is the pilot-facing product: TAF forecasts (the `/api/data/taf` endpoint is verified working) and a dedicated aviation tool, both explicitly out of scope for v1.17.0 (metar-plan D7) |
 | Drought indices (US Drought Monitor) | 💡 | FE §5.2 |
@@ -71,13 +71,13 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Forecast uncertainty/confidence | 💡 | FE §13.1 — overlaps multi-model comparison above |
 | Solar radiation / solar power forecasts | 💡 | FE §18.1 |
 | Heating/cooling degree days | 💡 | FE §18.2 |
-| Pollen & allergen forecasts | ✅ | Implemented on `fix/live-test-hardening` for the release after v1.17.0 (current-conditions block of `get_air_quality`, auto-shown when non-null; Europe-only via CAMS). FE §6.1's "no free API" blocker went stale — 6 species on the air-quality endpoint the tool already calls. Hourly/daily pollen *forecast* remains open if ever wanted |
+| Pollen & allergen forecasts | ✅ | Shipped in v1.18.0 (current-conditions block of `get_air_quality`, auto-shown when non-null; Europe-only via CAMS). FE §6.1's "no free API" blocker went stale — 6 species on the air-quality endpoint the tool already calls. Hourly/daily pollen *forecast* remains open if ever wanted |
 
 ### Hardening & fixes
 
 | Idea | Status | Detail |
 |------|--------|--------|
-| Live-test hardening: saved-location update metadata loss, NOAA observation staleness (age/caveat/fresher-station retry), containment-aware wildfire assessment, marine water-body disclosure, UTC date-bounds docs | ✅ | Implemented on `fix/live-test-hardening` for the release after v1.17.0; [`docs/plans/live-test-hardening-plan.md`](../plans/live-test-hardening-plan.md) — five findings (F1–F5) from the 2026-08-13 full-suite live test of the `feat/metar` build |
+| Live-test hardening: saved-location update metadata loss, NOAA observation staleness (age/caveat/fresher-station retry), containment-aware wildfire assessment, marine water-body disclosure, UTC date-bounds docs | ✅ | Shipped in v1.18.0; [`docs/plans/live-test-hardening-plan.md`](../plans/live-test-hardening-plan.md) — five findings (F1–F5) from the 2026-08-13 full-suite live test of the `feat/metar` build |
 
 ---
 
@@ -125,8 +125,10 @@ One line per idea that graduated; see [CHANGELOG.md](../../CHANGELOG.md) for rel
 | Global current conditions (ICR Phase 1), border fallback routing | ✅ v1.12.0 |
 | Max-range expansion, output completeness | ✅ v1.13.0 |
 | Default location (`WEATHER_DEFAULT_LOCATION`), CI workflow, tz band fix | ✅ v1.14.0 |
-| Global river conditions via Open-Meteo Flood/GloFAS (ICR Phase 2) | ✅ v1.15.0 (pending release) |
-| Almanac: moon phase, twilight times, US record highs/lows | ✅ v1.16.0 (pending release) |
+| Global river conditions via Open-Meteo Flood/GloFAS (ICR Phase 2) | ✅ v1.18.0 (developed as the v1.15.0 milestone) |
+| Almanac: moon phase, twilight times, US record highs/lows | ✅ v1.18.0 (developed as the v1.16.0 milestone) |
+| Worldwide METAR station observations (`source: 'metar'`) | ✅ v1.18.0 (developed as the v1.17.0 milestone) |
+| Live-test hardening (staleness, containment, metadata) + European pollen | ✅ v1.18.0 |
 
 ---
 
