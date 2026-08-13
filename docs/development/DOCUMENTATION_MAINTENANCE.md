@@ -61,6 +61,7 @@ saying why and where the live equivalent is, and update
 
 | Location | Contents |
 |----------|----------|
+| `examples/` (repo root) | Example sessions with captured tool output; raw-output blocks are regenerated in place by `npm run examples` (`scripts/capture-examples.mjs`) — refresh at release time when output formats change |
 | `docs/` root | Live reference docs + **in-flight** design plans only |
 | `docs/plans/` | Shipped plan sets (design, implementation, verification) |
 | `docs/planning/` | Idea backlog; `README.md` there is the status index |

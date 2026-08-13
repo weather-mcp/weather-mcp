@@ -27,7 +27,8 @@
     "test:ui": "vitest --ui",
     "audit": "npm audit --audit-level=moderate",
     "audit:fix": "npm audit fix",
-    "stress": "node scripts/stress-harness.mjs"
+    "stress": "node scripts/stress-harness.mjs",
+    "examples": "node scripts/capture-examples.mjs"
   },
   "keywords": [
     "mcp",

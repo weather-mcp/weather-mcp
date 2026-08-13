@@ -48,6 +48,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 | Remote hosting: Streamable HTTP transport + OAuth | 💡 | [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #3 |
 | Multi-model forecast comparison (Open-Meteo `models` param) | 💡 | [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #4 — *rejected in 2025 as "too complex" via NOMADS; reconsidered 2026-08 via Open-Meteo* |
 | ESLint in the toolchain / CI | 💡 | [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #5 |
+| Examples folder (`examples/` with captured real output, README-linked) | ✅ | Shipped 2026-08-13 (post-v1.18.0 docs); 8 conversation-first scenario files + regenerable raw output via `npm run examples` (`scripts/capture-examples.mjs`) |
 | Opt-in usage analytics integration | 🚧 | Backend is the separate [analytics-server](https://github.com/weather-mcp/analytics-server) repo; MCP-side plan in [archive/IMPLEMENTATION_PLAN.md](./archive/IMPLEMENTATION_PLAN.md) §6.3 |
 | Split into domain MCP servers (climate, agriculture, …) if scope grows | 💡 | [archive/ROADMAP.md](./archive/ROADMAP.md) "Possible v2.0.0 Direction" |
 

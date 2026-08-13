@@ -38,6 +38,8 @@ Then just ask:
 > *"How bad is the pollen in Berlin today?"*
 > *"What was the weather in Paris on June 6, 1944?"*
 
+👉 **[See it in action](./examples/)** — real prompts like these with the answers they produced, and the raw server output behind them.
+
 📦 Listed in the [Official MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp) as `io.github.dgahagan/weather-mcp`.
 
 ## Why this server?
@@ -295,6 +297,7 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
 ## Documentation
 
+- **[Examples](./examples/)** — realistic sessions in cities around the world: prompt → assistant answer → verbatim server output
 - **[Tool Reference](./docs/TOOLS.md)** — all 17 tools: parameters, examples, sample output
 - **[Client Setup](./docs/CLIENT_SETUP.md)** — step-by-step for 8 MCP clients
 - **[Error Handling](./docs/ERROR_HANDLING.md)** — how failures are reported

@@ -6,6 +6,7 @@ This directory contains comprehensive documentation for the Weather MCP Server p
 
 ### 📁 Getting Started
 - **[../README.md](../README.md)** - Main project README with installation and usage instructions
+- **[../examples/](../examples/README.md)** - Realistic sessions: prompt → assistant answer → verbatim server output (regenerable via `npm run examples`)
 - **[CLIENT_SETUP.md](./CLIENT_SETUP.md)** - Setup guides for 8 different MCP clients
 
 ### 📁 Analytics (`analytics/`)

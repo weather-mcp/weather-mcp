@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`examples/` folder — real prompts, real output** - Eight conversation-first scenario files (Tokyo trip planning, Oklahoma City severe weather, Sydney boating, Paris METAR + pollen, Memphis/Manaus rivers, Denver wildfire, Berlin 1945 + Chicago normals, Lake Tahoe saved locations) showing a user prompt, the answer Claude Code gave, and the verbatim server output behind it in collapsible blocks. All 17 tools are covered (matrix in `examples/README.md`). Raw-output blocks are captured over the real MCP protocol from `dist/index.js` and regenerate in place with `npm run examples` (`scripts/capture-examples.mjs`, same client pattern as the stress harness; the saved-locations scenario runs against a scratch `HOME` so it never touches a real `~/.weather-mcp/`). Linked from the README's prompt list and Documentation section.
+
 ## [1.18.0] - 2026-08-13
 
 ### Added
