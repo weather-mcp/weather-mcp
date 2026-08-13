@@ -507,7 +507,7 @@ const TOOL_DEFINITIONS = {
 
   get_weather_imagery: {
     name: 'get_weather_imagery' as const,
-    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization, plus an interactive-map link for viewing the imagery over a base map in a browser. Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. By default returns direct image URLs; use detail="full" to embed Markdown images and list every animation frame (lower detail levels show 3 representative frames of longer animations). Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For numerical forecast data, use get_forecast instead.',
+    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization, plus an interactive-map link for viewing the imagery over a base map in a browser. Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. By default returns direct image URLs; use detail="full" to embed Markdown images and list every animation frame (lower detail levels show 3 representative frames of longer animations). Use composite=true for radar/precipitation to also receive a finished map image — the radar overlay rendered onto a base map with a location marker — as an image content block you can look at and describe. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For numerical forecast data, use get_forecast instead.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -521,6 +521,11 @@ const TOOL_DEFINITIONS = {
         animated: {
           type: 'boolean' as const,
           description: 'Return animated frames showing progression over time (default: false)',
+          default: false
+        },
+        composite: {
+          type: 'boolean' as const,
+          description: 'Return a finished radar map — the radar overlay composited onto a NASA GIBS base map with a marker at the requested location — as an MCP image content block alongside the text. Radar/precipitation only, and the latest frame only (animation stays URL-based). You always receive the image and can describe what it shows; whether it displays inline depends on the client. Default: false',
           default: false
         },
         ...DETAIL_SCHEMA_PROPERTY

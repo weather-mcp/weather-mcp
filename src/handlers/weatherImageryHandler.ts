@@ -3,15 +3,35 @@
  * Provides weather radar, satellite, and precipitation imagery
  */
 
-import { WeatherImageryParams, WeatherImageryResponse, ImageryType } from '../types/imagery.js';
+import axios from 'axios';
+import {
+  WeatherImageryParams,
+  WeatherImageryResponse,
+  ImageryType,
+  ImageryFrame,
+  ImageryContentBlock
+} from '../types/imagery.js';
 import { rainViewerService } from '../services/rainviewer.js';
 import { gibsService } from '../services/gibs.js';
+import { basemapService } from '../services/basemap.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { validateLatitude, validateLongitude, validateDetail, DetailLevel } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { ValidationError } from '../errors/ApiError.js';
+import { Cache } from '../utils/cache.js';
+import { CacheConfig } from '../config/cache.js';
+import { VERSION } from '../utils/version.js';
+import {
+  PNG,
+  parseRadarTileUrl,
+  latLonToTilePixel,
+  blendOnto,
+  drawMarker,
+  encodePng,
+  MAX_COMPOSITE_BYTES
+} from '../utils/composite.js';
 
 interface WeatherImageryArgs {
   latitude?: number;
@@ -20,7 +40,129 @@ interface WeatherImageryArgs {
   city_name?: string;
   type?: ImageryType;
   animated?: boolean;
+  composite?: boolean;
   detail?: DetailLevel;
+}
+
+/**
+ * Encoded composites, keyed on (frame URL, tile address, marker pixel) — the
+ * three things that fully determine the output image. Radar frames are
+ * immutable once published under their timestamp, so a repeat call inside the
+ * feed cycle is looking at the identical picture
+ * (`CacheConfig.ttl.compositeImage`).
+ */
+const compositeCache = new Cache<Buffer>(CacheConfig.maxSize);
+
+/** Descriptive User-Agent for overlay tile fetches, matching the basemap service. */
+const COMPOSITE_USER_AGENT = `weather-mcp/${VERSION} (+https://github.com/weather-mcp/weather-mcp)`;
+
+/**
+ * Appended when compositing was requested but couldn't be produced. The tool
+ * call itself never fails because the composite failed — the imagery the
+ * caller asked for still arrives as URLs (garnish precedent, see
+ * docs/composited-imagery-implementation-plan.md "Findings").
+ */
+const COMPOSITE_UNAVAILABLE_NOTE =
+  '\n*Composite map unavailable for this request — the tile URLs and interactive-map link above still apply.*\n';
+
+/**
+ * The most recent frame that has actually been observed.
+ *
+ * With `animated: true` RainViewer may append nowcast (forecast) frames after
+ * the observed ones, and a forecast tile is not what "the latest radar" means
+ * — so pick the newest frame at or before now, which is exactly the frame a
+ * non-animated request returns. Falls back to the last frame if every
+ * timestamp somehow reads as future (clock skew).
+ */
+function latestObservedFrame(frames: ImageryFrame[]): ImageryFrame | undefined {
+  if (frames.length === 0) {
+    return undefined;
+  }
+  const now = Date.now();
+  const observed = frames.filter((frame) => frame.timestamp.getTime() <= now);
+  return observed.length > 0 ? observed[observed.length - 1] : frames[frames.length - 1];
+}
+
+/** Fetch a single RainViewer overlay tile as a raw buffer. */
+async function fetchRadarTile(url: string): Promise<Buffer> {
+  const response = await axios.get<ArrayBuffer>(url, {
+    responseType: 'arraybuffer',
+    timeout: CacheConfig.apiTimeoutMs,
+    headers: { 'User-Agent': COMPOSITE_USER_AGENT }
+  });
+  return Buffer.from(response.data);
+}
+
+/**
+ * Composite one radar frame onto the GIBS base map and mark the requested
+ * location, returning the PNG as base64.
+ *
+ * Throws on any failure (unparseable URL, fetch, decode, over-cap encode) —
+ * the caller degrades to text-only output.
+ */
+async function renderComposite(
+  frame: ImageryFrame,
+  latitude: number,
+  longitude: number
+): Promise<{ base64: string; zoom: number }> {
+  const tile = parseRadarTileUrl(frame.url);
+  if (!tile) {
+    throw new Error('Radar frame URL does not carry a parseable /512/{z}/{x}/{y}/ tile address');
+  }
+
+  const { z, x, y } = tile;
+  const { px, py } = latLonToTilePixel(latitude, longitude, z, x, y);
+  const markerX = Math.round(px);
+  const markerY = Math.round(py);
+
+  const cacheKey = `${frame.url}|${z}/${x}/${y}|${markerX},${markerY}`;
+  if (CacheConfig.enabled) {
+    const cached = compositeCache.get(cacheKey);
+    if (cached) {
+      return { base64: cached.toString('base64'), zoom: z };
+    }
+  }
+
+  const overlay = PNG.sync.read(await fetchRadarTile(frame.url));
+  const composited = await basemapService.getBaseComposite(z, x, y);
+
+  blendOnto(composited, overlay);
+  drawMarker(composited, markerX, markerY);
+
+  const encoded = encodePng(composited);
+  if (encoded.length > MAX_COMPOSITE_BYTES) {
+    throw new Error(
+      `Composite of ${encoded.length} bytes exceeds the ${MAX_COMPOSITE_BYTES}-byte cap`
+    );
+  }
+
+  if (CacheConfig.enabled) {
+    compositeCache.set(cacheKey, encoded, CacheConfig.ttl.compositeImage);
+  }
+
+  return { base64: encoded.toString('base64'), zoom: z };
+}
+
+/** Lines describing an attached composite, including the required attributions. */
+function compositeAttachmentLines(frame: ImageryFrame, zoom: number, animated: boolean): string {
+  const lines = [
+    '',
+    `**Composited map attached:** radar frame ${frame.timestamp.toISOString()} at zoom ${zoom}, rendered over a NASA GIBS base map with a marker at the requested location.`
+  ];
+
+  if (animated) {
+    lines.push(
+      '*The animation frames above stay URL-based — only the latest frame is composited.*'
+    );
+  }
+
+  lines.push('');
+  lines.push('*Radar imagery © RainViewer.*');
+  lines.push(
+    "*Imagery provided by services from NASA's Global Imagery Browse Services (GIBS), part of NASA's Earth Science Data and Information System (ESDIS).*"
+  );
+
+  return lines.join('\n');
 }
 
 /**
@@ -28,12 +170,17 @@ interface WeatherImageryArgs {
  * city), fetch imagery, and format it. Markdown image embeds are opt-in via
  * detail="full"; the default surfaces direct URLs and metadata (lighter for
  * text-only agents).
+ *
+ * With `composite: true` the result additionally carries an MCP image content
+ * block — the radar overlay rendered onto a base map (see the composite
+ * helpers above). Requests without it are unaffected: same single text block,
+ * same bytes.
  */
 export async function handleGetWeatherImagery(
   args: unknown,
   locationStore: LocationStore,
   geocodingService: GeocodingService
-): Promise<{ content: Array<{ type: string; text: string }> }> {
+): Promise<{ content: ImageryContentBlock[] }> {
   const typedArgs = (args ?? {}) as WeatherImageryArgs;
   const resolved = await resolveLocationAsync(typedArgs, locationStore, geocodingService);
   const detail = validateDetail(typedArgs.detail);
@@ -42,19 +189,46 @@ export async function handleGetWeatherImagery(
     latitude: resolved.latitude,
     longitude: resolved.longitude,
     type: (typedArgs.type ?? 'precipitation') as ImageryType,
-    animated: typedArgs.animated
+    animated: typedArgs.animated,
+    composite: typedArgs.composite
   });
 
-  const formatted = formatWeatherImageryResponse(result, detail);
+  let formatted = formatWeatherImageryResponse(result, detail);
+  const content: ImageryContentBlock[] = [];
 
-  return prependLocationLine({
-    content: [
-      {
-        type: 'text',
-        text: formatted
+  if (typedArgs.composite === true) {
+    if (result.type === 'satellite') {
+      // A note, not an error — GeoColor is already a finished picture, so
+      // there is nothing to composite it onto (D7).
+      formatted +=
+        '\n*Note: composite rendering is available for radar/precipitation only. Satellite imagery is already a complete picture and needs no base map.*\n';
+    } else {
+      const frame = latestObservedFrame(result.frames);
+
+      if (!frame) {
+        formatted += COMPOSITE_UNAVAILABLE_NOTE;
+      } else {
+        try {
+          const { base64, zoom } = await renderComposite(
+            frame,
+            resolved.latitude,
+            resolved.longitude
+          );
+          formatted += compositeAttachmentLines(frame, zoom, result.animated);
+          content.push({ type: 'image', data: base64, mimeType: 'image/png' });
+        } catch (error) {
+          logger.warn('Composite imagery unavailable, returning URL-based output', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+          formatted += COMPOSITE_UNAVAILABLE_NOTE;
+        }
       }
-    ]
-  }, resolved);
+    }
+  }
+
+  content.unshift({ type: 'text', text: formatted });
+
+  return prependLocationLine({ content }, resolved);
 }
 
 /**
@@ -78,6 +252,10 @@ function validateImageryParams(params: WeatherImageryParams): void {
   // Validate boolean parameters
   if (params.animated !== undefined && typeof params.animated !== 'boolean') {
     throw new ValidationError('animated parameter must be a boolean', 'animated', params.animated);
+  }
+
+  if (params.composite !== undefined && typeof params.composite !== 'boolean') {
+    throw new ValidationError('composite parameter must be a boolean', 'composite', params.composite);
   }
 }
 
