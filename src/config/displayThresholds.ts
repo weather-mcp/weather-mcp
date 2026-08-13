@@ -49,6 +49,29 @@ export const DisplayThresholds = {
   },
 
   /**
+   * Current-conditions staleness and station-retry thresholds.
+   */
+  currentConditions: {
+    /**
+     * Observation age (minutes) at which a reading is flagged stale.
+     * NOAA stations report at least hourly, so 2 h means at least 2 missed
+     * reporting cycles.
+     */
+    staleWarningMinutes: 120,
+    /**
+     * Observation age (minutes) at which a reading is rejected outright.
+     * This is METAR's outer acceptance bound, reused here as the trigger
+     * for retrying against a fresher station.
+     */
+    staleAcceptanceMinutes: 360,
+    /**
+     * Total stations whose observations are fetched for a single request,
+     * including the first attempt.
+     */
+    maxStationAttempts: 3,
+  },
+
+  /**
    * Precipitation thresholds
    */
   precipitation: {

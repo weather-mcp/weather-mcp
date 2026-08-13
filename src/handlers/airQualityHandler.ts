@@ -180,6 +180,28 @@ function formatAirQuality(
 
   output += `\n`;
 
+  // Pollen (CAMS European model). Non-European points return HTTP 200 with
+  // every species null, so the section renders only when at least one species
+  // carries a real value — never trust the 200 alone. In-season zeros are
+  // meaningful ("none detected") and do render.
+  const pollenSpecies = [
+    { label: 'Alder', value: current.alder_pollen },
+    { label: 'Birch', value: current.birch_pollen },
+    { label: 'Grass', value: current.grass_pollen },
+    { label: 'Mugwort', value: current.mugwort_pollen },
+    { label: 'Olive', value: current.olive_pollen },
+    { label: 'Ragweed', value: current.ragweed_pollen }
+  ].filter(species => typeof species.value === 'number' && Number.isFinite(species.value));
+
+  if (pollenSpecies.length > 0) {
+    output += `## 🌾 Pollen\n\n`;
+    for (const species of pollenSpecies) {
+      const rounded = Math.round((species.value as number) * 10) / 10;
+      output += `**${species.label}:** ${rounded} grains/m³\n`;
+    }
+    output += `\n*Pollen from the CAMS European forecast — available for European locations only.*\n\n`;
+  }
+
   // Show secondary AQI for reference
   if (useUSAQI && current.european_aqi !== undefined) {
     output += `*European AQI: ${Math.round(current.european_aqi)} (${getEuropeanAQICategory(current.european_aqi).level})*\n\n`;

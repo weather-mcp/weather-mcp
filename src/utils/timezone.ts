@@ -189,6 +189,35 @@ export function formatTimeRangeInTimezone(
 }
 
 /**
+ * Format an observation age (in minutes) as a human-readable "N ago" string.
+ *
+ * Bands: 'just now' at 0, whole minutes under an hour, one-decimal hours
+ * under 48 h, and whole days beyond that. The first three bands match the
+ * expression this replaced verbatim (METAR's picker rejects anything over
+ * 6 h, so the days band is unreachable from that call site).
+ *
+ * @param ageMinutes - Observation age in minutes (non-negative)
+ * @returns Human-readable age string (e.g., "just now", "5 minutes ago", "2.5 hours ago", "3 days ago")
+ */
+export function formatObservationAge(ageMinutes: number): string {
+  if (ageMinutes === 0) {
+    return 'just now';
+  }
+
+  if (ageMinutes < 60) {
+    return `${ageMinutes} minute${ageMinutes === 1 ? '' : 's'} ago`;
+  }
+
+  if (ageMinutes < 48 * 60) {
+    const hours = Math.round((ageMinutes / 60) * 10) / 10;
+    return `${hours} hours ago`;
+  }
+
+  const days = Math.round(ageMinutes / 1440);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
+/**
  * Check if a timezone is valid IANA timezone identifier
  * @param timezone - Timezone string to validate
  * @returns true if valid, false otherwise

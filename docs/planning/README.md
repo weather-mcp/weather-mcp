@@ -71,13 +71,13 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Forecast uncertainty/confidence | 💡 | FE §13.1 — overlaps multi-model comparison above |
 | Solar radiation / solar power forecasts | 💡 | FE §18.1 |
 | Heating/cooling degree days | 💡 | FE §18.2 |
-| Pollen & allergen forecasts | 💡 | FE §6.1 — **unblocked 2026-08-13, Europe-only:** Open-Meteo's air-quality endpoint (the one `get_air_quality` already calls) serves 6 pollen species in `grains/m³`. Verified live: real values in Berlin/London, all-null (HTTP 200) in Seattle, St. Louis, Tokyo, Sydney — CAMS European, so it is a regional output enhancement, not a global one |
+| Pollen & allergen forecasts | ✅ | Implemented on `fix/live-test-hardening` for the release after v1.17.0 (current-conditions block of `get_air_quality`, auto-shown when non-null; Europe-only via CAMS). FE §6.1's "no free API" blocker went stale — 6 species on the air-quality endpoint the tool already calls. Hourly/daily pollen *forecast* remains open if ever wanted |
 
 ### Hardening & fixes
 
 | Idea | Status | Detail |
 |------|--------|--------|
-| Live-test hardening: saved-location update metadata loss, NOAA observation staleness (age/caveat/fresher-station retry), containment-aware wildfire assessment, marine water-body disclosure, UTC date-bounds docs | 📝 | [`docs/live-test-hardening-plan.md`](../live-test-hardening-plan.md) — five findings (F1–F5) from the 2026-08-13 full-suite live test of the `feat/metar` build; branch `fix/live-test-hardening` off `main` |
+| Live-test hardening: saved-location update metadata loss, NOAA observation staleness (age/caveat/fresher-station retry), containment-aware wildfire assessment, marine water-body disclosure, UTC date-bounds docs | ✅ | Implemented on `fix/live-test-hardening` for the release after v1.17.0; [`docs/plans/live-test-hardening-plan.md`](../plans/live-test-hardening-plan.md) — five findings (F1–F5) from the 2026-08-13 full-suite live test of the `feat/metar` build |
 
 ---
 

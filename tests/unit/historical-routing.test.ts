@@ -243,6 +243,92 @@ describe('handleGetHistoricalWeather — same-day NOAA window (N3)', () => {
   });
 });
 
+describe('handleGetHistoricalWeather — early-end note on NOAA recent path (F2)', () => {
+  /** Minimal NOAA observation feature — cast avoids populating every QuantitativeValue field. */
+  function noaaFeature(timestamp: string) {
+    return {
+      properties: {
+        timestamp,
+        temperature: { unitCode: 'wmoUnit:degC', value: 20 },
+        windSpeed: { unitCode: 'wmoUnit:km_h-1', value: 10 },
+        textDescription: 'Clear',
+      },
+    };
+  }
+
+  it('appends a note when the newest observation ends well before the requested end', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-13T12:00:00Z'));
+
+    const newest = '2026-08-11T12:00:00Z'; // ~2 days before the capped end
+    const fakes = buildFakes();
+    fakes.noaa.getHistoricalObservations = vi.fn().mockResolvedValue({
+      features: [noaaFeature('2026-08-10T12:00:00Z'), noaaFeature(newest)],
+    });
+
+    const result = await callHistorical(
+      { ...SEATTLE, start_date: '2026-08-10T00:00:00Z', end_date: '2026-08-13T12:00:00Z' },
+      fakes
+    );
+    const text = textOf(result);
+
+    expect(text).toContain('the reporting station may have gone offline');
+    expect(text).toContain(new Date(newest).toLocaleString());
+
+    vi.useRealTimers();
+  });
+
+  it('handles unsorted features — newest observation is not last in the array', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-13T12:00:00Z'));
+
+    const newest = '2026-08-11T12:00:00Z';
+    const fakes = buildFakes();
+    // Newest observation appears FIRST, oldest last — deliberately out of order.
+    fakes.noaa.getHistoricalObservations = vi.fn().mockResolvedValue({
+      features: [
+        noaaFeature(newest),
+        noaaFeature('2026-08-09T12:00:00Z'),
+        noaaFeature('2026-08-10T00:00:00Z'),
+      ],
+    });
+
+    const result = await callHistorical(
+      { ...SEATTLE, start_date: '2026-08-09T00:00:00Z', end_date: '2026-08-13T12:00:00Z' },
+      fakes
+    );
+    const text = textOf(result);
+
+    expect(text).toContain('the reporting station may have gone offline');
+    expect(text).toContain(new Date(newest).toLocaleString());
+
+    vi.useRealTimers();
+  });
+
+  it('omits the note when observations reach the requested end within the threshold', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-13T12:00:00Z'));
+
+    const fakes = buildFakes();
+    fakes.noaa.getHistoricalObservations = vi.fn().mockResolvedValue({
+      features: [
+        noaaFeature('2026-08-13T11:00:00Z'),
+        noaaFeature('2026-08-13T11:30:00Z'), // within staleWarningMinutes (120m) of the end
+      ],
+    });
+
+    const result = await callHistorical(
+      { ...SEATTLE, start_date: '2026-08-13T00:00:00Z', end_date: '2026-08-13T12:00:00Z' },
+      fakes
+    );
+    const text = textOf(result);
+
+    expect(text).not.toContain('the reporting station may have gone offline');
+
+    vi.useRealTimers();
+  });
+});
+
 describe('handleGetHistoricalWeather — coordinate hemisphere labels (N2)', () => {
   it('renders southern/western coordinates as °S/°W', async () => {
     const fakes = buildFakes({

@@ -13,7 +13,7 @@
  * See docs/global-current-conditions-implementation-plan.md T5.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleGetCurrentConditions } from '../../src/handlers/currentConditionsHandler.js';
 import { handleGetWeatherSummary } from '../../src/handlers/weatherSummaryHandler.js';
 import type { NOAAService } from '../../src/services/noaa.js';
@@ -45,6 +45,19 @@ const TORONTO = { latitude: 43.6532, longitude: -79.3832 };
 /** Note text the fallback prepends under the output's top heading. */
 const NOAA_FALLBACK_NOTE =
   '*NOAA does not cover this location; showing Open-Meteo model data instead.*';
+
+// The NOAA observation fixtures below are dated 2024-01-01. The handler now
+// computes observation age against the real clock (F2/D2a), so the clock is
+// pinned 30 minutes past the fixture timestamp to keep the NOAA path fresh
+// (no stale warning, no station retry) in every pre-existing scenario.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2024-01-01T12:30:00Z'));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function buildNOAAObservation(overrides: Record<string, unknown> = {}): ObservationResponse {
   return {
@@ -92,8 +105,12 @@ function buildNOAAGridpoint(): GridpointResponse {
  */
 function buildNoaaFake() {
   return {
+    // The handler's NOAA path now drives getStations + getLatestObservation
+    // directly (F2/D2c retry loop); the getCurrentConditions wrapper remains
+    // public API in noaa.ts but is no longer called by this handler.
     getCurrentConditions: vi.fn().mockResolvedValue(buildNOAAObservation()),
     getStations: vi.fn().mockResolvedValue(buildNOAAStations()),
+    getLatestObservation: vi.fn().mockResolvedValue(buildNOAAObservation()),
     getGridpointDataByCoordinates: vi.fn().mockResolvedValue(buildNOAAGridpoint()),
   };
 }
@@ -213,7 +230,8 @@ describe('handleGetCurrentConditions — source routing', () => {
     const fakes = buildFakes();
     await callCurrentConditions({ ...US_COORDS }, fakes);
 
-    expect(fakes.noaa.getCurrentConditions).toHaveBeenCalledTimes(1);
+    expect(fakes.noaa.getStations).toHaveBeenCalledTimes(1);
+    expect(fakes.noaa.getLatestObservation).toHaveBeenCalledTimes(1);
     expect(fakes.openMeteo.getCurrentConditions).not.toHaveBeenCalled();
   });
 
@@ -222,14 +240,16 @@ describe('handleGetCurrentConditions — source routing', () => {
     await callCurrentConditions({ ...LONDON }, fakes);
 
     expect(fakes.openMeteo.getCurrentConditions).toHaveBeenCalledTimes(1);
-    expect(fakes.noaa.getCurrentConditions).not.toHaveBeenCalled();
+    expect(fakes.noaa.getStations).not.toHaveBeenCalled();
+    expect(fakes.noaa.getLatestObservation).not.toHaveBeenCalled();
   });
 
   it('honors explicit source: "noaa" at non-US coordinates', async () => {
     const fakes = buildFakes();
     await callCurrentConditions({ ...LONDON, source: 'noaa' }, fakes);
 
-    expect(fakes.noaa.getCurrentConditions).toHaveBeenCalledTimes(1);
+    expect(fakes.noaa.getStations).toHaveBeenCalledTimes(1);
+    expect(fakes.noaa.getLatestObservation).toHaveBeenCalledTimes(1);
     expect(fakes.openMeteo.getCurrentConditions).not.toHaveBeenCalled();
   });
 
@@ -238,7 +258,7 @@ describe('handleGetCurrentConditions — source routing', () => {
     await callCurrentConditions({ ...US_COORDS, source: 'openmeteo' }, fakes);
 
     expect(fakes.openMeteo.getCurrentConditions).toHaveBeenCalledTimes(1);
-    expect(fakes.noaa.getCurrentConditions).not.toHaveBeenCalled();
+    expect(fakes.noaa.getStations).not.toHaveBeenCalled();
   });
 });
 
@@ -251,8 +271,8 @@ describe('handleGetCurrentConditions — non-US path avoids NOAA entirely', () =
     const fakes = buildFakes();
     await callCurrentConditions({ ...LONDON }, fakes);
 
-    expect(fakes.noaa.getCurrentConditions).not.toHaveBeenCalled();
     expect(fakes.noaa.getStations).not.toHaveBeenCalled();
+    expect(fakes.noaa.getLatestObservation).not.toHaveBeenCalled();
     expect(fakes.noaa.getGridpointDataByCoordinates).not.toHaveBeenCalled();
   });
 });
@@ -516,7 +536,7 @@ describe('handleGetWeatherSummary — drives the real currentConditionsHandler (
     expect(text).toContain('Open-Meteo (Global)');
     // Routed through the real handler to Open-Meteo, not NOAA.
     expect(fakes.openMeteo.getCurrentConditions).toHaveBeenCalledTimes(1);
-    expect(fakes.noaa.getCurrentConditions).not.toHaveBeenCalled();
+    expect(fakes.noaa.getStations).not.toHaveBeenCalled();
     // No section failure note.
     expect(text).not.toContain('current (unavailable)');
   });
@@ -537,7 +557,7 @@ describe('handleGetWeatherSummary — drives the real currentConditionsHandler (
 describe('handleGetCurrentConditions — auto-mode NOAA -> Open-Meteo fallback (D2)', () => {
   it('falls back to Open-Meteo when NOAA throws DataNotFoundError on an auto-routed border city', async () => {
     const fakes = buildFakes();
-    fakes.noaa.getCurrentConditions.mockRejectedValue(
+    fakes.noaa.getStations.mockRejectedValue(
       new DataNotFoundError('NOAA', 'Unable to provide data for requested point')
     );
 
@@ -564,7 +584,7 @@ describe('handleGetCurrentConditions — auto-mode NOAA -> Open-Meteo fallback (
 
   it('falls back to Open-Meteo when NOAA throws InvalidLocationError on an auto-routed border city', async () => {
     const fakes = buildFakes();
-    fakes.noaa.getCurrentConditions.mockRejectedValue(
+    fakes.noaa.getStations.mockRejectedValue(
       new InvalidLocationError('NOAA', 'Coordinates outside NOAA coverage')
     );
 
@@ -580,7 +600,7 @@ describe('handleGetCurrentConditions — auto-mode NOAA -> Open-Meteo fallback (
 
   it('does NOT fall back and rejects when NOAA throws ServiceUnavailableError', async () => {
     const fakes = buildFakes();
-    fakes.noaa.getCurrentConditions.mockRejectedValue(
+    fakes.noaa.getStations.mockRejectedValue(
       new ServiceUnavailableError('NOAA', 'NOAA API is currently unavailable')
     );
 
@@ -590,7 +610,7 @@ describe('handleGetCurrentConditions — auto-mode NOAA -> Open-Meteo fallback (
 
   it('does NOT fall back when source is explicitly "noaa", even for DataNotFoundError', async () => {
     const fakes = buildFakes();
-    fakes.noaa.getCurrentConditions.mockRejectedValue(
+    fakes.noaa.getStations.mockRejectedValue(
       new DataNotFoundError('NOAA', 'Unable to provide data for requested point')
     );
 
@@ -607,6 +627,6 @@ describe('handleGetCurrentConditions — auto-mode NOAA -> Open-Meteo fallback (
     const text = textOf(result);
 
     expect(text).not.toContain(NOAA_FALLBACK_NOTE);
-    expect(fakes.noaa.getCurrentConditions).not.toHaveBeenCalled();
+    expect(fakes.noaa.getStations).not.toHaveBeenCalled();
   });
 });

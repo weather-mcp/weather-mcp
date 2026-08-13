@@ -10,7 +10,8 @@ import {
   getTimezoneAbbreviation,
   guessTimezoneFromCoords,
   formatTimeRangeInTimezone,
-  isValidTimezone
+  isValidTimezone,
+  formatObservationAge
 } from '../../src/utils/timezone.js';
 
 describe('Timezone Utilities', () => {
@@ -282,6 +283,50 @@ describe('Timezone Utilities', () => {
 
       expect(typeof result).toBe('string');
       expect(result).toContain('-'); // Should still have separator
+    });
+  });
+
+  describe('formatObservationAge', () => {
+    it('should return "just now" for zero age', () => {
+      expect(formatObservationAge(0)).toBe('just now');
+    });
+
+    it('should use singular "minute" for exactly 1 minute', () => {
+      expect(formatObservationAge(1)).toBe('1 minute ago');
+    });
+
+    it('should use plural "minutes" up through 59 minutes', () => {
+      expect(formatObservationAge(59)).toBe('59 minutes ago');
+    });
+
+    it('should cross into the hours band at exactly 60 minutes', () => {
+      expect(formatObservationAge(60)).toBe('1 hours ago');
+    });
+
+    it('should format a mid-range value with one decimal hour', () => {
+      // 150 minutes = 2.5 hours
+      expect(formatObservationAge(150)).toBe('2.5 hours ago');
+    });
+
+    it('should stay in the hours band just under 48 hours', () => {
+      // 2879 minutes = 47.983... hours, rounds to 48.0
+      expect(formatObservationAge(2879)).toBe('48 hours ago');
+    });
+
+    it('should cross into the days band at exactly 48 hours', () => {
+      expect(formatObservationAge(2880)).toBe('2 days ago');
+    });
+
+    it('should use plural "days" beyond 48 hours', () => {
+      expect(formatObservationAge(4320)).toBe('3 days ago'); // 72 hours
+    });
+
+    // The days band only starts at the 48h boundary (2880 min), so the smallest
+    // reachable day count there is 2 — "1 day ago" cannot occur via this band.
+    // Singular pluralization is still exercised in the minutes band above.
+    it('should round to the nearest day for values between whole-day marks', () => {
+      // 3600 minutes = 60 hours -> 2.5 days, rounds to 3
+      expect(formatObservationAge(3600)).toBe('3 days ago');
     });
   });
 

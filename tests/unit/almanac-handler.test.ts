@@ -17,7 +17,7 @@
  * See docs/plans/almanac-implementation-plan.md T5.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleGetForecast } from '../../src/handlers/forecastHandler.js';
 import { handleGetCurrentConditions } from '../../src/handlers/currentConditionsHandler.js';
 import { dayOfYearIndex } from '../../src/services/acis.js';
@@ -233,8 +233,12 @@ function buildNOAAStations() {
 
 function buildNoaaCurrentFake() {
   return {
+    // The NOAA current-conditions path drives getStations + getLatestObservation
+    // directly (F2/D2c retry loop); the getCurrentConditions wrapper is public
+    // API in noaa.ts but no longer called by the handler.
     getCurrentConditions: vi.fn().mockResolvedValue(buildNOAACurrentObservation()),
     getStations: vi.fn().mockResolvedValue(buildNOAAStations()),
+    getLatestObservation: vi.fn().mockResolvedValue(buildNOAACurrentObservation()),
     getGridpointDataByCoordinates: vi.fn().mockRejectedValue(new Error('fire weather not requested')),
   };
 }
@@ -532,6 +536,18 @@ describe('handleGetForecast — include_astronomy on the NOAA daily path', () =>
 
 describe('handleGetCurrentConditions — US records gating', () => {
   const RECORDS_ATTRIBUTION = 'Records: NOAA Regional Climate Centers (ACIS)';
+
+  // The NOAA observation fixture is dated 2024-01-01 and the handler now
+  // computes observation age against the clock (F2/D2a) — pin it 30 minutes
+  // past the fixture so the observation stays fresh (no stale machinery).
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2024-01-01T12:30:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('renders the records line + attribution when normals + US + acisService are all present', async () => {
     const fakes = buildCurrentFakes();

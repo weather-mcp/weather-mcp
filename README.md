@@ -65,7 +65,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
 | `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
 | `search_location` | Geocode place names to coordinates ("Paris" → 48.85, 2.35) | 🌍 Global |
-| `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance; optional day-grouped forecast up to 7 days with per-day peak AQI and UV | 🌍 Global |
+| `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance; current pollen levels for European locations; optional day-grouped forecast up to 7 days with per-day peak AQI and UV | 🌍 Global |
 | `get_marine_conditions` | Wave height, swell, ocean currents, Douglas Sea Scale — includes Great Lakes and major US bays; forecast up to 16 days | 🌍 Global |
 | `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery | 🌍 Global |
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |

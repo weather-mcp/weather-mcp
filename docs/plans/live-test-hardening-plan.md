@@ -1,6 +1,6 @@
 # Live-Test Hardening (2026-08) — Design Plan
 
-**Status:** PLANNED
+**Status:** IMPLEMENTED (2026-08-13, on `fix/live-test-hardening` — see `live-test-hardening-implementation-plan.md` for the executed task graph)
 **Parent:** Full-suite live test of 2026-08-13 against the `feat/metar` build (all
 17 tools, US + international + unit-variant servers). Raw outputs and the issue
 log live in the local `saved-forecasts/` folder (gitignored — personal

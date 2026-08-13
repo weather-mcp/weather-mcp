@@ -13,11 +13,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleGetMarineConditions } from '../../src/handlers/marineConditionsHandler.js';
 import type { OpenMeteoMarineResponse } from '../../src/types/openmeteo.js';
+import type { GridpointResponse } from '../../src/types/noaa.js';
 
 const getMarineMock = vi.fn();
 const getStationsMock = vi.fn();
+const getGridpointDataMock = vi.fn();
 
-const noaaService = { getStations: getStationsMock } as never;
+const noaaService = {
+  getStations: getStationsMock,
+  getGridpointDataByCoordinates: getGridpointDataMock
+} as never;
 const openMeteoService = { getMarine: getMarineMock } as never;
 const locationStore = {} as never;
 const geocodingService = {} as never;
@@ -25,6 +30,10 @@ const geocodingService = {} as never;
 // Mid-Atlantic open ocean — outside every Great Lakes / coastal bay bounding
 // box, so shouldUseNOAAMarine routes straight to Open-Meteo.
 const COORDS = { latitude: 30.0, longitude: -60.0 };
+
+// Lake Michigan coordinates (within bbox: minLat: 41.6, maxLat: 46.0, minLon: -87.8, maxLon: -84.8)
+// This triggers the NOAA path
+const LAKE_MICHIGAN_COORDS = { latitude: 43.0, longitude: -86.0 };
 
 /**
  * Build a daily marine fixture. `values[i]` may be `null` to simulate the
@@ -201,6 +210,112 @@ describe('get_marine_conditions forecast', () => {
 
       expect(text.toLowerCase()).not.toContain('hourly forecast');
       expect(text).not.toContain('Hourly forecast data available');
+    });
+  });
+});
+
+/**
+ * Build a NOAA gridpoint fixture with marine wave data
+ */
+function buildNOAAGridpointResponse(): GridpointResponse {
+  return {
+    properties: {
+      '@id': 'https://api.weather.gov/gridpoints/test/1,1',
+      '@type': 'wx:Gridpoint',
+      updateTime: '2026-07-16T10:00:00Z',
+      validTimes: '2026-07-16T06:00:00Z/P7D',
+      elevation: {
+        unitCode: 'wmoUnit:m',
+        value: 10
+      },
+      forecastOffice: 'https://api.weather.gov/offices/test',
+      gridId: 'test',
+      gridX: 1,
+      gridY: 1,
+      waveHeight: {
+        values: [
+          { validTime: '2026-07-16T11:00:00Z', value: 1.5 },
+          { validTime: '2026-07-16T12:00:00Z', value: 1.6 }
+        ]
+      },
+      waveDirection: {
+        values: [
+          { validTime: '2026-07-16T11:00:00Z', value: 200 },
+          { validTime: '2026-07-16T12:00:00Z', value: 205 }
+        ]
+      },
+      wavePeriod: {
+        values: [
+          { validTime: '2026-07-16T11:00:00Z', value: 8.0 },
+          { validTime: '2026-07-16T12:00:00Z', value: 8.2 }
+        ]
+      },
+      windSpeed: {
+        values: [
+          { validTime: '2026-07-16T11:00:00Z', value: 5.0 },
+          { validTime: '2026-07-16T12:00:00Z', value: 5.5 }
+        ]
+      },
+      windDirection: {
+        values: [
+          { validTime: '2026-07-16T11:00:00Z', value: 210 },
+          { validTime: '2026-07-16T12:00:00Z', value: 215 }
+        ]
+      }
+    }
+  } as unknown as GridpointResponse;
+}
+
+describe('get_marine_conditions NOAA path', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getStationsMock.mockResolvedValue({ features: [] });
+    getMarineMock.mockResolvedValue(buildResponse(5, [1.0, 1.1, 1.2, 1.3, 1.4]));
+  });
+
+  describe('water-body disclosure', () => {
+    it('adds disclosure line in NOAA output for Great Lakes', async () => {
+      getGridpointDataMock.mockResolvedValue(buildNOAAGridpointResponse());
+
+      const result = await callHandler({ ...LAKE_MICHIGAN_COORDS });
+      const text = result.content[0].text;
+
+      expect(text).toContain('*Conditions describe Lake Michigan — the nearest covered water body, which may be distant from the requested point.*');
+    });
+
+    it('places disclosure line after header but before Region line', async () => {
+      getGridpointDataMock.mockResolvedValue(buildNOAAGridpointResponse());
+
+      const result = await callHandler({ ...LAKE_MICHIGAN_COORDS });
+      const text = result.content[0].text;
+
+      const headerIdx = text.indexOf('# Marine Conditions Report - Lake Michigan');
+      const disclosureIdx = text.indexOf('*Conditions describe Lake Michigan');
+      const regionIdx = text.indexOf('**Region:**');
+
+      expect(headerIdx).toBeGreaterThanOrEqual(0);
+      expect(disclosureIdx).toBeGreaterThan(headerIdx);
+      expect(regionIdx).toBeGreaterThan(disclosureIdx);
+    });
+
+    it('does NOT include disclosure line in Open-Meteo output', async () => {
+      // Use ocean coordinates to force Open-Meteo path
+      const result = await callHandler({ ...COORDS, forecast: false });
+      const text = result.content[0].text;
+
+      expect(text).not.toContain('*Conditions describe');
+      expect(text).not.toContain('the nearest covered water body');
+    });
+
+    it('substitutes the actual region name in the disclosure', async () => {
+      // Test with Chesapeake Bay coordinates (coastal bay region)
+      getGridpointDataMock.mockResolvedValue(buildNOAAGridpointResponse());
+
+      const result = await callHandler({ latitude: 37.5, longitude: -76.2 });
+      const text = result.content[0].text;
+
+      expect(text).toContain('*Conditions describe Chesapeake Bay — the nearest covered water body, which may be distant from the requested point.*');
+      expect(text).not.toContain('Lake Michigan');
     });
   });
 });

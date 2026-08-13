@@ -370,7 +370,7 @@ const TOOL_DEFINITIONS = {
 
   get_historical_weather: {
     name: 'get_historical_weather' as const,
-    description: 'Get historical weather data for a specific date range in the past. Use this when the user asks about weather on specific past dates (e.g., "yesterday", "last week", "November 4, 2024", "30 years ago"). Automatically uses NOAA API for recent dates (last 7 days, US only) or Open-Meteo API for older dates (worldwide, back to 1940). Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. Do NOT use for current conditions - use get_current_conditions instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get historical weather data for a specific date range in the past. Use this when the user asks about weather on specific past dates (e.g., "yesterday", "last week", "November 4, 2024", "30 years ago"). Automatically uses NOAA API for recent dates (last 7 days, US only) or Open-Meteo API for older dates (worldwide, back to 1940). Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. Do NOT use for current conditions - use get_current_conditions instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability. Dates are interpreted as UTC calendar days; for US timezones the range may include the prior local evening.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -459,7 +459,7 @@ const TOOL_DEFINITIONS = {
 
   get_air_quality: {
     name: 'get_air_quality' as const,
-    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", or health-related environmental conditions. Returns current conditions and an optional forecast grouped by day (up to 7 days / 168 hours via forecast_days). Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name.',
+    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", "pollen count", "allergy day", or health-related environmental conditions. Returns current conditions and an optional forecast grouped by day (up to 7 days / 168 hours via forecast_days). Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO. For European locations, current pollen levels (alder, birch, grass, mugwort, olive, ragweed) are included automatically; pollen data is not available outside Europe. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -611,7 +611,7 @@ const TOOL_DEFINITIONS = {
 
   save_location: {
     name: 'save_location' as const,
-    description: 'Save a location for easy reuse in weather queries. Use this when a user wants to save a frequently used location like "home", "work", "cabin", or "aunt lisa\'s house". Accepts either a location query (which will be geocoded automatically) or direct coordinates. Saved locations can be used with all weather tools by providing location_name instead of coordinates. Makes it easy to ask "What\'s the weather forecast at home?" without repeatedly providing coordinates. SMART UPDATES: If the alias already exists and you only provide name/activities (without location details), it will update just those fields while preserving coordinates.',
+    description: 'Save a location for easy reuse in weather queries. Use this when a user wants to save a frequently used location like "home", "work", "cabin", or "aunt lisa\'s house". Accepts either a location query (which will be geocoded automatically) or direct coordinates. Saved locations can be used with all weather tools by providing location_name instead of coordinates. Makes it easy to ask "What\'s the weather forecast at home?" without repeatedly providing coordinates. SMART UPDATES: If the alias already exists, any field you omit is preserved (including description, alternateNames, and notes) — provide only what you want to change (e.g. just name/activities, without location details, to update those while preserving coordinates and metadata). Pass an empty value ("" or []) to explicitly clear a field.',
     inputSchema: {
       type: 'object' as const,
       properties: {
