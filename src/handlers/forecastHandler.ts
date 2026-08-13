@@ -37,6 +37,12 @@ import {
 } from '../utils/snow.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
+import {
+  computeDayAstronomy,
+  nextMoonQuarters,
+  formatAstronomyBlock,
+  formatNextQuarters,
+} from '../utils/astronomy.js';
 import { isInUS } from '../utils/geography.js';
 import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
 
@@ -67,6 +73,7 @@ interface ForecastArgs extends UnitArgs {
   include_precipitation_probability?: boolean;
   include_severe_weather?: boolean;
   include_normals?: boolean;
+  include_astronomy?: boolean;
   source?: 'auto' | 'noaa' | 'openmeteo';
   detail?: DetailLevel;
 }
@@ -226,6 +233,13 @@ export async function handleGetForecast(
     'include_normals',
     false
   );
+  // Moon phase, moonrise/set, and twilight blocks (daily granularity only,
+  // like include_normals — silently ignored for hourly forecasts)
+  const include_astronomy = validateOptionalBoolean(
+    (args as ForecastArgs)?.include_astronomy,
+    'include_astronomy',
+    false
+  );
   // Output verbosity: caps hourly output unless detail="full" (see hourlyEntryCap)
   const detail = validateDetail((args as ForecastArgs)?.detail);
 
@@ -258,6 +272,7 @@ export async function handleGetForecast(
         include_precipitation_probability,
         include_severe_weather,
         include_normals,
+        include_astronomy,
         prefs,
         detail
       );
@@ -290,6 +305,7 @@ export async function handleGetForecast(
         granularity,
         include_precipitation_probability,
         include_normals,
+        include_astronomy,
         prefs,
         detail
       );
@@ -308,6 +324,7 @@ export async function handleGetForecast(
       granularity,
       include_precipitation_probability,
       include_normals,
+      include_astronomy,
       prefs,
       detail
     );
@@ -337,6 +354,7 @@ async function formatNOAAForecast(
   include_precipitation_probability: boolean,
   include_severe_weather: boolean,
   include_normals: boolean,
+  include_astronomy: boolean,
   prefs: UnitPreferences,
   detail: DetailLevel
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
@@ -377,6 +395,12 @@ async function formatNOAAForecast(
     output += `*Hourly output capped at ${periods.length} hours (detail="${detail}"). Use detail="full" for the full ${days}-day hourly forecast.*\n\n`;
   }
 
+  // NOAA daily output renders day/night *periods* with no sun lines, so the
+  // astronomy block anchors to calendar dates instead: one block per date,
+  // emitted at the end of the first period belonging to that date (which
+  // handles a "Tonight"-first response cleanly).
+  const astronomyDatesRendered = new Set<string>();
+
   for (const period of periods) {
     // For hourly forecasts, use the start time as the header since period names are empty
     const periodHeader = granularity === 'hourly' && !period.name
@@ -409,6 +433,27 @@ async function formatNOAAForecast(
     if (granularity === 'daily' && detail !== 'summary' && period.detailedForecast) {
       output += `${period.detailedForecast}\n\n`;
     }
+
+    // Astronomy block: once per calendar date, after the date's first period
+    if (include_astronomy && granularity === 'daily' && period.startTime) {
+      const periodDate = DateTime.fromISO(period.startTime, { zone: timezone });
+      const isoDate = periodDate.toISODate();
+      if (isoDate && !astronomyDatesRendered.has(isoDate)) {
+        astronomyDatesRendered.add(isoDate);
+        output += formatAstronomyBlock(
+          computeDayAstronomy(latitude, longitude, periodDate),
+          prefs
+        );
+        output += `\n`;
+      }
+    }
+  }
+
+  // Next full/new moon: once per response, anchored at the first forecast day
+  if (include_astronomy && granularity === 'daily' && periods[0]?.startTime) {
+    const firstDay = DateTime.fromISO(periods[0].startTime, { zone: timezone });
+    output += formatNextQuarters(nextMoonQuarters(firstDay), timezone);
+    output += `\n`;
   }
 
   output += `---\n`;
@@ -525,6 +570,7 @@ async function formatOpenMeteoForecast(
   granularity: 'daily' | 'hourly',
   include_precipitation_probability: boolean,
   include_normals: boolean,
+  include_astronomy: boolean,
   prefs: UnitPreferences,
   detail: DetailLevel
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
@@ -626,6 +672,11 @@ async function formatOpenMeteoForecast(
         output += `**Sunset:** ${formatLuxonTime(sunset, prefs)}\n`;
       }
 
+      // Astronomy block: moon phase/rise/set and twilight, right after the sun lines
+      if (include_astronomy) {
+        output += formatAstronomyBlock(computeDayAstronomy(latitude, longitude, dt), prefs);
+      }
+
       if (daily.daylight_duration?.[i] !== undefined) {
         const hours = Math.floor(daily.daylight_duration[i] / 3600);
         const minutes = Math.floor((daily.daylight_duration[i] % 3600) / 60);
@@ -659,6 +710,13 @@ async function formatOpenMeteoForecast(
         output += `**UV Index:** ${daily.uv_index_max[i].toFixed(1)}\n`;
       }
 
+      output += `\n`;
+    }
+
+    // Next full/new moon: once per response, anchored at the first forecast day
+    if (include_astronomy && numDays > 0 && daily.time[0]) {
+      const firstDay = DateTime.fromISO(daily.time[0], { zone: forecast.timezone });
+      output += formatNextQuarters(nextMoonQuarters(firstDay), forecast.timezone);
       output += `\n`;
     }
   }

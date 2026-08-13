@@ -287,6 +287,11 @@ const TOOL_DEFINITIONS = {
           description: 'Include climate normals (30-year averages) for comparison with forecasted temperatures (default: false, daily forecasts only). Shows normal high/low and departure from normal for the first forecast day.',
           default: false
         },
+        include_astronomy: {
+          type: 'boolean' as const,
+          description: 'Include astronomy details for each forecast day (default: false, daily forecasts only). Use when asked about the moon phase, a full moon or new moon, moonrise/moonset, golden hour, twilight, or "when does it get dark". Adds moon phase, illumination, moonrise/moonset, civil/nautical/astronomical twilight times, and the next full/new moon dates.',
+          default: false
+        },
         source: {
           type: 'string' as const,
           description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), or "openmeteo" (global)',
