@@ -52,7 +52,8 @@ Get weather forecast for any location worldwide.
 - `days` (optional): Number of days in forecast (1-16, default: 7)
 - `granularity` (optional): "daily" or "hourly" (default: "daily")
 - `include_precipitation_probability` (optional): Include rain chances (default: true)
-- `include_normals` (optional): Include climate normals for comparison (default: false)
+- `include_normals` (optional): Include climate normals for comparison (default: false). For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
+- `include_astronomy` (optional): Include a per-day astronomy block — moon phase name, illumination %, moonrise/moonset, and civil/nautical/astronomical twilight times — plus one next-full-moon / next-new-moon line per response (default: false, daily forecasts only; computed locally, no API calls). Polar days render explicit "none (polar day)" / "none (polar night)" wording
 - `source` (optional): "auto" (default), "noaa" (US only), or "openmeteo" (global)
 - `units` (optional): "imperial" (default) or "metric" — see [Units & Localization](#units--localization)
 - Unit overrides (optional): `temperature_unit`, `wind_speed_unit`, `precipitation_unit`, `pressure_unit`, `distance_unit`, `time_format`
@@ -78,7 +79,8 @@ Automatically selects the best data source: NOAA for US locations (more detailed
 - Weather conditions and descriptions
 - UV index (for international locations)
 - Humidity and atmospheric conditions
-- Climate normals comparison (when `include_normals=true`)
+- Climate normals comparison (when `include_normals=true`), plus the US record high/low for the first forecast date with attribution "Records: NOAA Regional Climate Centers (ACIS)"
+- Moon phase, moonrise/moonset, twilight times, and next full/new moon (when `include_astronomy=true`, daily only)
 - Snow and ice accumulation forecasts (when available)
 - All timestamps in local timezone
 
@@ -91,7 +93,7 @@ Get current weather conditions for a location (global).
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `include_fire_weather` (optional): Include fire weather indices (default: false, US only)
-- `include_normals` (optional): Include climate normals for comparison (default: false)
+- `include_normals` (optional): Include climate normals for comparison (default: false). For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
 - `source` (optional): `"auto"` (default), `"noaa"`, or `"openmeteo"` — see Description
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 
@@ -117,7 +119,7 @@ What's the weather right now in Tokyo?
 - Recent precipitation
 - Cloud cover and visibility
 - Snow depth on ground (when available)
-- Climate normals comparison (when `include_normals=true`)
+- Climate normals comparison (when `include_normals=true`), plus the US record high/low for today's date with attribution "Records: NOAA Regional Climate Centers (ACIS)"
 - Fire weather indices (when `include_fire_weather=true`) — Haines Index, Grassland Fire Danger, Red Flag Threat, mixing height, transport winds
 - All timestamps in local timezone
 

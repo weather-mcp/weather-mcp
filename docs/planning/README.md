@@ -58,9 +58,9 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Idea | Status | Detail |
 |------|--------|--------|
 | Satellite imagery in `get_weather_imagery` | 💡 | FE §12.1 (deferred from v1.5.0) |
-| Moon phase / astronomy (`include_astronomy` on forecast) | 📝 | [`docs/almanac-plan.md`](../almanac-plan.md) (target v1.16.0); FE §1.1 |
-| Extended twilight times (civil/nautical/astronomical) | 📝 | [`docs/almanac-plan.md`](../almanac-plan.md); FE §1.2 |
-| Record highs/lows for date (with normals) | 📝 | [`docs/almanac-plan.md`](../almanac-plan.md); FE §2.2 |
+| Moon phase / astronomy (`include_astronomy` on forecast) | ✅ | Implemented on `feat/almanac` for v1.16.0; [`docs/almanac-plan.md`](../almanac-plan.md); FE §1.1 |
+| Extended twilight times (civil/nautical/astronomical) | ✅ | Implemented on `feat/almanac` for v1.16.0; [`docs/almanac-plan.md`](../almanac-plan.md); FE §1.2 |
+| Record highs/lows for date (with normals) | ✅ | Implemented on `feat/almanac` for v1.16.0 (US, RCC ACIS); [`docs/almanac-plan.md`](../almanac-plan.md); FE §2.2 |
 | Better precipitation-type parsing (rain/snow/freezing rain) | 💡 | FE §3.2 |
 | Aviation weather tool (METAR/TAF) | 💡 | FE §4 |
 | Drought indices (US Drought Monitor) | 💡 | FE §5.2 |
@@ -118,6 +118,7 @@ One line per idea that graduated; see [CHANGELOG.md](../../CHANGELOG.md) for rel
 | Max-range expansion, output completeness | ✅ v1.13.0 |
 | Default location (`WEATHER_DEFAULT_LOCATION`), CI workflow, tz band fix | ✅ v1.14.0 |
 | Global river conditions via Open-Meteo Flood/GloFAS (ICR Phase 2) | ✅ v1.15.0 (pending release) |
+| Almanac: moon phase, twilight times, US record highs/lows | ✅ v1.16.0 (pending release) |
 
 ---
 

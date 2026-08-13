@@ -1,6 +1,6 @@
 # Almanac (Moon, Twilight, Records) — Design Plan
 
-**Status:** DRAFT (settled 2026-08-12, ready for /impl-plan)
+**Status:** IMPLEMENTED (2026-08-12, on `feat/almanac` for v1.16.0)
 **Parent:** `docs/planning/FUTURE_ENHANCEMENTS.md` §1.1 (moon), §1.2 (twilight), §2.2 (records)
 **Target release:** v1.16.0
 **Branch (for /impl-plan):** `feat/almanac`
@@ -168,10 +168,11 @@ nextMoonQuarters(from: DateTime): { nextFull: DateTime; nextNew: DateTime }
 
 ## Documentation / registration checklist
 
-- [ ] `package.json`: add `astronomy-engine` (runtime dep)
-- [ ] `src/index.ts`: `include_astronomy` in the `get_forecast` schema;
+- [x] `package.json`: add `astronomy-engine` (runtime dep)
+- [x] `src/index.ts`: `include_astronomy` in the `get_forecast` schema;
       `include_normals` descriptions mention records (US)
-- [ ] README.md: feature list + example queries
-- [ ] CHANGELOG.md v1.16.0
-- [ ] `docs/planning/README.md`: flip the three idea rows 📝 → 🚧 → ✅
-- [ ] CLAUDE.md: note the new dependency and the records/ACIS service
+- [x] README.md: feature list + example queries
+- [x] CHANGELOG.md (entry under `[Unreleased]` per repo convention — version
+      bump happens at release)
+- [x] `docs/planning/README.md`: flip the three idea rows 📝 → ✅
+- [x] CLAUDE.md: note the new dependency and the records/ACIS service

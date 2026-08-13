@@ -36,6 +36,7 @@ src/
 │   ├── nominatim.ts        # Nominatim/OSM geocoding client (v1.7.0)
 │   ├── locationStore.ts    # Saved locations storage service (v1.7.0)
 │   ├── nifc.ts             # NIFC wildfire API client
+│   ├── acis.ts             # RCC ACIS client — US daily temperature records (v1.16.0)
 │   └── usgs.ts             # USGS water services client
 ├── types/                   # TypeScript type definitions
 │   ├── noaa.ts
@@ -48,6 +49,8 @@ src/
 │   ├── units.ts            # Unit conversions
 │   ├── logger.ts           # Structured logging
 │   ├── locationResolver.ts # Location name/coordinate resolution (v1.7.0)
+│   ├── astronomy.ts        # Moon phase, rise/set, twilight — pure local math (v1.16.0)
+│   ├── records.ts          # US record high/low line orchestration (v1.16.0)
 │   ├── airQuality.ts       # AQI calculations
 │   ├── marine.ts           # Wave/ocean utilities
 │   ├── fireWeather.ts      # Fire weather indices
@@ -551,8 +554,9 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.14.0 (unreleased work on `feat/global-rivers` targets v1.15.0)
+- **Version:** 1.14.0 (unreleased: `feat/global-rivers` content targets v1.15.0; `feat/almanac` targets v1.16.0)
 - **Status:** Production Ready ✅
+- **New in v1.16.0 (unreleased):** Almanac — `include_astronomy` on `get_forecast` adds per-day moon phase/illumination/moonrise/moonset and civil/nautical/astronomical twilight, plus one next-full/new-moon line per response; computed locally by `src/utils/astronomy.ts` on top of `astronomy-engine` (the project's **first computational runtime dependency** — MIT, zero transitive deps, ±1 arcminute; it is not a data source, so the zero-cost/zero-key data model is preserved). Works on both provider paths (NOAA: one block per calendar date, "Tonight"-first safe; Open-Meteo: after the Sunset line); polar cases render "none (polar day)"/"none (polar night)"; daily-only like `include_normals`. US records — for US locations, `include_normals` on `get_forecast` (day 1) and `get_current_conditions` also appends `**Records for <date>:** High/Low (year) — records since <year>` from the keyless RCC ACIS API (`src/services/acis.ts`: bbox station search widened once on empty, longest period-of-record preferring threaded `…thr` ids; one POST fetches the full 366-slot leap-calendar table; cached 7d/30d). Records are garnish — any ACIS failure warns and omits the line, independent of the normals fetch (either can render without the other); non-US makes no ACIS request. Attribution: "Records: NOAA Regional Climate Centers (ACIS)".
 - **New in v1.15.0 (unreleased):** Global `get_river_conditions` — NOAA NWPS gauges in the US (unchanged), Open-Meteo Flood API (GloFAS v4) modeled discharge elsewhere, auto-selected by `isInUS` and overridable with `source` (`auto`/`noaa`/`openmeteo`); no cross-fallback, since gauge observations and model discharge are different claims. Because GloFAS discharge is per ~0.05° cell and an off-channel cell reports runoff rather than the river (Memphis: 0.63 vs 11,640 m³/s one cell apart), each request probes a 3×3 neighborhood in one multi-coordinate call and snaps to the highest past-31-day mean, disclosing the move when the winner is not the requested point (`src/utils/riverDischarge.ts`). Model output is framed against its own history and ensemble rather than flood categories (GloFAS publishes none): trend, 31-day-mean ratio, and a median/p25–p75 forecast, with `forecast_days` (1-210, default 7) and `detail="full"` for the min/max envelope and full range. `radius` stays NOAA-only. Alerts and wildfire remain US-only.
 - **New in v1.14.0:** Configurable default location (WEATHER_DEFAULT_LOCATION) with server-default disclosure, CI workflow for PRs, US timezone fallback band fix
 - **New in v1.13.0:** Max-range expansion — `get_air_quality` and `get_marine_conditions` gain `forecast_days` (1-7 and 1-16 respectively, day-grouped/null-trimmed full-range output), the historical hourly `limit` ceiling rises to 744 (the full 31-day hourly window; hourly-only semantics documented), `get_weather_imagery` `detail="full"` lists every animation frame, and RainViewer nowcast frames are appended defensively when the feed provides them. Output completeness — AQI forecast day headers add peak UV (hourly fetch trimmed to 3 variables); `detail="full"` on river/wildfire/lightning lifts display caps to 25 with disclosed remainders; wildfire surfaces the ArcGIS truncation caveat; river gauges show an observed rise/fall trend (NWPS stageflow, rate-limit tolerant) plus a multi-point forecast series at `full`; NWPS placeholder observed statuses are suppressed; river footer credits NWPS alone
@@ -586,6 +590,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2026-08-12 (v1.14.0)
+**Last Updated:** 2026-08-12 (v1.16.0 in progress on `feat/almanac`)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.
