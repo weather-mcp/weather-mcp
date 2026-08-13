@@ -163,6 +163,7 @@ function formatNOAAMarineConditions(
   includeForecast: boolean
 ): string {
   let output = `# Marine Conditions Report - ${region}\n\n`;
+  output += `*Conditions describe ${region} — the nearest covered water body, which may be distant from the requested point.*\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Region:** ${region}\n`;
   output += `**Last Updated:** ${formatInTimezone(data.timestamp, timezone)}\n\n`;
