@@ -31,7 +31,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 
 | Idea | Status | Detail |
 |------|--------|--------|
-| Global river/flood via Open-Meteo Flood API | ✅ | Implemented on `feat/global-rivers` for v1.15.0; [`docs/global-rivers-plan.md`](../global-rivers-plan.md); ICR Phase 2; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #1 |
+| Global river/flood via Open-Meteo Flood API | ✅ | Implemented on `feat/global-rivers` for v1.15.0; [`docs/plans/global-rivers-plan.md`](../plans/global-rivers-plan.md); ICR Phase 2; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #1 |
 | UK Environment Agency gauge supplement | 💡 | Descoped from the global-rivers work (2026-08-12) to keep v1.15.0 to one provider; England-only, keyless, OGL v3, 15-min real-time observations |
 | International alerts (MeteoAlarm, MSC GeoMet, WMO CAP) | 💡 | ICR Phase 3 |
 | Global wildfire via NASA FIRMS (optional MAP_KEY) | 💡 | ICR Phase 4; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #2 |

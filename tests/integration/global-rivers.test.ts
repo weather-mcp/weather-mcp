@@ -1,6 +1,6 @@
 /**
  * Integration tests for the global (non-US) river conditions path — the
- * Open-Meteo Flood API / GloFAS v4 model, per docs/global-rivers-plan.md (T7).
+ * Open-Meteo Flood API / GloFAS v4 model, per docs/plans/global-rivers-plan.md (T7).
  *
  * Block 1 is deterministic: only the HTTP layer (OpenMeteoService's private
  * `makeRequestToFlood`) is stubbed via `vi.spyOn`, following the same
@@ -142,7 +142,7 @@ function buildCell(
  *
  * - Index 4 (center / requested point): real but tiny discharge (0.63 m³/s,
  *   constant) — local runoff noise, mirroring the live Memphis vignette in
- *   docs/global-rivers-plan.md (0.63 m³/s off-channel vs. ~11,640 m³/s one
+ *   docs/plans/global-rivers-plan.md (0.63 m³/s off-channel vs. ~11,640 m³/s one
  *   cell west).
  * - Index 3 (its west neighbor): the actual river channel — high discharge,
  *   so `pickChannelCell` snaps west and the output has to disclose it.

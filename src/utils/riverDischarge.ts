@@ -8,7 +8,7 @@
  * Everything here exists to pick the right cell and then describe it
  * honestly. No I/O, no service calls — only the response type is imported.
  *
- * See docs/global-rivers-plan.md D3 (channel snapping) and D4 (presentation).
+ * See docs/plans/global-rivers-plan.md D3 (channel snapping) and D4 (presentation).
  */
 
 import { calculateDistance } from './distance.js';

@@ -22,7 +22,7 @@ import type { OpenMeteoFloodResponse } from '../../src/types/openmeteo.js';
  * Channel-snapping and presentation logic for the global river path.
  *
  * The scenario these tests are built around is the live Memphis probe from
- * docs/global-rivers-plan.md: 35.125,-90.075 sits off the Mississippi channel
+ * docs/plans/global-rivers-plan.md: 35.125,-90.075 sits off the Mississippi channel
  * and reads 0.63 m³/s, while the cell one step west reads ~11,600 m³/s.
  */
 

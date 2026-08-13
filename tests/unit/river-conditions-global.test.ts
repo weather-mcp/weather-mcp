@@ -14,7 +14,7 @@
  *   - detail level row caps and the full-only min/max range (D4)
  *   - the m³/s Unicode unit survives into rendered output
  *
- * See docs/global-rivers-plan.md.
+ * See docs/plans/global-rivers-plan.md.
  */
 
 import { describe, it, expect, vi } from 'vitest';
