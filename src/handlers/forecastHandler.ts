@@ -7,6 +7,7 @@ import { DateTime } from 'luxon';
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { NCEIService } from '../services/ncei.js';
+import { AcisService } from '../services/acis.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import type { GridpointProperties, GridpointDataSeries } from '../types/noaa.js';
@@ -37,6 +38,7 @@ import {
 } from '../utils/snow.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
+import { getRecordsLine } from '../utils/records.js';
 import {
   computeDayAstronomy,
   nextMoonQuarters,
@@ -211,7 +213,8 @@ export async function handleGetForecast(
   openMeteoService: OpenMeteoService,
   locationStore: LocationStore,
   geocodingService: GeocodingService,
-  nceiService?: NCEIService
+  nceiService?: NCEIService,
+  acisService?: AcisService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as ForecastArgs, locationStore, geocodingService);
@@ -274,7 +277,8 @@ export async function handleGetForecast(
         include_normals,
         include_astronomy,
         prefs,
-        detail
+        detail,
+        acisService
       );
     } catch (error) {
       // The US bounding boxes overrun the border (Toronto, Vancouver, Windsor
@@ -307,7 +311,8 @@ export async function handleGetForecast(
         include_normals,
         include_astronomy,
         prefs,
-        detail
+        detail,
+        acisService
       );
       if (result.content.length > 0 && result.content[0]?.type === 'text' && result.content[0].text) {
         result.content[0].text = insertNoteAfterHeading(result.content[0].text, NOAA_FALLBACK_NOTE);
@@ -326,7 +331,8 @@ export async function handleGetForecast(
       include_normals,
       include_astronomy,
       prefs,
-      detail
+      detail,
+      acisService
     );
   }
 
@@ -356,7 +362,8 @@ async function formatNOAAForecast(
   include_normals: boolean,
   include_astronomy: boolean,
   prefs: UnitPreferences,
-  detail: DetailLevel
+  detail: DetailLevel,
+  acisService?: AcisService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   const noaaUnits = noaaUnitsParam(prefs);
   // Fetch point data once. It yields both the timezone AND the grid coordinates,
@@ -505,12 +512,12 @@ async function formatNOAAForecast(
 
   // Add climate normals if requested and for daily forecasts only
   if (include_normals && granularity === 'daily') {
-    try {
-      // Get the first forecast day to determine the date
-      const firstPeriod = periods[0];
-      if (firstPeriod && firstPeriod.startTime) {
-        const { month, day } = getDateComponents(firstPeriod.startTime);
+    // Get the first forecast day to determine the date
+    const firstPeriod = periods[0];
+    if (firstPeriod && firstPeriod.startTime) {
+      const { month, day } = getDateComponents(firstPeriod.startTime);
 
+      try {
         // Fetch climate normals using hybrid strategy
         const normals = await getClimateNormals(
           openMeteoService,
@@ -540,11 +547,25 @@ async function formatNOAAForecast(
         };
 
         output += formatNormals(normals, currentTemps, prefs);
+      } catch (error) {
+        // If normals fetch fails, just skip it (don't error the whole request)
+        output += `\n## Climate Normals\n\n`;
+        output += `⚠️ Climate normals data not available for this location.\n`;
       }
-    } catch (error) {
-      // If normals fetch fails, just skip it (don't error the whole request)
-      output += `\n## Climate Normals\n\n`;
-      output += `⚠️ Climate normals data not available for this location.\n`;
+
+      // US temperature records: independent of the normals fetch above (D4/A5)
+      // — a records line can render even if normals failed, and vice versa.
+      if (isInUS(latitude, longitude) && acisService) {
+        try {
+          const recordsLine = await getRecordsLine(acisService, latitude, longitude, month, day, prefs);
+          if (recordsLine) {
+            output += `\n${recordsLine}\n`;
+          }
+        } catch (error) {
+          // getRecordsLine never throws, but stay defensive per D4 — records
+          // must never fail the primary forecast response.
+        }
+      }
     }
   }
 
@@ -572,7 +593,8 @@ async function formatOpenMeteoForecast(
   include_normals: boolean,
   include_astronomy: boolean,
   prefs: UnitPreferences,
-  detail: DetailLevel
+  detail: DetailLevel,
+  acisService?: AcisService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Unit labels for output (Open-Meteo returns values already in requested units)
   const tempU = temperatureLabel(prefs);
@@ -726,12 +748,12 @@ async function formatOpenMeteoForecast(
 
   // Add climate normals if requested and for daily forecasts only
   if (include_normals && granularity === 'daily' && forecast.daily) {
-    try {
-      // Get the first forecast day
-      const firstDay = forecast.daily.time[0];
-      if (firstDay) {
-        const { month, day } = getDateComponents(firstDay);
+    // Get the first forecast day
+    const firstDay = forecast.daily.time[0];
+    if (firstDay) {
+      const { month, day } = getDateComponents(firstDay);
 
+      try {
         // Fetch climate normals using hybrid strategy
         const normals = await getClimateNormals(
           openMeteoService,
@@ -753,11 +775,25 @@ async function formatOpenMeteoForecast(
         };
 
         output += formatNormals(normals, currentTemps, prefs);
+      } catch (error) {
+        // If normals fetch fails, just skip it (don't error the whole request)
+        output += `\n## Climate Normals\n\n`;
+        output += `⚠️ Climate normals data not available for this location.\n`;
       }
-    } catch (error) {
-      // If normals fetch fails, just skip it (don't error the whole request)
-      output += `\n## Climate Normals\n\n`;
-      output += `⚠️ Climate normals data not available for this location.\n`;
+
+      // US temperature records: independent of the normals fetch above (D4/A5)
+      // — a records line can render even if normals failed, and vice versa.
+      if (isInUS(latitude, longitude) && acisService) {
+        try {
+          const recordsLine = await getRecordsLine(acisService, latitude, longitude, month, day, prefs);
+          if (recordsLine) {
+            output += `\n${recordsLine}\n`;
+          }
+        } catch (error) {
+          // getRecordsLine never throws, but stay defensive per D4 — records
+          // must never fail the primary forecast response.
+        }
+      }
     }
   }
 

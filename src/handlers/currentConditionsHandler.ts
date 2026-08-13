@@ -5,6 +5,7 @@
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { NCEIService } from '../services/ncei.js';
+import { AcisService } from '../services/acis.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
@@ -42,6 +43,7 @@ import {
 import { extractSnowDepth, formatSnowData, hasWinterWeather } from '../utils/snow.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
+import { getRecordsLine } from '../utils/records.js';
 
 interface CurrentConditionsArgs extends UnitArgs {
   latitude?: number;
@@ -76,7 +78,8 @@ export async function handleGetCurrentConditions(
   openMeteoService: OpenMeteoService,
   nceiService: NCEIService,
   locationStore: LocationStore,
-  geocodingService: GeocodingService
+  geocodingService: GeocodingService,
+  acisService?: AcisService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as CurrentConditionsArgs, locationStore, geocodingService);
@@ -111,7 +114,8 @@ export async function handleGetCurrentConditions(
         longitude,
         includeFireWeather,
         includeNormals,
-        prefs
+        prefs,
+        acisService
       );
     } catch (error) {
       // The US bounding boxes overrun the border (Toronto, Vancouver, Windsor
@@ -141,7 +145,8 @@ export async function handleGetCurrentConditions(
           longitude,
           includeFireWeather,
           includeNormals,
-          prefs
+          prefs,
+          acisService
         ),
         NOAA_FALLBACK_NOTE
       );
@@ -154,7 +159,8 @@ export async function handleGetCurrentConditions(
       longitude,
       includeFireWeather,
       includeNormals,
-      prefs
+      prefs,
+      acisService
     );
   }
 
@@ -179,7 +185,8 @@ async function formatNOAACurrentConditions(
   longitude: number,
   includeFireWeather: boolean,
   includeNormals: boolean,
-  prefs: UnitPreferences
+  prefs: UnitPreferences,
+  acisService?: AcisService
 ): Promise<string> {
   // Get current observation
   const observation = await noaaService.getCurrentConditions(latitude, longitude);
@@ -462,10 +469,10 @@ async function formatNOAACurrentConditions(
 
   // Climate Normals section (optional)
   if (includeNormals) {
-    try {
-      // Get date components from observation timestamp
-      const { month, day } = getDateComponents(props.timestamp);
+    // Get date components from observation timestamp
+    const { month, day } = getDateComponents(props.timestamp);
 
+    try {
       // Fetch climate normals using hybrid strategy
       const normals = await getClimateNormals(
         openMeteoService,
@@ -491,6 +498,20 @@ async function formatNOAACurrentConditions(
       output += `\n## Climate Normals\n\n`;
       output += `⚠️ Climate normals data not available for this location.\n`;
     }
+
+    // US temperature records: independent of the normals fetch above (D4/A5)
+    // — a records line can render even if normals failed, and vice versa.
+    if (isInUS(latitude, longitude) && acisService) {
+      try {
+        const recordsLine = await getRecordsLine(acisService, latitude, longitude, month, day, prefs);
+        if (recordsLine) {
+          output += `\n${recordsLine}\n`;
+        }
+      } catch (error) {
+        // getRecordsLine never throws, but stay defensive per D4 — records
+        // must never fail the primary current-conditions response.
+      }
+    }
   }
 
   output += `\n---\n`;
@@ -514,7 +535,8 @@ async function formatOpenMeteoCurrentConditions(
   longitude: number,
   includeFireWeather: boolean,
   includeNormals: boolean,
-  prefs: UnitPreferences
+  prefs: UnitPreferences,
+  acisService?: AcisService
 ): Promise<string> {
   const tempU = temperatureLabel(prefs);
   const windU = windSpeedLabel(prefs);
@@ -625,9 +647,9 @@ async function formatOpenMeteoCurrentConditions(
 
   // Climate Normals section (optional)
   if (includeNormals) {
-    try {
-      const { month, day } = getDateComponents(current.time);
+    const { month, day } = getDateComponents(current.time);
 
+    try {
       const normals = await getClimateNormals(
         openMeteoService,
         nceiService,
@@ -648,6 +670,21 @@ async function formatOpenMeteoCurrentConditions(
       // If normals fetch fails, just skip it (don't error the whole request)
       output += `\n## Climate Normals\n\n`;
       output += `⚠️ Climate normals data not available for this location.\n`;
+    }
+
+    // US temperature records: independent of the normals fetch above (D4/A5)
+    // — a records line can render even if normals failed, and vice versa.
+    // This site is reachable for a US point via explicit source="openmeteo".
+    if (isInUS(latitude, longitude) && acisService) {
+      try {
+        const recordsLine = await getRecordsLine(acisService, latitude, longitude, month, day, prefs);
+        if (recordsLine) {
+          output += `\n${recordsLine}\n`;
+        }
+      } catch (error) {
+        // getRecordsLine never throws, but stay defensive per D4 — records
+        // must never fail the primary current-conditions response.
+      }
     }
   }
 

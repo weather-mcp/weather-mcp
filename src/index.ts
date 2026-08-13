@@ -18,6 +18,7 @@ import { NOAAService } from './services/noaa.js';
 import { OpenMeteoService } from './services/openmeteo.js';
 import { NominatimService } from './services/nominatim.js';
 import { NCEIService } from './services/ncei.js';
+import { AcisService } from './services/acis.js';
 import { NIFCService } from './services/nifc.js';
 import { GeocodingService } from './services/geocoding.js';
 import { LocationStore } from './services/locationStore.js';
@@ -128,6 +129,13 @@ const locationStore = new LocationStore();
  * Falls back to Open-Meteo computed normals if not configured
  */
 const nceiService = new NCEIService();
+
+/**
+ * Initialize the ACIS service for US daily temperature records (optional)
+ * Keyless (no signup) — appends a record high/low line to the include_normals
+ * output of get_forecast and get_current_conditions for US locations.
+ */
+const acisService = new AcisService();
 
 /**
  * Initialize the NIFC service for wildfire data
@@ -284,7 +292,7 @@ const TOOL_DEFINITIONS = {
         },
         include_normals: {
           type: 'boolean' as const,
-          description: 'Include climate normals (30-year averages) for comparison with forecasted temperatures (default: false, daily forecasts only). Shows normal high/low and departure from normal for the first forecast day.',
+          description: 'Include climate normals (30-year averages) for comparison with forecasted temperatures (default: false, daily forecasts only). Shows normal high/low and departure from normal for the first forecast day. For US locations, also shows the record high/low for the date and the year it was set.',
           default: false
         },
         include_astronomy: {
@@ -319,7 +327,7 @@ const TOOL_DEFINITIONS = {
         },
         include_normals: {
           type: 'boolean' as const,
-          description: 'Include climate normals (30-year averages) for comparison with current conditions (default: false). Shows normal high/low temperatures and precipitation, with departure from normal.',
+          description: 'Include climate normals (30-year averages) for comparison with current conditions (default: false). Shows normal high/low temperatures and precipitation, with departure from normal. For US locations, also shows the record high/low for the date and the year it was set.',
           default: false
         },
         source: {
@@ -721,12 +729,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'get_forecast':
         return await withAnalytics('get_forecast', async () =>
-          handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService)
+          handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService, acisService)
         );
 
       case 'get_current_conditions':
         return await withAnalytics('get_current_conditions', async () =>
-          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService)
+          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService, acisService)
         );
 
       case 'get_alerts':
