@@ -35,6 +35,7 @@ Then just ask:
 > *"Are there wildfires within 50 miles of my cabin?"*
 > *"Will there be a full moon this weekend?"*
 > *"Is this a record high for today?"*
+> *"How bad is the pollen in Berlin today?"*
 > *"What was the weather in Paris on June 6, 1944?"*
 
 📦 Listed in the [Official MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp) as `io.github.dgahagan/weather-mcp`.
@@ -60,7 +61,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | Tool | What it does | Coverage |
 |------|-------------|----------|
 | `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name; sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac | 🌍 Global |
-| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional fire-weather indices), Open-Meteo model data elsewhere, or real airport station observations worldwide with `source="metar"` | 🌍 Global |
+| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional fire-weather indices), Open-Meteo model data elsewhere, or real airport station observations worldwide with `source="metar"`. Always states the observation's age, and automatically falls back to a fresher nearby station when the nearest one has gone dark | 🌍 Global |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity | 🇺🇸 US |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
 | `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
@@ -70,7 +71,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery | 🌍 Global |
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
 | `get_river_conditions` | US: NWPS gauge levels, flood stages, streamflow, rise/fall trends, forecast series. Elsewhere: GloFAS modeled discharge snapped to the nearest river channel, with ensemble forecast | 🌍 Global |
-| `get_wildfire_info` | Active fires, containment, size, proximity-based safety guidance | 🇺🇸 US |
+| `get_wildfire_info` | Active fires, containment, size, safety guidance from the nearest *uncontained* fire (fully contained fires are listed but don't drive danger levels) | 🇺🇸 US |
 | `check_service_status` | Health checks for all upstream APIs plus cache statistics | — |
 | `save_location` | Save places as aliases ("home", "cabin") with optional activity tags | — |
 | `list_saved_locations` | List all saved locations | — |
