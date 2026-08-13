@@ -39,7 +39,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 | Global climate normals (Open-Meteo archive outside US) | 💡 | ICR Phase 5 |
 | Global fire weather indices (Open-Meteo hourly outside US) | 💡 | ICR Phase 5 |
 | UK river gauges (Environment Agency flood-monitoring API) | 💡 | ICR Phase 2 supplement |
-| Real station observations worldwide (aviationweather.gov METARs) | 💡 | ICR Phase 1 leftover (explicitly "not taken up, remains a future option"); [FUTURE_ENHANCEMENTS](./FUTURE_ENHANCEMENTS.md) §4. Re-verified live 2026-08-13. **Note the framing choice:** as a `source` on `get_current_conditions` this closes the "model-interpolated values, not station observations" gap that `currentConditionsHandler.ts` currently discloses outside the US; as a standalone `get_metar` tool it serves pilots instead. Same data, different products |
+| Real station observations worldwide (aviationweather.gov METARs) | 📝 | [`docs/metar-plan.md`](../metar-plan.md), targeting v1.17.0 on `feat/metar`; closes the ICR Phase 1 leftover (explicitly "not taken up, remains a future option") and the observation half of [FUTURE_ENHANCEMENTS](./FUTURE_ENHANCEMENTS.md) §4. Framing settled: a `source: 'metar'` on `get_current_conditions`, not a new tool, and `auto` stays unchanged in v1 |
 
 ### Architecture & tooling
 
@@ -62,7 +62,7 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Extended twilight times (civil/nautical/astronomical) | ✅ | Implemented on `feat/almanac` for v1.16.0; [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §1.2 |
 | Record highs/lows for date (with normals) | ✅ | Implemented on `feat/almanac` for v1.16.0 (US, RCC ACIS); [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §2.2 |
 | Better precipitation-type parsing (rain/snow/freezing rain) | 💡 | FE §3.2 |
-| Aviation weather tool (METAR/TAF) | 💡 | FE §4 |
+| Aviation weather tool (METAR/TAF) | 💡 | FE §4 — **partly superseded:** the observation half is planned as a `source` on `get_current_conditions` ([`docs/metar-plan.md`](../metar-plan.md)). What remains open here is the pilot-facing product: TAF forecasts and a dedicated tool, both explicitly out of scope for v1.17.0 (metar-plan D7) |
 | Drought indices (US Drought Monitor) | 💡 | FE §5.2 |
 | Heat/cold stress extras (WBGT, frostbite time-to-onset) | 💡 | FE §6.2 |
 | Smoke forecasts (NOAA HRRR-Smoke) | 💡 | FE §7.2 |
