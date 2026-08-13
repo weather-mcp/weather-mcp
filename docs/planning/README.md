@@ -77,7 +77,7 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 
 | Idea | Status | Detail |
 |------|--------|--------|
-| Live-test hardening: saved-location update metadata loss, NOAA observation staleness (age/caveat/fresher-station retry), containment-aware wildfire assessment, marine water-body disclosure, UTC date-bounds docs | 📝 | [`docs/live-test-hardening-plan.md`](../live-test-hardening-plan.md) — five findings (F1–F5) from the 2026-08-13 full-suite live test of the `feat/metar` build; branch `fix/live-test-hardening` off `main` |
+| Live-test hardening: saved-location update metadata loss, NOAA observation staleness (age/caveat/fresher-station retry), containment-aware wildfire assessment, marine water-body disclosure, UTC date-bounds docs | ✅ | Implemented on `fix/live-test-hardening` for the release after v1.17.0; [`docs/plans/live-test-hardening-plan.md`](../plans/live-test-hardening-plan.md) — five findings (F1–F5) from the 2026-08-13 full-suite live test of the `feat/metar` build |
 
 ---
 

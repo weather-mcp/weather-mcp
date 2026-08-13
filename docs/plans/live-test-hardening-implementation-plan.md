@@ -1,6 +1,6 @@
 # Live-Test Hardening — Implementation Plan
 
-**Status:** READY (2026-08-13)
+**Status:** EXECUTED (2026-08-13) — all tasks complete on `fix/live-test-hardening`; see the Progress Tracker
 
 Execution plan for `docs/live-test-hardening-plan.md` (the WHAT/WHY); rules live
 in `docs/orchestration-playbook.md`.
@@ -376,7 +376,14 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T5 — Containment-aware wildfire assessment (`sonnet`) — `cc11237`
 - [x] T6 — Water-body disclosure on NOAA marine path (`haiku`) — `def8646`
 - [x] T7 — Document UTC date bounds for historical weather (`haiku`) — `2ccbbef`
-- [ ] T8 — Docs, changelog, spot-check, plan closure (`opus`)
+- [x] T8 — Docs, changelog, spot-check, plan closure (`opus`) — SHA in the tracker-tick commit
+
+### T8 live spot-check (2026-08-13, built dist via MCP stdio client)
+
+- **D2a age suffix** — `get_current_conditions` Seattle (NOAA/KBFI): `**Time:** Aug 13, 2026, 11:20 AM (16 minutes ago)`; output otherwise normal. ✅
+- **D4 marine disclosure** — inland lower-Michigan point (43.6, −84.5, the live-repro shape): report opens with *"Conditions describe Lake Huron — the nearest covered water body, which may be distant from the requested point."* ✅
+- **D3 wildfire containment** — Boise (the exact live repro): the Claremont fire (2.7 km, 6,628 acres, **100% contained**) still lists, and the assessment now renders `ℹ️ **AWARENESS** / ℹ️ All fires within radius are 100% contained.` instead of EXTREME DANGER. ✅
+- **D2c retry path** — mock-covered only (`tests/unit/noaa-staleness.test.ts`); a live stale-station repro cannot be forced, as expected.
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the design plan's six
