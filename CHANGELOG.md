@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Global `get_river_conditions`** - The tool was US-only: it queried NOAA's NWPS gauge network unconditionally, so any non-US location returned nothing useful. It now auto-selects by location, matching the `get_current_conditions` pattern — US coordinates keep the NWPS gauge path exactly as-is (stage, flow, official flood categories, crest history, forecast series), and everywhere else returns Open-Meteo Flood API (GloFAS v4) modeled river discharge. New `source` parameter (`auto`/`noaa`/`openmeteo`) forces a branch; there is deliberately no cross-fallback, since gauge observations and model discharge are different claims. (`src/handlers/riverConditionsHandler.ts`, `src/services/openmeteo.ts`, `src/index.ts`)
+- **Channel snapping for model discharge** - GloFAS discharge is modeled per ~0.05° grid cell, and a cell that misses the river channel reports local runoff instead of the river — live probe: Memphis 35.125,-90.075 reads 0.63 m³/s while the cell one step west reads 11,640 m³/s. Each request now probes a 3×3 neighborhood in a single multi-coordinate call and selects the cell with the highest mean discharge over the past 31 days, disclosing the move ("Nearest modeled river channel: ~5 km W of requested point") whenever the winner is not the requested point. Cells with no modeled channel at all return a friendly "no river data" result rather than an error, and a winner under 0.1 m³/s is labeled minor local drainage rather than presented as a river. (`src/utils/riverDischarge.ts`)
+- **Discharge presented against its own history and ensemble** - GloFAS publishes no flood-stage thresholds, so model output is framed relative to what it can support: current discharge with a rise/fall trend (relative ±10%), a ratio against the past-31-day mean, and a daily ensemble forecast showing the median inside its p25–p75 band. `detail="full"` adds the min/max envelope and the full requested range; `forecast_days` accepts 1–210 (default 7). Model output carries an explicit "not gauge observations" caveat and the CC-BY attribution required by Open-Meteo. (`src/utils/units.ts`, `src/config/cache.ts`)
+
 ## [1.14.0] - 2026-08-12
 
 ### Added

@@ -31,7 +31,8 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 
 | Idea | Status | Detail |
 |------|--------|--------|
-| Global river/flood via Open-Meteo Flood API | 📝 | [`docs/global-rivers-plan.md`](../global-rivers-plan.md) (target v1.15.0); ICR Phase 2; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #1 |
+| Global river/flood via Open-Meteo Flood API | ✅ | Implemented on `feat/global-rivers` for v1.15.0; [`docs/global-rivers-plan.md`](../global-rivers-plan.md); ICR Phase 2; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #1 |
+| UK Environment Agency gauge supplement | 💡 | Descoped from the global-rivers work (2026-08-12) to keep v1.15.0 to one provider; England-only, keyless, OGL v3, 15-min real-time observations |
 | International alerts (MeteoAlarm, MSC GeoMet, WMO CAP) | 💡 | ICR Phase 3 |
 | Global wildfire via NASA FIRMS (optional MAP_KEY) | 💡 | ICR Phase 4; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #2 |
 | met.no Locationforecast as fallback/second-opinion source | 💡 | ICR Phase 5 |
@@ -116,6 +117,7 @@ One line per idea that graduated; see [CHANGELOG.md](../../CHANGELOG.md) for rel
 | Global current conditions (ICR Phase 1), border fallback routing | ✅ v1.12.0 |
 | Max-range expansion, output completeness | ✅ v1.13.0 |
 | Default location (`WEATHER_DEFAULT_LOCATION`), CI workflow, tz band fix | ✅ v1.14.0 |
+| Global river conditions via Open-Meteo Flood/GloFAS (ICR Phase 2) | ✅ v1.15.0 (pending release) |
 
 ---
 

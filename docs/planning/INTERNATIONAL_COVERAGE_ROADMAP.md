@@ -107,7 +107,7 @@ All options preserve the zero-cost model; only FIRMS breaks the zero-key model (
 | Phase | Change | New provider? | Effort |
 |-------|--------|---------------|--------|
 | ~~1~~ ✅ | ~~Open-Meteo fallback in `get_current_conditions`~~ — shipped in v1.12.0 | No | Small |
-| 2 | Open-Meteo Flood API in `get_river_conditions` | No (new endpoint) | Small–medium |
+| ~~2~~ ✅ | ~~Open-Meteo Flood API in `get_river_conditions`~~ — implemented for v1.15.0 (channel snapping per the live finding below). The **UK Environment Agency gauge supplement remains open** and moves to Phase 5. | No (new endpoint) | Small–medium |
 | 3 | MeteoAlarm + GeoMet alerts routing | Yes (2, keyless) | Medium |
 | 4 | NASA FIRMS in `get_wildfire_info` | Yes (free key, optional) | Medium |
 | 5 | Polish: met.no fallback, global normals/FWI, UK gauges | Yes (keyless) | Small each |
@@ -120,7 +120,9 @@ All APIs above were verified with real requests (summary table in the
 [planning index](./README.md)). Corrections to what this document previously
 claimed:
 
-- **Phase 2 (Open-Meteo Flood):** works as described, **but** discharge is per
+- **Phase 2 (Open-Meteo Flood)** — *shipped for v1.15.0; the snapping requirement
+  below is what `src/utils/riverDischarge.ts` implements.* Works as described,
+  **but** discharge is per
   ~5 km GloFAS grid cell and a cell that misses the river channel returns
   runoff noise, not the river (Memphis 35.125,-90.075 → 0.63 m³/s; one cell
   west → 11,640 m³/s). Any implementation must probe neighboring cells and

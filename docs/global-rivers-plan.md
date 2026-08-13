@@ -1,6 +1,6 @@
 # Global River Conditions — Design Plan
 
-**Status:** DRAFT (settled 2026-08-12, ready for /impl-plan)
+**Status:** IMPLEMENTED (2026-08-12, on `feat/global-rivers` for v1.15.0)
 **Parent:** `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md` (Phase 2)
 **Target release:** v1.15.0
 **Branch (for /impl-plan):** `feat/global-rivers`
@@ -162,8 +162,30 @@ matches existing Open-Meteo attribution elsewhere in the server.
 
 ## Documentation / registration checklist
 
-- [ ] `src/index.ts` schema + description (D5)
-- [ ] README.md tool table: `get_river_conditions` → global
-- [ ] CHANGELOG.md v1.15.0
-- [ ] `docs/planning/README.md`: flip idea row to 🚧 then ✅; ICR Phase 2 marked shipped
-- [ ] CLAUDE.md tool list note (rivers no longer "US only")
+- [x] `src/index.ts` schema + description (D5)
+- [x] README.md tool table: `get_river_conditions` → global (plus the coverage
+      table row and a modeled-discharge caveat in the limitations list)
+- [x] CHANGELOG.md — recorded under `[Unreleased]`; the version bump to 1.15.0
+      is a separate release step
+- [x] `docs/planning/README.md`: idea row flipped to ✅, Shipped table updated,
+      UK EA supplement listed as its own open idea; ICR Phase 2 marked shipped
+- [x] CLAUDE.md tool list note (rivers no longer "US only") + status blurb
+- [x] `docs/TOOLS.md` §12 rewritten for both data modes, index line at §12
+
+## Implementation notes (added at completion)
+
+Two things the live sweep settled that the design could not:
+
+- **`forecast_days=N` counts from the location's local today**, not the day
+  after — `forecast_days=1` returns today and nothing else. Day 1 of the
+  ensemble is therefore today, which is also why today's ensemble median can
+  differ from the Current Discharge figure (the latter is the deterministic
+  run, the former the ensemble median).
+- **Ensemble spread confirmed absent before ~day 4**: p25 and p75 were
+  identical for the first three forecast days at every location probed, then
+  widened sharply. D4's decision to show the band from day 1 with the caveat in
+  the section wording holds up — the early rows are honest, just narrow.
+
+The Memphis probe reproduced exactly as predicted against the built dist:
+35.125,-90.075 snapped ~5 km W to 11,640 m³/s, rejecting the 0.63 m³/s
+off-channel cell.
