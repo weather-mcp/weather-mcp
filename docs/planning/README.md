@@ -39,7 +39,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 | Global climate normals (Open-Meteo archive outside US) | 💡 | ICR Phase 5 |
 | Global fire weather indices (Open-Meteo hourly outside US) | 💡 | ICR Phase 5 |
 | UK river gauges (Environment Agency flood-monitoring API) | 💡 | ICR Phase 2 supplement |
-| Real station observations worldwide (aviationweather.gov METARs) | 💡 | ICR Phase 1 leftover; [FUTURE_ENHANCEMENTS](./FUTURE_ENHANCEMENTS.md) §4 |
+| Real station observations worldwide (aviationweather.gov METARs) | 💡 | ICR Phase 1 leftover (explicitly "not taken up, remains a future option"); [FUTURE_ENHANCEMENTS](./FUTURE_ENHANCEMENTS.md) §4. Re-verified live 2026-08-13. **Note the framing choice:** as a `source` on `get_current_conditions` this closes the "model-interpolated values, not station observations" gap that `currentConditionsHandler.ts` currently discloses outside the US; as a standalone `get_metar` tool it serves pilots instead. Same data, different products |
 
 ### Architecture & tooling
 
@@ -71,11 +71,11 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Forecast uncertainty/confidence | 💡 | FE §13.1 — overlaps multi-model comparison above |
 | Solar radiation / solar power forecasts | 💡 | FE §18.1 |
 | Heating/cooling degree days | 💡 | FE §18.2 |
-| Pollen & allergen forecasts | ⛔ | FE §6.1 — blocked: no free, reliable API found |
+| Pollen & allergen forecasts | 💡 | FE §6.1 — **unblocked 2026-08-13, Europe-only:** Open-Meteo's air-quality endpoint (the one `get_air_quality` already calls) serves 6 pollen species in `grains/m³`. Verified live: real values in Berlin/London, all-null (HTTP 200) in Seattle, St. Louis, Tokyo, Sydney — CAMS European, so it is a regional output enhancement, not a global one |
 
 ---
 
-## Upstream API viability check (verified live 2026-08-12)
+## Upstream API viability check (verified live 2026-08-12; extended 2026-08-13)
 
 All candidate bundles' upstream APIs were verified with real requests (response
 shapes, limits, licensing, error behavior). Corrections discovered in this pass
@@ -91,6 +91,8 @@ significant time has passed.
 | **international-alerts** (MeteoAlarm, MSC GeoMet) | ✅ Viable for EU+CA; ⛔ rest-of-world | MeteoAlarm: keyless JSON is `feeds.meteoalarm.org/api/v1/warnings/feeds-<country>` (per-country only; `api.meteoalarm.org` needs registration); no polygons keyless — country-level matching only; strict terms (unmodified display, "EUMETNET – MeteoAlarm" attribution, time of issue). GeoMet: collection is **`weather-alerts`**, native bbox works, real polygons, bilingual `_en`/`_fr`, not CAP-shaped, ECCC licence forbids altering alert content. WMO SWIC/Alert-Hub: undocumented demo feeds, no geometry, unclear rights — blocked for production. |
 | **global-wildfire** (NASA FIRMS) | ✅ Viable (key in hand) | Area API verified live with real MAP_KEY (200, VIIRS detections; extra `instrument` column; `confidence` abbreviated `l/n/h`). Country API is down — use area/bbox only. Day range max 5. Rate limit 5,000 tx/10 min. **Keyless fallback exists**: flat 24h/48h/7d CSVs (global ~12 MB, regional cuts smaller) — key becomes an optimization, not a gate. |
 | **aviation-weather** (aviationweather.gov) | ✅ Viable | Keyless v4.0 NWS API, worldwide METAR/TAF confirmed live (EGLL/YSSY/SBGR/FAOR), bbox geo-query on metar/taf/stationinfo, decoded JSON with pre-computed flight category. 100 req/min documented; custom User-Agent advised. Type gotchas: string `visib` ("10+"), mixed epoch/ISO timestamps, most fields optional. |
+| **pollen** (Open-Meteo air quality) *(2026-08-13)* | ✅ Viable, Europe-only | Unblocks FE §6.1's "no free API" — **stale, like FE §1.1's "no moon API" was**. Six species (`alder`/`birch`/`grass`/`mugwort`/`olive`/`ragweed_pollen`) on the air-quality endpoint `get_air_quality` already calls, so marginal cost is added hourly variables, not a new provider. **Coverage is the catch:** non-European points return HTTP 200 with an all-null series (same failure mode as the Flood API over ocean), so any design must trim on null rather than trust the 200. |
+| **storm-reports / drought / seasonal** *(2026-08-13)* | ✅ / ✅ / ⚠️ | SPC storm reports: `spc.noaa.gov/climo/reports/{today,yesterday}.csv`, HTTP 200, CSV with lat/lon per report — but *today*'s file is near-empty early in the day, so recency needs handling. US Drought Monitor: `usdmdataservices.unl.edu` keyless JSON, D0–D4 percentages, but keyed by **county FIPS**, so it needs a lat/lon → FIPS step the project does not have today. CPC seasonal: ENSO ONI page returns HTML (scrape-only) and the long-range `.dat` path 404s — no clean JSON found, the weakest of the three. |
 | **coverage-polish** (met.no, global normals, global FWI) | ✅ Viable with obligations | met.no: global (9.5-day horizon), keyless, but ToS mandates identifying User-Agent + `If-Modified-Since` caching + ≤4-decimal coords; coarser than Open-Meteo outside Nordics. Global normals: one 30-year archive pull works (~1.2 s) but is **weighted as hundreds of API calls** — two pulls tripped the 600/min limit; needs permanent cache + serialized backoff. Global FWI: all Fosberg inputs in Open-Meteo hourly (km/h → mph conversion required); no direct FWI variable exists — keep computing in-house. |
 
 ---
