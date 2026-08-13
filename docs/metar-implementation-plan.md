@@ -450,7 +450,7 @@ Spot-checks against the code, reconciled into the tasks below:
     runs tripped NOAA rate limiting; structural proof stands meanwhile (every
     removed line in the handler diff is accounted for, and
     `current-conditions-global.test.ts` passes unedited).
-- [ ] T6 — Handler unit tests for METAR routing and rendering (`sonnet`)
+- [x] T6 — Handler unit tests for METAR routing and rendering (`sonnet`) — `fb21d1a`
 - [ ] T7 — Integration tests: captured shapes + tolerant live smoke (`sonnet`)
 - [ ] T8 — Live sweep + documentation checklist (`opus`)
 
