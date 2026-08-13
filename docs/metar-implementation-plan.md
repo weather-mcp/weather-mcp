@@ -443,7 +443,13 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T2 — Move bearing/compass geometry; add compass + humidity helpers (`sonnet`) — `07f0bc1`
 - [x] T3 — METAR types, AviationWeatherService, cache TTL (`sonnet`) — `24ab7cf`
 - [x] T4 — Station picker and METAR parsing helpers (`opus`) — `1475f31`
-- [ ] T5 — `source: 'metar'` on get_current_conditions + schema (`opus`)
+- [x] T5 — `source: 'metar'` on get_current_conditions + schema (`opus`) — `f3ddaab`
+  - Live: KBFI (Seattle), EGLC (London), HKNW (Nairobi), YSSY (Sydney, metric),
+    mid-Pacific no-station message, normals + US records on the METAR path.
+  - **Outstanding for T8:** the live `auto`-vs-`main` byte comparison. Repeated
+    runs tripped NOAA rate limiting; structural proof stands meanwhile (every
+    removed line in the handler diff is accounted for, and
+    `current-conditions-global.test.ts` passes unedited).
 - [ ] T6 — Handler unit tests for METAR routing and rendering (`sonnet`)
 - [ ] T7 — Integration tests: captured shapes + tolerant live smoke (`sonnet`)
 - [ ] T8 — Live sweep + documentation checklist (`opus`)
