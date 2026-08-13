@@ -341,7 +341,7 @@ Spot-checks against the code and live endpoints, reconciled into the tasks:
 
 ## Progress Tracker
 
-- [ ] T1 — Promote pngjs to a runtime dependency (`haiku`)
+- [x] T1 — Promote pngjs to a runtime dependency (`haiku`) — `9217379`
 - [ ] T2 — Pure PNG compositing utilities (`sonnet`)
 - [ ] T3 — GIBS basemap service + cache TTLs (`sonnet`)
 - [ ] T4 — `composite` parameter returning `[text, image]` (`opus`)
