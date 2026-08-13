@@ -440,7 +440,7 @@ Spot-checks against the code, reconciled into the tasks below:
 ## Progress Tracker
 
 - [x] T1 — Widen the ApiError service union (`haiku`) — `b2e57c4`
-- [ ] T2 — Move bearing/compass geometry; add compass + humidity helpers (`sonnet`)
+- [x] T2 — Move bearing/compass geometry; add compass + humidity helpers (`sonnet`) — `07f0bc1`
 - [ ] T3 — METAR types, AviationWeatherService, cache TTL (`sonnet`)
 - [ ] T4 — Station picker and METAR parsing helpers (`opus`)
 - [ ] T5 — `source: 'metar'` on get_current_conditions + schema (`opus`)
