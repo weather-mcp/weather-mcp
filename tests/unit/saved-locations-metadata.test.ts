@@ -278,6 +278,65 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
       expect(result.content[0].text).toContain('Great sunsets');
     });
 
+    it('should keep activities when re-saving with new coordinates (round-2 live find)', async () => {
+      await handleSaveLocation(
+        {
+          alias: 'activespot',
+          latitude: 34.0,
+          longitude: -118.0,
+          name: 'Old Spot',
+          activities: ['hiking', 'fishing']
+        },
+        locationStore,
+        nominatimService
+      );
+
+      // Full re-save: new coordinates + name provided, activities omitted.
+      // Only the partial-update path used to preserve activities.
+      await handleSaveLocation(
+        {
+          alias: 'activespot',
+          latitude: 34.5,
+          longitude: -118.5,
+          name: 'New Spot'
+        },
+        locationStore,
+        nominatimService
+      );
+
+      const saved = locationStore.get('activespot');
+      expect(saved?.name).toBe('New Spot');
+      expect(saved?.activities).toEqual(['hiking', 'fishing']);
+    });
+
+    it('should still clear activities with an explicit empty array on a full re-save', async () => {
+      await handleSaveLocation(
+        {
+          alias: 'clearspot',
+          latitude: 34.0,
+          longitude: -118.0,
+          name: 'Old Spot',
+          activities: ['hiking']
+        },
+        locationStore,
+        nominatimService
+      );
+
+      await handleSaveLocation(
+        {
+          alias: 'clearspot',
+          latitude: 34.5,
+          longitude: -118.5,
+          name: 'New Spot',
+          activities: []
+        },
+        locationStore,
+        nominatimService
+      );
+
+      expect(locationStore.get('clearspot')?.activities).toBeUndefined();
+    });
+
     it('should allow overriding metadata during a full re-save while other fields stay preserved', async () => {
       await handleSaveLocation(
         {

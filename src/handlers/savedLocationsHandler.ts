@@ -179,12 +179,6 @@ export async function handleSaveLocation(
     country_code = existingLocation.country_code;
     admin1 = existingLocation.admin1;
     admin2 = existingLocation.admin2;
-
-    // If activities not provided, preserve existing ones
-    // If activities provided (even if empty array), use the new value (which may be undefined)
-    if (!activitiesProvided) {
-      activities = existingLocation.activities;
-    }
   } else if (saveArgs.location_query && typeof saveArgs.location_query === 'string') {
     // Geocode the query
     const query = saveArgs.location_query.trim();
@@ -229,10 +223,11 @@ export async function handleSaveLocation(
     );
   }
 
-  // Preserve description/alternateNames/notes when omitted on ANY update to an
-  // existing alias (partial update OR full re-save with new coordinates).
-  // Omitted (undefined) -> keep the stored value. Explicitly cleared ("" / [])
-  // was already normalized to undefined above by the *Provided validation blocks.
+  // Preserve description/alternateNames/notes/activities when omitted on ANY
+  // update to an existing alias (partial update OR full re-save with new
+  // coordinates). Omitted (undefined) -> keep the stored value. Explicitly
+  // cleared ("" / []) was already normalized to undefined above by the
+  // *Provided validation blocks.
   if (existingLocation) {
     if (!descriptionProvided) {
       description = existingLocation.description;
@@ -242,6 +237,9 @@ export async function handleSaveLocation(
     }
     if (!notesProvided) {
       notes = existingLocation.notes;
+    }
+    if (!activitiesProvided) {
+      activities = existingLocation.activities;
     }
   }
 
