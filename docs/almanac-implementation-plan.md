@@ -370,7 +370,7 @@ Spot-checks against the code, reconciled into the tasks below:
 
 ## Progress Tracker
 
-- [ ] T1 — astronomy-engine dep + pure astronomy utility (`opus`)
+- [x] T1 — astronomy-engine dep + pure astronomy utility (`opus`) — `73b3ab6`
 - [ ] T2 — include_astronomy on get_forecast, both paths + schema (`opus`)
 - [ ] T3 — ACIS types, service, cache TTLs, records formatting (`sonnet`)
 - [ ] T4 — Wire records into the four include_normals sites (`sonnet`)
