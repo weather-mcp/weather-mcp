@@ -8,7 +8,7 @@ Each file in this folder is a realistic session: a user prompt, the answer **Cla
 
 | Example | Location(s) | What it shows off |
 |---|---|---|
-| [Planning a weekend trip](./weekend-trip-planning.md) | Tokyo | Forecast by free-text city name, moon phase & twilight (`include_astronomy`) |
+| [Planning a weekend trip](./weekend-trip-planning.md) | Tokyo | Forecast by free-text city name, moon phase & twilight (`include_astronomy`), live radar with a committed snapshot |
 | [A hazardous-weather day](./severe-weather-day.md) | Oklahoma City | One-call weather summary, full alert text (`detail: "full"`), animated radar |
 | [A day on the water](./boating-and-marine.md) | Sydney | Marine forecast (waves, swell, currents), real-time lightning detection, metric units |
 | [Traveling abroad](./international-travel.md) | Paris | Real airport station observations anywhere on earth (`source: "metar"`), European pollen levels |
@@ -32,7 +32,7 @@ All 17 tools appear across these examples:
 | `search_location` | [saved locations](./saved-locations-workflow.md) |
 | `get_air_quality` | [international travel](./international-travel.md) (pollen), [wildfire](./wildfire-awareness.md) (smoke) |
 | `get_marine_conditions` | [boating](./boating-and-marine.md) |
-| `get_weather_imagery` | [severe weather](./severe-weather-day.md) |
+| `get_weather_imagery` | [trip planning](./weekend-trip-planning.md) (with snapshot), [severe weather](./severe-weather-day.md) |
 | `get_lightning_activity` | [boating](./boating-and-marine.md) |
 | `get_river_conditions` | [rivers & flood](./river-and-flood.md) (both US and global paths) |
 | `get_wildfire_info` | [wildfire](./wildfire-awareness.md) |
@@ -121,6 +121,8 @@ npm run build && npm run examples
 ```
 
 `scripts/capture-examples.mjs` spawns the built server as a real MCP stdio subprocess, replays the manifest of tool calls, and splices fresh output into these files between `<!-- capture:* -->` markers — the surrounding prose is never touched. The saved-locations scenario runs against a scratch `HOME`, so it never touches your real `~/.weather-mcp/locations.json` (the one edit made to that scenario's otherwise-verbatim output: the scratch path is rewritten to `~`, which is what the path looks like on a real install).
+
+**About imagery links:** the radar URLs inside captured output expire — RainViewer retains only ~2 hours of frames — and a tile over dry skies renders blank, since radar tiles are transparent precipitation overlays. So the imagery examples also commit a PNG snapshot (`images/`), downloaded by the capture script at capture time; it warns if the saved tile looks echo-free so a blank snapshot never ships unnoticed. Verify the image visually after regenerating.
 
 <!-- capture-stamp -->
 *Captured 2026-08-13 with weather-mcp v1.18.0 — raw output is live data and will differ when regenerated (`npm run examples`).*

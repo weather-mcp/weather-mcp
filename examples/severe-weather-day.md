@@ -197,6 +197,8 @@ the sun, and check up on relatives and neighbors.
 
 <!-- answer-3 -->
 Here's the animated radar for the past hour — 13 frames from RainViewer (the links below open the tiles directly). Consistent with the 0% precipitation chances, there's nothing on it: the heat is the whole story today.
+
+*Two things to know if you click those frame URLs: RainViewer only retains about two hours of history, so links in this captured output have long since expired — and even a live tile over dry skies renders as a blank white square, because radar tiles are transparent precipitation overlays with nothing to draw when it isn't raining. For what a tile with actual weather on it looks like, see the committed snapshot in [the Tokyo example](./weekend-trip-planning.md).*
 <!-- /answer-3 -->
 
 <!-- capture:radar -->

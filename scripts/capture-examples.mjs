@@ -29,7 +29,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
-import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -49,6 +49,10 @@ const GEO_UNAVAILABLE = /no locations found|could not find|not found/i;
 //   geocoded  -> retry on transient geocoder rate-limiting
 //   warmupMs  -> make the call once, discard, wait, call again (lightning
 //                needs time to accumulate strikes after first subscribing)
+//   image     -> examples-relative path: download the last "Image URL" in the
+//                output there as a committed snapshot (imagery URLs expire in
+//                ~2h). Radar tiles are transparent overlays — blank where dry —
+//                so a warning fires when the PNG is small enough to be echo-free.
 // ---------------------------------------------------------------------------
 const EXAMPLES = [
   {
@@ -59,6 +63,12 @@ const EXAMPLES = [
         tool: 'get_forecast',
         args: { city_name: 'Tokyo, Japan', days: 3, include_astronomy: true },
         geocoded: true,
+      },
+      {
+        id: 'tokyo-radar',
+        tool: 'get_weather_imagery',
+        args: { latitude: 35.6769, longitude: 139.7639, type: 'radar' },
+        image: 'images/tokyo-radar.png',
       },
     ],
   },
@@ -288,6 +298,28 @@ function spliceStamp(content, file) {
   return content.replace(re, `$1\n${stamp}\n$2`);
 }
 
+/**
+ * Download the last "Image URL" in a tool's output to examples/<relPath>.
+ * A near-empty PNG (< ~4 KB for a 512px tile) usually means a transparent,
+ * echo-free tile — flagged so a blank snapshot never ships unnoticed.
+ */
+async function saveImageSnapshot(text, relPath) {
+  const urls = [...text.matchAll(/\*\*Image URL:\*\* (\S+)/g)].map((m) => m[1]);
+  if (urls.length === 0) return { ok: false, detail: 'no Image URL lines in output' };
+  const url = urls[urls.length - 1];
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return { ok: false, detail: `HTTP ${resp.status} for ${url}` };
+    const buf = Buffer.from(await resp.arrayBuffer());
+    const dest = join(ROOT, 'examples', relPath);
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, buf);
+    return { ok: true, bytes: buf.length, blankWarning: buf.length < 4096 };
+  } catch (e) {
+    return { ok: false, detail: e.message };
+  }
+}
+
 async function main() {
   let failures = 0;
 
@@ -335,6 +367,15 @@ async function main() {
         }
         content = splice(content, call.id, renderCapture(call, res.text), example.file);
         console.log(`  ✅ ${call.id} (${res.text.length} chars)`);
+        if (call.image) {
+          const saved = await saveImageSnapshot(res.text, call.image);
+          if (!saved.ok) {
+            failures++;
+            console.log(`  ❌ ${call.id}: image snapshot failed — ${saved.detail}`);
+          } else {
+            console.log(`  🖼️  ${call.image} (${saved.bytes} bytes)${saved.blankWarning ? ' ⚠️ looks blank (no echoes?) — verify visually' : ''}`);
+          }
+        }
       }
     } catch (e) {
       failures++;

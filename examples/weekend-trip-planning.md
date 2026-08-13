@@ -96,9 +96,64 @@ get_forecast({
 </details>
 <!-- /capture:tokyo-forecast -->
 
+> **You:** Is it raining there right now? Show me the radar.
+
+**Claude Code answered** (using `get_weather_imagery`):
+
+<!-- answer-2 -->
+Yes — the rain is already arriving. The current radar frame (5:20 AM Friday, Tokyo time) shows bands of showers moving through the region, with a few heavy cells embedded in them — the orange-and-red cores on the tile below. That lines up with Friday being the washout day in the forecast: 100% chance, moderate rain.
+<!-- /answer-2 -->
+
+![Radar tile over Tokyo, saved at capture time](./images/tokyo-radar.png)
+
+*A snapshot of the returned radar tile, committed at capture time — the URLs in the raw output below expire within about two hours, so they won't load for you. Radar tiles are transparent precipitation overlays (meant to be drawn over a map): colored echoes mean rain, and a fully blank tile means dry skies, not a broken link.*
+
+<!-- capture:tokyo-radar -->
+<details>
+<summary>🔍 Tool call & raw server output — <code>get_weather_imagery</code></summary>
+
+**Call:**
+
+```js
+get_weather_imagery({
+  latitude: 35.6769,
+  longitude: 139.7639,
+  type: "radar"
+})
+```
+
+**The server returned** (verbatim — this is exactly what the MCP client receives):
+
+````markdown
+# Weather Imagery
+
+**Location:** 35.6769, 139.7639
+**Type:** Radar
+**Coverage:** Global
+**Resolution:** Latest snapshot
+**Source:** RainViewer
+**Animated:** No
+
+## 📸 Current Imagery
+
+**Timestamp:** 2026-08-13T20:20:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/ec89d7054da0/512/6/56/25/4/1_1.png
+
 ---
 
-**Features shown:** `city_name` free-text geocoding (no coordinates needed) · `include_astronomy` (moon phase, moonrise/moonset, twilight times — computed locally, no extra API call) · `days` forecast-length control.
+⚠️ **DISCLAIMER:** RainViewer provides global precipitation radar. Data may have 5-10 minute delay. For official forecasts, consult local meteorological services.
+
+---
+*Generated: 2026-08-13T20:27:41.996Z*
+*Data source: RainViewer*
+````
+
+</details>
+<!-- /capture:tokyo-radar -->
+
+---
+
+**Features shown:** `city_name` free-text geocoding (no coordinates needed) · `include_astronomy` (moon phase, moonrise/moonset, twilight times — computed locally, no extra API call) · `days` forecast-length control · `get_weather_imagery` radar (RainViewer) with a committed snapshot.
 
 <!-- capture-stamp -->
 *Captured 2026-08-13 with weather-mcp v1.18.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
