@@ -58,7 +58,7 @@ function station(spec: StationSpec): MetarObservation {
     receiptTime: new Date(obsTime * 1000).toISOString(),
     rawOb: `METAR ${spec.id} 131453Z 19006KT 10SM FEW250 18/12 A2994`,
     metarType: 'METAR',
-    qcField: '0'
+    qcField: 0
   };
 }
 

@@ -58,7 +58,7 @@ const CAPTURED_STATIONS: MetarObservation[] = [
     receiptTime: '2026-08-13T14:54:12Z',
     rawOb: 'METAR KSEA 131453Z 19006KT 10SM FEW250 18/12 A2994 RMK AO2',
     metarType: 'METAR',
-    qcField: '0',
+    qcField: 0,
     temp: 18,
     dewp: 12,
     wdir: 190,
@@ -79,7 +79,7 @@ const CAPTURED_STATIONS: MetarObservation[] = [
     receiptTime: '2026-08-13T14:51:03Z',
     rawOb: 'METAR KBOI 131450Z VRB03KT 1/2SM FG VV002 13/13 A2994 RMK AO2',
     metarType: 'METAR',
-    qcField: '0',
+    qcField: 0,
     dewp: 13, // temp intentionally missing (1% case)
     wdir: 'VRB',
     wspd: 3,

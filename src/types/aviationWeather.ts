@@ -55,8 +55,8 @@ export interface MetarObservation {
   rawOb: string;
   /** Report type: "METAR" (routine) or "SPECI" (off-cycle special). Always present. */
   metarType: string;
-  /** Quality-control field, passed through as-is. Always present. */
-  qcField: string;
+  /** Quality-control bitfield, passed through as-is. Numeric, despite sitting beside the string fields. Always present. */
+  qcField: number;
 
   /** Temperature, **°C**. ~99% presence. */
   temp?: number;
@@ -87,8 +87,14 @@ export interface MetarObservation {
   /**
    * Sky condition layers, low to high. `base` is **feet AGL** (verified:
    * `SCT110` → base `11000`, `BKN024` → base `2400`). ~96% presence.
+   *
+   * Present but **empty** for a clear sky (`CLR`/`SKC`), so an empty array
+   * means "no layers", not "no data".
    */
   clouds?: Array<{ cover: string; base?: number }>;
+
+  /** Summary sky cover for the report, duplicating the dominant `clouds[].cover`. ~96% presence. */
+  cover?: string;
 
   /** Pre-computed flight category: VFR / MVFR / IFR / LIFR. ~96% presence. */
   fltCat?: string;
