@@ -375,7 +375,7 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T4 — Early-end note on NOAA recent historical (`sonnet`) — `36c5efa`
 - [x] T5 — Containment-aware wildfire assessment (`sonnet`) — `cc11237`
 - [x] T6 — Water-body disclosure on NOAA marine path (`haiku`) — `def8646`
-- [ ] T7 — Document UTC date bounds for historical weather (`haiku`)
+- [x] T7 — Document UTC date bounds for historical weather (`haiku`) — `2ccbbef`
 - [ ] T8 — Docs, changelog, spot-check, plan closure (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
