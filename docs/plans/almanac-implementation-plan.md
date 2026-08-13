@@ -2,7 +2,7 @@
 
 **Status:** COMPLETE (2026-08-12) — all tasks ticked; see Progress Tracker
 
-Execution plan for `docs/almanac-plan.md` (the WHAT/WHY); rules live in
+Execution plan for `docs/plans/almanac-plan.md` (the WHAT/WHY); rules live in
 `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ Execution plan for `docs/almanac-plan.md` (the WHAT/WHY); rules live in
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/almanac-implementation-plan.md
+/run-plan docs/plans/almanac-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/almanac-plan.md` (design),
+Or, equivalently: read `docs/plans/almanac-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review the
 diff, run the gate yourself, commit, tick the tracker, push.
@@ -320,7 +320,7 @@ Spot-checks against the code, reconciled into the tasks below:
 **T7 — Live sweep + documentation/registration checklist** (`opus`)
 
 - Files: `CHANGELOG.md`, `README.md`, `docs/TOOLS.md`, `CLAUDE.md`,
-  `docs/planning/README.md`, `docs/almanac-plan.md`
+  `docs/planning/README.md`, `docs/plans/almanac-plan.md`
 - **Live sweep against the built dist**, re-verifying T2 and T4's acceptance
   lists end to end, plus: a no-flags forecast call byte-identical to
   pre-branch output; a polar location in the current season (e.g. Longyearbyen)
@@ -336,9 +336,11 @@ Spot-checks against the code, reconciled into the tasks below:
   model note from D1), the `acis.ts` service in the architecture tree, the
   v1.16.0 status blurb; `docs/planning/README.md` — flip the three idea rows
   (§1.1 moon, §1.2 twilight, §2.2 records) to ✅ (the orchestrator may flip
-  them to 🚧 at kickoff). Mark `docs/almanac-plan.md` status `IMPLEMENTED`.
-- Leave the plan set in `docs/` — per the playbook, the move to `docs/plans/`
-  happens when v1.16.0 actually ships.
+  them to 🚧 at kickoff). Mark `docs/plans/almanac-plan.md` status `IMPLEMENTED`.
+- ~~Leave the plan set in `docs/` — per the playbook, the move to `docs/plans/`
+  happens when v1.16.0 actually ships.~~ **Superseded:** the plan set was moved
+  to `docs/plans/` at implementation completion, ahead of the v1.16.0 release,
+  at the maintainer's request. All references were updated with it.
 - Acceptance: live sweep recorded in the commit message or a short note; full
   gate green; every box of the design plan's "Documentation / registration
   checklist" satisfied.
@@ -382,5 +384,5 @@ Spot-checks against the code, reconciled into the tasks below:
 (`npm run build`, `npm test`, `npm audit`) is green, the design plan's D1–D4
 acceptance is demonstrably met live (astronomy on both provider paths, polar
 wording, records line in the US and cleanly absent abroad), flag-off output is
-byte-identical to pre-branch behavior, and `docs/almanac-plan.md` is marked
+byte-identical to pre-branch behavior, and `docs/plans/almanac-plan.md` is marked
 `IMPLEMENTED`. Opening the PR is the human's call.

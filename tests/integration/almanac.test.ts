@@ -1,7 +1,7 @@
 /**
  * Integration tests for the almanac features — US daily temperature records
- * (ACIS) and moon/twilight astronomy — per docs/almanac-plan.md D3/D4 and
- * docs/almanac-implementation-plan.md T6.
+ * (ACIS) and moon/twilight astronomy — per docs/plans/almanac-plan.md D3/D4 and
+ * docs/plans/almanac-implementation-plan.md T6.
  *
  * Block 1 is deterministic: only the HTTP-issuing method of a real
  * `AcisService` instance is stubbed via `vi.spyOn` on its private axios

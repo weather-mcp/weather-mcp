@@ -14,7 +14,7 @@
  * exercised end to end with plain fake services (vi.fn() spies returning
  * canned fixtures) — no HTTP, no live network calls, fully deterministic.
  *
- * See docs/almanac-implementation-plan.md T5.
+ * See docs/plans/almanac-implementation-plan.md T5.
  */
 
 import { describe, it, expect, vi } from 'vitest';
