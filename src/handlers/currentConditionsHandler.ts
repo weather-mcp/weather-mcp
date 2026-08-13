@@ -6,6 +6,7 @@ import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { NCEIService } from '../services/ncei.js';
 import { AcisService } from '../services/acis.js';
+import { AviationWeatherService } from '../services/aviationWeather.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
@@ -20,14 +21,28 @@ import {
   formatHeightFromFt,
   formatPrecipFromMm,
   formatPressureFromPa,
+  formatTemperatureFromC,
+  formatElevationFromM,
+  convertWindFromMps,
+  convertDistanceFromKm,
   temperatureLabel,
   windSpeedLabel,
   precipitationLabel,
+  distanceLabel,
   withLabel,
   snowfallToPrecipUnit,
 } from '../utils/unitFormat.js';
 import { isInUS } from '../utils/geography.js';
-import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
+import {
+  SEARCH_TIERS,
+  pickNearestStation,
+  parseVisibilityMiles,
+  parseWindDirection,
+  type StationPick
+} from '../utils/metarStation.js';
+import { windDirectionFromDegrees, relativeHumidityFromDewpoint } from '../utils/units.js';
+import { milesToKm } from '../utils/distance.js';
+import { DataNotFoundError, InvalidLocationError, ServiceUnavailableError } from '../errors/ApiError.js';
 import { logger } from '../utils/logger.js';
 import { UnitPreferences } from '../config/units.js';
 import { DisplayThresholds } from '../config/displayThresholds.js';
@@ -41,7 +56,7 @@ import {
   getFireWeatherContext
 } from '../utils/fireWeather.js';
 import { extractSnowDepth, formatSnowData, hasWinterWeather } from '../utils/snow.js';
-import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
+import { formatInTimezone, guessTimezoneFromCoords, getTimezoneAbbreviation } from '../utils/timezone.js';
 import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
 import { getRecordsLine } from '../utils/records.js';
 
@@ -52,8 +67,11 @@ interface CurrentConditionsArgs extends UnitArgs {
   city_name?: string;
   include_fire_weather?: boolean;
   include_normals?: boolean;
-  source?: 'auto' | 'noaa' | 'openmeteo';
+  source?: 'auto' | 'noaa' | 'openmeteo' | 'metar';
 }
+
+/** METAR reports wind in knots; every project converter takes m/s. */
+const KNOTS_TO_MPS = 0.514444;
 
 /** Note shown when an auto-routed NOAA request falls back to Open-Meteo. */
 const NOAA_FALLBACK_NOTE =
@@ -79,7 +97,8 @@ export async function handleGetCurrentConditions(
   nceiService: NCEIService,
   locationStore: LocationStore,
   geocodingService: GeocodingService,
-  acisService?: AcisService
+  acisService?: AcisService,
+  aviationWeatherService?: AviationWeatherService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as CurrentConditionsArgs, locationStore, geocodingService);
@@ -104,7 +123,29 @@ export async function handleGetCurrentConditions(
     : requestedSource === 'noaa';
 
   let output: string;
-  if (useNOAA) {
+  if (requestedSource === 'metar') {
+    // METAR is never auto-routed (D1): `auto` keeps its exact US-NOAA /
+    // elsewhere-Open-Meteo semantics, and this arm is reached only on an
+    // explicit request. A model estimate at the caller's coordinates and a
+    // measurement at an airport 40 km away answer different questions.
+    if (!aviationWeatherService) {
+      throw new ServiceUnavailableError(
+        'AviationWeather',
+        'METAR station observations are not available in this server configuration.'
+      );
+    }
+    output = await formatMetarCurrentConditions(
+      aviationWeatherService,
+      openMeteoService,
+      nceiService,
+      latitude,
+      longitude,
+      includeFireWeather,
+      includeNormals,
+      prefs,
+      acisService
+    );
+  } else if (useNOAA) {
     try {
       output = await formatNOAACurrentConditions(
         noaaService,
@@ -690,6 +731,330 @@ async function formatOpenMeteoCurrentConditions(
 
   output += `\n---\n`;
   output += `*Data source: Open-Meteo (Global) — model-interpolated values, not station observations*\n`;
+
+  return output;
+}
+
+/** Sky cover abbreviations as they appear in the decoded `clouds[].cover` field. */
+const METAR_CLOUD_COVER: Record<string, string> = {
+  SKC: 'Sky clear',
+  CLR: 'Clear',
+  NCD: 'No cloud detected',
+  NSC: 'No significant cloud',
+  FEW: 'Few clouds',
+  SCT: 'Scattered clouds',
+  BKN: 'Broken clouds',
+  OVC: 'Overcast',
+  OVX: 'Obscured'
+};
+
+/**
+ * Present-weather abbreviations from the `wxString` field. Only the codes
+ * that actually appear with any frequency are decoded; anything else falls
+ * through as the raw token, which is still meaningful to a pilot and honest
+ * to everyone else.
+ */
+const METAR_WEATHER_CODES: Record<string, string> = {
+  BR: 'mist', FG: 'fog', FU: 'smoke', HZ: 'haze', DU: 'dust', SA: 'sand',
+  VA: 'volcanic ash', PY: 'spray', PO: 'dust whirls', SQ: 'squalls',
+  FC: 'funnel cloud', SS: 'sandstorm', DS: 'duststorm',
+  DZ: 'drizzle', RA: 'rain', SN: 'snow', SG: 'snow grains', IC: 'ice crystals',
+  PL: 'ice pellets', GR: 'hail', GS: 'small hail', UP: 'unknown precipitation',
+  TS: 'thunderstorm', SH: 'showers', FZ: 'freezing', BL: 'blowing',
+  DR: 'drifting', MI: 'shallow', BC: 'patches', PR: 'partial'
+};
+
+/**
+ * Decode a `wxString` such as `-RA BR` or `+TSRA` into readable text.
+ * Intensity prefixes and the `VC` (vicinity) qualifier are handled; the
+ * two-letter codes are then decoded in order and joined.
+ */
+function describeMetarWeather(wxString: string): string {
+  const groups = wxString.trim().split(/\s+/).filter(Boolean);
+
+  const described = groups.map(group => {
+    let rest = group;
+    const qualifiers: string[] = [];
+
+    if (rest.startsWith('-')) {
+      qualifiers.push('light');
+      rest = rest.slice(1);
+    } else if (rest.startsWith('+')) {
+      qualifiers.push('heavy');
+      rest = rest.slice(1);
+    }
+    if (rest.startsWith('VC')) {
+      qualifiers.push('in the vicinity');
+      rest = rest.slice(2);
+    }
+
+    const parts: string[] = [];
+    for (let i = 0; i + 1 < rest.length + 1; i += 2) {
+      const code = rest.slice(i, i + 2);
+      if (code.length < 2) break;
+      parts.push(METAR_WEATHER_CODES[code] ?? code);
+    }
+
+    if (parts.length === 0) return group;
+
+    // "in the vicinity" reads as a suffix; intensity reads as a prefix.
+    const vicinity = qualifiers.includes('in the vicinity');
+    const intensity = qualifiers.filter(q => q !== 'in the vicinity');
+    const body = [...intensity, ...parts].join(' ');
+    return vicinity ? `${body} in the vicinity` : body;
+  });
+
+  const joined = described.join(', ');
+  return joined.charAt(0).toUpperCase() + joined.slice(1);
+}
+
+/** Render the sky-condition layers, low to high, with bases in the caller's unit. */
+function formatMetarSky(pick: StationPick, prefs: UnitPreferences): string | undefined {
+  const clouds = pick.observation.clouds;
+  if (!clouds || clouds.length === 0) return undefined;
+
+  const layers = clouds.map(layer => {
+    const description = METAR_CLOUD_COVER[layer.cover] ?? layer.cover;
+    // `base` is feet AGL — verified against the raw text (SCT110 -> 11000).
+    return layer.base === undefined
+      ? description
+      : `${description} at ${formatHeightFromFt(layer.base, prefs)}`;
+  });
+
+  return layers.join(', ');
+}
+
+/** Message shown when no station within any search tier can answer for this point. */
+function noStationMessage(prefs: UnitPreferences): string {
+  const far = withLabel(convertDistanceFromKm(250, prefs), distanceLabel(prefs), 0);
+
+  let output = `# Current Conditions — No Station Nearby\n\n`;
+  output += `ℹ️ **No reporting station near this location**\n\n`;
+  output += `The nearest METAR station is more than ${far} away, or has not `;
+  output += `reported in the last 6 hours. METAR coverage follows airports, so `;
+  output += `remote land and open ocean have real gaps.\n\n`;
+  output += `**Tip:** use \`source: "openmeteo"\` for model-interpolated conditions `;
+  output += `at these exact coordinates. Those are an estimate rather than a `;
+  output += `measurement, which is why they are not substituted automatically here.\n`;
+  output += `\n---\n`;
+  output += `*Data source: NOAA Aviation Weather Center (aviationweather.gov) — METAR station observation*\n`;
+
+  return output;
+}
+
+/**
+ * Format current conditions from a METAR station observation (worldwide).
+ *
+ * Station identity, distance, and observation age are not decoration on this
+ * path — they are what makes the number interpretable. A METAR is a real
+ * instrument reading, but it was taken at an airport that may be tens of
+ * kilometres away, up to an hour ago. All three are always shown.
+ *
+ * See docs/metar-plan.md D5 (output) and D6 (units).
+ */
+async function formatMetarCurrentConditions(
+  aviationWeatherService: AviationWeatherService,
+  openMeteoService: OpenMeteoService,
+  nceiService: NCEIService,
+  latitude: number,
+  longitude: number,
+  includeFireWeather: boolean,
+  includeNormals: boolean,
+  prefs: UnitPreferences,
+  acisService?: AcisService
+): Promise<string> {
+  // Widen the search only as far as it has to go. Each tier is a superset of
+  // the last, so a wider box can only find a nearer or fresher station; the
+  // picker stays pure and this loop supplies the I/O (assumption A9).
+  const now = new Date();
+  let pick: StationPick | null = null;
+
+  for (const tier of SEARCH_TIERS) {
+    const stations = await aviationWeatherService.getMetarsInBoundingBox({
+      minLat: latitude - tier,
+      minLon: longitude - tier,
+      maxLat: latitude + tier,
+      maxLon: longitude + tier
+    });
+
+    pick = pickNearestStation(stations, latitude, longitude, now, tier);
+    if (pick) break;
+  }
+
+  if (!pick) {
+    logger.info('No usable METAR station within any search tier', {
+      widestTierDegrees: SEARCH_TIERS[SEARCH_TIERS.length - 1]
+    });
+    return noStationMessage(prefs);
+  }
+
+  const obs = pick.observation;
+  // The station's clock, not the caller's — matching how the NOAA path derives
+  // its own. obsTime is epoch seconds, not milliseconds and not an ISO string.
+  const timezone = guessTimezoneFromCoords(obs.lat, obs.lon);
+  const observedIso = new Date(obs.obsTime * 1000).toISOString();
+
+  let output = `# Current Conditions — ${obs.name} (${obs.icaoId})\n\n`;
+
+  const distance = withLabel(convertDistanceFromKm(pick.distanceKm, prefs), distanceLabel(prefs), 0);
+  output += `**Station:** ${obs.name} (${obs.icaoId}) — ${distance} ${pick.bearing} `;
+  output += `of the requested point, elev ${formatElevationFromM(obs.elev, prefs)}\n`;
+
+  const age = pick.ageMinutes === 0
+    ? 'just now'
+    : pick.ageMinutes < 60
+      ? `${pick.ageMinutes} minute${pick.ageMinutes === 1 ? '' : 's'} ago`
+      : `${Math.round(pick.ageMinutes / 60 * 10) / 10} hours ago`;
+  // The zone abbreviation is spelled out here, unlike the other two paths,
+  // because this clock is the *station's* rather than the requested point's —
+  // an unlabeled time would be ambiguous exactly where the station is distant.
+  const zoneLabel = getTimezoneAbbreviation(timezone, new Date(obs.obsTime * 1000));
+  output += `**Observed:** ${formatInTimezone(observedIso, timezone, 'medium', prefs.timeFormat)}`;
+  output += `${zoneLabel ? ` ${zoneLabel}` : ''} (${age})\n`;
+
+  // Caveats, each only when it applies. These are the difference between a
+  // number a reader can trust and one they cannot.
+  if (pick.far) {
+    output += `\n⚠️ **Nearest station is ${distance} away** — conditions at your `;
+    output += `exact location may differ substantially.\n`;
+  }
+  if (pick.stale) {
+    output += `\n⚠️ **Observation is ${age}** — no station nearby has reported more recently.\n`;
+  }
+  if (obs.metarType === 'SPECI') {
+    output += `\n**Special report (SPECI):** issued off the hourly cycle because `;
+    output += `conditions changed significantly.\n`;
+  }
+
+  output += `\n`;
+
+  // --- Measurements (D6 units). Absent fields are omitted, never blanked:
+  // wgst appears in 14% of reports and wxString in 8%, so sparse is normal.
+  if (obs.temp !== undefined) {
+    const extras: string[] = [];
+    if (obs.dewp !== undefined) {
+      extras.push(`dew point ${formatTemperatureFromC(obs.dewp, prefs)}`);
+      extras.push(`humidity ${relativeHumidityFromDewpoint(obs.temp, obs.dewp)}%`);
+    }
+    output += `**Temperature:** ${formatTemperatureFromC(obs.temp, prefs)}`;
+    output += extras.length > 0 ? ` (${extras.join(', ')})\n` : `\n`;
+  } else if (obs.dewp !== undefined) {
+    output += `**Dew Point:** ${formatTemperatureFromC(obs.dewp, prefs)}\n`;
+  }
+
+  // Wind: knots natively, so kt -> m/s -> the caller's unit.
+  const windDirection = parseWindDirection(obs.wdir);
+  if (obs.wspd !== undefined) {
+    const speed = withLabel(
+      convertWindFromMps(obs.wspd * KNOTS_TO_MPS, prefs),
+      windSpeedLabel(prefs),
+      0
+    );
+
+    let wind: string;
+    if (windDirection === 'variable') {
+      // No compass point for a wind that has no direction.
+      wind = `Variable at ${speed}`;
+    } else if (windDirection !== undefined) {
+      wind = `${windDirectionFromDegrees(windDirection)} (${Math.round(windDirection)}°) at ${speed}`;
+    } else {
+      wind = speed;
+    }
+
+    if (obs.wgst !== undefined) {
+      wind += `, gusting to ${withLabel(
+        convertWindFromMps(obs.wgst * KNOTS_TO_MPS, prefs),
+        windSpeedLabel(prefs),
+        0
+      )}`;
+    }
+
+    output += `**Wind:** ${wind}\n`;
+  }
+
+  // Visibility: statute miles natively. The "+" qualifier is a floor, not a
+  // measurement, so it survives conversion as a leading "+".
+  const visibility = parseVisibilityMiles(obs.visib);
+  if (visibility) {
+    const value = convertDistanceFromKm(milesToKm(visibility.miles), prefs);
+    const decimals = value < 10 ? 1 : 0;
+    const shown = withLabel(value, distanceLabel(prefs), decimals);
+    output += `**Visibility:** ${visibility.qualifier === 'plus' ? '+' : ''}${shown}\n`;
+  }
+
+  const sky = formatMetarSky(pick, prefs);
+  if (sky) {
+    output += `**Sky:** ${sky}\n`;
+  }
+
+  if (obs.wxString) {
+    output += `**Weather:** ${describeMetarWeather(obs.wxString)}\n`;
+  }
+
+  // Pressure: hPa natively, so hPa -> Pa -> the caller's unit.
+  if (obs.altim !== undefined) {
+    output += `**Pressure:** ${formatPressureFromPa(obs.altim * 100, prefs)}`;
+    output += obs.slp !== undefined
+      ? ` (sea level ${formatPressureFromPa(obs.slp * 100, prefs)})\n`
+      : `\n`;
+  } else if (obs.slp !== undefined) {
+    output += `**Pressure:** ${formatPressureFromPa(obs.slp * 100, prefs)} (sea level)\n`;
+  }
+
+  if (obs.fltCat) {
+    output += `**Flight category:** ${obs.fltCat}\n`;
+  }
+
+  // The observation of record. This is the pilot-facing value, shipped without
+  // a pilot-facing tool.
+  output += `\n\`${obs.rawOb}\`\n`;
+
+  // Fire weather (optional) — needs NOAA gridpoint inputs (transport wind,
+  // Haines) that a METAR simply does not carry, so it is named rather than
+  // silently dropped (D7).
+  if (includeFireWeather) {
+    output += `\n## Fire Weather\n\n`;
+    output += `Fire weather indices are not available on the METAR source — they `;
+    output += `require NOAA gridpoint data. Use \`source: "noaa"\` for a US location.\n`;
+  }
+
+  // Climate normals (optional) — supported here exactly as on the other two
+  // paths (D7): they need only the coordinates and the date.
+  if (includeNormals) {
+    const { month, day } = getDateComponents(observedIso);
+
+    try {
+      const normals = await getClimateNormals(
+        openMeteoService,
+        nceiService,
+        latitude,
+        longitude,
+        month,
+        day
+      );
+      output += formatNormals(normals, {}, prefs);
+    } catch (error) {
+      output += `\n## Climate Normals\n\n`;
+      output += `⚠️ Climate normals data not available for this location.\n`;
+    }
+
+    // US temperature records, independent of the normals fetch above — either
+    // can render without the other. Non-US makes no ACIS request at all.
+    if (isInUS(latitude, longitude) && acisService) {
+      try {
+        const recordsLine = await getRecordsLine(acisService, latitude, longitude, month, day, prefs);
+        if (recordsLine) {
+          output += `\n${recordsLine}\n`;
+        }
+      } catch (error) {
+        // getRecordsLine never throws, but records must never fail the
+        // primary response.
+      }
+    }
+  }
+
+  output += `\n---\n`;
+  output += `*Data source: NOAA Aviation Weather Center (aviationweather.gov) — METAR station observation*\n`;
 
   return output;
 }

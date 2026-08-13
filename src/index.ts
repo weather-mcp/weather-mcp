@@ -19,6 +19,7 @@ import { OpenMeteoService } from './services/openmeteo.js';
 import { NominatimService } from './services/nominatim.js';
 import { NCEIService } from './services/ncei.js';
 import { AcisService } from './services/acis.js';
+import { AviationWeatherService } from './services/aviationWeather.js';
 import { NIFCService } from './services/nifc.js';
 import { GeocodingService } from './services/geocoding.js';
 import { LocationStore } from './services/locationStore.js';
@@ -136,6 +137,13 @@ const nceiService = new NCEIService();
  * output of get_forecast and get_current_conditions for US locations.
  */
 const acisService = new AcisService();
+
+/**
+ * Initialize the Aviation Weather service for worldwide METAR observations
+ * Keyless (no signup) — backs source="metar" on get_current_conditions, the
+ * only source that returns real station instrument readings outside the US.
+ */
+const aviationWeatherService = new AviationWeatherService();
 
 /**
  * Initialize the NIFC service for wildfire data
@@ -332,8 +340,8 @@ const TOOL_DEFINITIONS = {
         },
         source: {
           type: 'string' as const,
-          description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), or "openmeteo" (global)',
-          enum: ['auto', 'noaa', 'openmeteo'],
+          description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), "openmeteo" (global), or "metar" (global airport station observations). Choose "metar" when the user wants an ACTUAL or REAL observation rather than a model estimate — "what is the station actually reporting?", "measured", "observed conditions", "METAR", "airport weather", "flight category", "raw observation". It is the only source that returns real instrument readings outside the US. It reports from the nearest airport, which may be tens of kilometers from the requested point, and always states the station, its distance, and the age of the observation.',
+          enum: ['auto', 'noaa', 'openmeteo', 'metar'],
           default: 'auto'
         },
         ...UNIT_SCHEMA_PROPERTIES
@@ -734,7 +742,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_current_conditions':
         return await withAnalytics('get_current_conditions', async () =>
-          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService, acisService)
+          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService, acisService, aviationWeatherService)
         );
 
       case 'get_alerts':
