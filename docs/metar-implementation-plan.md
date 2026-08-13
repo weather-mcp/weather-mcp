@@ -451,7 +451,7 @@ Spot-checks against the code, reconciled into the tasks below:
     removed line in the handler diff is accounted for, and
     `current-conditions-global.test.ts` passes unedited).
 - [x] T6 — Handler unit tests for METAR routing and rendering (`sonnet`) — `fb21d1a`
-- [ ] T7 — Integration tests: captured shapes + tolerant live smoke (`sonnet`)
+- [x] T7 — Integration tests: captured shapes + tolerant live smoke (`sonnet`) — `e42749a`
 - [ ] T8 — Live sweep + documentation checklist (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
