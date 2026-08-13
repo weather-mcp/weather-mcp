@@ -84,6 +84,7 @@
     "@types/node": "^26.1.2",
     "@types/tz-lookup": "^6.1.2",
     "@vitest/coverage-v8": "^4.0.8",
+    "pngjs": "^7.0.0",
     "tsx": "^4.23.11",
     "typescript": "^7.0.2",
     "vitest": "^4.0.8"

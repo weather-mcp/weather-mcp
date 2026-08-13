@@ -101,12 +101,12 @@ get_forecast({
 **Claude Code answered** (using `get_weather_imagery`):
 
 <!-- answer-2 -->
-Yes — the rain is already arriving. The current radar frame (5:20 AM Friday, Tokyo time) shows bands of showers moving through the region, with a few heavy cells embedded in them — the orange-and-red cores on the tile below. That lines up with Friday being the washout day in the forecast: 100% chance, moderate rain.
+Yes — the rain is already arriving. The current radar frame (5:30 AM Friday, Tokyo time) shows a broad rain shield moving over the Tokyo area, with heavier storm cells — the orange-and-red cores — further southwest over the Kii Peninsula. That lines up with Friday being the washout day in the forecast: 100% chance, moderate rain.
 <!-- /answer-2 -->
 
-![Radar tile over Tokyo, saved at capture time](./images/tokyo-radar.png)
+![Radar over Tokyo composited onto an OpenStreetMap base layer, saved at capture time](./images/tokyo-radar.png)
 
-*A snapshot of the returned radar tile, committed at capture time — the URLs in the raw output below expire within about two hours, so they won't load for you. Radar tiles are transparent precipitation overlays (meant to be drawn over a map): colored echoes mean rain, and a fully blank tile means dry skies, not a broken link.*
+*A snapshot committed at capture time: the radar tile the server returned, composited onto a map base layer so the echoes have geography under them. The raw tile itself is a transparent precipitation overlay — blank where dry — and RainViewer's frame URLs expire within about two hours, which is why the server's output also includes an **interactive map** link for the live, animated view. Radar © RainViewer · base map © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.*
 
 <!-- capture:tokyo-radar -->
 <details>
@@ -136,15 +136,18 @@ get_weather_imagery({
 
 ## 📸 Current Imagery
 
-**Timestamp:** 2026-08-13T20:20:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/ec89d7054da0/512/6/56/25/4/1_1.png
+**Timestamp:** 2026-08-13T20:30:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/155731d3c90c/512/6/56/25/4/1_1.png
+
+**Interactive map:** https://www.rainviewer.com/map.html?loc=35.6769,139.7639,7
+*Opens live animated radar over a base map in the browser — the frame URLs above are transparent overlay tiles (blank where dry) and expire within about two hours.*
 
 ---
 
 ⚠️ **DISCLAIMER:** RainViewer provides global precipitation radar. Data may have 5-10 minute delay. For official forecasts, consult local meteorological services.
 
 ---
-*Generated: 2026-08-13T20:27:41.996Z*
+*Generated: 2026-08-13T20:36:34.116Z*
 *Data source: RainViewer*
 ````
 

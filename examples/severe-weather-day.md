@@ -5,7 +5,7 @@
 **Claude Code answered** (using `get_weather_summary`):
 
 <!-- answer -->
-The story in Oklahoma City today is **extreme heat**, not storms. It's currently **106°F and clear** (KOKC station reading from 21 minutes ago), heading for 103°F this afternoon and 102°F again Friday, with no rain in sight.
+The story in Oklahoma City today is **extreme heat**, not storms. It's currently **104°F and clear** (KOKC station reading from 17 minutes ago), heading for 103°F this afternoon and 102°F again Friday, with no rain in sight.
 
 There's one active alert: a **Heat Advisory from NWS Norman, in effect until Sunday 7 PM** — so this isn't a one-day spike, it's a multi-day event. Plan around it: outdoor time early morning or after sunset (still 81°F tonight), and hydrate aggressively.
 <!-- /answer -->
@@ -37,11 +37,11 @@ get_weather_summary({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KOKC
-**Time:** Aug 13, 2026, 2:45 PM (21 minutes ago)
+**Time:** Aug 13, 2026, 3:20 PM (17 minutes ago)
 
 **Conditions:** Clear
-**Temperature:** 106°F
-**Pressure:** 29.85 inHg
+**Temperature:** 104°F
+**Pressure:** 29.83 inHg
 **Visibility:** 10.0 miles
 **Cloud Cover:** Clear at 12500ft
 
@@ -89,7 +89,7 @@ get_weather_summary({
 
 **Location:** 35.4730, -97.5171
 **Status:** Active alerts only
-**Updated:** Aug 13, 2026, 3:06 PM
+**Updated:** Aug 13, 2026, 3:36 PM
 
 ⚠️ **1 active alert found**
 
@@ -154,7 +154,7 @@ get_alerts({
 
 **Location:** 35.4676, -97.5164
 **Status:** Active alerts only
-**Updated:** Aug 13, 2026, 3:06 PM
+**Updated:** Aug 13, 2026, 3:36 PM
 
 ⚠️ **1 active alert found**
 
@@ -230,23 +230,26 @@ get_weather_imagery({
 
 ## 🎬 Animation Frames (13 frames)
 
-### Frame 1 - 2026-08-13T18:00:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/086272568b88/512/6/14/25/4/1_1.png
+### Frame 1 - 2026-08-13T18:30:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/061f0cb2acc8/512/6/14/25/4/1_1.png
 
-### Frame 7 - 2026-08-13T19:00:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/2b06ff9e3930/512/6/14/25/4/1_1.png
+### Frame 7 - 2026-08-13T19:30:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/8fdb47068a61/512/6/14/25/4/1_1.png
 
-### Frame 13 - 2026-08-13T20:00:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/41019f470334/512/6/14/25/4/1_1.png
+### Frame 13 - 2026-08-13T20:30:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/155731d3c90c/512/6/14/25/4/1_1.png
 
 *Showing 3 of 13 frames for brevity — use detail="full" for all frames*
+
+**Interactive map:** https://www.rainviewer.com/map.html?loc=35.4676,-97.5164,7
+*Opens live animated radar over a base map in the browser — the frame URLs above are transparent overlay tiles (blank where dry) and expire within about two hours.*
 
 ---
 
 ⚠️ **DISCLAIMER:** RainViewer provides global precipitation radar. Data may have 5-10 minute delay. For official forecasts, consult local meteorological services.
 
 ---
-*Generated: 2026-08-13T20:06:31.567Z*
+*Generated: 2026-08-13T20:36:46.024Z*
 *Data source: RainViewer*
 ````
 

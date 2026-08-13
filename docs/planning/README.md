@@ -59,6 +59,7 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Idea | Status | Detail |
 |------|--------|--------|
 | Satellite imagery in `get_weather_imagery` | 💡 | FE §12.1 (deferred from v1.5.0) |
+| Composited imagery via MCP image content blocks (radar over base map, returned as a finished picture) | 📝 | [`docs/composited-imagery-plan.md`](../composited-imagery-plan.md) — compositing mechanics proven offline in `scripts/capture-examples.mjs` (2026-08-13); open: base-layer licensing (D2), client image-support survey |
 | Moon phase / astronomy (`include_astronomy` on forecast) | ✅ | Shipped in v1.18.0 (developed on `feat/almanac` as the v1.16.0 milestone); [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §1.1 |
 | Extended twilight times (civil/nautical/astronomical) | ✅ | Shipped in v1.18.0 (developed on `feat/almanac` as the v1.16.0 milestone); [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §1.2 |
 | Record highs/lows for date (with normals) | ✅ | Shipped in v1.18.0 (developed on `feat/almanac` as the v1.16.0 milestone; US, RCC ACIS); [`docs/plans/almanac-plan.md`](../plans/almanac-plan.md); FE §2.2 |

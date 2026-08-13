@@ -27,6 +27,7 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { PNG } from 'pngjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { readFileSync, writeFileSync, mkdtempSync, rmSync, mkdirSync } from 'node:fs';
@@ -50,9 +51,11 @@ const GEO_UNAVAILABLE = /no locations found|could not find|not found/i;
 //   warmupMs  -> make the call once, discard, wait, call again (lightning
 //                needs time to accumulate strikes after first subscribing)
 //   image     -> examples-relative path: download the last "Image URL" in the
-//                output there as a committed snapshot (imagery URLs expire in
-//                ~2h). Radar tiles are transparent overlays — blank where dry —
-//                so a warning fires when the PNG is small enough to be echo-free.
+//                output, composite it onto an OpenStreetMap base layer (radar
+//                tiles are transparent overlays — geography-free blobs on their
+//                own), and commit the result (imagery URLs expire in ~2h).
+//                A warning fires when the overlay is small enough to be
+//                echo-free, so a rain-free snapshot never ships unnoticed.
 // ---------------------------------------------------------------------------
 const EXAMPLES = [
   {
@@ -298,23 +301,87 @@ function spliceStamp(content, file) {
   return content.replace(re, `$1\n${stamp}\n$2`);
 }
 
+// OSM's tile usage policy requires an identifying User-Agent for programmatic
+// access. One capture run fetches four base tiles — comfortably "light use".
+const OSM_UA = 'weather-mcp-examples-capture/1.0 (+https://github.com/weather-mcp/weather-mcp)';
+
+async function fetchBuffer(url, headers = {}) {
+  const resp = await fetch(url, { headers });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
+  return Buffer.from(await resp.arrayBuffer());
+}
+
 /**
- * Download the last "Image URL" in a tool's output to examples/<relPath>.
- * A near-empty PNG (< ~4 KB for a 512px tile) usually means a transparent,
- * echo-free tile — flagged so a blank snapshot never ships unnoticed.
+ * Build a 512×512 OSM base image for the tile a RainViewer overlay URL
+ * addresses. OSM serves 256px tiles, so the four z+1 children of the same
+ * web-mercator tile are stitched into one 512px image — pixel-exact, no
+ * resampling.
+ */
+async function fetchOsmBase(z, x, y) {
+  const base = new PNG({ width: 512, height: 512 });
+  const quadrants = [
+    [2 * x, 2 * y, 0, 0],
+    [2 * x + 1, 2 * y, 256, 0],
+    [2 * x, 2 * y + 1, 0, 256],
+    [2 * x + 1, 2 * y + 1, 256, 256],
+  ];
+  for (const [cx, cy, ox, oy] of quadrants) {
+    const buf = await fetchBuffer(
+      `https://tile.openstreetmap.org/${z + 1}/${cx}/${cy}.png`,
+      { 'User-Agent': OSM_UA }
+    );
+    const tile = PNG.sync.read(buf);
+    // OSM tiles can be paletted; pngjs normalizes to RGBA on read.
+    for (let row = 0; row < 256; row++) {
+      for (let col = 0; col < 256; col++) {
+        const s = (row * 256 + col) * 4;
+        const d = ((row + oy) * 512 + (col + ox)) * 4;
+        base.data[d] = tile.data[s];
+        base.data[d + 1] = tile.data[s + 1];
+        base.data[d + 2] = tile.data[s + 2];
+        base.data[d + 3] = 255;
+      }
+    }
+  }
+  return base;
+}
+
+/** Source-over alpha blend of a semi-transparent overlay onto an opaque base. */
+function blendOnto(base, overlay) {
+  for (let i = 0; i < base.data.length; i += 4) {
+    const a = overlay.data[i + 3] / 255;
+    if (a === 0) continue;
+    base.data[i] = Math.round(overlay.data[i] * a + base.data[i] * (1 - a));
+    base.data[i + 1] = Math.round(overlay.data[i + 1] * a + base.data[i + 1] * (1 - a));
+    base.data[i + 2] = Math.round(overlay.data[i + 2] * a + base.data[i + 2] * (1 - a));
+  }
+}
+
+/**
+ * Download the last "Image URL" in a tool's output, composite it over an OSM
+ * base map, and write the result to examples/<relPath>. A near-empty overlay
+ * PNG (< ~4 KB for a 512px tile) usually means a transparent, echo-free tile —
+ * flagged so a rain-free snapshot never ships unnoticed.
  */
 async function saveImageSnapshot(text, relPath) {
   const urls = [...text.matchAll(/\*\*Image URL:\*\* (\S+)/g)].map((m) => m[1]);
   if (urls.length === 0) return { ok: false, detail: 'no Image URL lines in output' };
   const url = urls[urls.length - 1];
+  // RainViewer tile path: .../512/{z}/{x}/{y}/{color}/{options}.png
+  const m = url.match(/\/512\/(\d+)\/(\d+)\/(\d+)\//);
+  if (!m) return { ok: false, detail: `unrecognized tile URL shape: ${url}` };
+  const [z, x, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
   try {
-    const resp = await fetch(url);
-    if (!resp.ok) return { ok: false, detail: `HTTP ${resp.status} for ${url}` };
-    const buf = Buffer.from(await resp.arrayBuffer());
+    const overlayBuf = await fetchBuffer(url);
+    const blankWarning = overlayBuf.length < 4096;
+    const overlay = PNG.sync.read(overlayBuf);
+    const composite = await fetchOsmBase(z, x, y);
+    blendOnto(composite, overlay);
+    const out = PNG.sync.write(composite);
     const dest = join(ROOT, 'examples', relPath);
     mkdirSync(dirname(dest), { recursive: true });
-    writeFileSync(dest, buf);
-    return { ok: true, bytes: buf.length, blankWarning: buf.length < 4096 };
+    writeFileSync(dest, out);
+    return { ok: true, bytes: out.length, blankWarning };
   } catch (e) {
     return { ok: false, detail: e.message };
   }
