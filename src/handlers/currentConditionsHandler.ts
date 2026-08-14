@@ -1211,7 +1211,8 @@ async function formatMetarCurrentConditions(
   if (includeFireWeather) {
     output += `\n## Fire Weather\n\n`;
     output += `Fire weather indices are not available on the METAR source — they `;
-    output += `require NOAA gridpoint data. Use \`source: "noaa"\` for a US location.\n`;
+    output += `require NOAA gridpoint data. Use \`source: "noaa"\` for a US location, `;
+    output += `or omit \`source\` to get a server-computed Fosberg index from model data elsewhere.\n`;
   }
 
   // Climate normals (optional) — supported here exactly as on the other two
