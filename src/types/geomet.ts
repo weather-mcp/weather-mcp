@@ -4,7 +4,7 @@
  *
  * This is a keyless OGC API Features endpoint (`f=json`), **not CAP-shaped**.
  * Live verification (2026-08-13, see "MSC GeoMet (Canada)" in
- * `docs/international-alerts-plan.md`) found the real property set below —
+ * `docs/plans/international-alerts-plan.md`) found the real property set below —
  * there is no severity/urgency/certainty anywhere, so none is typed or
  * invented here. All properties are optional: presence is not guaranteed
  * for every feature, and a live response has been observed with several of

@@ -1,7 +1,7 @@
 /**
  * Handler for get_alerts tool.
  *
- * Routed by country (see docs/international-alerts-plan.md D1):
+ * Routed by country (see docs/plans/international-alerts-plan.md D1):
  *   US → NOAA (the original path, byte-identical output),
  *   Canada → MSC GeoMet (Environment and Climate Change Canada),
  *   MeteoAlarm member countries → the country's MeteoAlarm feed,

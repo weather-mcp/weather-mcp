@@ -115,7 +115,7 @@ All options preserve the zero-cost model; only FIRMS breaks the zero-key model (
 |-------|--------|---------------|--------|
 | ~~1~~ ✅ | ~~Open-Meteo fallback in `get_current_conditions`~~ — shipped in v1.12.0 | No | Small |
 | ~~2~~ ✅ | ~~Open-Meteo Flood API in `get_river_conditions`~~ — implemented for v1.15.0 (channel snapping per the live finding below). The **UK Environment Agency gauge supplement remains open** and moves to Phase 5. | No (new endpoint) | Small–medium |
-| 3 | MeteoAlarm + GeoMet alerts routing | Yes (2, keyless) | Medium |
+| ~~3~~ ✅ | ~~MeteoAlarm + GeoMet alerts routing~~ — implemented for v1.19.0 (country routing via a cached Nominatim reverse lookup; all 38 MeteoAlarm slugs live-verified) | Yes (2, keyless) | Medium |
 | 4 | NASA FIRMS in `get_wildfire_info` | Yes (free key, optional) | Medium |
 | 5 | Polish: met.no fallback, global normals/FWI, UK gauges | Yes (keyless) | Small each |
 

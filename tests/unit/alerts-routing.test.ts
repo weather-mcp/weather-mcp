@@ -12,7 +12,7 @@
  *   - MeteoAlarm/GeoMet active_only:false notes (D6)
  *   - MeteoAlarm detail display caps (D5): standard=10, full=25, summary=counts
  *
- * See docs/international-alerts-plan.md D1, D5, D6.
+ * See docs/plans/international-alerts-plan.md D1, D5, D6.
  */
 
 import { describe, it, expect, vi } from 'vitest';

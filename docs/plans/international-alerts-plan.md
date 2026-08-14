@@ -1,6 +1,6 @@
 # International Alerts (MeteoAlarm + MSC GeoMet) — Design Plan
 
-**Status:** Settled — ready for `/impl-plan`
+**Status:** IMPLEMENTED — shipped on `feat/international-alerts` (2026-08-13); execution record in `international-alerts-implementation-plan.md`
 **Parent:** `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md` Phase 3;
 planning-index row "International alerts (MeteoAlarm, MSC GeoMet, WMO CAP)"
 **Target release:** v1.19.0

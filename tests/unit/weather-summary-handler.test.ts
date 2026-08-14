@@ -126,7 +126,7 @@ describe('handleGetWeatherSummary', () => {
   });
 
   it('dispatches handleGetAlerts for a non-US location instead of short-circuiting', async () => {
-    // Designed behaviour change (docs/international-alerts-plan.md D7): alerts
+    // Designed behaviour change (docs/plans/international-alerts-plan.md D7): alerts
     // are no longer US-only in the summary handler. handleGetAlerts itself now
     // routes by country and produces its own graceful output everywhere, so the
     // summary calls it unconditionally, same as for a US location.

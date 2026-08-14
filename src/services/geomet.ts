@@ -5,7 +5,7 @@
  *
  * A keyless OGC API Features endpoint. Queried with a small bbox (±0.25°)
  * around a point, `f=json`. Live-verified (2026-08-13, see "MSC GeoMet
- * (Canada)" in `docs/international-alerts-plan.md`): a zero-result bbox
+ * (Canada)" in `docs/plans/international-alerts-plan.md`): a zero-result bbox
  * returns HTTP 200 with `numberMatched: 0` — the happy empty path, not an
  * error — and `status_en: "ended"` items **remain in the collection**, so
  * expiry filtering is always required at read time (both on a fresh fetch

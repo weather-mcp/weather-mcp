@@ -2,7 +2,7 @@
 
 **Status:** READY (2026-08-13)
 
-Execution plan for `docs/international-alerts-plan.md` (the WHAT/WHY); rules
+Execution plan for `docs/plans/international-alerts-plan.md` (the WHAT/WHY); rules
 live in `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ live in `docs/orchestration-playbook.md`.
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/international-alerts-implementation-plan.md
+/run-plan docs/plans/international-alerts-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/international-alerts-plan.md` (design),
+Or, equivalently: read `docs/plans/international-alerts-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review
 the diff, run the gate yourself, commit, tick the tracker, push.
@@ -400,7 +400,7 @@ Spot-checks against the code, reconciled into the tasks below:
 - Files: `CHANGELOG.md`, `README.md`, `docs/TOOLS.md`, `CLAUDE.md`,
   `docs/planning/README.md`,
   `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md`,
-  `docs/international-alerts-plan.md`
+  `docs/plans/international-alerts-plan.md`
 - **Live sweep against the built dist** — the design's seven acceptance
   points, run by the orchestrator personally:
   1. Munich (`city_name` **and** raw coordinates) → German warnings, coverage
@@ -430,7 +430,7 @@ Spot-checks against the code, reconciled into the tasks below:
     📝 → ✅ with the Shipped link; update the viability row (`:100`) and the
     ICR Phase 3 sequencing row in
     `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md`.
-  - Mark `docs/international-alerts-plan.md` status `IMPLEMENTED`, then **move
+  - Mark `docs/plans/international-alerts-plan.md` status `IMPLEMENTED`, then **move
     the plan set (design plan + this file) to `docs/plans/`** per the
     playbook, updating references.
 - Acceptance: the sweep recorded in this file (tracker section) or the commit
@@ -482,7 +482,27 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T7 — `get_weather_summary`: drop the US-only short-circuit (`sonnet`) — `4007526`
 - [x] T8 — Routing unit tests (`sonnet`, 14 tests) — `fbd46f6`
 - [x] T9 — Integration tests: captured shapes + tolerant live smoke (`sonnet`, 5 tests; instance-scoped axios spies so the live block stays genuinely live) — `adc9e13`
-- [ ] T10 — Live acceptance sweep + documentation checklist (`opus`)
+- [x] T10 — Live acceptance sweep + documentation checklist (`opus`) — see sweep record below; SHA in the tracker-tick commit
+
+**T10 live acceptance sweep (2026-08-13, orchestrator-run against the built dist):**
+
+1. ✅ Munich by `city_name` and by raw coordinates → 51 active German warnings
+   (matching the design's 161→51 filtering observation), country-level
+   coverage note, `EUMETNET – MeteoAlarm (national warnings: Deutscher
+   Wetterdienst)` attribution, Issued times shown as published (`+02:00`).
+2. ✅ Toronto (raw coordinates) → GeoMet ("Weather Alerts — Canada", ECCC
+   footer, clean empty at sweep time), NOAA not consulted.
+3. ✅ Seattle → built-dist output diffed **byte-identical** against a `main`
+   worktree build for the same arguments.
+4. ✅ Sydney → not-covered message naming Australia and the three covered
+   regions; not an error.
+5. ✅ US offshore point (47.9, −124.85, ~10 km off the Washington coast) →
+   NOAA alerts response.
+6. ✅ `get_weather_summary` Paris → real alerts section ("Weather Alerts —
+   France", 3 warnings, Météo-France attribution); Sydney → the handler's
+   not-covered message inside the summary.
+7. ✅ Two consecutive Munich calls → exactly one `MeteoAlarm feed fetch` log
+   followed by `MeteoAlarm cache hit` (one 2.8 MB-class fetch per 5 min).
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the design's seven live
@@ -490,5 +510,5 @@ acceptance points are demonstrably met against the built dist (Munich both
 ways, Toronto → GeoMet, Seattle byte-identical, Sydney not-covered, US
 offshore → NOAA, summary Paris/Sydney, cache single-fetch),
 `tests/unit/alerts-detail.test.ts` and `tests/unit/alert-sorting.test.ts` pass
-unedited, and `docs/international-alerts-plan.md` is marked `IMPLEMENTED` and
+unedited, and `docs/plans/international-alerts-plan.md` is marked `IMPLEMENTED` and
 the plan set moved to `docs/plans/`. Opening the PR is the human's call.

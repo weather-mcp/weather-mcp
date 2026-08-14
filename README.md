@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1%2C675%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-1%2C812%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -50,7 +50,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
-- **Fully open source** — MIT licensed, readable TypeScript, 1,675 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 1,812 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -64,7 +64,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 |------|-------------|----------|
 | `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name; sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac | 🌍 Global |
 | `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional fire-weather indices), Open-Meteo model data elsewhere, or real airport station observations worldwide with `source="metar"`. Always states the observation's age, and automatically falls back to a fresher nearby station when the nearest one has gone dark | 🌍 Global |
-| `get_alerts` | Active watches, warnings, and advisories sorted by severity | 🇺🇸 US |
+| `get_alerts` | Active watches, warnings, and advisories sorted by severity; official national warnings for the US (NOAA), Canada (ECCC), and 38 European countries (MeteoAlarm) | 🇺🇸 🇨🇦 🇪🇺 |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
 | `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
 | `search_location` | Geocode place names to coordinates ("Paris" → 48.85, 2.35) | 🌍 Global |
@@ -89,6 +89,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 ## Feature highlights
 
 - **Smart source selection** — US queries use NOAA (detailed, includes forecaster narratives); everywhere else uses Open-Meteo. You never pick; it just works.
+- **International weather alerts** — `get_alerts` routes by country: NOAA in the US, Environment and Climate Change Canada alerts in Canada, and the official national warnings of 38 European countries via EUMETNET MeteoAlarm — shown unmodified, with the issuing service credited. Border cities like Toronto get the right country's alerts, not the nearest bounding box's.
 - **Real observations worldwide** — ask for what a station is *actually reporting* and `get_current_conditions` will read the nearest airport's METAR (`source="metar"`): a genuine instrument reading anywhere on earth, with the station, its distance, and the observation age always stated. Outside the US this is the difference between a measurement and a model estimate.
 - **Saved locations** — save "home", "work", or "cabin" once, then ask *"what's the weather at home?"* Locations persist in `~/.weather-mcp/locations.json` and can be tagged with activities ("boating", "skiing") so the AI highlights what matters to you.
 - **Climate context** — optional 30-year climate normals show how today compares: *"10°F warmer than normal for this date."* For US locations the normals also carry the record high/low for the date and the year it was set: *"is this a record high?"*
@@ -110,6 +111,8 @@ All free, all public, no authentication required:
 | [Open-Meteo](https://open-meteo.com/) | Global forecasts, historical data (1940+), air quality, marine, geocoding, climate normals | Global |
 | [NOAA NWPS](https://water.noaa.gov/) | River levels, streamflow, flood stages | US |
 | [RCC ACIS](https://www.rcc-acis.org/) | Daily record high/low temperatures | US |
+| [EUMETNET MeteoAlarm](https://meteoalarm.org/) | Official national weather warnings (38 European countries) | Europe |
+| [MSC GeoMet](https://api.weather.gc.ca/) | Environment and Climate Change Canada weather alerts | Canada |
 | [NIFC WFIGS](https://data-nifc.opendata.arcgis.com/) | Active wildfire perimeters and incidents | US |
 | [RainViewer](https://www.rainviewer.com/api.html) | Precipitation radar imagery | Global |
 | [NASA GIBS](https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api) | GOES GeoColor satellite imagery; base map for composited radar | Western Hemisphere (satellite), Global (base map) |
@@ -261,10 +264,11 @@ Being honest about what free public data can and can't do:
 | Historical weather (1940+) | ✅ (>7 days old) | Station-level detail for last 7 days |
 | Air quality, marine, radar, lightning | ✅ | — |
 | Current conditions | ✅ (model data, or real station observations via `source="metar"`) | Station observations via NOAA (richer detail) |
-| Weather alerts | ❌ | ✅ |
+| Weather alerts | ✅ US, Canada, and 38 European countries | NWS zone-level precision; Europe is matched at country level |
 | River conditions | ✅ (GloFAS modeled discharge) | Gauge observations + official flood stages via NWPS |
 | Wildfires | ❌ | ✅ |
 
+- European alerts are matched at **country level** — the keyless MeteoAlarm feeds carry no region polygons, so warnings for a large country may not affect the requested point; the output says so. Canadian alerts use a real bbox query with polygon-backed features.
 - International current conditions default to **model-interpolated** values at the exact coordinates. `source="metar"` returns a **real instrument reading** instead — but from the nearest airport, which may be tens of km away and up to an hour old. The output always names the station, its distance and bearing, and the observation age, so the tradeoff is visible rather than assumed. METAR coverage follows airports, so remote land and open ocean have real gaps.
 - Historical data older than 7 days comes from reanalysis models (9–25km grid), not direct station observations, and trails real time by ~5 days.
 - Non-US river discharge is **modeled**, not observed, and has no official flood-stage thresholds — levels are shown relative to recent history and the forecast ensemble. The ~5km model grid means the reported channel may be a few km from the requested point; the output says so when it is.
@@ -277,7 +281,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 1,675 tests
+npm test               # Run all 1,812 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

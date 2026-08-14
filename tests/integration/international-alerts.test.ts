@@ -1,6 +1,6 @@
 /**
  * Integration tests for international alerts routing (T9,
- * docs/international-alerts-plan.md) — MeteoAlarm (Europe) and MSC GeoMet
+ * docs/plans/international-alerts-plan.md) — MeteoAlarm (Europe) and MSC GeoMet
  * (Canada) driven end to end through the real `handleGetAlerts` handler.
  *
  * Block 1 is deterministic: rather than a module-level `vi.mock('axios')`
