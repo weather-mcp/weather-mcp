@@ -57,11 +57,11 @@ check_service_status({})
 ````markdown
 # Weather API Service Status
 
-**Check Time:** 8/13/2026, 4:08:49 PM
+**Check Time:** 8/14/2026, 2:05:46 PM
 
 ## Server Version
 
-**Installed Version:** 1.18.0
+**Installed Version:** 1.19.0
 **Latest Release:** https://github.com/weather-mcp/weather-mcp/releases/latest
 **Changelog:** https://github.com/weather-mcp/weather-mcp/blob/main/CHANGELOG.md
 **Upgrade Instructions:** See README.md "Upgrading to Latest Version" section
@@ -125,5 +125,5 @@ npm run build && npm run examples
 **About imagery links:** the radar URLs inside captured output expire — RainViewer retains only ~2 hours of frames — and a tile over dry skies renders blank, since radar tiles are transparent precipitation overlays. So the imagery examples also commit a PNG snapshot (`images/`): the capture script downloads the radar tile and composites it onto an OpenStreetMap base layer (four z+1 tiles stitched, pure-JS via the `pngjs` devDependency) so the echoes have geography under them, and warns if the overlay looks echo-free so a rain-free snapshot never ships unnoticed. Verify the image visually after regenerating. Committed snapshots carry attribution: radar © RainViewer, base map © OpenStreetMap contributors. The server output itself now includes an **interactive map** link (RainViewer live map / NASA Worldview) for the layered, animated browser view.
 
 <!-- capture-stamp -->
-*Captured 2026-08-13 with weather-mcp v1.18.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

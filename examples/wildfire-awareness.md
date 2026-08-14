@@ -52,7 +52,7 @@ get_wildfire_info({
 **Size:** 7196 acres (2912 hectares)
 **Containment:** 67% ███████░░░
 **Discovery Date:** 6/28/2026
-**Days Active:** 45
+**Days Active:** 46
 
 ---
 
@@ -67,7 +67,7 @@ get_wildfire_info({
 **Size:** 309 acres (125 hectares)
 **Containment:** 100% ██████████
 **Discovery Date:** 7/12/2026
-**Days Active:** 32
+**Days Active:** 33
 
 ---
 
@@ -82,7 +82,7 @@ get_wildfire_info({
 **Size:** 102003 acres (41279 hectares)
 **Containment:** 72% ███████░░░
 **Discovery Date:** 6/29/2026
-**Days Active:** 45
+**Days Active:** 46
 
 ---
 
@@ -97,7 +97,7 @@ get_wildfire_info({
 **Size:** 1650 acres (668 hectares)
 **Containment:** 100% ██████████
 **Discovery Date:** 7/21/2026
-**Days Active:** 22
+**Days Active:** 23
 
 ---
 
@@ -165,9 +165,9 @@ get_air_quality({
 **Timezone:** America/Denver
 **Elevation:** 1599m
 
-**Observation Time:** 8/13/2026, 2:00:00 PM
+**Observation Time:** 8/14/2026, 12:00:00 PM
 
-## 🟡 US Air Quality Index: 51
+## 🟡 US Air Quality Index: 59
 
 **Category:** Moderate (Yellow)
 **Description:** Air quality is acceptable
@@ -177,24 +177,22 @@ Air quality is acceptable; however, unusually sensitive people may experience mi
 
 ⚠️ **Caution:** Unusually sensitive people should consider reducing prolonged outdoor exertion.
 
-## 🟡 UV Index: 5.0
+## 🔴 UV Index: 9.2
 
-**Level:** Moderate
-**Description:** Protection recommended
-**Recommendation:** Wear sunscreen, hat, and sunglasses. Seek shade during midday hours.
-
-*Note: UV index under clear sky would be 8.6*
+**Level:** Very High
+**Description:** Extra protection required
+**Recommendation:** Minimize sun exposure 10am-4pm. Apply SPF 30+ sunscreen every 2 hours. Wear protective clothing and sunglasses.
 
 ## Pollutant Concentrations
 
-**PM2.5 (Fine Particulate Matter):** 8.8 μg/m³
-**PM10 (Coarse Particulate Matter):** 9.7 μg/m³
-**Ozone (O₃):** 134 μg/m³
-**Nitrogen Dioxide (NO₂):** 1.5 μg/m³
-**Sulfur Dioxide (SO₂):** 0.70 μg/m³
-**Carbon Monoxide (CO):** 147 μg/m³
+**PM2.5 (Fine Particulate Matter):** 9.6 μg/m³
+**PM10 (Coarse Particulate Matter):** 10 μg/m³
+**Ozone (O₃):** 136 μg/m³
+**Nitrogen Dioxide (NO₂):** 3.3 μg/m³
+**Sulfur Dioxide (SO₂):** 1.0 μg/m³
+**Carbon Monoxide (CO):** 162 μg/m³
 **Ammonia (NH₃):** N/A
-**Aerosol Optical Depth:** 0.320 (atmospheric haze indicator)
+**Aerosol Optical Depth:** 0.120 (atmospheric haze indicator)
 
 *European AQI: 61 (Poor)*
 ````
@@ -207,5 +205,5 @@ Air quality is acceptable; however, unusually sensitive people may experience mi
 **Features shown:** `get_wildfire_info` — active fires within a radius (NIFC), containment, distance, safety assessment tier · `get_air_quality` on the US path — US AQI scale, pollutant breakdown (PM2.5 is the smoke signal), UV index, health recommendations.
 
 <!-- capture-stamp -->
-*Captured 2026-08-13 with weather-mcp v1.18.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->
