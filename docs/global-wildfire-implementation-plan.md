@@ -407,7 +407,7 @@ Spot-checks against the code, reconciled into the tasks below:
 
 - [x] T1 — `FIRMS_MAP_KEY` config + `.env.example` (`haiku`) — `3d2d579`
 - [x] T2 — FIRMS types + pure hotspot module (`sonnet`) — `1e520a8` (orchestrator tightened the US–Canada border-band insets: Canada south bound 50°N, CONUS split at −95° with a 47°N/41°N cap, border cities → Global)
-- [ ] T3 — `FIRMSService` + cache TTLs (`sonnet`)
+- [x] T3 — `FIRMSService` + cache TTLs (`sonnet`) — `5dc4433`
 - [ ] T4 — Country routing + FIRMS renderer in `get_wildfire_info` (`opus`)
 - [ ] T5 — Routing unit tests (`sonnet`)
 - [ ] T6 — Integration tests: mocked shapes + tolerant keyless live smoke (`sonnet`)
