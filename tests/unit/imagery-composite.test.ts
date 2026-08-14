@@ -15,6 +15,17 @@
  * the overlay-tile fetch (axios) — with fixture PNG tiles generated
  * programmatically via pngjs (no binary fixtures, no live network calls).
  *
+ * Composites are now **centered on the requested coordinates** rather than
+ * aligned to a whole map tile (`src/utils/composite.ts`, `centeredWindowOrigin`),
+ * so the handler fetches the 1-4 radar tiles of the *same frame* that cover a
+ * 512x512 window around the point (`fetchRadarWindow` / `buildRadarTileUrl`)
+ * instead of a single fetch of `frame.url`, and the basemap service exposes
+ * `getBaseWindow(z, gx0, gy0, size)` instead of a tile-addressed
+ * `getBaseComposite(z, x, y)`. The mocks below reflect that: `mockAxiosGet`
+ * answers any radar tile URL (URL-agnostic by default), and call counts are
+ * asserted against the real covering-tile count computed from the same pure
+ * geometry helpers the handler itself calls, rather than a hardcoded "1".
+ *
  * `compositeCache` (src/handlers/weatherImageryHandler.ts) is module-level
  * and persists for the lifetime of this file's module registry, so every
  * test other than the deliberate cache-hit test uses a distinct radar frame
@@ -48,10 +59,10 @@ vi.mock('../../src/services/rainviewer.js', () => ({
   },
 }));
 
-const { mockGetBaseComposite } = vi.hoisted(() => ({ mockGetBaseComposite: vi.fn() }));
+const { mockGetBaseWindow } = vi.hoisted(() => ({ mockGetBaseWindow: vi.fn() }));
 vi.mock('../../src/services/basemap.js', () => ({
   basemapService: {
-    getBaseComposite: (...args: unknown[]) => mockGetBaseComposite(...args),
+    getBaseWindow: (...args: unknown[]) => mockGetBaseWindow(...args),
   },
 }));
 
@@ -74,7 +85,13 @@ import {
   getWeatherImagery,
   formatWeatherImageryResponse,
 } from '../../src/handlers/weatherImageryHandler.js';
-import { latLonToTilePixel, MAX_COMPOSITE_BYTES } from '../../src/utils/composite.js';
+import {
+  MAX_COMPOSITE_BYTES,
+  parseRadarTileUrl,
+  latLonToGlobalPixel,
+  centeredWindowOrigin,
+  planTileWindow,
+} from '../../src/utils/composite.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -121,8 +138,34 @@ const BASE_COLOR: [number, number, number, number] = [40, 120, 180, 255];
 /** Fully transparent overlay — most of a real radar tile is transparent sky, and leaves the base color untouched wherever there's no marker. */
 const TRANSPARENT_OVERLAY: [number, number, number, number] = [0, 0, 0, 0];
 
+/** Edge length of a composited map / RainViewer's native radar tile, in pixels — mirrors the handler's own private `COMPOSITE_SIZE` / `RADAR_TILE_PIXELS` constants (both 512). */
+const COMPOSITE_SIZE = 512;
+const RADAR_TILE_PIXELS = 512;
+
+/**
+ * The exact radar-tile window the handler computes for MIAMI at the frame's
+ * zoom — derived from the same pure geometry functions the handler itself
+ * calls (`latLonToGlobalPixel` → `centeredWindowOrigin` → `planTileWindow`),
+ * so these tests assert against the real math rather than a hardcoded guess.
+ * A centered window rarely lines up with the tile grid, so MIAMI's window
+ * covers more than one tile — that's the common case post-centering, not a
+ * special one.
+ */
+const MIAMI_RADAR_WINDOW = (() => {
+  const parsed = parseRadarTileUrl(radarUrl('geometry-probe'));
+  if (!parsed) throw new Error('geometry probe URL failed to parse — fixture regressed');
+  const { z } = parsed;
+  const { gx, gy } = latLonToGlobalPixel(MIAMI.latitude, MIAMI.longitude, z);
+  const { gx0, gy0 } = centeredWindowOrigin(gx, gy, COMPOSITE_SIZE, z);
+  const window = planTileWindow(gx0, gy0, COMPOSITE_SIZE, RADAR_TILE_PIXELS, z);
+  return { z, gx0, gy0, ...window };
+})();
+
+/** Number of distinct radar tiles the handler must fetch to cover MIAMI's centered window. */
+const RADAR_TILE_COUNT = MIAMI_RADAR_WINDOW.tileXs.length * MIAMI_RADAR_WINDOW.tileYs.length;
+
 function defaultOverlayBuffer(): Buffer {
-  return PNG.sync.write(makeSolidPng(512, 512, TRANSPARENT_OVERLAY));
+  return PNG.sync.write(makeSolidPng(RADAR_TILE_PIXELS, RADAR_TILE_PIXELS, TRANSPARENT_OVERLAY));
 }
 
 function decodeImageBlock(data: string): PNG {
@@ -134,12 +177,15 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
 
   mockAxiosGet.mockReset();
+  // URL-agnostic by default: the handler now issues 1-4 distinct radar-tile
+  // requests per composite (the covering tiles of a centered window), not
+  // one fetch of the exact frame URL — every one of them gets this fixture.
   mockAxiosGet.mockResolvedValue({ data: defaultOverlayBuffer() });
 
   mockGetPrecipitationRadar.mockReset();
 
-  mockGetBaseComposite.mockReset();
-  mockGetBaseComposite.mockImplementation(() => Promise.resolve(makeSolidPng(512, 512, BASE_COLOR)));
+  mockGetBaseWindow.mockReset();
+  mockGetBaseWindow.mockImplementation(() => Promise.resolve(makeSolidPng(COMPOSITE_SIZE, COMPOSITE_SIZE, BASE_COLOR)));
 
   mockEncodePng.mockClear();
 });
@@ -149,7 +195,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('get_weather_imagery composite branch', () => {
-  it('composite: true on precipitation returns exactly [text, image] with a 512×512 PNG', async () => {
+  it('composite: true on precipitation returns exactly [text, image] with a 512×512 PNG, centered on the requested window', async () => {
     const frame = makeFrame('basic-1', -5);
     mockGetPrecipitationRadar.mockResolvedValue([frame]);
 
@@ -167,6 +213,15 @@ describe('get_weather_imagery composite branch', () => {
     const decoded = decodeImageBlock(imageBlock.data);
     expect(decoded.width).toBe(512);
     expect(decoded.height).toBe(512);
+
+    // The basemap window is centered on the same global pixel as the radar
+    // window — both derive from one `centeredWindowOrigin` call in the handler.
+    expect(mockGetBaseWindow).toHaveBeenCalledWith(
+      MIAMI_RADAR_WINDOW.z,
+      MIAMI_RADAR_WINDOW.gx0,
+      MIAMI_RADAR_WINDOW.gy0,
+      COMPOSITE_SIZE
+    );
   });
 
   it('omitted composite returns a byte-identical text-only response to the pre-branch formatter', async () => {
@@ -192,7 +247,7 @@ describe('get_weather_imagery composite branch', () => {
     expect(result.content[0]).toEqual({ type: 'text', text: expectedText });
     // No composite side effects on the omitted path.
     expect(mockAxiosGet).not.toHaveBeenCalled();
-    expect(mockGetBaseComposite).not.toHaveBeenCalled();
+    expect(mockGetBaseWindow).not.toHaveBeenCalled();
   });
 
   it('composite: false returns the same byte-identical text-only response as omitted', async () => {
@@ -243,13 +298,14 @@ describe('get_weather_imagery composite branch', () => {
     expect(result.content).toHaveLength(2);
     const text = (result.content[0] as { type: 'text'; text: string }).text;
 
-    // Only one composite round — one overlay fetch, one basemap call.
-    expect(mockAxiosGet).toHaveBeenCalledTimes(1);
-    expect(mockAxiosGet).toHaveBeenCalledWith(
-      frames[2].url,
-      expect.objectContaining({ responseType: 'arraybuffer' })
-    );
-    expect(mockGetBaseComposite).toHaveBeenCalledTimes(1);
+    // Only one composite round: the covering radar tiles of the latest
+    // observed frame's window (1-4, MIAMI's straddles more than one), and one
+    // basemap window fetch — not one per animation frame.
+    expect(mockAxiosGet).toHaveBeenCalledTimes(RADAR_TILE_COUNT);
+    for (const [url] of mockAxiosGet.mock.calls) {
+      expect(url as string).toMatch(/\/512\/\d+\/\d+\/\d+\//);
+    }
+    expect(mockGetBaseWindow).toHaveBeenCalledTimes(1);
 
     // The attached-composite line names the latest *observed* frame specifically
     // (the animation-frames list above it legitimately lists all 5 frames,
@@ -276,14 +332,14 @@ describe('get_weather_imagery composite branch', () => {
     const text = (result.content[0] as { type: 'text'; text: string }).text;
     expect(text).toContain('composite rendering is available for radar/precipitation only');
 
-    expect(mockGetBaseComposite).not.toHaveBeenCalled();
+    expect(mockGetBaseWindow).not.toHaveBeenCalled();
     expect(mockAxiosGet).not.toHaveBeenCalled();
   });
 
   it('basemap failure degrades to text-only output with the unavailable note, without throwing', async () => {
     const frame = makeFrame('basemap-fail-1', -5);
     mockGetPrecipitationRadar.mockResolvedValue([frame]);
-    mockGetBaseComposite.mockRejectedValueOnce(new Error('simulated basemap failure'));
+    mockGetBaseWindow.mockRejectedValueOnce(new Error('simulated basemap failure'));
 
     const result = await handleGetWeatherImagery(
       { latitude: MIAMI.latitude, longitude: MIAMI.longitude, type: 'precipitation', composite: true },
@@ -314,7 +370,7 @@ describe('get_weather_imagery composite branch', () => {
     expect(text).toContain('Composite map unavailable for this request');
   });
 
-  it('draws the marker at the requested coordinates: near-black core, near-white outline', async () => {
+  it('centers the marker at the image center (256, 256): near-black core, near-white outline', async () => {
     const frame = makeFrame('marker-1', -5);
     mockGetPrecipitationRadar.mockResolvedValue([frame]);
 
@@ -327,23 +383,25 @@ describe('get_weather_imagery composite branch', () => {
     const imageBlock = result.content[1] as { type: 'image'; data: string; mimeType: string };
     const decoded = decodeImageBlock(imageBlock.data);
 
-    const { px, py } = latLonToTilePixel(MIAMI.latitude, MIAMI.longitude, TILE.z, TILE.x, TILE.y);
-    const cx = Math.round(px);
-    const cy = Math.round(py);
+    // Headline assertion of the centering change: a composite centered on the
+    // requested coordinates always places the marker at the image's exact
+    // center for a non-polar point, replacing the old tile-relative
+    // `latLonToTilePixel` math (removed — see src/utils/composite.ts).
+    const CENTER = 256;
 
     const pixelAt = (x: number, y: number): [number, number, number] => {
       const i = (y * decoded.width + x) * 4;
       return [decoded.data[i], decoded.data[i + 1], decoded.data[i + 2]];
     };
 
-    // Marker core: the requested coordinates themselves — near-black.
-    const [cr, cg, cb] = pixelAt(cx, cy);
+    // Marker core: dead center of the composite — near-black.
+    const [cr, cg, cb] = pixelAt(CENTER, CENTER);
     expect(cr).toBeLessThan(30);
     expect(cg).toBeLessThan(30);
     expect(cb).toBeLessThan(30);
 
     // Marker outline: just past the 3px core arm — near-white, not the base-map fill.
-    const [or_, og, ob] = pixelAt(cx + 4, cy);
+    const [or_, og, ob] = pixelAt(CENTER + 4, CENTER);
     expect(or_).toBeGreaterThan(225);
     expect(og).toBeGreaterThan(225);
     expect(ob).toBeGreaterThan(225);
@@ -380,11 +438,76 @@ describe('get_weather_imagery composite branch', () => {
     const first = await handleGetWeatherImagery(args, locationStore, geocodingService);
     const second = await handleGetWeatherImagery(args, locationStore, geocodingService);
 
-    expect(mockAxiosGet).toHaveBeenCalledTimes(1);
-    expect(mockGetBaseComposite).toHaveBeenCalledTimes(1);
+    // Radar-tile fetches happen only on the first (uncached) call.
+    expect(mockAxiosGet).toHaveBeenCalledTimes(RADAR_TILE_COUNT);
+    expect(mockGetBaseWindow).toHaveBeenCalledTimes(1);
 
     const firstImage = first.content[1] as { type: 'image'; data: string };
     const secondImage = second.content[1] as { type: 'image'; data: string };
     expect(secondImage.data).toBe(firstImage.data);
+  });
+
+  it('a centered window straddling a radar tile boundary is correctly assembled and cropped from multiple tiles', async () => {
+    const frame = makeFrame('straddle-1', -5);
+    mockGetPrecipitationRadar.mockResolvedValue([frame]);
+
+    // Sanity: this test only exercises the multi-tile path if MIAMI's
+    // centered window genuinely straddles the radar tile grid — which is the
+    // common case post-centering, but assert it explicitly so a future
+    // geometry change that happens to land MIAMI back on a tile boundary
+    // fails loudly here instead of silently testing nothing.
+    expect(RADAR_TILE_COUNT).toBeGreaterThan(1);
+
+    /** Deterministic, fully opaque per-tile color so assembly + crop position is directly visible in the output pixels. */
+    const colorForTile = (tx: number, ty: number): [number, number, number, number] => [
+      (tx * 37) % 256,
+      (ty * 61) % 256,
+      90,
+      255,
+    ];
+
+    mockAxiosGet.mockImplementation((url: unknown) => {
+      const match = (url as string).match(/\/512\/(\d+)\/(\d+)\/(\d+)\//);
+      if (!match) {
+        return Promise.reject(new Error(`unexpected radar tile URL in straddle test: ${String(url)}`));
+      }
+      const [, , x, y] = match;
+      const png = makeSolidPng(RADAR_TILE_PIXELS, RADAR_TILE_PIXELS, colorForTile(Number(x), Number(y)));
+      return Promise.resolve({ data: PNG.sync.write(png) });
+    });
+
+    const result = await handleGetWeatherImagery(
+      { latitude: MIAMI.latitude, longitude: MIAMI.longitude, type: 'precipitation', composite: true },
+      locationStore,
+      geocodingService
+    );
+
+    const imageBlock = result.content[1] as { type: 'image'; data: string; mimeType: string };
+    const decoded = decodeImageBlock(imageBlock.data);
+    expect(decoded.width).toBe(512);
+    expect(decoded.height).toBe(512);
+
+    const pixelAt = (x: number, y: number): [number, number, number, number] => {
+      const i = (y * decoded.width + x) * 4;
+      return [decoded.data[i], decoded.data[i + 1], decoded.data[i + 2], decoded.data[i + 3]];
+    };
+
+    // The crop's top-left corner sits inside the first covering tile, and its
+    // bottom-right corner sits inside the last covering tile (opaque radar
+    // pixels fully replace the base map, per `blendOnto`'s alpha===255
+    // shortcut) — so these corners are a direct readout of `assembleTiles` +
+    // `cropTo` having placed each tile at the right offset.
+    const firstTile = { x: MIAMI_RADAR_WINDOW.tileXs[0], y: MIAMI_RADAR_WINDOW.tileYs[0] };
+    const lastTile = {
+      x: MIAMI_RADAR_WINDOW.tileXs[MIAMI_RADAR_WINDOW.tileXs.length - 1],
+      y: MIAMI_RADAR_WINDOW.tileYs[MIAMI_RADAR_WINDOW.tileYs.length - 1],
+    };
+
+    expect(pixelAt(0, 0)).toEqual(colorForTile(firstTile.x, firstTile.y));
+    expect(pixelAt(511, 511)).toEqual(colorForTile(lastTile.x, lastTile.y));
+
+    // And it really did take multiple distinct tile fetches to build this.
+    const urls = mockAxiosGet.mock.calls.map(([url]) => url as string);
+    expect(new Set(urls).size).toBe(RADAR_TILE_COUNT);
   });
 });

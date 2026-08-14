@@ -156,6 +156,31 @@ live verification session (maintainer sign-off on the two judgment calls):
   readable; the features layer materially improves geographic context for
   ~30 KB.
 
+## Post-implementation amendment (2026-08-14) — centered composites
+
+The first implementation reused the RainViewer frame's own tile address for
+the whole composite (see the implementation plan's Findings: "the composite
+path parses the latest frame's URL rather than recomputing tile math"). That
+is correct and cheap, but it makes the output **tile-aligned**: the requested
+location lands wherever it happens to fall inside that tile. Live testing
+after the branch was complete found the maintainer's saved `home` rendering
+36 px from the right edge of its own map, with most of the frame showing
+terrain to the west; a location falling near a tile corner would be worse.
+
+Amended: composites are **centered on the requested coordinates**. All layers
+are addressed in one shared global pixel space — RainViewer's 512px tiles at
+zoom *z* and the GIBS 256px tiles at zoom *z+1* describe the identical grid
+(`512 * 2^z` pixels across) — so the pipeline computes the point's global
+pixel, takes a 512×512 window centered on it, fetches whichever tiles cover
+that window, assembles them, and crops. Longitude wraps at the antimeridian;
+latitude clamps at the Mercator limit (the marker is then deliberately
+off-center, since there is no imagery past the edge).
+
+Output size, zoom, payload, and the 1 MB cap are unchanged. The cost is more
+upstream tile requests per uncached composite — 4–9 per base layer instead of
+a fixed 4, and 1–4 radar tiles instead of 1 — mitigated by the existing 24 h
+tile cache and 10 min composite cache.
+
 ## Rough shape (post-decisions)
 
 - `src/services/basemap.ts` — base-tile fetch + stitch + cache

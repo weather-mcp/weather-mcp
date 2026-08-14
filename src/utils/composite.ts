@@ -12,12 +12,21 @@
  * together, then the radar overlay is blended on top, then a marker is drawn
  * — each step a small, independently testable pure function.
  *
- * `stitch512` intentionally does *not* force opacity the way the capture
+ * `assembleTiles` intentionally does *not* force opacity the way the capture
  * script's single-purpose `fetchOsmBase` does: the outline layer
  * (`Reference_Features_15m`) is transparent by design, and that transparency
  * must survive stitching so `blendOnto` can composite it correctly.
  * Opacity-forcing is the separate, explicit `flattenOpaque`, applied only to
  * the opaque base layer.
+ *
+ * Composites are **centered on the requested coordinates**, not aligned to a
+ * tile boundary. A tile-aligned composite puts the location wherever it
+ * happens to fall inside its tile — live testing found a saved location
+ * landing 36px from the edge of its own map. So the geometry helpers here
+ * (`latLonToGlobalPixel`, `centeredWindowOrigin`, `planTileWindow`) work out
+ * a window centered on the point, the covering tiles are assembled with
+ * `assembleTiles`, and `cropTo` cuts the exact window out. Output size and
+ * zoom are unchanged — only the framing moves.
  *
  * `pngjs` is a runtime dependency (pure JS, zero transitive deps — see D5 in
  * the design plan); its types come from the `@types/pngjs` devDependency,
@@ -35,36 +44,65 @@ export { PNG };
 // ---------------------------------------------------------------------------
 
 /**
- * Stitch four 256px PNG tile buffers — in **TL, TR, BL, BR** order — into one
- * 512×512 RGBA image, preserving each source pixel's alpha unchanged.
+ * Assemble a `cols`×`rows` grid of equally-sized square PNG tiles into one
+ * image, preserving each source pixel's alpha unchanged.
  *
- * The four tiles are expected to be the z+1 web-mercator children of a single
- * parent tile (`(2x, 2y)`, `(2x+1, 2y)`, `(2x, 2y+1)`, `(2x+1, 2y+1)`), so the
- * stitch is pixel-exact with no resampling — the same trick the capture
- * script uses, generalized to any 256px source (opaque or transparent).
+ * `tileBuffers` is in **row-major** order (left-to-right, then top-to-bottom).
+ * Because every tile is placed at its native resolution there is no
+ * resampling — the assembly is pixel-exact.
  */
-export function stitch512(tileBuffers: [Buffer, Buffer, Buffer, Buffer]): PNG {
-  const out = new PNG({ width: 512, height: 512 });
-  const offsets: Array<[number, number]> = [
-    [0, 0], // TL
-    [256, 0], // TR
-    [0, 256], // BL
-    [256, 256], // BR
-  ];
+export function assembleTiles(
+  tileBuffers: Buffer[],
+  cols: number,
+  rows: number,
+  tileSize: number
+): PNG {
+  if (tileBuffers.length !== cols * rows) {
+    throw new Error(`Expected ${cols * rows} tiles for a ${cols}x${rows} grid, got ${tileBuffers.length}`);
+  }
 
-  for (let i = 0; i < 4; i++) {
+  const out = new PNG({ width: cols * tileSize, height: rows * tileSize });
+
+  for (let i = 0; i < tileBuffers.length; i++) {
     const tile = PNG.sync.read(tileBuffers[i]);
-    const [ox, oy] = offsets[i];
-    for (let row = 0; row < 256; row++) {
-      for (let col = 0; col < 256; col++) {
-        const s = (row * 256 + col) * 4;
-        const d = ((row + oy) * 512 + (col + ox)) * 4;
+    const ox = (i % cols) * tileSize;
+    const oy = Math.floor(i / cols) * tileSize;
+
+    for (let row = 0; row < tileSize; row++) {
+      for (let col = 0; col < tileSize; col++) {
+        const s = (row * tileSize + col) * 4;
+        const d = ((row + oy) * out.width + (col + ox)) * 4;
         out.data[d] = tile.data[s];
         out.data[d + 1] = tile.data[s + 1];
         out.data[d + 2] = tile.data[s + 2];
         out.data[d + 3] = tile.data[s + 3];
       }
     }
+  }
+
+  return out;
+}
+
+/**
+ * Copy a `width`×`height` rectangle out of `src`, starting at `(x, y)`.
+ *
+ * This is what lets a composite be centered on a coordinate rather than
+ * aligned to a tile boundary: the covering tiles are assembled into a grid
+ * that is deliberately larger than the output, then the exact window around
+ * the point of interest is cut out of it.
+ */
+export function cropTo(src: PNG, x: number, y: number, width: number, height: number): PNG {
+  if (x < 0 || y < 0 || x + width > src.width || y + height > src.height) {
+    throw new Error(
+      `Crop ${width}x${height} at (${x}, ${y}) falls outside a ${src.width}x${src.height} image`
+    );
+  }
+
+  const out = new PNG({ width, height });
+
+  for (let row = 0; row < height; row++) {
+    const srcStart = ((row + y) * src.width + x) * 4;
+    src.data.copy(out.data, row * width * 4, srcStart, srcStart + width * 4);
   }
 
   return out;
@@ -192,39 +230,120 @@ export function drawMarker(png: PNG, px: number, py: number): void {
 // Tile geometry
 // ---------------------------------------------------------------------------
 
-/**
- * Web Mercator position of `(lat, lon)` within the tile at `(z, x, y)`, in
- * pixels from the tile's top-left corner.
- *
- * `size` is the pixel edge length of the tile *addressing scheme* being used
- * — the RainViewer/GIBS composite path addresses tiles as 512px (see
- * `parseRadarTileUrl`), where `z, x, y` is the same web-mercator tile grid as
- * standard 256px slippy-map tiles one zoom level higher (a "512px tile at
- * zoom z" covers exactly the area of the four 256px children at zoom z+1
- * that `stitch512` assembles it from), just addressed with `size` pixels
- * instead of 256. The caller is expected to have already resolved `(z, x,
- * y)` from the tile that actually contains the point (e.g. via
- * `parseRadarTileUrl` on the frame the point was requested against); this
- * function does no bounds validation of its own and simply projects — a
- * point outside the given tile returns coordinates outside `[0, size)`.
- */
-export function latLonToTilePixel(
-  lat: number,
-  lon: number,
-  z: number,
-  x: number,
-  y: number,
-  size = 512
-): { px: number; py: number } {
-  const n = 2 ** z;
-  const latRad = (lat * Math.PI) / 180;
+/** Output pixels per zoom-`z` tile — RainViewer's native 512px radar tile. */
+const PIXELS_PER_ZOOM_TILE = 512;
 
-  const xTile = n * ((lon + 180) / 360);
-  const yTile = (n * (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI)) / 2;
+/**
+ * Web Mercator pixel edge length of the world at zoom `z`, in the composite
+ * path's shared pixel space.
+ *
+ * Every layer the composite touches lands in **one** pixel space, which is
+ * what makes centering tractable: RainViewer serves 512px tiles addressed at
+ * zoom `z`, and the GIBS layers serve 256px tiles addressed at zoom `z + 1`.
+ * Those describe the identical grid — `2^z` tiles of 512px and `2^(z+1)`
+ * tiles of 256px both come to `512 * 2^z` pixels across — so a single global
+ * pixel coordinate indexes into both, and only the divisor differs.
+ */
+export function worldPixelSize(z: number): number {
+  return PIXELS_PER_ZOOM_TILE * 2 ** z;
+}
+
+/**
+ * Web Mercator position of `(lat, lon)` in the shared global pixel space at
+ * zoom `z` (see `worldPixelSize`), as fractional pixels from the world's
+ * top-left corner.
+ *
+ * Latitude is clamped to the Mercator-valid range, matching
+ * `rainviewer.ts`'s own clamp — the projection is undefined at the poles.
+ */
+export function latLonToGlobalPixel(lat: number, lon: number, z: number): { gx: number; gy: number } {
+  const MAX_LATITUDE = 85.05112878;
+  const clampedLat = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, lat));
+  const latRad = (clampedLat * Math.PI) / 180;
+  const world = worldPixelSize(z);
 
   return {
-    px: (xTile - x) * size,
-    py: (yTile - y) * size,
+    gx: world * ((lon + 180) / 360),
+    gy: (world * (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI)) / 2,
+  };
+}
+
+/** A window of the world, in global pixels, and the tiles that cover it. */
+export interface TileWindow {
+  /** Tile column indices covering the window, west to east (wrapped at the antimeridian). */
+  tileXs: number[];
+  /** Tile row indices covering the window, north to south. */
+  tileYs: number[];
+  /** Where the window's top-left sits inside the assembled tile grid. */
+  offsetX: number;
+  offsetY: number;
+}
+
+/**
+ * Work out which tiles of edge length `tileSize` cover the `size`×`size`
+ * window whose top-left corner is at global pixel `(gx0, gy0)`, and where the
+ * window sits within that assembled grid.
+ *
+ * Columns **wrap** at the antimeridian (the world is cyclic in longitude), so
+ * a window straddling ±180° still resolves to real tiles. Rows are not
+ * wrapped — the caller is expected to have clamped `gy0` into range already,
+ * since there is nothing beyond a pole to show.
+ */
+export function planTileWindow(
+  gx0: number,
+  gy0: number,
+  size: number,
+  tileSize: number,
+  z: number
+): TileWindow {
+  const tilesAcross = worldPixelSize(z) / tileSize;
+
+  const firstCol = Math.floor(gx0 / tileSize);
+  const lastCol = Math.floor((gx0 + size - 1) / tileSize);
+  const firstRow = Math.floor(gy0 / tileSize);
+  const lastRow = Math.floor((gy0 + size - 1) / tileSize);
+
+  const tileXs: number[] = [];
+  for (let col = firstCol; col <= lastCol; col++) {
+    tileXs.push(((col % tilesAcross) + tilesAcross) % tilesAcross);
+  }
+
+  const tileYs: number[] = [];
+  for (let row = firstRow; row <= lastRow; row++) {
+    tileYs.push(row);
+  }
+
+  return {
+    tileXs,
+    tileYs,
+    offsetX: gx0 - firstCol * tileSize,
+    offsetY: gy0 - firstRow * tileSize,
+  };
+}
+
+/**
+ * Top-left corner of a `size`×`size` window centered on global pixel
+ * `(gx, gy)`, with the vertical axis clamped so the window stays inside the
+ * world.
+ *
+ * Horizontal position is left unclamped because longitude wraps
+ * (`planTileWindow` handles it); vertical is clamped because a window
+ * centered near a pole would otherwise run off the top or bottom of the
+ * projection. Near a pole the point is therefore *not* perfectly centered —
+ * which is correct: there is no imagery past the edge to center it against.
+ */
+export function centeredWindowOrigin(
+  gx: number,
+  gy: number,
+  size: number,
+  z: number
+): { gx0: number; gy0: number } {
+  const world = worldPixelSize(z);
+  const half = size / 2;
+
+  return {
+    gx0: Math.round(gx - half),
+    gy0: Math.round(Math.max(0, Math.min(world - size, gy - half))),
   };
 }
 
@@ -242,6 +361,18 @@ export function parseRadarTileUrl(url: string): { z: number; x: number; y: numbe
   const match = url.match(RADAR_TILE_URL_PATTERN);
   if (!match) return null;
   return { z: Number(match[1]), x: Number(match[2]), y: Number(match[3]) };
+}
+
+/**
+ * Re-point a RainViewer frame URL at a different tile of the same frame.
+ *
+ * The frame's timestamp/hash path and its color/options suffix are preserved
+ * verbatim — only the tile address is swapped — so a centered window can
+ * gather the neighbouring tiles of the very same radar frame rather than
+ * recomputing an upstream URL from scratch.
+ */
+export function buildRadarTileUrl(url: string, z: number, x: number, y: number): string {
+  return url.replace(RADAR_TILE_URL_PATTERN, `/512/${z}/${x}/${y}/`);
 }
 
 // ---------------------------------------------------------------------------

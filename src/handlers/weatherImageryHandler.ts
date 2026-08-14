@@ -26,7 +26,12 @@ import { VERSION } from '../utils/version.js';
 import {
   PNG,
   parseRadarTileUrl,
-  latLonToTilePixel,
+  buildRadarTileUrl,
+  latLonToGlobalPixel,
+  centeredWindowOrigin,
+  planTileWindow,
+  assembleTiles,
+  cropTo,
   blendOnto,
   drawMarker,
   encodePng,
@@ -83,6 +88,12 @@ function latestObservedFrame(frames: ImageryFrame[]): ImageryFrame | undefined {
   return observed.length > 0 ? observed[observed.length - 1] : frames[frames.length - 1];
 }
 
+/** Edge length of a composited map, in pixels. */
+const COMPOSITE_SIZE = 512;
+
+/** RainViewer's native radar tile size — the frame URLs embed `/512/`. */
+const RADAR_TILE_PIXELS = 512;
+
 /** Fetch a single RainViewer overlay tile as a raw buffer. */
 async function fetchRadarTile(url: string): Promise<Buffer> {
   const response = await axios.get<ArrayBuffer>(url, {
@@ -94,8 +105,44 @@ async function fetchRadarTile(url: string): Promise<Buffer> {
 }
 
 /**
+ * Fetch and assemble the radar tiles covering a window, cropped to it.
+ *
+ * A centered window rarely lines up with RainViewer's tile grid, so this
+ * gathers the 1-4 tiles of the *same frame* that overlap it (via
+ * `buildRadarTileUrl`, which only swaps the tile address) and cuts the window
+ * out of the assembly.
+ */
+async function fetchRadarWindow(
+  frameUrl: string,
+  z: number,
+  gx0: number,
+  gy0: number,
+  size: number
+): Promise<PNG> {
+  const window = planTileWindow(gx0, gy0, size, RADAR_TILE_PIXELS, z);
+  const addresses = window.tileYs.flatMap((ty) => window.tileXs.map((tx) => [tx, ty] as const));
+
+  const buffers = await Promise.all(
+    addresses.map(([tx, ty]) => fetchRadarTile(buildRadarTileUrl(frameUrl, z, tx, ty)))
+  );
+
+  const assembled = assembleTiles(
+    buffers,
+    window.tileXs.length,
+    window.tileYs.length,
+    RADAR_TILE_PIXELS
+  );
+
+  return cropTo(assembled, window.offsetX, window.offsetY, size, size);
+}
+
+/**
  * Composite one radar frame onto the GIBS base map and mark the requested
  * location, returning the PNG as base64.
+ *
+ * The window is centered on the coordinates rather than aligned to the
+ * frame's tile, so the marker lands in the middle of the map (except near a
+ * pole, where the window is clamped to the edge of the projection).
  *
  * Throws on any failure (unparseable URL, fetch, decode, over-cap encode) —
  * the caller degrades to text-only output.
@@ -110,12 +157,19 @@ async function renderComposite(
     throw new Error('Radar frame URL does not carry a parseable /512/{z}/{x}/{y}/ tile address');
   }
 
-  const { z, x, y } = tile;
-  const { px, py } = latLonToTilePixel(latitude, longitude, z, x, y);
-  const markerX = Math.round(px);
-  const markerY = Math.round(py);
+  const { z } = tile;
+  const { gx, gy } = latLonToGlobalPixel(latitude, longitude, z);
+  const { gx0, gy0 } = centeredWindowOrigin(gx, gy, COMPOSITE_SIZE, z);
+  // Normally dead center. Clamped because a point at the very edge of the
+  // Mercator projection (|lat| >= 85.05112878) projects exactly onto the world
+  // boundary, which lands one pixel past the clamped window — drawing there
+  // would silently clip the whole marker away.
+  const clampToImage = (value: number): number =>
+    Math.min(COMPOSITE_SIZE - 1, Math.max(0, Math.round(value)));
+  const markerX = clampToImage(gx - gx0);
+  const markerY = clampToImage(gy - gy0);
 
-  const cacheKey = `${frame.url}|${z}/${x}/${y}|${markerX},${markerY}`;
+  const cacheKey = `${frame.url}|${z}|${gx0},${gy0}`;
   if (CacheConfig.enabled) {
     const cached = compositeCache.get(cacheKey);
     if (cached) {
@@ -123,8 +177,10 @@ async function renderComposite(
     }
   }
 
-  const overlay = PNG.sync.read(await fetchRadarTile(frame.url));
-  const composited = await basemapService.getBaseComposite(z, x, y);
+  const [composited, overlay] = await Promise.all([
+    basemapService.getBaseWindow(z, gx0, gy0, COMPOSITE_SIZE),
+    fetchRadarWindow(frame.url, z, gx0, gy0, COMPOSITE_SIZE)
+  ]);
 
   blendOnto(composited, overlay);
   drawMarker(composited, markerX, markerY);

@@ -466,6 +466,8 @@ Returns a finished 512×512 PNG as an MCP image content block *alongside* the us
 
 The image contains three layers: a NASA GIBS land/water base map, coastline and border outlines over it, and the radar/precipitation overlay on top — plus a high-contrast crosshair marking the requested coordinates. That marker is what makes an echo-free result readable: instead of a blank square, you get recognizable geography with your location on it.
 
+The map is **centered on the requested coordinates**, so the marker sits at the middle of the image and you see roughly equal weather in every direction. (Near a pole the window is clamped to the edge of the Web Mercator projection, so the marker sits off-center — there is no imagery beyond the edge to center it against.)
+
 Rules and caveats:
 - **Radar/precipitation only.** `type: "satellite"` with `composite` returns a note, not an error — GOES GeoColor is already a complete picture and needs no base map.
 - **Latest observed frame only.** With `animated: true` the animation frames stay URL-based and only the newest observed frame is composited (forecast/nowcast frames are never used as "the latest radar"). Compositing a full 13-frame loop would be a multi-megabyte payload.

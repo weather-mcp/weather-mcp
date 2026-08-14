@@ -374,6 +374,33 @@ with the design plan's live-measured 24–91 KB, and ~10× under
 `tests/unit/imagery-handler.test.ts` and `tests/unit/gibs.test.ts` passed
 unedited throughout (A7).
 
+## T8 (post-sweep amendment) — centered composites
+
+Testing the finished branch through a live MCP client surfaced a framing
+problem the automated tests could not: the composite was **tile-aligned**, so
+the requested location landed wherever it fell inside the frame's tile.
+Measured marker offsets from the nearest edge at zoom 6 — Miami 131 px,
+Denver 148 px, Sahara 171 px, but the maintainer's saved `home` only **36 px**,
+with most of its map showing terrain to the west.
+
+Amended so composites are **centered on the coordinates**; see the design
+plan's "Post-implementation amendment" section for the rationale. All layers
+now share one global pixel space; the pipeline takes a 512×512 window around
+the point, fetches the covering tiles, assembles, and crops. Output size,
+zoom, and payload are unchanged.
+
+- `src/utils/composite.ts`: `stitch512` → `assembleTiles` + `cropTo`;
+  `latLonToTilePixel` → `latLonToGlobalPixel`; new `worldPixelSize`,
+  `centeredWindowOrigin`, `planTileWindow`, `buildRadarTileUrl`.
+- `src/services/basemap.ts`: `getBaseComposite(z, x, y)` →
+  `getBaseWindow(z, gx0, gy0, size)`.
+- `src/handlers/weatherImageryHandler.ts`: centered window; radar overlay now
+  assembled from the 1–4 covering tiles of the same frame; base and radar
+  fetches run concurrently; cache key is now `frame|z|gx0,gy0`.
+
+Cost: 4–9 tiles per base layer (was a fixed 4) and 1–4 radar tiles (was 1) per
+uncached composite, absorbed by the 24 h tile cache and 10 min composite cache.
+
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T7 live sweep is
 recorded (including the visual inspection of a real composite and the

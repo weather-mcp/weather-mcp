@@ -17,10 +17,12 @@
  *     sharing one.
  *   - **WMTS REST path order is `{z}/{row=y}/{col=x}`** — y before x — same
  *     convention as `gibs.ts`.
- *   - A 512px composite tile at zoom `z` is assembled from the four 256px
- *     children of each layer at zoom `z+1` (`stitch512`, from
- *     `src/utils/composite.ts`), in TL/TR/BL/BR order — pixel-exact, no
- *     resampling.
+ *   - Output is a window **centered on the requested coordinates**, not a
+ *     whole tile, so a location never lands against the edge of its own map.
+ *     The covering 256px tiles at zoom `z+1` are assembled and cropped
+ *     (`assembleTiles`/`cropTo`, from `src/utils/composite.ts`) — pixel-exact,
+ *     no resampling, since zoom `z+1` at 256px is the same grid as zoom `z`
+ *     at 512px.
  *   - The land/water layer is opaque (`flattenOpaque` forces alpha 255 after
  *     stitching, since GIBS occasionally emits antialiased seam pixels with
  *     alpha < 255); the features layer is intentionally transparent and is
@@ -40,7 +42,15 @@ import axios, { AxiosInstance } from 'axios';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { VERSION } from '../utils/version.js';
-import { PNG, stitch512, flattenOpaque, blendOnto } from '../utils/composite.js';
+import {
+  PNG,
+  assembleTiles,
+  cropTo,
+  flattenOpaque,
+  blendOnto,
+  encodePng,
+  planTileWindow
+} from '../utils/composite.js';
 
 /** WMTS REST base for EPSG:3857 "best" imagery — same endpoint family as `gibs.ts`. */
 const GIBS_BASE = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best';
@@ -52,19 +62,38 @@ const BASEMAP_USER_AGENT = `weather-mcp/${VERSION} (+https://github.com/weather-
 interface GibsLayer {
   readonly name: string;
   readonly matrixSet: string;
+  /**
+   * When true, a **404** for one of this layer's tiles is treated as an empty
+   * transparent tile instead of failing the composite — see
+   * `MISSING_OPTIONAL_TILE`.
+   */
+  readonly optional?: boolean;
 }
 
-/** Opaque land/water base layer. */
+/** Opaque land/water base layer — required; without it there is no map. */
 export const BASE_LAYER: GibsLayer = {
   name: 'OSM_Land_Water_Map',
   matrixSet: 'GoogleMapsCompatible_Level9',
 };
 
-/** Transparent coastline/border outline layer, blended over the base. */
+/**
+ * Transparent coastline/border outline layer, blended over the base.
+ *
+ * Marked optional because GIBS does not serve a tile everywhere: at extreme
+ * polar rows there is no coastline or border to draw and the tile 404s
+ * (observed live at `7/1/63` and `7/126/63`). Losing decorative outlines is
+ * not a reason to lose the whole map, so a 404 here degrades to a blank tile.
+ * **Only 404 is tolerated** — a wrong tile matrix set returns 400, which must
+ * still fail loudly rather than silently rendering a base-only map.
+ */
 export const FEATURES_LAYER: GibsLayer = {
   name: 'Reference_Features_15m',
   matrixSet: 'GoogleMapsCompatible_Level13',
+  optional: true,
 };
+
+/** A fully transparent 256px tile, standing in for an absent optional tile. */
+const MISSING_OPTIONAL_TILE = encodePng(new PNG({ width: 256, height: 256 }));
 
 /**
  * Build a WMTS REST tile URL for a specific layer/matrix set and address.
@@ -75,17 +104,12 @@ function buildTileUrl(layer: GibsLayer, z: number, x: number, y: number): string
 }
 
 /**
- * The four z+1 web-mercator children of tile `(x, y)`, in TL/TR/BL/BR order
- * — the order `stitch512` expects.
+ * GIBS serves these layers as 256px tiles addressed at zoom `z + 1`, which is
+ * the same grid as the 512px radar tiles at zoom `z` (see `worldPixelSize` in
+ * `src/utils/composite.ts`) — so the base layers are always fetched one zoom
+ * level in from the radar frame's own zoom.
  */
-function childTileAddresses(x: number, y: number): Array<[number, number]> {
-  return [
-    [2 * x, 2 * y], // TL
-    [2 * x + 1, 2 * y], // TR
-    [2 * x, 2 * y + 1], // BL
-    [2 * x + 1, 2 * y + 1], // BR
-  ];
-}
+const BASE_TILE_PIXELS = 256;
 
 export class BasemapService {
   private client: AxiosInstance;
@@ -123,8 +147,14 @@ export class BasemapService {
       const response = await this.client.get<ArrayBuffer>(url, { responseType: 'arraybuffer' });
       buffer = Buffer.from(response.data);
     } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new Error(`GIBS basemap tile fetch failed for ${layer.name} ${z}/${y}/${x}: ${detail}`);
+      if (layer.optional && axios.isAxiosError(error) && error.response?.status === 404) {
+        // Nothing to draw here (see FEATURES_LAYER) — carry on with a blank
+        // tile, and cache it so the known-absent tile isn't re-requested.
+        buffer = MISSING_OPTIONAL_TILE;
+      } else {
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new Error(`GIBS basemap tile fetch failed for ${layer.name} ${z}/${y}/${x}: ${detail}`);
+      }
     }
 
     if (CacheConfig.enabled) {
@@ -135,31 +165,50 @@ export class BasemapService {
   }
 
   /**
-   * Fetch, stitch, and blend the 512px base composite for the tile at
-   * `(z, x, y)`: the four z+1 children of `BASE_LAYER` and `FEATURES_LAYER`
-   * (8 tile fetches total, cached individually), stitched with `stitch512`,
-   * the base flattened opaque, and the features layer blended on top.
-   *
-   * Fetches for both layers' four children run concurrently. If any of the 8
-   * fetches fails, the whole call rejects — no partial composite is ever
-   * returned.
+   * Fetch a single layer's tiles covering `window` and assemble them into one
+   * image (uncropped — the caller crops once, after blending).
+   * @private
    */
-  async getBaseComposite(z: number, x: number, y: number): Promise<PNG> {
-    const childZ = z + 1;
-    const children = childTileAddresses(x, y);
+  private async fetchLayerWindow(
+    layer: GibsLayer,
+    tileZ: number,
+    window: ReturnType<typeof planTileWindow>
+  ): Promise<PNG> {
+    const addresses = window.tileYs.flatMap((ty) => window.tileXs.map((tx) => [tx, ty] as const));
+    const buffers = await Promise.all(
+      addresses.map(([tx, ty]) => this.fetchTile(layer, tileZ, tx, ty))
+    );
 
-    const [baseTiles, featureTiles] = await Promise.all([
-      Promise.all(children.map(([cx, cy]) => this.fetchTile(BASE_LAYER, childZ, cx, cy))),
-      Promise.all(children.map(([cx, cy]) => this.fetchTile(FEATURES_LAYER, childZ, cx, cy))),
+    return assembleTiles(buffers, window.tileXs.length, window.tileYs.length, BASE_TILE_PIXELS);
+  }
+
+  /**
+   * Build the base map for a `size`×`size` window whose top-left corner sits
+   * at global pixel `(gx0, gy0)` in the zoom-`z` pixel space (see
+   * `worldPixelSize` in `src/utils/composite.ts`).
+   *
+   * Fetches the covering tiles of `BASE_LAYER` and `FEATURES_LAYER` at zoom
+   * `z + 1` (2x2 to 3x3 per layer depending on how the window straddles tile
+   * boundaries — individually cached, so neighbouring requests and repeat
+   * calls mostly hit cache), assembles each layer, flattens the land/water
+   * base opaque, blends the outline layer over it, and crops to the window.
+   *
+   * Both layers' fetches run concurrently. If any tile fails the whole call
+   * rejects — no partial base map is ever returned.
+   */
+  async getBaseWindow(z: number, gx0: number, gy0: number, size: number): Promise<PNG> {
+    const tileZ = z + 1;
+    const window = planTileWindow(gx0, gy0, size, BASE_TILE_PIXELS, z);
+
+    const [base, features] = await Promise.all([
+      this.fetchLayerWindow(BASE_LAYER, tileZ, window),
+      this.fetchLayerWindow(FEATURES_LAYER, tileZ, window),
     ]);
-
-    const base = stitch512(baseTiles as [Buffer, Buffer, Buffer, Buffer]);
-    const features = stitch512(featureTiles as [Buffer, Buffer, Buffer, Buffer]);
 
     flattenOpaque(base);
     blendOnto(base, features);
 
-    return base;
+    return cropTo(base, window.offsetX, window.offsetY, size, size);
   }
 }
 

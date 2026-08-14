@@ -15,9 +15,9 @@
  *
  * Block 1 (mocked, deterministic) stubs only the HTTP layer — the three
  * axios call sites the composite pipeline touches: the bare `axios.get` the
- * handler's own `fetchRadarTile` uses for the radar overlay tile,
+ * handler's own `fetchRadarTile` uses for each radar overlay tile,
  * `rainViewerService`'s private axios client (the `/public/weather-maps.json`
- * feed), and `basemapService`'s private axios client (the 8 GIBS tile
+ * feed), and `basemapService`'s private axios client (the GIBS tile
  * fetches) — via `vi.spyOn`, following the instance/method-scoped spy
  * convention in tests/integration/metar.test.ts and
  * tests/integration/global-rivers.test.ts rather than a module-level
@@ -27,6 +27,13 @@
  * runs. The result: the *real* `BasemapService` singleton, the *real*
  * `RainViewerService` singleton, and the real handler run fully end to end —
  * only the network is faked.
+ *
+ * Composites are now **centered on the requested coordinates** rather than
+ * aligned to a whole map tile (`src/utils/composite.ts`), so a centered
+ * window straddles the GIBS tile grid the common way: the mocked GIBS layer
+ * fetches below serve a 2x2-3x3 grid per layer (not a fixed 4), and the
+ * radar overlay fetch answers 1-4 distinct tile URLs of the same frame
+ * (`buildRadarTileUrl`), not a single fetch of `frame.url`.
  *
  * Fixture PNG tiles are generated programmatically with pngjs (no binary
  * fixtures), matching the pattern in tests/unit/basemap.test.ts and
@@ -82,11 +89,11 @@ function makeSolidTileBuffer(size: number, rgba: [number, number, number, number
   return PNG.sync.write(png);
 }
 
-/** Opaque land/water base tile fill — the 256px children `stitch512` assembles for `BASE_LAYER`. */
+/** Opaque land/water base tile fill — the 256px children `assembleTiles` stitches for `BASE_LAYER`. */
 const BASE_TILE = makeSolidTileBuffer(256, [40, 90, 180, 255]);
-/** Semi-transparent features/outline tile fill — alpha must survive `stitch512` + `blendOnto` (see composite.ts). */
+/** Semi-transparent features/outline tile fill — alpha must survive `assembleTiles` + `blendOnto` (see composite.ts). */
 const FEATURES_TILE = makeSolidTileBuffer(256, [20, 20, 20, 120]);
-/** Radar overlay tile — fetched directly as a single 512px tile, no stitching. */
+/** Radar overlay tile fill — every covering tile of the centered window gets this fixture, regardless of its x/y address. */
 const RADAR_TILE = makeSolidTileBuffer(512, [0, 200, 255, 160]);
 
 /** A single-frame RainViewer feed timestamped a few minutes ago, so it is always the "latest observed frame" (see latestObservedFrame in the handler). */
@@ -113,11 +120,13 @@ function stubRainViewerFeed(): void {
 /**
  * Stub the GIBS tile fetches on the real `basemapService` singleton's
  * private axios client — routes each request to the base or features fixture
- * by layer name in the URL. When `failUrlSubstring` is given, any request
- * whose URL contains it rejects with an axios-shaped 400
- * `InvalidParameterValue` error (the real failure mode documented in the
- * plan's Findings for a wrong tile matrix set), so `Promise.all` in
- * `getBaseComposite` rejects and the whole composite degrades.
+ * by layer name in the URL. `getBaseWindow` fetches a 2x2-3x3 grid per layer
+ * depending on how the centered window straddles the tile grid, so this
+ * responds to any tile address for a layer, not a fixed count. When
+ * `failUrlSubstring` is given, any request whose URL contains it rejects
+ * with an axios-shaped 400 `InvalidParameterValue` error (the real failure
+ * mode documented in the plan's Findings for a wrong tile matrix set), so
+ * `Promise.all` in `getBaseWindow` rejects and the whole composite degrades.
  */
 function stubBasemapTiles(failUrlSubstring?: string): void {
   vi.spyOn((basemapService as any).client, 'get').mockImplementation(async (...args: unknown[]) => {
@@ -141,7 +150,7 @@ function stubBasemapTiles(failUrlSubstring?: string): void {
   });
 }
 
-/** Stub the radar overlay tile fetch — the handler's own bare `axios.get` call in `fetchRadarTile`. */
+/** Stub the radar overlay tile fetches — the handler's own bare `axios.get` calls in `fetchRadarTile`, one per covering tile of the centered window. */
 function stubRadarTileFetch(): void {
   vi.spyOn(axios, 'get').mockResolvedValue({ data: RADAR_TILE, status: 200 });
 }
@@ -155,6 +164,13 @@ const MIAMI_LON = -80.1918;
 // tile cache left over from the Miami test above.
 const SEATTLE_LAT = 47.6062;
 const SEATTLE_LON = -122.3321;
+
+// Denver — a third, distinct zoom-6 tile, so the multi-tile straddle test
+// below (which also composites successfully, unlike the Seattle failure
+// test) never hits basemapService's singleton tile cache left over from the
+// Miami success test.
+const DENVER_LAT = 39.7392;
+const DENVER_LON = -104.9903;
 
 describe('Composited weather imagery — mocked end-to-end (deterministic)', () => {
   afterEach(() => {
@@ -185,6 +201,27 @@ describe('Composited weather imagery — mocked end-to-end (deterministic)', () 
     expect(decoded.width).toBe(512);
     expect(decoded.height).toBe(512);
 
+    // Headline centering assertion: with a fully opaque radar tile fill
+    // (alpha 160, blended over the base) the marker's near-black core still
+    // reads clearly dead center of the composite — not wherever the point
+    // happened to fall inside a tile.
+    const centerPixel = (x: number, y: number): [number, number, number] => {
+      const i = (y * decoded.width + x) * 4;
+      return [decoded.data[i], decoded.data[i + 1], decoded.data[i + 2]];
+    };
+    const [cr, cg, cb] = centerPixel(256, 256);
+    expect(cr).toBeLessThan(30);
+    expect(cg).toBeLessThan(30);
+    expect(cb).toBeLessThan(30);
+
+    // The radar overlay is fetched as however many tiles cover the centered
+    // window (1-4), not a single fetch of the exact frame URL.
+    expect((axios.get as any).mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect((axios.get as any).mock.calls.length).toBeLessThanOrEqual(4);
+    for (const [url] of (axios.get as any).mock.calls) {
+      expect(url as string).toMatch(/\/512\/\d+\/\d+\/\d+\//);
+    }
+
     const text = (result.content[0] as TextBlock).text;
     expect(text).toContain('**Composited map attached:**');
     expect(text).toContain('© RainViewer');
@@ -212,6 +249,40 @@ describe('Composited weather imagery — mocked end-to-end (deterministic)', () 
     expect(text).toContain('# Weather Imagery');
     expect(text).toContain('Composite map unavailable for this request');
     expect(text).not.toContain('**Composited map attached:**');
+  });
+
+  it('a centered window straddling the GIBS tile grid fetches a multi-tile 2x2-3x3 grid per layer, assembled and cropped correctly', async () => {
+    stubRainViewerFeed();
+    stubRadarTileFetch();
+
+    const basemapCalls: string[] = [];
+    vi.spyOn((basemapService as any).client, 'get').mockImplementation(async (...args: unknown[]) => {
+      const url = args[0] as string;
+      basemapCalls.push(url);
+      if (url.includes('OSM_Land_Water_Map')) return { data: BASE_TILE, status: 200 };
+      if (url.includes('Reference_Features_15m')) return { data: FEATURES_TILE, status: 200 };
+      throw new Error(`Unexpected GIBS tile URL in test stub: ${url}`);
+    });
+
+    const result = await handleGetWeatherImagery(
+      { latitude: DENVER_LAT, longitude: DENVER_LON, type: 'precipitation', composite: true },
+      UNUSED as LocationStore,
+      UNUSED as GeocodingService
+    );
+
+    expect(result.content).toHaveLength(2);
+    const imageBlock = result.content[1] as ImageBlock;
+    const decoded = PNG.sync.read(Buffer.from(imageBlock.data, 'base64'));
+    expect(decoded.width).toBe(512);
+    expect(decoded.height).toBe(512);
+
+    // Each layer is fetched as a 2x2-3x3 grid (4-9 tiles), not a fixed 4 —
+    // the whole point of centering rather than tile-aligning.
+    const baseTileFetches = basemapCalls.filter((u) => u.includes('OSM_Land_Water_Map'));
+    const featuresTileFetches = basemapCalls.filter((u) => u.includes('Reference_Features_15m'));
+    expect(baseTileFetches.length).toBeGreaterThanOrEqual(4);
+    expect(baseTileFetches.length).toBeLessThanOrEqual(9);
+    expect(featuresTileFetches.length).toBe(baseTileFetches.length);
   });
 });
 
