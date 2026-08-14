@@ -409,8 +409,8 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T2 — FIRMS types + pure hotspot module (`sonnet`) — `1e520a8` (orchestrator tightened the US–Canada border-band insets: Canada south bound 50°N, CONUS split at −95° with a 47°N/41°N cap, border cities → Global)
 - [x] T3 — `FIRMSService` + cache TTLs (`sonnet`) — `5dc4433`
 - [x] T4 — Country routing + FIRMS renderer in `get_wildfire_info` (`opus`) — `9dbcef4` (mechanical addition: the keyed-path bbox is clamped to ±90/±180 before `getDetectionsByBbox`, since the service validates corners the NIFC path never did; sanity: Toronto → FIRMS/Global file, Sacramento auto → NIFC, Sacramento `source:'firms'` → FIRMS, locked test unedited)
-- [ ] T5 — Routing unit tests (`sonnet`)
-- [ ] T6 — Integration tests: mocked shapes + tolerant keyless live smoke (`sonnet`)
+- [x] T5 — Routing unit tests (`sonnet`) — `2dcbe8f`
+- [x] T6 — Integration tests: mocked shapes + tolerant keyless live smoke (`sonnet`) — `1e2b24f` (mock/live split via per-instance client spies, the almanac `AcisService` pattern — no module-level `vi.mock`)
 - [ ] T7 — Live acceptance sweep + documentation checklist (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
