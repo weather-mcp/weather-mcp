@@ -2,7 +2,7 @@
 
 **Status:** READY (2026-08-14)
 
-Execution plan for `docs/global-fire-weather-plan.md` (the WHAT/WHY); rules live in
+Execution plan for `docs/plans/global-fire-weather-plan.md` (the WHAT/WHY); rules live in
 `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ Execution plan for `docs/global-fire-weather-plan.md` (the WHAT/WHY); rules live
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/global-fire-weather-implementation-plan.md
+/run-plan docs/plans/global-fire-weather-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/global-fire-weather-plan.md` (design),
+Or, equivalently: read `docs/plans/global-fire-weather-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review
 the diff, run the gate yourself, commit, tick the tracker, push.
@@ -275,7 +275,7 @@ Spot-checks against the code, reconciled into the tasks below:
 - Files: `CHANGELOG.md`, `README.md`, `docs/TOOLS.md`, `CLAUDE.md`,
   `docs/planning/README.md`,
   `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md`,
-  `docs/global-fire-weather-plan.md` (status + move),
+  `docs/plans/global-fire-weather-plan.md` (status + move),
   this file (move)
 - **Sweep against the built dist**, run by the orchestrator personally
   (record the branch-base SHA — the `feat/global-wildfire` tip — at kickoff;
@@ -351,7 +351,9 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T4 — Fosberg rendering on the Open-Meteo path (`opus`) — `4b201b8`
 - [x] T5 — Schema and tool-description updates (`haiku`) — `b3f3921`
 - [x] T6 — Integration coverage: mocked end-to-end + tolerant live smoke (`sonnet`) — `9534509`
-- [ ] T7 — Byte-identical sweep + documentation checklist (`opus`)
+- [x] T7 — Byte-identical sweep + documentation checklist (`opus`) — see the
+  sweep table in `docs/plans/global-fire-weather-plan.md` §Implementation notes
+  (all 8 points met against branch base `0c4117c`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T7 sweep is
@@ -360,6 +362,6 @@ byte-identical to the branch base, Milan/Sydney Fosberg section, Reykjavik
 Low, US `source: "openmeteo"` Fosberg, metric/imperial index invariance,
 METAR note unchanged, ocean dryness omission), the locked test files
 (`fireWeatherContext.test.ts`, `metar-handler.test.ts`, NOAA-path fire
-rendering) pass unedited, and `docs/global-fire-weather-plan.md` is marked
+rendering) pass unedited, and `docs/plans/global-fire-weather-plan.md` is marked
 `IMPLEMENTED` with the plan set moved to `docs/plans/`. Opening the PR is the
 human's call.

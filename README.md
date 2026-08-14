@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1%2C888%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-1%2C930%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -50,7 +50,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
-- **Fully open source** — MIT licensed, readable TypeScript, 1,888 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 1,930 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -63,7 +63,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | Tool | What it does | Coverage |
 |------|-------------|----------|
 | `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name; sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac | 🌍 Global |
-| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional fire-weather indices), Open-Meteo model data elsewhere, or real airport station observations worldwide with `source="metar"`. Always states the observation's age, and automatically falls back to a fresher nearby station when the nearest one has gone dark | 🌍 Global |
+| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional NOAA fire-weather indices), Open-Meteo model data elsewhere (with an optional computed Fosberg fire-weather index), or real airport station observations worldwide with `source="metar"`. Always states the observation's age, and automatically falls back to a fresher nearby station when the nearest one has gone dark | 🌍 Global |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity; official national warnings for the US (NOAA), Canada (ECCC), and 38 European countries (MeteoAlarm) | 🇺🇸 🇨🇦 🇪🇺 |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
 | `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
@@ -108,7 +108,7 @@ All free, all public, no authentication required:
 | Source | Provides | Coverage |
 |--------|----------|----------|
 | [NOAA Weather API](https://www.weather.gov/documentation/services-web-api) | US forecasts, current conditions, alerts, fire weather | US |
-| [Open-Meteo](https://open-meteo.com/) | Global forecasts, historical data (1940+), air quality, marine, geocoding, climate normals | Global |
+| [Open-Meteo](https://open-meteo.com/) | Global forecasts, historical data (1940+), air quality, marine, geocoding, climate normals, fire-weather inputs | Global |
 | [NOAA NWPS](https://water.noaa.gov/) | River levels, streamflow, flood stages | US |
 | [RCC ACIS](https://www.rcc-acis.org/) | Daily record high/low temperatures | US |
 | [EUMETNET MeteoAlarm](https://meteoalarm.org/) | Official national weather warnings (38 European countries) | Europe |
@@ -268,11 +268,13 @@ Being honest about what free public data can and can't do:
 | Weather alerts | ✅ US, Canada, and 38 European countries | NWS zone-level precision; Europe is matched at country level |
 | River conditions | ✅ (GloFAS modeled discharge) | Gauge observations + official flood stages via NWPS |
 | Wildfires | ✅ (FIRMS satellite detections) | Named incidents with acreage + containment via NIFC |
+| Fire weather | ✅ (computed Fosberg index + dryness context) | NOAA-published Haines, grassland, red-flag indices |
 
 - European alerts are matched at **country level** — the keyless MeteoAlarm feeds carry no region polygons, so warnings for a large country may not affect the requested point; the output says so. Canadian alerts use a real bbox query with polygon-backed features.
 - International current conditions default to **model-interpolated** values at the exact coordinates. `source="metar"` returns a **real instrument reading** instead — but from the nearest airport, which may be tens of km away and up to an hour old. The output always names the station, its distance and bearing, and the observation age, so the tradeoff is visible rather than assumed. METAR coverage follows airports, so remote land and open ocean have real gaps.
 - Historical data older than 7 days comes from reanalysis models (9–25km grid), not direct station observations, and trails real time by ~5 days.
 - Non-US wildfire results are **satellite heat detections, not managed incidents** — no fire names, sizes, or containment percentages exist in the data, detections can include industrial heat sources or agricultural burns, and a clear result is not an all-clear (cloud cover hides fires; small or new fires evade detection). The output frames all of this explicitly. Keyless data covers the last 24 hours; an optional free [`FIRMS_MAP_KEY`](https://firms.modaps.eosdis.nasa.gov/api/map_key/) unlocks targeted queries and up to 5 days of detection history (`day_range`).
+- Non-US fire weather is a **Fosberg Fire Weather Index computed by this server** from current model values, not an agency-published rating — US locations get NOAA's own Haines/grassland/red-flag indices instead. The output says which it is and defers to national fire authorities; its category bands are a project heuristic.
 - Non-US river discharge is **modeled**, not observed, and has no official flood-stage thresholds — levels are shown relative to recent history and the forecast ensemble. The ~5km model grid means the reported channel may be a few km from the requested point; the output says so when it is.
 - Marine data has limited coastal accuracy and is **not suitable for navigation**.
 - Lightning coverage varies by region (community-operated detector network).
@@ -283,7 +285,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 1,888 tests
+npm test               # Run all 1,930 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

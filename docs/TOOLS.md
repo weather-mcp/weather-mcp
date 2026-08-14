@@ -92,7 +92,7 @@ Get current weather conditions for a location (global).
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `include_fire_weather` (optional): Include fire weather indices (default: false, US only)
+- `include_fire_weather` (optional): Include fire weather (default: false). US locations get NOAA's published indices; elsewhere a Fosberg Fire Weather Index computed by this server, with dryness context
 - `include_normals` (optional): Include climate normals for comparison (default: false). For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
 - `source` (optional): `"auto"` (default), `"noaa"`, `"openmeteo"`, or `"metar"` — see Description
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
@@ -154,7 +154,7 @@ What's the weather right now in Tokyo?
 - Cloud cover and visibility
 - Snow depth on ground (when available)
 - Climate normals comparison (when `include_normals=true`), plus the US record high/low for today's date with attribution "Records: NOAA Regional Climate Centers (ACIS)"
-- Fire weather indices (when `include_fire_weather=true`) — Haines Index, Grassland Fire Danger, Red Flag Threat, mixing height, transport winds
+- Fire weather indices (when `include_fire_weather=true`) — Haines Index, Grassland Fire Danger, Red Flag Threat, mixing height, transport winds, as published by NOAA
 - All timestamps in local timezone
 
 **Returns (international, via Open-Meteo):**
@@ -163,10 +163,20 @@ What's the weather right now in Tokyo?
 - Dewpoint, humidity, wind with gusts, pressure, cloud cover percentage
 - Recent precipitation (broken out into rain/showers/snowfall when present)
 - Climate normals comparison (when `include_normals=true`)
+- Fire weather (when `include_fire_weather=true`) — a **Fosberg Fire Weather
+  Index computed by this server** from the current temperature, humidity, and
+  sustained wind, with its category, plus a dryness-context block (vapour-pressure
+  deficit, topsoil moisture) when the model reports those values
 - All timestamps in the location's local timezone
 
-Visibility, snow depth, cloud layer detail, and fire weather indices are not
-available on the international path.
+Visibility, snow depth, and cloud layer detail are not available on the
+international path. Neither are NOAA's published fire-danger indices (Haines,
+grassland, red-flag): those are agency products computed on NOAA's gridpoint
+API, and no equivalent exists globally. The Fosberg index shown instead is
+**derived by this server from model data, not an official fire-danger rating** —
+the output says so and defers to national fire authorities, and its category
+bands are a project heuristic rather than an agency scale. It renders anywhere
+the model path runs, including US locations queried with `source="openmeteo"`.
 
 **Returns (worldwide, via `source="metar"`):**
 - Station name, ICAO identifier, distance and bearing from the requested

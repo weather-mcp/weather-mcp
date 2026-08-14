@@ -99,7 +99,7 @@ FRP-descending) with an honest hotspots-not-incidents framing.
 
 1. **met.no Locationforecast as fallback/second-opinion forecast source** — free, global (ECMWF HRES), no key; requires identifying User-Agent (already sent for Nominatim) and CC-BY 4.0 attribution. https://api.met.no/weatherapi/locationforecast/2.0/documentation
 2. **Global climate normals** — compute from Open-Meteo historical archive (already integrated) when outside US, instead of NCEI.
-3. **Global fire weather indices** — run the existing `fireWeather.ts` formulas off Open-Meteo hourly variables instead of NOAA gridpoint data outside the US.
+3. ~~**Global fire weather indices**~~ — ✅ **Shipped** on `feat/global-fire-weather` targeting v1.20.0; [`docs/plans/global-fire-weather-plan.md`](../plans/global-fire-weather-plan.md). **The premise above was wrong** and design exploration corrected it: there were no `fireWeather.ts` formulas to run — that module *interprets* five indices NOAA pre-computes on its gridpoint API, and nothing in the codebase computed a fire-weather index. The global path therefore computes a **Fosberg Fire Weather Index in-house** from Open-Meteo *current* values (not hourly), with soil moisture and VPD as dryness context, framed in-output as server-derived rather than an agency rating. Descoped to ideas: global Haines via pressure-level variables, and Fosberg on the METAR source.
 4. **UK river gauges** — see Priority 2 supplement.
 
 ## Licensing Summary

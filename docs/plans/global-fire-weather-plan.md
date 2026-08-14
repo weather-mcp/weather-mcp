@@ -1,6 +1,6 @@
 # Global Fire Weather Indices — Design Plan
 
-**Status:** DESIGN — settled, ready for `/impl-plan`
+**Status:** IMPLEMENTED (2026-08-14, `feat/global-fire-weather`) — see §Implementation notes
 **Parent:** `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md` (Phase 5, item 3)
 **Target release:** rides the next release alongside global wildfire (v1.20.0 line; version settled at release time)
 **Branch (for /impl-plan):** `feat/global-fire-weather` — create off `feat/global-wildfire` if it has not merged yet (this feature's docs touch CLAUDE.md lines that branch rewrote), off `main` otherwise
@@ -218,12 +218,50 @@ hotspots-not-incidents framing and the GloFAS model-not-gauge framing.
 
 ## Documentation / registration checklist (for /run-plan tracking)
 
-- [ ] `src/utils/fireWeather.ts` — D2 pure functions + doc comments citing Fosberg (1978)
-- [ ] `src/utils/units.ts` — `knotsToMph`
-- [ ] `src/services/openmeteo.ts` + `src/types/openmeteo.ts` — D3 flag, variables, cache key
-- [ ] `src/handlers/currentConditionsHandler.ts` — D4 normalization + D5 rendering
-- [ ] `src/index.ts` — D7 schema/description
-- [ ] Tests per §Testing
-- [ ] README.md, CHANGELOG.md, CLAUDE.md, `docs/TOOLS.md`
-- [ ] `docs/planning/README.md` + ICR — status flips and descoped-idea rows
-- [ ] Move this doc to `docs/plans/` at completion (project convention)
+- [x] `src/utils/fireWeather.ts` — D2 pure functions + doc comments citing Fosberg (1978)
+- [x] `src/utils/units.ts` — `knotsToMph`
+- [x] `src/services/openmeteo.ts` + `src/types/openmeteo.ts` — D3 flag, variables, cache key
+- [x] `src/handlers/currentConditionsHandler.ts` — D4 normalization + D5 rendering
+- [x] `src/index.ts` — D7 schema/description
+- [x] Tests per §Testing
+- [x] README.md, CHANGELOG.md, CLAUDE.md, `docs/TOOLS.md`
+- [x] `docs/planning/README.md` + ICR — status flips and descoped-idea rows
+- [x] Move this doc to `docs/plans/` at completion (project convention)
+
+## Implementation notes (2026-08-14)
+
+Shipped as designed; D1–D7 all landed unmodified. Points worth carrying forward:
+
+- **Prefs field names.** The design's `prefs.temperatureUnit`/`windSpeedUnit`
+  was shorthand — `UnitPreferences` actually exposes `temperature` (`'F'|'C'`)
+  and `windSpeed` (`'mph'|'kmh'|'ms'|'kn'`). The two normalization helpers
+  (`prefsTempToFahrenheit`, `prefsWindToMph`, both pure, in the handler) switch
+  on those.
+- **Category is computed on the rounded value.** The displayed index and its
+  label can otherwise disagree at a band edge (24.6 → "25 (Low)").
+- **No handler-boundary signature change was needed.**
+  `formatOpenMeteoCurrentConditions` already received `includeFireWeather` and
+  `prefs`; the change was passing the flag into the service call and replacing
+  the stub.
+- **Mid-ocean is not the null case it was expected to be.** The verification
+  sweep's mid-Pacific point (−30, −140) returned *non-null* soil moisture
+  (0.00 m³/m³ → "very dry") and VPD, so the dryness block rendered rather than
+  being omitted. The null-omission path is still correct and unit/integration
+  tested; it simply is not what this API returns at that point. Anywhere the
+  model does return nulls, the lines drop.
+
+### Verification sweep (built dist, branch base `0c4117c`)
+
+Run by the orchestrator against `dist/` on both trees, sequentially:
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | Default no-flag, US (Denver) and non-US (Milan) | **byte-identical** to base |
+| 2 | US + `include_fire_weather` (auto → NOAA) | **byte-identical** to base |
+| 3 | Milan + flag | Fosberg 8 (Low), dryness context, disclosure ✓ |
+| 3 | Sydney + flag | Fosberg 2 (Low), dryness context, disclosure ✓ |
+| 4 | Reykjavik + flag | Fosberg 22 (Low) — rendered, not suppressed ✓ |
+| 5 | Denver + `source: "openmeteo"` + flag | Fosberg 10 (Low) ✓ |
+| 6 | Milan, `units: metric` vs `imperial` | index 8 in both ✓ |
+| 7 | `source: "metar"` + flag | note **byte-identical** to base |
+| 8 | Mid-ocean (−30, −140) + flag | index rendered; dryness present (values non-null — see note above) |
