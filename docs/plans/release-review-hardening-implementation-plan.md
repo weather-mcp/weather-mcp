@@ -2,7 +2,7 @@
 
 **Status:** READY (2026-08-14)
 
-Execution plan for `docs/release-review-hardening-plan.md` (the WHAT/WHY); rules
+Execution plan for `docs/plans/release-review-hardening-plan.md` (the WHAT/WHY); rules
 live in `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ live in `docs/orchestration-playbook.md`.
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/release-review-hardening-implementation-plan.md
+/run-plan docs/plans/release-review-hardening-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/release-review-hardening-plan.md` (design),
+Or, equivalently: read `docs/plans/release-review-hardening-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review
 the diff, run the gate yourself, commit, tick the tracker, push.
@@ -280,7 +280,7 @@ Three parallel lanes (disjoint files), then a docs/verification close-out:
 **T7 — Edge-case sweep + documentation checklist** (`opus`)
 
 - Files: `CHANGELOG.md`, `CLAUDE.md`,
-  `docs/release-review-hardening-plan.md` (status + move),
+  `docs/plans/release-review-hardening-plan.md` (status + move),
   this file (move)
 - **Sweep** (orchestrator personally; unit-level against the built dist where
   live APIs aren't needed — standing driver caveat: `process.exit(0)`, no
@@ -367,6 +367,6 @@ Three parallel lanes (disjoint files), then a docs/verification close-out:
 eight edge-case rows, the locked files
 (`tests/unit/fireWeatherContext.test.ts`, `tests/unit/wildfire-handler.test.ts`)
 are absent from the branch diff, and
-`docs/release-review-hardening-plan.md` is marked `IMPLEMENTED` with the plan
+`docs/plans/release-review-hardening-plan.md` is marked `IMPLEMENTED` with the plan
 set moved to `docs/plans/`. Opening the PR / tagging v1.20.0 is the human's
 call.
