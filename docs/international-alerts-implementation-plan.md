@@ -478,7 +478,7 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T3 — MeteoAlarm types, service, and filter pipeline (`opus`) — `0f4c554`
 - [x] T4 — Live-verify the full MeteoAlarm slug map (orchestrator-run sweep: 38/38 verified, `mk` slug corrected to `republic-of-north-macedonia`) — `2bece5b`
 - [x] T5 — GeoMet types, service, and filtering (`sonnet`) — `ccb4953`
-- [ ] T6 — Country routing + per-source renderers in `get_alerts` (`opus`)
+- [x] T6 — Country routing + per-source renderers in `get_alerts` (`opus`; live sanity: Munich → 51 DWD warnings + attribution, Toronto → GeoMet clean-empty not NOAA, Seattle built-dist output diffed byte-identical vs `main`) — `e1dba84`
 - [ ] T7 — `get_weather_summary`: drop the US-only short-circuit (`sonnet`)
 - [ ] T8 — Routing unit tests (`sonnet`)
 - [ ] T9 — Integration tests: captured shapes + tolerant live smoke (`sonnet`)
