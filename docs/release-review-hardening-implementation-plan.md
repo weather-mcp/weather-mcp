@@ -351,8 +351,10 @@ Three parallel lanes (disjoint files), then a docs/verification close-out:
 ## Progress Tracker
 
 - [x] T1 — F1: null-safe Fosberg core inputs (`sonnet`) — `65f962a`
-- [ ] T2 — F4: correct the METAR fire-weather note's advice (`haiku`)
-- [ ] T3 — F2: route US territories to NIFC (`opus`)
+- [x] T2 — F4: correct the METAR fire-weather note's advice (`haiku`) — `40e60fc`
+- [x] T3 — F2: route US territories to NIFC (`opus`) — `456a6a6`
+      (WFIGS evidence 2026-08-14: all-years `POOState` carries `US-GU` 90,
+      `US-VI` 5, `US-PR` 4; `US-AS`/`US-MP` zero → allowlist is `us, pr, vi, gu`)
 - [ ] T4 — F3: coverage disclosure on forced-NIFC empty results (`opus`)
 - [ ] T5 — F6: split keyed FIRMS bbox queries across the antimeridian (`sonnet`)
 - [x] T6 — F5: retry without fire variables on a 400 (`sonnet`) — `9180be0`
