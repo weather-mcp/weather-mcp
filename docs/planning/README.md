@@ -83,6 +83,7 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Idea | Status | Detail |
 |------|--------|--------|
 | Live-test hardening: saved-location update metadata loss, NOAA observation staleness (age/caveat/fresher-station retry), containment-aware wildfire assessment, marine water-body disclosure, UTC date-bounds docs | ✅ | Shipped in v1.18.0; [`docs/plans/live-test-hardening-plan.md`](../plans/live-test-hardening-plan.md) — five findings (F1–F5) from the 2026-08-13 full-suite live test of the `feat/metar` build |
+| Release-review hardening: null-input Fosberg fabrication, US-territory wildfire routing, forced-NIFC false all-clear, METAR note advice, fire-variable blast radius, antimeridian bbox | 📝 | [`docs/release-review-hardening-plan.md`](../release-review-hardening-plan.md) (2026-08-14); six findings (F1–F6) from the pre-release code review of `main...feat/global-fire-weather`, targeting v1.20.0 before the tag. The security review of the same diff returned no HIGH/MEDIUM findings |
 
 ---
 
