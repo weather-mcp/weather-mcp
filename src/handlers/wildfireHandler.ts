@@ -104,38 +104,43 @@ export async function handleGetWildfireInfo(
   // --- Country routing (D1/D2) ---
   let reverseLookupFailed = false;
   let useFirms: boolean;
+  // Only meaningful on a NIFC render: does this point look like somewhere
+  // NIFC/WFIGS has no coverage at all? Drives the empty-result disclosure
+  // instead of an affirmative all-clear (F3/D3).
+  let outsideNifcCoverage = false;
 
   if (source === 'firms') {
     // Explicit override — works anywhere, including the US (satellite
     // detections often appear before an incident is catalogued in WFIGS).
     useFirms = true;
   } else if (source === 'nifc') {
-    // Explicit override — outside the US this finds nothing; documented.
+    // Explicit override — honoured as asked (no cross-fallback), but the
+    // point may be somewhere WFIGS simply does not track incidents. Resolve
+    // the country anyway (cached, country-level) so an empty result can
+    // disclose that rather than print a green checkmark over a live fire.
     useFirms = false;
+    const { countryCode, lookupFailed } = await resolveCountryCode(
+      resolved.country_code,
+      latitude,
+      longitude,
+      nominatimService
+    );
+    reverseLookupFailed = lookupFailed;
+    outsideNifcCoverage = countryCode
+      ? !NIFC_COVERED_COUNTRIES.has(countryCode)
+      : !isInUS(latitude, longitude);
   } else {
-    // 1. A country the resolution path already knows (saved location /
-    //    geocoded city). Sources vary in casing; normalize to lowercase once.
-    let countryCode: string | null = resolved.country_code
-      ? resolved.country_code.toLowerCase()
-      : null;
+    const { countryCode, lookupFailed } = await resolveCountryCode(
+      resolved.country_code,
+      latitude,
+      longitude,
+      nominatimService
+    );
+    reverseLookupFailed = lookupFailed;
 
-    // 2. Coordinates only: cached country-level reverse lookup. A missing
-    //    service (test harnesses) skips this silently; only a *failed* lookup
-    //    earns the one-line fallback note.
-    if (!countryCode && nominatimService) {
-      try {
-        countryCode = await nominatimService.reverseCountry(latitude, longitude);
-      } catch (error) {
-        reverseLookupFailed = true;
-        logger.warn('Reverse country lookup failed; falling back to coordinate routing', {
-          error: error instanceof Error ? error.message : 'unknown'
-        });
-      }
-    }
-
-    // 3. Route. The reverse answer wins over isInUS; "no country" (open
-    //    water, absent service, or a failed lookup) falls back to the
-    //    bounding boxes.
+    // Route. The reverse answer wins over isInUS; "no country" (open
+    // water, absent service, or a failed lookup) falls back to the
+    // bounding boxes.
     if (countryCode) {
       // NIFC covers the US *and* the territories WFIGS publishes for
       // (Puerto Rico, the US Virgin Islands, Guam) — testing `!== 'us'`
@@ -155,7 +160,7 @@ export async function handleGetWildfireInfo(
 
   const output = useFirms && firmsService
     ? await formatFIRMSWildfire(firmsService, latitude, longitude, radius, dayRange, detail)
-    : await formatNIFCWildfire(nifcService, latitude, longitude, radius, detail);
+    : await formatNIFCWildfire(nifcService, latitude, longitude, radius, detail, outsideNifcCoverage);
 
   const result = prependLocationLine({
     content: [
@@ -175,6 +180,41 @@ export async function handleGetWildfireInfo(
 }
 
 /**
+ * Country resolution, in the order get_alerts uses: a `country_code` the
+ * resolution path already knows (saved location / geocoded city) > a cached
+ * country-level Nominatim reverse lookup > nothing (the caller falls back to
+ * `isInUS`).
+ *
+ * A missing service (test harnesses) skips the lookup silently; only a
+ * *failed* lookup sets `lookupFailed`, which earns the one-line note.
+ */
+async function resolveCountryCode(
+  resolvedCountryCode: string | undefined,
+  latitude: number,
+  longitude: number,
+  nominatimService?: NominatimService
+): Promise<{ countryCode: string | null; lookupFailed: boolean }> {
+  // Sources vary in casing; normalize to lowercase once.
+  let countryCode: string | null = resolvedCountryCode
+    ? resolvedCountryCode.toLowerCase()
+    : null;
+  let lookupFailed = false;
+
+  if (!countryCode && nominatimService) {
+    try {
+      countryCode = await nominatimService.reverseCountry(latitude, longitude);
+    } catch (error) {
+      lookupFailed = true;
+      logger.warn('Reverse country lookup failed; falling back to coordinate routing', {
+        error: error instanceof Error ? error.message : 'unknown'
+      });
+    }
+  }
+
+  return { countryCode, lookupFailed };
+}
+
+/**
  * The original US path: NIFC/WFIGS named incidents with acreage,
  * containment, and the containment-aware safety assessment. Byte-identical
  * to the pre-global behavior (locked by tests/unit/wildfire-handler.test.ts
@@ -185,7 +225,14 @@ async function formatNIFCWildfire(
   latitude: number,
   longitude: number,
   radius: number,
-  detail: 'summary' | 'standard' | 'full'
+  detail: 'summary' | 'standard' | 'full',
+  /**
+   * True only when `source: "nifc"` was forced at a point NIFC does not
+   * cover. Changes the empty-result branch alone (F3/D3): an all-clear must
+   * never stand in for "this authority has no data here". Optional and
+   * trailing so every existing caller and test harness is unaffected.
+   */
+  outsideCoverage = false
 ): Promise<string> {
   // Get timezone for proper time formatting
   const timezone = guessTimezoneFromCoords(latitude, longitude);
@@ -209,7 +256,19 @@ async function formatNIFCWildfire(
     const response = await nifcService.queryFirePerimeters(west, south, east, north);
     const features = response.features || [];
 
-    if (features.length === 0) {
+    if (features.length === 0 && outsideCoverage) {
+      // Forced `source: "nifc"` outside NIFC coverage. An empty result here
+      // means "this authority does not track fires at this location", which
+      // is emphatically not an all-clear — so no ✅ and no "currently clear"
+      // sentence (F3/D3). The override is deliberate, so disclose rather
+      // than error or silently swap sources.
+      output += `**NIFC/WFIGS tracks wildfire incidents in the United States and its `;
+      output += `territories only, and this location appears to be outside that coverage.**\n\n`;
+      output += `No incidents were returned — but that is an absence of coverage, not an `;
+      output += `all-clear. There may be active fires here that NIFC does not report.\n\n`;
+      output += `Use \`source: "firms"\` (or omit \`source\`) for NASA FIRMS satellite fire `;
+      output += `detections, which are global.\n`;
+    } else if (features.length === 0) {
       output += `✅ **No active wildfires found within ${radius} km**\n\n`;
       if (response.exceededTransferLimit) {
         output += `*Results may be incomplete — the fire data service truncated the response.*\n\n`;

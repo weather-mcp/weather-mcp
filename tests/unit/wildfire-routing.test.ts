@@ -159,7 +159,11 @@ describe('handleGetWildfireInfo — country routing (D1)', () => {
     expect(nominatim.reverseCountry).not.toHaveBeenCalled();
   });
 
-  it('honors explicit source: "nifc" at a non-US point (finds nothing there, as documented)', async () => {
+  // F3/D3 updated this expectation: the override is still honoured with no
+  // cross-fallback, but the forced branch now resolves the country (cached,
+  // country-level) so an empty result discloses NIFC's coverage instead of
+  // printing an all-clear over a place NIFC does not watch.
+  it('honors explicit source: "nifc" at a non-US point, disclosing coverage rather than an all-clear', async () => {
     const nifc = makeNifcFake({ features: [] });
     const firms = makeFirmsFake();
     const nominatim = makeNominatimFake(async () => 'pt');
@@ -176,8 +180,9 @@ describe('handleGetWildfireInfo — country routing (D1)', () => {
     expect(nifc.queryFirePerimeters).toHaveBeenCalledTimes(1);
     expect(firms.getDetectionsByBbox).not.toHaveBeenCalled();
     expect(firms.getDetectionsByRegion).not.toHaveBeenCalled();
-    expect(nominatim.reverseCountry).not.toHaveBeenCalled();
-    expect(result.content[0].text).toContain('No active wildfires found');
+    expect(nominatim.reverseCountry).toHaveBeenCalledTimes(1);
+    expect(result.content[0].text).not.toContain('No active wildfires found');
+    expect(result.content[0].text).toContain('United States and its territories only');
   });
 
   it('does not cross-fall-back to FIRMS when NIFC returns zero features at a US point (auto)', async () => {
@@ -489,6 +494,171 @@ describe('handleGetWildfireInfo — NIFC-covered US territories (F2/D2)', () => 
     expect(nominatim.reverseCountry).not.toHaveBeenCalled();
     expect(nifc.queryFirePerimeters).toHaveBeenCalledTimes(1);
     expect(firms.getDetectionsByRegion).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Forced-NIFC coverage disclosure (F3/D3) — an empty result outside NIFC
+// coverage must never render as an affirmative all-clear.
+// ---------------------------------------------------------------------------
+
+describe('handleGetWildfireInfo — forced NIFC outside coverage (F3/D3)', () => {
+  /** Athens, Greece. */
+  const ATHENS = { latitude: 37.9838, longitude: 23.7275 };
+
+  it('discloses coverage instead of an all-clear for Athens with source: "nifc"', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: false });
+    const nominatim = makeNominatimFake(async () => 'gr');
+
+    const result = await handleGetWildfireInfo(
+      { ...ATHENS, source: 'nifc' },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+    const text = result.content[0].text;
+
+    // The override is honoured — no cross-fallback to FIRMS.
+    expect(nifc.queryFirePerimeters).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByBbox).not.toHaveBeenCalled();
+    expect(firms.getDetectionsByRegion).not.toHaveBeenCalled();
+
+    expect(text).not.toContain('✅');
+    expect(text).not.toContain('currently clear of reported wildfire activity');
+    expect(text).toContain('United States and its territories only');
+    expect(text).toContain('not an all-clear');
+    expect(text).toContain('source: "firms"');
+
+    // Header and radius lines survive.
+    expect(text).toContain('# Wildfire Information Report');
+    expect(text).toContain('**Search Radius:**');
+  });
+
+  it('renders incidents normally if forced NIFC outside coverage somehow returns some', async () => {
+    const nifc = makeNifcFake({
+      features: [
+        {
+          attributes: {
+            poly_IncidentName: 'Test Fire',
+            poly_GISAcres: 100,
+            attr_PercentContained: 0,
+            attr_IncidentTypeCategory: 'WF',
+            attr_InitialLatitude: ATHENS.latitude,
+            attr_InitialLongitude: ATHENS.longitude,
+            attr_FireDiscoveryDateTime: Date.now()
+          }
+        }
+      ]
+    } as unknown as NIFCQueryResponse);
+    const firms = makeFirmsFake({ keyAvailable: false });
+    const nominatim = makeNominatimFake(async () => 'gr');
+
+    const result = await handleGetWildfireInfo(
+      { ...ATHENS, source: 'nifc' },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+    const text = result.content[0].text;
+
+    expect(text).toContain('Test Fire');
+    expect(text).not.toContain('United States and its territories only');
+  });
+
+  it('keeps the byte-identical all-clear for a US point with source: "nifc"', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: false });
+    const nominatim = makeNominatimFake(async () => 'us');
+
+    const result = await handleGetWildfireInfo(
+      { ...SACRAMENTO, source: 'nifc' },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+    const text = result.content[0].text;
+
+    expect(text).toContain('✅ **No active wildfires found within 100 km**');
+    expect(text).toContain('The area is currently clear of reported wildfire activity.');
+    expect(text).not.toContain('United States and its territories only');
+  });
+
+  it('falls back to isInUS when no nominatimService is injected (US coordinates → all-clear)', async () => {
+    const nifc = makeNifcFake({ features: [] });
+
+    const result = await handleGetWildfireInfo(
+      { ...SACRAMENTO, source: 'nifc' },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding
+    );
+    const text = result.content[0].text;
+
+    expect(text).toContain('✅ **No active wildfires found within 100 km**');
+    expect(text).not.toContain('United States and its territories only');
+  });
+
+  it('falls back to isInUS when no nominatimService is injected (non-US coordinates → disclosure)', async () => {
+    const nifc = makeNifcFake({ features: [] });
+
+    const result = await handleGetWildfireInfo(
+      { ...ATHENS, source: 'nifc' },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding
+    );
+    const text = result.content[0].text;
+
+    expect(text).not.toContain('✅');
+    expect(text).toContain('United States and its territories only');
+  });
+
+  it('adds the lookup-failed note and still discloses when the reverse lookup throws outside the US', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: false });
+    const nominatim = makeNominatimFake(async () => {
+      throw new Error('nominatim down');
+    });
+
+    const result = await handleGetWildfireInfo(
+      { ...ATHENS, source: 'nifc' },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+    const text = result.content[0].text;
+
+    expect(text).toContain('the country lookup service was unavailable');
+    // isInUS(Athens) is false, so the disclosure still applies.
+    expect(text).toContain('United States and its territories only');
+  });
+
+  it('treats a forced-NIFC US territory (pr) as inside coverage', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: false });
+    const nominatim = makeNominatimFake(async () => 'pr');
+
+    const result = await handleGetWildfireInfo(
+      { latitude: 18.4655, longitude: -66.1057, source: 'nifc' },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+    const text = result.content[0].text;
+
+    expect(text).toContain('✅ **No active wildfires found within 100 km**');
+    expect(text).not.toContain('United States and its territories only');
   });
 });
 
