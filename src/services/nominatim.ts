@@ -16,11 +16,12 @@ import type {
   NominatimLocation,
   NominatimErrorResponse,
   MappedGeocodingResponse,
-  MappedGeocodingLocation
+  MappedGeocodingLocation,
+  NominatimReverseResponse
 } from '../types/nominatim.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
-import { logger } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
 import {
   RateLimitError,
@@ -339,6 +340,62 @@ export class NominatimService {
       results: mappedResults,
       generationtime_ms: generationTime
     };
+  }
+
+  /**
+   * Resolve the country at a coordinate via Nominatim reverse geocoding
+   * (country-level only — `zoom=3`, the privacy-minimal request for this
+   * purpose).
+   *
+   * Open ocean / unresolvable coordinates return HTTP 200 with
+   * `{"error": "Unable to geocode"}` — that is a *result* (no country),
+   * not a failure, and is cached like any other answer: countries don't
+   * move, so a permanent cache applies even to "no country" answers.
+   *
+   * @param latitude - Latitude
+   * @param longitude - Longitude
+   * @returns Lowercased ISO 3166-1 alpha-2 country code, or `null` if the
+   *   point has no resolvable country (e.g. open ocean).
+   */
+  async reverseCountry(latitude: number, longitude: number): Promise<string | null> {
+    // Round to ~1.1km so nearby repeat queries share one cache entry.
+    const cacheKey = Cache.generateKey(
+      'reverse-country',
+      latitude.toFixed(2),
+      longitude.toFixed(2)
+    );
+
+    if (CacheConfig.enabled) {
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) {
+        logger.info('Nominatim reverse-country cache hit', redactCoordinatesForLogging(latitude, longitude));
+        return cached as string | null;
+      }
+    }
+
+    await this.enforceRateLimit();
+
+    const params = {
+      lat: latitude,
+      lon: longitude,
+      format: 'jsonv2',
+      zoom: 3
+    };
+
+    logger.info('Nominatim reverse geocoding request', redactCoordinatesForLogging(latitude, longitude));
+    const response = await this.client.get<NominatimReverseResponse>('/reverse', { params });
+    const data = response.data;
+
+    const countryCode: string | null =
+      !data.error && data.address?.country_code
+        ? data.address.country_code.toLowerCase()
+        : null;
+
+    if (CacheConfig.enabled) {
+      this.cache.set(cacheKey, countryCode, CacheConfig.ttl.reverseCountry);
+    }
+
+    return countryCode;
   }
 
   /**

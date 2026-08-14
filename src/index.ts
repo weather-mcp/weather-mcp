@@ -20,6 +20,8 @@ import { NominatimService } from './services/nominatim.js';
 import { NCEIService } from './services/ncei.js';
 import { AcisService } from './services/acis.js';
 import { AviationWeatherService } from './services/aviationWeather.js';
+import { MeteoAlarmService } from './services/meteoalarm.js';
+import { GeoMetService } from './services/geomet.js';
 import { NIFCService } from './services/nifc.js';
 import { GeocodingService } from './services/geocoding.js';
 import { LocationStore } from './services/locationStore.js';
@@ -144,6 +146,20 @@ const acisService = new AcisService();
  * only source that returns real station instrument readings outside the US.
  */
 const aviationWeatherService = new AviationWeatherService();
+
+/**
+ * Initialize the MeteoAlarm service for European weather warnings
+ * Keyless — per-country CAP JSON feeds aggregating the official warnings of
+ * the European national meteorological services (EUMETNET MeteoAlarm).
+ */
+const meteoAlarmService = new MeteoAlarmService();
+
+/**
+ * Initialize the MSC GeoMet service for Canadian weather alerts
+ * Keyless — Environment and Climate Change Canada's OGC API Features
+ * weather-alerts collection.
+ */
+const geoMetService = new GeoMetService();
 
 /**
  * Initialize the NIFC service for wildfire data
@@ -352,7 +368,7 @@ const TOOL_DEFINITIONS = {
 
   get_alerts: {
     name: 'get_alerts' as const,
-    description: 'Get active weather alerts, watches, warnings, and advisories for a location (US only). Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get active weather alerts, watches, warnings, and advisories for a location. Coverage: the United States (NOAA), Canada (Environment and Climate Change Canada), and European MeteoAlarm member countries (official national warnings, matched at country level — regional filtering within a European country is not yet available). Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas where the source provides them. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -398,7 +414,7 @@ const TOOL_DEFINITIONS = {
 
   get_weather_summary: {
     name: 'get_weather_summary' as const,
-    description: 'Get a combined weather overview for a location in a SINGLE call. Best for broad questions like "What\'s the weather like in Seattle?", "Is it safe to hike today?", or "Give me a weather rundown". Aggregates current conditions, forecast, and active alerts by default, and can also include air quality and lightning. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For a single specific data product (just the forecast, just alerts, etc.), call that specialized tool directly. Sections that are unavailable for a location (e.g. US-only alerts abroad) are noted rather than failing the whole summary.',
+    description: 'Get a combined weather overview for a location in a SINGLE call. Best for broad questions like "What\'s the weather like in Seattle?", "Is it safe to hike today?", or "Give me a weather rundown". Aggregates current conditions, forecast, and active alerts by default, and can also include air quality and lightning. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For a single specific data product (just the forecast, just alerts, etc.), call that specialized tool directly. Sections that are unavailable for a location (e.g. alerts in a country not yet covered) are noted rather than failing the whole summary.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -752,7 +768,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_alerts':
         return await withAnalytics('get_alerts', async () =>
-          handleGetAlerts(args, noaaService, locationStore, geocodingService)
+          handleGetAlerts(args, noaaService, locationStore, geocodingService, meteoAlarmService, geoMetService, nominatimService)
         );
 
       case 'get_historical_weather':
@@ -762,7 +778,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_weather_summary':
         return await withAnalytics('get_weather_summary', async () =>
-          handleGetWeatherSummary(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService)
+          handleGetWeatherSummary(
+            args, noaaService, openMeteoService, nceiService, locationStore, geocodingService,
+            meteoAlarmService, geoMetService, nominatimService
+          )
         );
 
       case 'check_service_status':

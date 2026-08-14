@@ -125,15 +125,38 @@ describe('handleGetWeatherSummary', () => {
     expect(text).toContain('Weather Forecast');
   });
 
-  it('notes alerts are US-only for a non-US location without calling handleGetAlerts', async () => {
+  it('dispatches handleGetAlerts for a non-US location instead of short-circuiting', async () => {
+    // Designed behaviour change (docs/plans/international-alerts-plan.md D7): alerts
+    // are no longer US-only in the summary handler. handleGetAlerts itself now
+    // routes by country and produces its own graceful output everywhere, so the
+    // summary calls it unconditionally, same as for a US location.
+    alertsMock.mockResolvedValue(textResult('# Weather Alerts — United Kingdom\nNone'));
+
     const result = await callSummary({ latitude: 51.5074, longitude: -0.1278 }); // London
     const text = result.content[0].text;
 
-    expect(text).toContain('## Alerts');
-    expect(text).toContain('Weather alerts are currently available for US locations only.');
-    expect(text).not.toContain('⚠️');
+    expect(alertsMock).toHaveBeenCalledTimes(1);
+    expect(text).toContain('Weather Alerts — United Kingdom');
+    expect(text).not.toContain('Weather alerts are currently available for US locations only.');
+    // Other sections still render normally
+    expect(text).toContain('Current Weather Conditions');
+    expect(text).toContain('Weather Forecast');
+  });
+
+  it('renders the alerts handler\'s not-covered message for an unsupported region', async () => {
+    // Simulates handleGetAlerts's own graceful "not covered" output (e.g. a
+    // region with no MeteoAlarm/GeoMet/NOAA coverage) flowing through the
+    // normal dispatch path unmodified.
+    alertsMock.mockResolvedValue(
+      textResult('# Weather Alerts\n\nWeather alerts are not yet available for this region.')
+    );
+
+    const result = await callSummary({ latitude: -33.8688, longitude: 151.2093 }); // Sydney
+    const text = result.content[0].text;
+
+    expect(alertsMock).toHaveBeenCalledTimes(1);
+    expect(text).toContain('Weather alerts are not yet available for this region.');
     expect(text).not.toContain('alerts (unavailable)');
-    expect(alertsMock).not.toHaveBeenCalled();
     // Other sections still render normally
     expect(text).toContain('Current Weather Conditions');
     expect(text).toContain('Weather Forecast');

@@ -143,6 +143,11 @@ export const CacheConfig = {
     // nowcast cadence is ~10 minutes, so a repeat call inside that window is
     // still looking at the same latest frame.
     compositeImage: 10 * MINUTE,
+
+    // Nominatim reverse geocoding — country resolution only (zoom=3). Keyed
+    // on coordinates rounded to ~1.1km; countries don't move, so once
+    // resolved (including a "no country" open-ocean result) it's permanent.
+    reverseCountry: Infinity,
   },
 } as const;
 

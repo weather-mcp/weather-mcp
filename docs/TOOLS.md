@@ -11,7 +11,7 @@ Complete reference for all 17 MCP tools provided by the Weather MCP Server.
 **Core Weather**
 1. [get_forecast](#1-get_forecast) — Forecasts, global
 2. [get_current_conditions](#2-get_current_conditions) — Current weather, global
-3. [get_alerts](#3-get_alerts) — Watches/warnings/advisories, US
+3. [get_alerts](#3-get_alerts) — Watches/warnings/advisories: US, Canada, Europe
 4. [get_historical_weather](#4-get_historical_weather) — 1940–present, global
 5. [get_weather_summary](#5-get_weather_summary) — One-call combined overview, global
 6. [search_location](#6-search_location) — Geocoding, global
@@ -186,7 +186,7 @@ Any field the station did not report is omitted. Fire weather indices are not
 available on this source.
 
 ### 3. get_alerts
-Get active weather alerts, watches, warnings, and advisories for US locations.
+Get active weather alerts, watches, warnings, and advisories. Coverage is routed by country: the United States (NOAA), Canada (Environment and Climate Change Canada via MSC GeoMet), and 38 European MeteoAlarm member countries (each country's official national warnings). Other regions receive a clean "not yet covered" message.
 
 **Parameters:**
 - `latitude` (required*): Latitude coordinate (-90 to 90)
@@ -199,22 +199,37 @@ Get active weather alerts, watches, warnings, and advisories for US locations.
 *Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
-Retrieves current weather alerts from the NOAA API for safety-critical weather information. Returns severity levels (Extreme, Severe, Moderate, Minor), urgency indicators, effective/expiration times, and affected areas. Alerts are automatically sorted by severity with the most critical first.
+Retrieves current weather alerts for safety-critical weather information, routed by the location's country:
+
+| Region | Source | Output shape |
+|--------|--------|--------------|
+| United States | NOAA National Weather Service | Severity/urgency/certainty, effective/expiration times, affected zones, instructions — unchanged from previous releases |
+| Canada | Environment and Climate Change Canada (MSC GeoMet) | Alert name + type (warning > watch > advisory > statement), affected area, risk/confidence where provided, issued/ends times, full alert text verbatim — no invented severity fields |
+| Europe (38 MeteoAlarm members) | The country's national meteorological service, via EUMETNET MeteoAlarm | CAP severity/urgency/certainty, MeteoAlarm awareness colour, areas, issued/expires times as published, headline/description/instruction verbatim |
+
+Country resolution: a saved location or geocoded `city_name` that already knows its country is used directly; coordinate-only requests use a cached country-level reverse lookup (Nominatim, `zoom=3`). A "no country" answer (e.g. US coastal waters) falls back to the US bounding boxes, preserving NOAA marine alerts offshore.
+
+**European coverage is country-level**: the keyless MeteoAlarm feeds carry no region geometry, so all of a country's warnings are returned with an explicit coverage note — warnings may not affect the exact requested point. Alerts from all sources are sorted most-critical-first; European and Canadian lists cap at 10 (`standard`) / 25 (`full`) with a disclosed remainder, and `summary` returns counts only.
+
+**Licence attributions (rendered in the output, per source terms):** US: *NOAA National Weather Service*. Canada: *Environment and Climate Change Canada (MSC GeoMet)* — alert content shown unaltered. Europe: *EUMETNET – MeteoAlarm (national warnings: <service>)* — alerts shown unmodified as issued, times as published.
 
 **Examples:**
 ```
 "Are there any weather alerts for Miami, Florida?"
 "Check for severe weather warnings in Oklahoma City"
+"Are there any weather warnings for Munich right now?"
+"Any alerts in Toronto?"
 "What weather watches are active in my area?" (latitude: 40.7128, longitude: -74.0060)
 ```
 
 **Returns:**
-- Alert type and severity (Extreme → Severe → Moderate → Minor)
-- Urgency, certainty, and response type
-- Event description and instructions
-- Effective and expiration times
+- Alert type and severity (Extreme → Severe → Moderate → Minor, where the source provides severity)
+- Urgency, certainty, and response type (US and Europe)
+- Event description and instructions, verbatim
+- Effective/issued and expiration times (international times shown as published by the source)
 - Affected geographic areas
 - Recommended actions and safety information
+- Source attribution and, in Europe, the country-level coverage note
 
 ### 4. get_historical_weather
 Get historical weather observations for a location.
@@ -295,7 +310,7 @@ Get a combined weather overview for a location in a single call.
 *Coordinates not required when `location_name` or `city_name` is provided. Precedence: coordinates > `location_name` > `city_name`.
 
 **Description:**
-Best for broad questions like "What's the weather like in Seattle?" or "Is it safe to hike today?". Aggregates several specialized tools for one location in a single response, resolving the location once so there is no repeated geocoding. Sections that are unavailable for a location (e.g. US-only alerts abroad) are noted rather than failing the whole summary. For a single specific data product, call that specialized tool directly.
+Best for broad questions like "What's the weather like in Seattle?" or "Is it safe to hike today?". Aggregates several specialized tools for one location in a single response, resolving the location once so there is no repeated geocoding. Sections that are unavailable for a location (e.g. alerts in a country not yet covered) are noted rather than failing the whole summary. For a single specific data product, call that specialized tool directly.
 
 **Examples:**
 ```
