@@ -257,6 +257,62 @@ fetch both returned 83 rows, of which 23 fell inside the rolling 24 h window.
 The `fetchDays` compensation was a declared non-goal, already verified live
 this review pass.)
 
+### Live MCP verification (2026-08-14, over the real protocol)
+
+Run after restarting the MCP servers against the rebuilt `dist/` — all four
+weather server configs point at the same `dist/index.js`, and `FIRMS_MAP_KEY`
+loaded from `.env` (confirmed by a `day_range: 3` Athens query being honored
+with no keyless-upgrade note), so the keyed FIRMS path was genuinely exercised.
+
+**New features**
+
+| Case | Result |
+|------|--------|
+| Athens, coords only | FIRMS — 3 detections / 3 clusters, disclosure header, per-cluster distance + bearing, peak FRP, age, confidence, satellite |
+| Sacramento, 300 km | NIFC — 13 named incidents with acreage/containment, cap-5 + remainder note; tier correctly **AWARENESS** (the 96 %-contained CHUTE did not drive it) |
+| Sacramento + `source: "firms"` | FIRMS in the US — 9 detections / 5 clusters |
+| Reykjavík (no fires) | Not-all-clear caveat, no ✅ |
+| Athens, `include_fire_weather` | Fosberg **11 (Low)**, dryness context (VPD 2.0 kPa, topsoil 0.07 m³/m³), derivation disclosure |
+| Denver, `include_fire_weather` | NOAA published indices (seasonal risk, mixing height, transport wind) — US path unchanged |
+| Sydney, `include_fire_weather` | Fosberg **3 (Low)** at 50 °F / 92 % RH — southern-hemisphere winter read from actual conditions, no northern seasonality wording |
+
+**Fixes exercised live**
+
+- **F2** — San Juan PR, coordinate-only → NIFC (WFIGS footer, no FIRMS source
+  line). The ✅ is correct here: PR is *inside* coverage and genuinely clear.
+- **F3** — Athens + `source: "nifc"` → no ✅, no "currently clear", explicit
+  coverage statement, `source: "firms"` suggested, no cross-fallback.
+- **F4** — Paris + `source: "metar"` + `include_fire_weather` → the note names
+  both routes.
+- **F6** — Fiji 178°E / 500 km keyed → 23 detections / 16 clusters, matching the
+  standalone driver exactly. The eastern slice was legitimately empty that day;
+  the driver separately confirmed both slices are issued at `[173.27, 180]` and
+  `[-180, -177.27]`.
+
+**F1's strongest live evidence is indirect but decisive:** Athens returned the
+**same index — 11 (Low)** — on the imperial and metric servers, with identical
+dryness values, while displayed temperature and wind differed (77 °F / 5 mph vs
+25 °C / 8 km/h). The bug class F1 describes is a safety number that changes with
+the caller's unit preference; that is now demonstrably gone. It is *not* the
+null path itself, which stays covered by the 6-cell unit matrix and sweep rows
+1–2.
+
+**Not live-triggerable, by nature:** F1's null path (needs Open-Meteo to return
+`null` for a core input) and F5's retry (needs a 400 on a fire variable).
+Neither can be provoked on demand against the live API; both rest on unit tests
+plus the dist sweep.
+
+**Regressions checked, all clean:** US alerts (NOAA), Canada alerts (Toronto →
+ECCC, so the reverse-geocode answer still beats `isInUS`), non-US
+`get_weather_summary` (current + forecast + Greek MeteoAlarm warnings), US
+current conditions without the flag, and `composite: true` radar (image block
+returned, correctly centered on the marker).
+
+**Unrelated cosmetic observation, not from this branch:** the Paris METAR
+station renders as `Paris/De Gaulle Arpt, ID, FR` — the `, ID,` comes from the
+upstream AWC `name` field, passed through verbatim since v1.17. Recorded here
+so it isn't mistaken for release fallout; not a tag blocker.
+
 ## Follow-ups (not tasked here)
 
 - **`examples/` does not exercise either new feature.** The capture manifest was
