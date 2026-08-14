@@ -473,8 +473,8 @@ Spot-checks against the code, reconciled into the tasks below:
 
 ## Progress Tracker
 
-- [ ] T1 — `NominatimService.reverseCountry` + permanent cache (`sonnet`)
-- [ ] T2 — Thread `country_code` through `ResolvedLocation` (`sonnet`)
+- [x] T1 — `NominatimService.reverseCountry` + permanent cache (`sonnet`) — `279d4ad`
+- [x] T2 — Thread `country_code` through `ResolvedLocation` (`sonnet`) — `c53f729`
 - [ ] T3 — MeteoAlarm types, service, and filter pipeline (`opus`)
 - [ ] T4 — Live-verify the full MeteoAlarm slug map (`sonnet`)
 - [ ] T5 — GeoMet types, service, and filtering (`sonnet`)
