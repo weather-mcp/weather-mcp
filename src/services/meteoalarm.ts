@@ -51,10 +51,12 @@ export interface MeteoAlarmServiceConfig {
  * slug, display name, and (where known) the national meteorological service
  * for the attribution footer.
  *
- * Seeded from MeteoAlarm's published membership; slugs are hyphenated
- * lowercase English country names, live-verified by the T4 sweep before
- * release. A country absent from this map routes to the not-covered message
- * by design, so the map degrades gracefully; never add an unverified slug.
+ * Every slug in this table was live-verified (HTTP 200 JSON with a
+ * `warnings` array) on 2026-08-13 — 38/38 members passed after one
+ * correction (`mk`: `north-macedonia` 404'd; the live slug is
+ * `republic-of-north-macedonia`). A country absent from this map routes to
+ * the not-covered message by design, so the map degrades gracefully; never
+ * add an unverified slug.
  */
 export const COUNTRY_FEEDS: Record<string, MeteoAlarmCountryFeed> = {
   at: { slug: 'austria', name: 'Austria', service: 'GeoSphere Austria' },
@@ -82,7 +84,7 @@ export const COUNTRY_FEEDS: Record<string, MeteoAlarmCountryFeed> = {
   md: { slug: 'moldova', name: 'Moldova' },
   me: { slug: 'montenegro', name: 'Montenegro' },
   nl: { slug: 'netherlands', name: 'Netherlands', service: 'KNMI' },
-  mk: { slug: 'north-macedonia', name: 'North Macedonia' },
+  mk: { slug: 'republic-of-north-macedonia', name: 'North Macedonia' },
   no: { slug: 'norway', name: 'Norway', service: 'MET Norway' },
   pl: { slug: 'poland', name: 'Poland', service: 'IMGW-PIB' },
   pt: { slug: 'portugal', name: 'Portugal', service: 'IPMA' },
