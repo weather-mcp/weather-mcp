@@ -358,7 +358,7 @@ Three parallel lanes (disjoint files), then a docs/verification close-out:
 - [x] T4 — F3: coverage disclosure on forced-NIFC empty results (`opus`) — `ddf713f`
       (also updated one pre-existing `wildfire-routing.test.ts` case that
       asserted the old all-clear — the exact behaviour D3 changes)
-- [ ] T5 — F6: split keyed FIRMS bbox queries across the antimeridian (`sonnet`)
+- [x] T5 — F6: split keyed FIRMS bbox queries across the antimeridian (`sonnet`) — `5d81446`
 - [x] T6 — F5: retry without fire variables on a 400 (`sonnet`) — `9180be0`
 - [ ] T7 — Edge-case sweep + documentation checklist (`opus`)
 
