@@ -148,6 +148,16 @@ export const CacheConfig = {
     // on coordinates rounded to ~1.1km; countries don't move, so once
     // resolved (including a "no country" open-ocean result) it's permanent.
     reverseCountry: Infinity,
+
+    // NASA FIRMS Area API bbox query (keyed path). NRT detections land
+    // within ~3 h of overpass; 30 min matches the NIFC perimeter refresh
+    // cadence.
+    firmsAreaQuery: 30 * MINUTE,
+
+    // NASA FIRMS regional flat-file fetch (keyless path). Caches the parsed
+    // rows per region file (not per request), so repeated queries anywhere
+    // in a region cost one fetch per half hour.
+    firmsRegionalFile: 30 * MINUTE,
   },
 } as const;
 
