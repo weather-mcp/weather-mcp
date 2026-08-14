@@ -1,6 +1,6 @@
 /**
  * Integration tests for global wildfire coverage (NASA FIRMS satellite
- * fire detections) — per docs/global-wildfire-plan.md D3/D4/D5 and the
+ * fire detections) — per docs/plans/global-wildfire-plan.md D3/D4/D5 and the
  * "Testing" section's T6 (integration tests): mocked CSV shapes end-to-end
  * through the real handler, plus one tolerant keyless live smoke test.
  *
@@ -65,13 +65,32 @@ function textResponse(data: string) {
  * default 100 km radius and close enough to fall into one cluster
  * (default cluster radius 2 km).
  */
+/**
+ * The keyed handler path filters Area-API rows to a rolling `day_range`-day
+ * window ending now (the API counts calendar UTC days; see the handler
+ * comment), so this fixture's timestamps must be *recent*, not static — a
+ * hard-coded date would age out of the window and silently empty the
+ * result. Times are generated a few hours in the past, formatted in the
+ * Area API's unpadded acq_time style (`215`, `48`).
+ */
+function recentAcq(hoursAgo: number): { date: string; time: string } {
+  const d = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+  const date = d.toISOString().slice(0, 10);
+  const padded = `${String(d.getUTCHours()).padStart(2, '0')}${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  const time = String(Number(padded)); // strip leading zeros — Area API style
+  return { date, time };
+}
+
+const ACQ_A = recentAcq(2);
+const ACQ_B = recentAcq(5);
+
 const AREA_API_CSV = [
   'latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,instrument,confidence,version,bright_ti5,frp,daynight',
-  '39.501,-8.001,330.5,0.4,0.4,2026-08-13,215,N,VIIRS,n,2.0NRT,290.1,15.3,D',
-  '39.502,-8.002,335.0,0.4,0.4,2026-08-13,215,N,VIIRS,h,2.0NRT,295.0,22.7,D',
-  '39.499,-8.003,328.0,0.4,0.4,2026-08-13,48,N,VIIRS,n,2.0NRT,288.0,9.1,N',
-  '39.503,-8.000,340.0,0.4,0.4,2026-08-13,215,N,VIIRS,h,2.0NRT,300.0,30.5,D',
-  '39.498,-8.002,325.0,0.4,0.4,2026-08-13,48,N,VIIRS,n,2.0NRT,287.0,7.4,N'
+  `39.501,-8.001,330.5,0.4,0.4,${ACQ_A.date},${ACQ_A.time},N,VIIRS,n,2.0NRT,290.1,15.3,D`,
+  `39.502,-8.002,335.0,0.4,0.4,${ACQ_A.date},${ACQ_A.time},N,VIIRS,h,2.0NRT,295.0,22.7,D`,
+  `39.499,-8.003,328.0,0.4,0.4,${ACQ_B.date},${ACQ_B.time},N,VIIRS,n,2.0NRT,288.0,9.1,N`,
+  `39.503,-8.000,340.0,0.4,0.4,${ACQ_A.date},${ACQ_A.time},N,VIIRS,h,2.0NRT,300.0,30.5,D`,
+  `39.498,-8.002,325.0,0.4,0.4,${ACQ_B.date},${ACQ_B.time},N,VIIRS,n,2.0NRT,287.0,7.4,N`
 ].join('\n');
 
 const AREA_API_QUERY_LAT = 39.5;

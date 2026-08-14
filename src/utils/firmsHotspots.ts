@@ -5,7 +5,7 @@
  * service's job; every judgement call about what the rows mean lives here,
  * unit-tested without HTTP.
  *
- * See `docs/global-wildfire-plan.md` D4 (parsing) and D5 (output framing —
+ * See `docs/plans/global-wildfire-plan.md` D4 (parsing) and D5 (output framing —
  * clustering is the load-bearing decision that keeps hundreds of raw
  * detections from a large fire unreadable).
  *
@@ -248,8 +248,9 @@ const REGION_DEFINITIONS: FIRMSRegionDefinition[] = [
   {
     file: 'Europe',
     // Eastern edge stops well short of the Middle East / western Russia —
-    // that gap is intentional (falls to Global).
-    boxes: [{ west: -12, south: 36, east: 40, north: 70 }]
+    // that gap is intentional (falls to Global). 35°E matches the live
+    // file's observed detection extent (spot-checked 2026-08-14).
+    boxes: [{ west: -12, south: 36, east: 35, north: 70 }]
   },
   {
     file: 'Northern_and_Central_Africa',

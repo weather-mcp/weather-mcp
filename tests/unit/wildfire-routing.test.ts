@@ -16,7 +16,7 @@
  *     row-cap truncation caveat, no-detections caveat, and detail="full"
  *     cluster display cap
  *
- * See src/handlers/wildfireHandler.ts and docs/global-wildfire-plan.md D1/D2.
+ * See src/handlers/wildfireHandler.ts and docs/plans/global-wildfire-plan.md D1/D2.
  * Negative-assertion discipline (asserting the wrong-branch service was
  * NEVER called) mirrors tests/unit/river-conditions-global.test.ts and
  * tests/unit/alerts-routing.test.ts.
@@ -419,7 +419,10 @@ describe('handleGetWildfireInfo — FIRMS renderer', () => {
     );
   });
 
-  it('passes day_range through to getDetectionsByBbox as the 5th argument when a key is available', async () => {
+  it('requests day_range + 1 calendar days from getDetectionsByBbox when a key is available', async () => {
+    // The Area API counts calendar UTC days including today, while the
+    // rendered window is rolling — the handler requests one extra day
+    // (capped at the API's max of 5) and filters to the rolling window.
     const nifc = makeNifcFake({ features: [] });
     const firms = makeFirmsFake({ keyAvailable: true, bboxImpl: async () => [] });
     const nominatim = makeNominatimFake(async () => 'pt');
@@ -435,7 +438,38 @@ describe('handleGetWildfireInfo — FIRMS renderer', () => {
 
     expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(1);
     const args = firms.getDetectionsByBbox.mock.calls[0];
-    expect(args[4]).toBe(3);
+    expect(args[4]).toBe(4);
+  });
+
+  it('caps the keyed fetch at 5 calendar days and filters detections to the rolling window', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    // One detection inside the rolling 5-day window, one far outside it —
+    // only the recent one should survive the window filter.
+    const recent = makeDetection({
+      latitude: LISBON.latitude,
+      longitude: LISBON.longitude,
+      acquiredAt: new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    });
+    const stale = makeDetection({
+      latitude: LISBON.latitude,
+      longitude: LISBON.longitude,
+      acquiredAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+    });
+    const firms = makeFirmsFake({ keyAvailable: true, bboxImpl: async () => [recent, stale] });
+    const nominatim = makeNominatimFake(async () => 'pt');
+
+    const result = await handleGetWildfireInfo(
+      { latitude: LISBON.latitude, longitude: LISBON.longitude, day_range: 5 },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+
+    const args = firms.getDetectionsByBbox.mock.calls[0];
+    expect(args[4]).toBe(5); // 5 + 1 capped at the API's max of 5
+    expect(result.content[0].text).toContain('1 satellite fire detection in the last 5 days');
   });
 
   it('discloses the 5000-row truncation caveat when in-radius detections exceed the cap', async () => {

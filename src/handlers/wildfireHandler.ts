@@ -1,7 +1,7 @@
 /**
  * Handler for get_wildfire_info tool.
  *
- * Routed by country (see docs/global-wildfire-plan.md D1/D2):
+ * Routed by country (see docs/plans/global-wildfire-plan.md D1/D2):
  *   US → NIFC/WFIGS named incidents (the original path, byte-identical
  *   output), elsewhere → NASA FIRMS satellite fire detections (VIIRS, near
  *   real-time, global). An explicit `source` forces the branch; there is
@@ -387,8 +387,22 @@ async function formatFIRMSWildfire(
         const east = Math.min(180, longitude + lonOffset);
         const north = Math.min(90, latitude + latOffset);
 
-        const raw = await firmsService.getDetectionsByBbox(west, south, east, north, dayRange);
-        ({ detections, truncated } = filterByRadius(raw, latitude, longitude, radius));
+        // Upstream semantics (live-verified 2026-08-14): the Area API's day
+        // range counts calendar UTC days *including today*, while the keyless
+        // flat files serve a rolling 24 h window — so a day-range-1 query at
+        // midday would silently miss yesterday evening's detections that the
+        // keyless path shows. Request one extra calendar day (the API caps at
+        // 5) and filter to the true rolling window, keeping the "last N days"
+        // label honest and the two paths comparable. At day_range 5 the
+        // request can't widen further, so the tail of the window may fall up
+        // to a day short — acceptable for multi-day history.
+        const fetchDays = Math.min(dayRange + 1, 5);
+        const raw = await firmsService.getDetectionsByBbox(west, south, east, north, fetchDays);
+        const cutoffMs = Date.now() - dayRange * 24 * 60 * 60 * 1000;
+        const withinWindow = raw.filter(
+          d => new Date(d.acquiredAt).getTime() >= cutoffMs
+        );
+        ({ detections, truncated } = filterByRadius(withinWindow, latitude, longitude, radius));
       } catch (error) {
         if (!(error instanceof FIRMSKeyRejectedError)) {
           throw error;
