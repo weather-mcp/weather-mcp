@@ -34,7 +34,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 | Global river/flood via Open-Meteo Flood API | ✅ | Shipped in v1.18.0 (developed on `feat/global-rivers` as the v1.15.0 milestone); [`docs/plans/global-rivers-plan.md`](../plans/global-rivers-plan.md); ICR Phase 2; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #1 |
 | UK Environment Agency gauge supplement | 💡 | Descoped from the global-rivers work (2026-08-12) to keep v1.15.0 to one provider; England-only, keyless, OGL v3, 15-min real-time observations |
 | International alerts (MeteoAlarm, MSC GeoMet, WMO CAP) | ✅ | Shipped on `feat/international-alerts` targeting v1.19.0; [`docs/plans/international-alerts-plan.md`](../plans/international-alerts-plan.md); ICR Phase 3; rest-of-world stays out (WMO feeds not production-usable) |
-| Global wildfire via NASA FIRMS (optional MAP_KEY) | 💡 | ICR Phase 4; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #2 |
+| Global wildfire via NASA FIRMS (optional MAP_KEY) | 📝 | Design doc: [`docs/global-wildfire-plan.md`](../global-wildfire-plan.md) (2026-08-14, targeting v1.20.0 on `feat/global-wildfire`; keyless-first — flat regional CSVs, key upgrades to Area-API bbox + multi-day); ICR Phase 4; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #2 |
 | met.no Locationforecast as fallback/second-opinion source | 💡 | ICR Phase 5 |
 | Global climate normals (Open-Meteo archive outside US) | 💡 | ICR Phase 5 |
 | Global fire weather indices (Open-Meteo hourly outside US) | 💡 | ICR Phase 5 |
