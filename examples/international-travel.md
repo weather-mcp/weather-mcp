@@ -36,15 +36,14 @@ get_current_conditions({
 # Current Conditions — Villacoublay, ID, FR (LFPV)
 
 **Station:** Villacoublay, ID, FR (LFPV) — 13 km SW of the requested point, elev 171m
-**Observed:** Aug 13, 2026, 22:00 GMT+2 (8 minutes ago)
+**Observed:** Aug 14, 2026, 20:00 GMT+2 (5 minutes ago)
 
-**Temperature:** 31°C (dew point 7°C, humidity 22%)
-**Wind:** NNE (30°) at 7 km/h
+**Temperature:** 36°C (dew point 10°C, humidity 21%)
+**Wind:** Variable at 2 km/h
 **Visibility:** +9.7 km
-**Pressure:** 1019 hPa
-**Flight category:** VFR
+**Pressure:** 1014 hPa
 
-`METAR LFPV 132000Z AUTO 03004KT CAVOK 31/07 Q1019 NOSIG`
+`METAR LFPV 141800Z AUTO VRB01KT 9999 ///CB 36/10 Q1014 TEMPO VRB15G30KT 4500 -TSRA`
 
 ---
 *Data source: NOAA Aviation Weather Center (aviationweather.gov) — METAR station observation*
@@ -83,17 +82,19 @@ get_air_quality({
 **Timezone:** Europe/Paris
 **Elevation:** 36m
 
-**Observation Time:** 8/13/2026, 10:00:00 PM
+**Observation Time:** 8/14/2026, 8:00:00 PM
 
-## 🟢 European Air Quality Index: 35
+## 🟡 European Air Quality Index: 57
 
-**Category:** Fair (Green)
-**Description:** Air quality is fair
+**Category:** Moderate (Yellow)
+**Description:** Air quality is moderate
 
 **Health Implications:**
-Enjoy your usual outdoor activities.
+Consider reducing intense outdoor activities if you experience symptoms.
 
-## 🟢 UV Index: 0.0
+⚠️ **Caution:** Sensitive individuals should consider reducing intense activities.
+
+## 🟢 UV Index: 0.1
 
 **Level:** Low
 **Description:** Minimal protection required
@@ -101,27 +102,27 @@ Enjoy your usual outdoor activities.
 
 ## Pollutant Concentrations
 
-**PM2.5 (Fine Particulate Matter):** 7.8 μg/m³
-**PM10 (Coarse Particulate Matter):** 17 μg/m³
-**Ozone (O₃):** 87 μg/m³
-**Nitrogen Dioxide (NO₂):** 24 μg/m³
-**Sulfur Dioxide (SO₂):** 1.5 μg/m³
-**Carbon Monoxide (CO):** 195 μg/m³
+**PM2.5 (Fine Particulate Matter):** 10 μg/m³
+**PM10 (Coarse Particulate Matter):** 15 μg/m³
+**Ozone (O₃):** 125 μg/m³
+**Nitrogen Dioxide (NO₂):** 12 μg/m³
+**Sulfur Dioxide (SO₂):** 0.90 μg/m³
+**Carbon Monoxide (CO):** 187 μg/m³
 **Ammonia (NH₃):** 2.8 μg/m³
-**Aerosol Optical Depth:** 0.110 (atmospheric haze indicator)
+**Aerosol Optical Depth:** 0.320 (atmospheric haze indicator)
 
 ## 🌾 Pollen
 
 **Alder:** 0 grains/m³
 **Birch:** 0 grains/m³
-**Grass:** 4.2 grains/m³
-**Mugwort:** 11.7 grains/m³
+**Grass:** 3.1 grains/m³
+**Mugwort:** 4.1 grains/m³
 **Olive:** 0 grains/m³
-**Ragweed:** 0.1 grains/m³
+**Ragweed:** 0.3 grains/m³
 
 *Pollen from the CAMS European forecast — available for European locations only.*
 
-*US AQI: 94 (Moderate)*
+*US AQI: 118 (Unhealthy for Sensitive Groups)*
 ````
 
 </details>
@@ -132,5 +133,5 @@ Enjoy your usual outdoor activities.
 **Features shown:** `source: "metar"` — real airport instrument observations anywhere on earth (station, distance, bearing, observation age always disclosed) · European pollen levels on `get_air_quality` (automatic for European locations) · European EAQI air-quality scale · per-call `units: "metric"`.
 
 <!-- capture-stamp -->
-*Captured 2026-08-13 with weather-mcp v1.18.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

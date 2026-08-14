@@ -157,6 +157,27 @@ const EXAMPLES = [
         tool: 'get_air_quality',
         args: { latitude: 39.7392, longitude: -104.9903 },
       },
+      {
+        id: 'denver-fire-weather',
+        tool: 'get_current_conditions',
+        // US point: NOAA publishes its own fire-weather indices on the
+        // gridpoint API, so this path reports rather than computes.
+        args: { latitude: 39.7392, longitude: -104.9903, include_fire_weather: true },
+      },
+      {
+        id: 'athens-hotspots',
+        tool: 'get_wildfire_info',
+        // Outside the US there are no managed incidents to report — this
+        // routes to NASA FIRMS satellite heat detections instead.
+        args: { latitude: 37.9838, longitude: 23.7275, radius: 200, day_range: 3 },
+      },
+      {
+        id: 'athens-fire-weather',
+        tool: 'get_current_conditions',
+        // Non-US: no agency index exists, so the server computes a Fosberg
+        // index from temperature/humidity/wind and says so.
+        args: { latitude: 37.9838, longitude: 23.7275, include_fire_weather: true },
+      },
     ],
   },
   {

@@ -40,7 +40,14 @@ import {
   parseWindDirection,
   type StationPick
 } from '../utils/metarStation.js';
-import { windDirectionFromDegrees, relativeHumidityFromDewpoint } from '../utils/units.js';
+import {
+  windDirectionFromDegrees,
+  relativeHumidityFromDewpoint,
+  celsiusToFahrenheit,
+  kphToMph,
+  mpsToMph,
+  knotsToMph
+} from '../utils/units.js';
 import { milesToKm } from '../utils/distance.js';
 import { DataNotFoundError, InvalidLocationError, ServiceUnavailableError } from '../errors/ApiError.js';
 import { logger } from '../utils/logger.js';
@@ -53,7 +60,11 @@ import {
   getCurrentFireWeatherValue,
   formatMixingHeight,
   interpretTransportWind,
-  getFireWeatherContext
+  getFireWeatherContext,
+  calculateFosbergIndex,
+  getFosbergCategory,
+  describeVpd,
+  describeTopsoilMoisture
 } from '../utils/fireWeather.js';
 import { extractSnowDepth, formatSnowData, hasWinterWeather } from '../utils/snow.js';
 import {
@@ -644,6 +655,102 @@ async function formatNOAACurrentConditions(
 }
 
 /**
+ * Normalize a temperature that arrived in the caller's preferred unit back to
+ * the fixed °F the Fosberg index requires.
+ *
+ * Open-Meteo converts server-side (`openMeteoUnitParams`), so the response
+ * carries the caller's units. Normalizing here rather than issuing a second
+ * fixed-unit fetch is design decision D4.
+ */
+function prefsTempToFahrenheit(value: number, prefs: UnitPreferences): number {
+  return prefs.temperature === 'C' ? celsiusToFahrenheit(value) : value;
+}
+
+/** Normalize a wind speed from the caller's preferred unit to fixed mph (D4). */
+function prefsWindToMph(value: number, prefs: UnitPreferences): number {
+  switch (prefs.windSpeed) {
+    case 'kmh':
+      return kphToMph(value);
+    case 'ms':
+      return mpsToMph(value);
+    case 'kn':
+      return knotsToMph(value);
+    default:
+      return value;
+  }
+}
+
+/**
+ * Render the Fire Weather section for the Open-Meteo (model) path: a Fosberg
+ * Fire Weather Index computed by this server from current values, plus dryness
+ * context (D5), carrying the derivation disclosure (D6).
+ *
+ * `getFireWeatherContext` — US geography boxes and northern-hemisphere
+ * seasonality — is deliberately never called here; the index reflects actual
+ * current conditions and is hemisphere-proof by construction.
+ *
+ * Sustained wind feeds the index; gusts are display context only and are
+ * already rendered above, so inputs are not repeated in this section.
+ */
+function formatOpenMeteoFireWeather(
+  temperature: number | null | undefined,
+  relativeHumidity: number | null | undefined,
+  windSpeed: number | null | undefined,
+  vpdKPa: number | null | undefined,
+  topsoilMoisture: number | null | undefined,
+  prefs: UnitPreferences
+): string {
+  let output = `\n## Fire Weather\n\n`;
+
+  const ffwi =
+    temperature != null && relativeHumidity != null && windSpeed != null
+      ? calculateFosbergIndex(
+          prefsTempToFahrenheit(temperature, prefs),
+          relativeHumidity,
+          prefsWindToMph(windSpeed, prefs)
+        )
+      : NaN;
+
+  if (!Number.isFinite(ffwi)) {
+    output += `⚠️ Fire weather inputs unavailable for this location.\n`;
+    return output;
+  }
+
+  // Categorize the displayed (rounded) value so the number and the label
+  // never disagree at a band edge.
+  const index = Math.round(ffwi);
+  const category = getFosbergCategory(index);
+  const emoji =
+    category.level === 'Low' ? '🟢' :
+    category.level === 'Moderate' ? '🟡' :
+    category.level === 'High' ? '🟠' : '🔴';
+
+  output += `**${emoji} Fosberg Fire Weather Index:** ${index} (${category.level})\n`;
+  output += `Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.\n\n`;
+
+  // Open ocean returns HTTP 200 with null dryness fields (Flood-API
+  // precedent): omit the line, or the whole block when both are missing.
+  const hasVpd = vpdKPa !== undefined && vpdKPa !== null && Number.isFinite(vpdKPa);
+  const hasSoil =
+    topsoilMoisture !== undefined && topsoilMoisture !== null && Number.isFinite(topsoilMoisture);
+
+  if (hasVpd || hasSoil) {
+    output += `**Dryness context:**\n`;
+    if (hasVpd) {
+      output += `- **Vapour-pressure deficit:** ${vpdKPa!.toFixed(1)} kPa (${describeVpd(vpdKPa!)})\n`;
+    }
+    if (hasSoil) {
+      output += `- **Topsoil moisture (top 1 cm):** ${topsoilMoisture!.toFixed(2)} m³/m³ (${describeTopsoilMoisture(topsoilMoisture!)})\n`;
+    }
+    output += `\n`;
+  }
+
+  output += `*Derived by this server from Open-Meteo model data — not an official fire-danger rating. Heed warnings from your national fire authority.*\n`;
+
+  return output;
+}
+
+/**
  * Format current conditions from Open-Meteo model data (non-US locations).
  *
  * Values arrive already in the caller's preferred units (Open-Meteo converts
@@ -665,7 +772,12 @@ async function formatOpenMeteoCurrentConditions(
   const windU = windSpeedLabel(prefs);
   const precipU = precipitationLabel(prefs);
 
-  const response = await openMeteoService.getCurrentConditions(latitude, longitude, prefs);
+  const response = await openMeteoService.getCurrentConditions(
+    latitude,
+    longitude,
+    prefs,
+    includeFireWeather
+  );
   // getCurrentConditions rejects responses without a `current` block.
   const current = response.current!;
   const timezone = response.timezone;
@@ -677,7 +789,7 @@ async function formatOpenMeteoCurrentConditions(
     output += `**Conditions:** ${openMeteoService.getWeatherDescription(current.weather_code)}\n`;
   }
 
-  if (current.temperature_2m !== undefined) {
+  if (current.temperature_2m != null) {
     output += `**Temperature:** ${Math.round(current.temperature_2m)}${tempU}\n`;
 
     // Feels-like only earns a line when it diverges meaningfully from actual.
@@ -705,11 +817,11 @@ async function formatOpenMeteoCurrentConditions(
     output += `**Dewpoint:** ${Math.round(current.dew_point_2m)}${tempU}\n`;
   }
 
-  if (current.relative_humidity_2m !== undefined) {
+  if (current.relative_humidity_2m != null) {
     output += `**Humidity:** ${Math.round(current.relative_humidity_2m)}%\n`;
   }
 
-  if (current.wind_speed_10m !== undefined) {
+  if (current.wind_speed_10m != null) {
     output += `**Wind:** ${Math.round(current.wind_speed_10m)} ${windU}`;
     if (current.wind_direction_10m !== undefined) {
       output += ` from ${Math.round(current.wind_direction_10m)}°`;
@@ -761,11 +873,17 @@ async function formatOpenMeteoCurrentConditions(
     }
   }
 
-  // Fire Weather section (optional) — indices are US-only for now, so the
-  // non-US path makes no NOAA call at all.
+  // Fire Weather section (optional) — a server-computed Fosberg index off the
+  // model values already in hand; this path never makes a NOAA call.
   if (includeFireWeather) {
-    output += `\n## Fire Weather\n\n`;
-    output += `Fire weather indices are currently available for US locations only.\n`;
+    output += formatOpenMeteoFireWeather(
+      current.temperature_2m,
+      current.relative_humidity_2m,
+      current.wind_speed_10m,
+      current.vapour_pressure_deficit,
+      current.soil_moisture_0_to_1cm,
+      prefs
+    );
   }
 
   // Climate Normals section (optional)
@@ -1093,7 +1211,8 @@ async function formatMetarCurrentConditions(
   if (includeFireWeather) {
     output += `\n## Fire Weather\n\n`;
     output += `Fire weather indices are not available on the METAR source — they `;
-    output += `require NOAA gridpoint data. Use \`source: "noaa"\` for a US location.\n`;
+    output += `require NOAA gridpoint data. Use \`source: "noaa"\` for a US location, `;
+    output += `or omit \`source\` to get a server-computed Fosberg index from model data elsewhere.\n`;
   }
 
   // Climate normals (optional) — supported here exactly as on the other two

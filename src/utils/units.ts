@@ -36,6 +36,13 @@ export function kphToMph(kph: number): number {
 }
 
 /**
+ * Convert knots to miles per hour
+ */
+export function knotsToMph(knots: number): number {
+  return knots * 1.15078;
+}
+
+/**
  * Convert meters to miles
  */
 export function metersToMiles(meters: number): number {

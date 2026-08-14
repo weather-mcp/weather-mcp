@@ -675,51 +675,121 @@ export class OpenMeteoService {
    * @param latitude - Latitude coordinate (-90 to 90)
    * @param longitude - Longitude coordinate (-180 to 180)
    * @param prefs - Unit preferences (default: imperial)
+   * @param includeFireWeather - When true, also request soil moisture and vapour-pressure
+   *   deficit (used to compute the Fosberg Fire Weather Index). Defaults to false so every
+   *   existing caller's request URL is unchanged. If the request 400s with these variables
+   *   attached, the fire variables are treated as best-effort garnish: the request is
+   *   retried once without them (see `fetchCurrentConditions`) rather than failing the
+   *   whole call.
    * @returns Forecast response populated with current conditions
    */
   async getCurrentConditions(
     latitude: number,
     longitude: number,
-    prefs: UnitPreferences = IMPERIAL_PREFERENCES
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES,
+    includeFireWeather = false
   ): Promise<OpenMeteoForecastResponse> {
     // Validate coordinates
     validateLatitude(latitude);
     validateLongitude(longitude);
 
     // Build parameters
-    const params = this.buildCurrentParams(latitude, longitude, prefs);
+    const params = this.buildCurrentParams(latitude, longitude, prefs, includeFireWeather);
 
-    // Check cache first (unit signature keeps imperial/metric responses distinct)
+    // Check cache first (unit signature keeps imperial/metric responses distinct; the
+    // fire-weather flag keeps requests with the extra variables from serving/being served
+    // by a cache entry that lacks them)
     if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('openmeteo-current', latitude, longitude, unitSignature(prefs));
+      const cacheKey = Cache.generateKey(
+        'openmeteo-current',
+        latitude,
+        longitude,
+        unitSignature(prefs),
+        includeFireWeather
+      );
       const cached = this.cache.get(cacheKey);
       if (cached) {
         return cached as OpenMeteoForecastResponse;
       }
 
-      const response = await this.makeRequestToForecast<OpenMeteoForecastResponse>('/forecast', params);
-      this.validateCurrentResponse(response);
+      const response = await this.fetchCurrentConditions(
+        latitude,
+        longitude,
+        prefs,
+        includeFireWeather,
+        params
+      );
 
-      // Cache for 15 minutes (current conditions update every 20-60 minutes)
+      // Cache for 15 minutes (current conditions update every 20-60 minutes). If the fire
+      // variables were rejected and a garnish-free retry succeeded, the degraded response is
+      // cached under this same (includeFireWeather = true) key — a re-request with the flag
+      // would 400 on the same variables again.
       this.cache.set(cacheKey, response, CacheConfig.ttl.currentConditions);
 
       return response;
     }
 
     // No caching
-    const response = await this.makeRequestToForecast<OpenMeteoForecastResponse>('/forecast', params);
-    this.validateCurrentResponse(response);
-    return response;
+    return this.fetchCurrentConditions(latitude, longitude, prefs, includeFireWeather, params);
+  }
+
+  /**
+   * Issue the current-conditions request, retrying once without the fire-weather variables
+   * if `includeFireWeather` is set and Open-Meteo rejects the request with a 400
+   * (`InvalidLocationError`). Fire weather is best-effort garnish (matching the ACIS/NIFC
+   * precedent elsewhere in this codebase) — it must never take down the whole call.
+   *
+   * Only a 400 (`InvalidLocationError`) triggers the retry. Any other error class (rate
+   * limit, 5xx, etc.) propagates immediately, since the fire variables were not the cause.
+   * If the retry itself also fails, that error propagates — the original 400 was not the
+   * garnish's fault, so no further fallback is attempted.
+   *
+   * @private
+   */
+  private async fetchCurrentConditions(
+    latitude: number,
+    longitude: number,
+    prefs: UnitPreferences,
+    includeFireWeather: boolean,
+    params: Record<string, string | number>
+  ): Promise<OpenMeteoForecastResponse> {
+    try {
+      const response = await this.makeRequestToForecast<OpenMeteoForecastResponse>('/forecast', params);
+      this.validateCurrentResponse(response);
+      return response;
+    } catch (error) {
+      if (!includeFireWeather || !(error instanceof InvalidLocationError)) {
+        throw error;
+      }
+
+      logger.warn('Fire-weather variables rejected by Open-Meteo; retrying current conditions without them', {
+        service: 'OpenMeteo',
+        reason: error.message
+      });
+
+      const fallbackParams = this.buildCurrentParams(latitude, longitude, prefs, false);
+      const retryResponse = await this.makeRequestToForecast<OpenMeteoForecastResponse>(
+        '/forecast',
+        fallbackParams
+      );
+      this.validateCurrentResponse(retryResponse);
+      return retryResponse;
+    }
   }
 
   /**
    * Build request parameters for current conditions data
+   *
+   * @param includeFireWeather - When true, appends soil moisture and vapour-pressure
+   *   deficit to the `current` variable list. These two variables are always returned
+   *   in fixed units (m³/m³ and kPa) — they are not affected by `openMeteoUnitParams`.
    * @private
    */
   private buildCurrentParams(
     latitude: number,
     longitude: number,
-    prefs: UnitPreferences = IMPERIAL_PREFERENCES
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES,
+    includeFireWeather = false
   ): Record<string, string | number> {
     const params: Record<string, string | number> = {
       latitude,
@@ -729,7 +799,7 @@ export class OpenMeteoService {
       timezone: 'auto'
     };
 
-    params.current = [
+    const currentVariables = [
       'temperature_2m',
       'relative_humidity_2m',
       'apparent_temperature',
@@ -745,7 +815,13 @@ export class OpenMeteoService {
       'wind_speed_10m',
       'wind_direction_10m',
       'wind_gusts_10m'
-    ].join(',');
+    ];
+
+    if (includeFireWeather) {
+      currentVariables.push('soil_moisture_0_to_1cm', 'vapour_pressure_deficit');
+    }
+
+    params.current = currentVariables.join(',');
 
     params.daily = 'temperature_2m_max,temperature_2m_min';
 

@@ -45,8 +45,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:00 PM
-**River Stage:** 1.55 ft  → steady (last 4h)
+**Observed:** Aug 14, 2026, 12:00 PM
+**River Stage:** 1.23 ft  ↘ falling (-0.1 ft / 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ### Forecast
@@ -55,63 +55,63 @@ get_river_conditions({
 **Forecasted Category:** ✅ NO FLOODING
 
 ### Forecast Series
-- **Aug 13, 2026, 1:00 PM:** 1.60 ft
-- **Aug 13, 2026, 7:00 PM:** 1.50 ft
-- **Aug 14, 2026, 1:00 AM:** 1.40 ft
-- **Aug 14, 2026, 7:00 AM:** 1.30 ft
-- **Aug 14, 2026, 1:00 PM:** 1.10 ft
-- **Aug 14, 2026, 7:00 PM:** 1.00 ft
-- **Aug 15, 2026, 1:00 AM:** 1.00 ft
-- **Aug 15, 2026, 7:00 AM:** 1.10 ft
-- **Aug 15, 2026, 1:00 PM:** 1.30 ft
-- **Aug 15, 2026, 7:00 PM:** 1.50 ft
-- **Aug 16, 2026, 1:00 AM:** 1.90 ft
-- **Aug 16, 2026, 7:00 AM:** 2.30 ft
-- **Aug 16, 2026, 1:00 PM:** 2.80 ft
-- **Aug 16, 2026, 7:00 PM:** 3.30 ft
-- **Aug 17, 2026, 1:00 AM:** 4.00 ft
-- **Aug 17, 2026, 7:00 AM:** 4.60 ft
-- **Aug 17, 2026, 1:00 PM:** 5.20 ft
-- **Aug 17, 2026, 7:00 PM:** 5.50 ft
-- **Aug 18, 2026, 1:00 AM:** 5.90 ft
+- **Aug 14, 2026, 1:00 PM:** 1.20 ft
+- **Aug 14, 2026, 7:00 PM:** 1.10 ft
+- **Aug 15, 2026, 1:00 AM:** 1.10 ft
+- **Aug 15, 2026, 7:00 AM:** 1.30 ft
+- **Aug 15, 2026, 1:00 PM:** 1.50 ft
+- **Aug 15, 2026, 7:00 PM:** 1.80 ft
+- **Aug 16, 2026, 1:00 AM:** 2.10 ft
+- **Aug 16, 2026, 7:00 AM:** 2.60 ft
+- **Aug 16, 2026, 1:00 PM:** 3.20 ft
+- **Aug 16, 2026, 7:00 PM:** 3.50 ft
+- **Aug 17, 2026, 1:00 AM:** 4.10 ft
+- **Aug 17, 2026, 7:00 AM:** 4.70 ft
+- **Aug 17, 2026, 1:00 PM:** 5.10 ft
+- **Aug 17, 2026, 7:00 PM:** 5.30 ft
+- **Aug 18, 2026, 1:00 AM:** 5.60 ft
 - **Aug 18, 2026, 7:00 AM:** 6.30 ft
-- **Aug 18, 2026, 1:00 PM:** 6.50 ft
-- **Aug 18, 2026, 7:00 PM:** 6.80 ft
-- **Aug 19, 2026, 1:00 AM:** 7.20 ft
-- **Aug 19, 2026, 7:00 AM:** 7.60 ft
-- **Aug 19, 2026, 1:00 PM:** 8.10 ft
-- **Aug 19, 2026, 7:00 PM:** 8.40 ft
-- **Aug 20, 2026, 1:00 AM:** 8.80 ft
-- **Aug 20, 2026, 7:00 AM:** 9.20 ft
-- **Aug 20, 2026, 1:00 PM:** 9.40 ft
-- **Aug 20, 2026, 7:00 PM:** 9.70 ft
-- **Aug 21, 2026, 1:00 AM:** 10.00 ft
-- **Aug 21, 2026, 7:00 AM:** 10.30 ft
-- **Aug 21, 2026, 1:00 PM:** 10.40 ft
+- **Aug 18, 2026, 1:00 PM:** 6.60 ft
+- **Aug 18, 2026, 7:00 PM:** 6.70 ft
+- **Aug 19, 2026, 1:00 AM:** 6.90 ft
+- **Aug 19, 2026, 7:00 AM:** 7.40 ft
+- **Aug 19, 2026, 1:00 PM:** 7.80 ft
+- **Aug 19, 2026, 7:00 PM:** 8.00 ft
+- **Aug 20, 2026, 1:00 AM:** 8.50 ft
+- **Aug 20, 2026, 7:00 AM:** 9.00 ft
+- **Aug 20, 2026, 1:00 PM:** 9.30 ft
+- **Aug 20, 2026, 7:00 PM:** 9.60 ft
+- **Aug 21, 2026, 1:00 AM:** 9.90 ft
+- **Aug 21, 2026, 7:00 AM:** 10.20 ft
+- **Aug 21, 2026, 1:00 PM:** 10.30 ft
 - **Aug 21, 2026, 7:00 PM:** 10.50 ft
-- **Aug 22, 2026, 1:00 AM:** 10.40 ft
-- **Aug 22, 2026, 7:00 AM:** 10.30 ft
-- **Aug 22, 2026, 1:00 PM:** 10.10 ft
-- **Aug 22, 2026, 7:00 PM:** 9.70 ft
-- **Aug 23, 2026, 1:00 AM:** 9.20 ft
-- **Aug 23, 2026, 7:00 AM:** 8.80 ft
-- **Aug 23, 2026, 1:00 PM:** 8.30 ft
-- **Aug 23, 2026, 7:00 PM:** 7.80 ft
-- **Aug 24, 2026, 1:00 AM:** 7.20 ft
-- **Aug 24, 2026, 7:00 AM:** 6.80 ft
-- **Aug 24, 2026, 1:00 PM:** 6.40 ft
-- **Aug 24, 2026, 7:00 PM:** 6.10 ft
-- **Aug 25, 2026, 1:00 AM:** 5.90 ft
-- **Aug 25, 2026, 7:00 AM:** 5.70 ft
-- **Aug 25, 2026, 1:00 PM:** 5.50 ft
-- **Aug 25, 2026, 7:00 PM:** 5.30 ft
-- **Aug 26, 2026, 1:00 AM:** 5.10 ft
-- **Aug 26, 2026, 7:00 AM:** 5.00 ft
-- **Aug 26, 2026, 1:00 PM:** 4.80 ft
-- **Aug 26, 2026, 7:00 PM:** 4.60 ft
-- **Aug 27, 2026, 1:00 AM:** 4.50 ft
-- **Aug 27, 2026, 7:00 AM:** 4.30 ft
-- **Aug 27, 2026, 1:00 PM:** 4.20 ft
+- **Aug 22, 2026, 1:00 AM:** 10.50 ft
+- **Aug 22, 2026, 7:00 AM:** 10.40 ft
+- **Aug 22, 2026, 1:00 PM:** 10.30 ft
+- **Aug 22, 2026, 7:00 PM:** 10.00 ft
+- **Aug 23, 2026, 1:00 AM:** 9.80 ft
+- **Aug 23, 2026, 7:00 AM:** 9.50 ft
+- **Aug 23, 2026, 1:00 PM:** 9.30 ft
+- **Aug 23, 2026, 7:00 PM:** 9.00 ft
+- **Aug 24, 2026, 1:00 AM:** 8.80 ft
+- **Aug 24, 2026, 7:00 AM:** 8.50 ft
+- **Aug 24, 2026, 1:00 PM:** 8.20 ft
+- **Aug 24, 2026, 7:00 PM:** 8.00 ft
+- **Aug 25, 2026, 1:00 AM:** 7.70 ft
+- **Aug 25, 2026, 7:00 AM:** 7.50 ft
+- **Aug 25, 2026, 1:00 PM:** 7.20 ft
+- **Aug 25, 2026, 7:00 PM:** 7.00 ft
+- **Aug 26, 2026, 1:00 AM:** 6.70 ft
+- **Aug 26, 2026, 7:00 AM:** 6.50 ft
+- **Aug 26, 2026, 1:00 PM:** 6.30 ft
+- **Aug 26, 2026, 7:00 PM:** 6.10 ft
+- **Aug 27, 2026, 1:00 AM:** 5.80 ft
+- **Aug 27, 2026, 7:00 AM:** 5.60 ft
+- **Aug 27, 2026, 1:00 PM:** 5.40 ft
+- **Aug 27, 2026, 7:00 PM:** 5.20 ft
+- **Aug 28, 2026, 1:00 AM:** 5.00 ft
+- **Aug 28, 2026, 7:00 AM:** 4.80 ft
+- **Aug 28, 2026, 1:00 PM:** 4.60 ft
 
 ---
 
@@ -124,8 +124,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 1:45 PM
-**River Stage:** 6.60 ft  → steady (last 6h)
+**Observed:** Aug 14, 2026, 11:45 AM
+**River Stage:** 6.61 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ---
@@ -139,8 +139,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:15 PM
-**River Stage:** -2.59 ft  → steady (last 4h)
+**Observed:** Aug 14, 2026, 11:15 AM
+**River Stage:** -2.60 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ---
@@ -154,8 +154,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 1:00 PM
-**River Stage:** 5.45 ft  → steady (last 4h)
+**Observed:** Aug 14, 2026, 11:00 AM
+**River Stage:** 5.43 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ---
@@ -169,8 +169,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:30 PM
-**River Stage:** 1.80 ft  → steady (last 5h)
+**Observed:** Aug 14, 2026, 12:30 PM
+**River Stage:** 1.78 ft  → steady (last 6h)
 **Flood Category:** ✅ NOT DEFINED
 
 ---
@@ -184,8 +184,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 1:45 PM
-**River Stage:** 1.77 ft  → steady (last 6h)
+**Observed:** Aug 14, 2026, 11:45 AM
+**River Stage:** 1.74 ft  → steady (last 6h)
 **Flood Category:** ✅ NOT DEFINED
 
 ---
@@ -199,10 +199,38 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 1:45 PM
-**River Stage:** 2.99 ft  → steady (last 5h)
-**Flow Rate:** 0.41 kcfs (409 cfs)
+**Observed:** Aug 14, 2026, 11:45 AM
+**River Stage:** 2.94 ft  → steady (last 6h)
+**Flow Rate:** 0.40 kcfs (396 cfs)
 **Flood Category:** ✅ NO FLOODING
+
+### Forecast
+**Valid Time:** Aug 14, 2026, 1:00 PM
+**Forecasted Stage:** 3.00 ft
+**Forecasted Flow:** 0.41 kcfs
+**Forecasted Category:** ✅ NO FLOODING
+
+### Forecast Series
+- **Aug 14, 2026, 1:00 PM:** 3.00 ft
+- **Aug 14, 2026, 7:00 PM:** 2.90 ft
+- **Aug 15, 2026, 1:00 AM:** 2.90 ft
+- **Aug 15, 2026, 7:00 AM:** 2.90 ft
+- **Aug 15, 2026, 1:00 PM:** 2.90 ft
+- **Aug 15, 2026, 7:00 PM:** 2.90 ft
+- **Aug 16, 2026, 1:00 AM:** 2.90 ft
+- **Aug 16, 2026, 7:00 AM:** 2.90 ft
+- **Aug 16, 2026, 1:00 PM:** 2.90 ft
+- **Aug 16, 2026, 7:00 PM:** 2.80 ft
+- **Aug 17, 2026, 1:00 AM:** 2.80 ft
+- **Aug 17, 2026, 7:00 AM:** 2.80 ft
+- **Aug 17, 2026, 1:00 PM:** 2.80 ft
+- **Aug 17, 2026, 7:00 PM:** 2.80 ft
+- **Aug 18, 2026, 1:00 AM:** 2.80 ft
+- **Aug 18, 2026, 7:00 AM:** 2.80 ft
+- **Aug 18, 2026, 1:00 PM:** 2.80 ft
+- **Aug 18, 2026, 7:00 PM:** 2.80 ft
+- **Aug 19, 2026, 1:00 AM:** 2.80 ft
+- **Aug 19, 2026, 7:00 AM:** 2.80 ft
 
 ---
 
@@ -215,8 +243,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 1:45 PM
-**River Stage:** 6.54 ft  → steady (last 6h)
+**Observed:** Aug 14, 2026, 11:45 AM
+**River Stage:** 6.47 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ---
@@ -230,8 +258,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:00 PM
-**River Stage:** 9.53 ft  → steady (last 5h)
+**Observed:** Aug 14, 2026, 12:00 PM
+**River Stage:** 9.53 ft  → steady (last 6h)
 **Flow Rate:** 0.02 kcfs (19 cfs)
 **Flood Category:** ✅ NO FLOODING
 
@@ -246,8 +274,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:15 PM
-**River Stage:** 3.70 ft  → steady (last 5h)
+**Observed:** Aug 14, 2026, 12:15 PM
+**River Stage:** 3.71 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ---
@@ -261,8 +289,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 1:45 PM
-**River Stage:** 11.08 ft  → steady (last 5h)
+**Observed:** Aug 14, 2026, 11:45 AM
+**River Stage:** 11.03 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ---
@@ -276,8 +304,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 1:45 PM
-**River Stage:** 3.16 ft  → steady (last 6h)
+**Observed:** Aug 14, 2026, 11:45 AM
+**River Stage:** 3.12 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ---
@@ -291,9 +319,9 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:00 PM
-**River Stage:** 0.58 ft  → steady (last 5h)
-**Flow Rate:** 0.06 kcfs (56 cfs)
+**Observed:** Aug 14, 2026, 12:00 PM
+**River Stage:** 0.51 ft  → steady (last 6h)
+**Flow Rate:** 0.05 kcfs (49 cfs)
 **Flood Category:** ✅ NO FLOODING
 
 ---
@@ -307,10 +335,38 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:15 PM
-**River Stage:** 1.11 ft  → steady (last 5h)
-**Flow Rate:** 0.13 kcfs (131 cfs)
+**Observed:** Aug 14, 2026, 12:15 PM
+**River Stage:** 1.08 ft  → steady (last 6h)
+**Flow Rate:** 0.13 kcfs (128 cfs)
 **Flood Category:** ✅ NO FLOODING
+
+### Forecast
+**Valid Time:** Aug 14, 2026, 1:00 PM
+**Forecasted Stage:** 1.10 ft
+**Forecasted Flow:** 0.13 kcfs
+**Forecasted Category:** ✅ NO FLOODING
+
+### Forecast Series
+- **Aug 14, 2026, 1:00 PM:** 1.10 ft
+- **Aug 14, 2026, 7:00 PM:** 1.10 ft
+- **Aug 15, 2026, 1:00 AM:** 1.10 ft
+- **Aug 15, 2026, 7:00 AM:** 1.10 ft
+- **Aug 15, 2026, 1:00 PM:** 1.10 ft
+- **Aug 15, 2026, 7:00 PM:** 1.10 ft
+- **Aug 16, 2026, 1:00 AM:** 1.10 ft
+- **Aug 16, 2026, 7:00 AM:** 1.10 ft
+- **Aug 16, 2026, 1:00 PM:** 1.10 ft
+- **Aug 16, 2026, 7:00 PM:** 1.10 ft
+- **Aug 17, 2026, 1:00 AM:** 1.00 ft
+- **Aug 17, 2026, 7:00 AM:** 1.00 ft
+- **Aug 17, 2026, 1:00 PM:** 1.00 ft
+- **Aug 17, 2026, 7:00 PM:** 1.00 ft
+- **Aug 18, 2026, 1:00 AM:** 1.00 ft
+- **Aug 18, 2026, 7:00 AM:** 1.00 ft
+- **Aug 18, 2026, 1:00 PM:** 1.00 ft
+- **Aug 18, 2026, 7:00 PM:** 1.00 ft
+- **Aug 19, 2026, 1:00 AM:** 1.00 ft
+- **Aug 19, 2026, 7:00 AM:** 1.00 ft
 
 ---
 
@@ -323,8 +379,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:00 PM
-**River Stage:** 247.11 ft  ↗ rising (+0.1 ft / 4h)
+**Observed:** Aug 14, 2026, 12:00 PM
+**River Stage:** 247.08 ft  → steady (last 6h)
 **Flood Category:** ✅ NOT DEFINED
 
 ---
@@ -338,8 +394,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:00 PM
-**River Stage:** 205.35 ft  → steady (last 5h)
+**Observed:** Aug 14, 2026, 12:00 PM
+**River Stage:** 205.55 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ---
@@ -353,8 +409,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:00 PM
-**River Stage:** 9.50 ft  → steady (last 3h)
+**Observed:** Aug 14, 2026, 11:00 AM
+**River Stage:** 9.47 ft  ↗ rising (+0.1 ft / 6h)
 **Flood Category:** ✅ NOT DEFINED
 
 ---
@@ -368,10 +424,38 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 2:00 PM
-**River Stage:** 1.86 ft  → steady (last 5h)
-**Flow Rate:** 0.22 kcfs (216 cfs)
+**Observed:** Aug 14, 2026, 12:00 PM
+**River Stage:** 1.79 ft  → steady (last 6h)
+**Flow Rate:** 0.20 kcfs (205 cfs)
 **Flood Category:** ✅ NO FLOODING
+
+### Forecast
+**Valid Time:** Aug 14, 2026, 1:00 PM
+**Forecasted Stage:** 1.80 ft
+**Forecasted Flow:** 0.21 kcfs
+**Forecasted Category:** ✅ NO FLOODING
+
+### Forecast Series
+- **Aug 14, 2026, 1:00 PM:** 1.80 ft
+- **Aug 14, 2026, 7:00 PM:** 1.80 ft
+- **Aug 15, 2026, 1:00 AM:** 1.80 ft
+- **Aug 15, 2026, 7:00 AM:** 1.80 ft
+- **Aug 15, 2026, 1:00 PM:** 1.70 ft
+- **Aug 15, 2026, 7:00 PM:** 1.70 ft
+- **Aug 16, 2026, 1:00 AM:** 1.70 ft
+- **Aug 16, 2026, 7:00 AM:** 1.70 ft
+- **Aug 16, 2026, 1:00 PM:** 1.70 ft
+- **Aug 16, 2026, 7:00 PM:** 1.70 ft
+- **Aug 17, 2026, 1:00 AM:** 1.70 ft
+- **Aug 17, 2026, 7:00 AM:** 1.70 ft
+- **Aug 17, 2026, 1:00 PM:** 1.70 ft
+- **Aug 17, 2026, 7:00 PM:** 1.70 ft
+- **Aug 18, 2026, 1:00 AM:** 1.70 ft
+- **Aug 18, 2026, 7:00 AM:** 1.70 ft
+- **Aug 18, 2026, 1:00 PM:** 1.70 ft
+- **Aug 18, 2026, 7:00 PM:** 1.70 ft
+- **Aug 19, 2026, 1:00 AM:** 1.70 ft
+- **Aug 19, 2026, 7:00 AM:** 1.70 ft
 
 ---
 
@@ -384,8 +468,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 1:00 PM
-**River Stage:** 3.08 ft  → steady (last 4h)
+**Observed:** Aug 14, 2026, 11:00 AM
+**River Stage:** 3.12 ft  → steady (last 6h)
 **Flood Category:** ✅ NOT DEFINED
 
 ---
@@ -399,8 +483,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Aug 13, 2026, 1:00 PM
-**River Stage:** 9.79 ft  ↘ falling (-0.1 ft / 5h)
+**Observed:** Aug 14, 2026, 11:00 AM
+**River Stage:** 9.71 ft  ↘ falling (-0.1 ft / 6h)
 **Flood Category:** ✅ NOT DEFINED
 
 ---
@@ -452,20 +536,20 @@ Nearest modeled river channel: ~6 km E of requested point
 
 ## Current Discharge
 
-**Discharge:** 104,471 m³/s (3,689,363 ft³/s)  ↘ falling (-10% / 6d)
-**vs. recent history:** near the recent average — 31-day mean 135,725 m³/s (4,793,074 ft³/s)
+**Discharge:** 102,801 m³/s (3,630,374 ft³/s)  ↘ falling (-10% / 6d)
+**vs. recent history:** near the recent average — 31-day mean 133,692 m³/s (4,721,280 ft³/s)
 
 ## Ensemble Forecast
 
 Daily median with the p25–p75 ensemble band, in ft³/s, starting today. Members stay tightly clustered for the first few days and diverge from about day 4, so a near-zero band early on reflects that clustering, not certainty.
 
-- **Aug 13:** 3,689,363 · p25–p75 3,689,363–3,689,363
 - **Aug 14:** 3,630,374 · p25–p75 3,630,374–3,630,374
 - **Aug 15:** 3,572,328 · p25–p75 3,572,328–3,572,328
 - **Aug 16:** 3,523,313 · p25–p75 3,523,313–3,523,313
 - **Aug 17:** 3,466,979 · p25–p75 3,459,006–3,466,979
 - **Aug 18:** 3,403,700 · p25–p75 3,403,700–3,403,700
 - **Aug 19:** 3,341,572 · p25–p75 3,341,572–3,341,572
+- **Aug 20:** 3,280,581 · p25–p75 3,273,036–3,280,581
 
 *Note: 3 more forecast days available — use detail="full" for the full range and the min/max envelope*
 
@@ -482,5 +566,5 @@ Daily median with the p25–p75 ensemble band, in ft³/s, starting today. Member
 **Features shown:** US path — NWPS gauge observations, official flood categories, observed trend, forecast series (`detail: "full"`) · global path — GloFAS v4 modeled discharge snapped to the river channel, framed against its own 31-day history and forecast ensemble, `forecast_days` up to 210.
 
 <!-- capture-stamp -->
-*Captured 2026-08-13 with weather-mcp v1.18.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

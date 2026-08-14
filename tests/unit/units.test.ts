@@ -3,6 +3,7 @@ import {
   celsiusToFahrenheit,
   metersToFeet,
   kphToMph,
+  knotsToMph,
   pascalsToInHg,
   pascalsToMb,
   metersToMiles,
@@ -116,6 +117,20 @@ describe('Unit Conversions', () => {
 
       it('should convert 0 m/s to 0 mph', () => {
         expect(mpsToMph(0)).toBe(0);
+      });
+    });
+
+    describe('knotsToMph', () => {
+      it('should convert 10 knots to approximately 11.5078 mph', () => {
+        expect(knotsToMph(10)).toBeCloseTo(11.5078, 4);
+      });
+
+      it('should convert 0 knots to 0 mph', () => {
+        expect(knotsToMph(0)).toBe(0);
+      });
+
+      it('should handle negative values', () => {
+        expect(knotsToMph(-10)).toBeCloseTo(-11.5078, 4);
       });
     });
   });

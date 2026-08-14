@@ -23,6 +23,7 @@ import { AviationWeatherService } from './services/aviationWeather.js';
 import { MeteoAlarmService } from './services/meteoalarm.js';
 import { GeoMetService } from './services/geomet.js';
 import { NIFCService } from './services/nifc.js';
+import { FIRMSService } from './services/firms.js';
 import { GeocodingService } from './services/geocoding.js';
 import { LocationStore } from './services/locationStore.js';
 import { blitzortungService } from './services/blitzortung.js';
@@ -166,6 +167,14 @@ const geoMetService = new GeoMetService();
  * No API key required - uses public ArcGIS REST API
  */
 const nifcService = new NIFCService();
+
+/**
+ * Initialize the NASA FIRMS service for global satellite fire detections.
+ * No API key required — keyless regional flat files serve 24 h data
+ * globally; an optional FIRMS_MAP_KEY upgrades to targeted Area-API bbox
+ * queries with day_range up to 5.
+ */
+const firmsService = new FIRMSService();
 
 /**
  * Initialize the Geocoding service with multi-provider support
@@ -339,14 +348,14 @@ const TOOL_DEFINITIONS = {
 
   get_current_conditions: {
     name: 'get_current_conditions' as const,
-    description: 'Get the most recent weather observation for a location (global coverage). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns NOAA station observations for US locations and Open-Meteo model data for international locations. Optionally includes fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) when requested. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get the most recent weather observation for a location (global coverage). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns NOAA station observations for US locations and Open-Meteo model data for international locations. Optionally includes fire weather indices: NOAA fire-weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) for US locations, or a computed Fosberg Fire Weather Index with dryness context elsewhere, when requested. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         ...LOCATION_SCHEMA_PROPERTIES,
         include_fire_weather: {
           type: 'boolean' as const,
-          description: 'Include fire weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) in the response (default: false, US only)',
+          description: 'US locations get NOAA fire-weather indices (Haines, grassland, red-flag); elsewhere a computed Fosberg Fire Weather Index with dryness context. (default: false)',
           default: false
         },
         include_normals: {
@@ -612,7 +621,7 @@ const TOOL_DEFINITIONS = {
 
   get_wildfire_info: {
     name: 'get_wildfire_info' as const,
-    description: 'Monitor active wildfires and fire perimeters for a location (US focus). Use this when asked about "wildfires nearby", "fire danger", "active fires", "wildfire smoke", "fire perimeters", or "evacuation risk". Returns active wildfire information within specified radius including fire name, size, containment percentage, distance from location, and safety assessment. Provides critical evacuation awareness and air quality impact information. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for wildfire-prone areas.',
+    description: 'Monitor active wildfires and fire activity for a location, worldwide. Use this when asked about "wildfires nearby", "fire danger", "active fires", "wildfire smoke", "fire perimeters", or "evacuation risk". Two data modes routed by country: US locations return NIFC named incidents (fire name, size in acres, containment percentage, distance, safety assessment); locations outside the US return NASA FIRMS satellite heat detections (VIIRS, near real-time), clustered with count, distance, bearing, intensity (fire radiative power), and a safety assessment — no fire names or containment exist in satellite data, and detections can include industrial heat sources or agricultural burns. Provides critical evacuation awareness and air quality impact information. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for wildfire-prone areas.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -623,6 +632,19 @@ const TOOL_DEFINITIONS = {
           minimum: 1,
           maximum: 500,
           default: 100
+        },
+        source: {
+          type: 'string' as const,
+          description: 'Data source: "auto" (default, routes by country — NIFC named incidents for the US, NASA FIRMS satellite detections elsewhere), "nifc" (US incidents only; finds nothing outside the US), or "firms" (satellite detections, works anywhere including the US — useful for fires not yet catalogued as incidents)',
+          enum: ['auto', 'nifc', 'firms'],
+          default: 'auto'
+        },
+        day_range: {
+          type: 'number' as const,
+          description: 'Days of detection history (1-5, default: 1); FIRMS path only, and more than 1 day requires a configured FIRMS_MAP_KEY (keyless data covers the last 24 hours). The NIFC path ignores day_range.',
+          minimum: 1,
+          maximum: 5,
+          default: 1
         },
         ...DETAIL_SCHEMA_PROPERTY
       },
@@ -821,7 +843,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_wildfire_info':
         return await withAnalytics('get_wildfire_info', async () =>
-          handleGetWildfireInfo(args, nifcService, locationStore, geocodingService)
+          handleGetWildfireInfo(
+            args, nifcService, locationStore, geocodingService,
+            firmsService, nominatimService
+          )
         );
 
       case 'save_location':

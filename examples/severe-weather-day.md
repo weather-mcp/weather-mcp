@@ -37,11 +37,11 @@ get_weather_summary({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KOKC
-**Time:** Aug 13, 2026, 3:20 PM (17 minutes ago)
+**Time:** Aug 14, 2026, 12:40 PM (23 minutes ago)
 
 **Conditions:** Clear
-**Temperature:** 104°F
-**Pressure:** 29.83 inHg
+**Temperature:** 99°F
+**Pressure:** 30.00 inHg
 **Visibility:** 10.0 miles
 **Cloud Cover:** Clear at 12500ft
 
@@ -57,27 +57,27 @@ get_weather_summary({
 **Showing:** 4 periods
 
 ## This Afternoon
-**Temperature:** 103°F
-**Precipitation Chance:** 0%
-**Wind:** 16 mph SSW
+**Temperature:** 104°F
+**Precipitation Chance:** 1%
+**Wind:** 15 mph SSW
 **Forecast:** Sunny
 
 ## Tonight
-**Temperature:** 81°F
-**Precipitation Chance:** 2%
-**Wind:** 16 mph S
+**Temperature:** 80°F
+**Precipitation Chance:** 0%
+**Wind:** 12 to 15 mph S
 **Forecast:** Clear
 
-## Friday
+## Saturday
 **Temperature:** 102°F
-**Precipitation Chance:** 3%
-**Wind:** 17 mph SSW
+**Precipitation Chance:** 0%
+**Wind:** 13 mph SSW
 **Forecast:** Sunny
 
-## Friday Night
-**Temperature:** 79°F
-**Precipitation Chance:** 3%
-**Wind:** 12 to 15 mph S
+## Saturday Night
+**Temperature:** 81°F
+**Precipitation Chance:** 0%
+**Wind:** 9 to 13 mph S
 **Forecast:** Mostly Clear
 
 ---
@@ -89,18 +89,18 @@ get_weather_summary({
 
 **Location:** 35.4730, -97.5171
 **Status:** Active alerts only
-**Updated:** Aug 13, 2026, 3:36 PM
+**Updated:** Aug 14, 2026, 1:02 PM
 
 ⚠️ **1 active alert found**
 
 🟡 **Heat Advisory**
 ---
-**Heat Advisory issued August 13 at 12:48PM CDT until August 16 at 7:00PM CDT by NWS Norman OK**
+**Heat Advisory issued August 14 at 9:00AM CDT until August 16 at 7:00PM CDT by NWS Norman OK**
 
 **Severity:** Moderate | **Urgency:** Expected | **Certainty:** Likely
 **Area:** Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Stephens; Garvin; Murray; Pontotoc; Coal; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan
-**Effective:** Aug 13, 2026, 12:48 PM
-**Expires:** Aug 14, 2026, 3:30 AM
+**Effective:** Aug 14, 2026, 9:00 AM
+**Expires:** Aug 14, 2026, 11:00 PM
 **Ends:** Aug 16, 2026, 7:00 PM
 
 **Recommended Response:** Execute
@@ -154,22 +154,22 @@ get_alerts({
 
 **Location:** 35.4676, -97.5164
 **Status:** Active alerts only
-**Updated:** Aug 13, 2026, 3:36 PM
+**Updated:** Aug 14, 2026, 1:02 PM
 
 ⚠️ **1 active alert found**
 
 🟡 **Heat Advisory**
 ---
-**Heat Advisory issued August 13 at 12:48PM CDT until August 16 at 7:00PM CDT by NWS Norman OK**
+**Heat Advisory issued August 14 at 9:00AM CDT until August 16 at 7:00PM CDT by NWS Norman OK**
 
 **Severity:** Moderate | **Urgency:** Expected | **Certainty:** Likely
 **Area:** Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Stephens; Garvin; Murray; Pontotoc; Coal; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan
-**Effective:** Aug 13, 2026, 12:48 PM
-**Expires:** Aug 14, 2026, 3:30 AM
+**Effective:** Aug 14, 2026, 9:00 AM
+**Expires:** Aug 14, 2026, 11:00 PM
 **Ends:** Aug 16, 2026, 7:00 PM
 
 **Description:**
-* WHAT...Heat index values of 105 to 110 expected.
+* WHAT...Heat index values up to 110 expected.
 
 * WHERE...Portions of central, east central, southeast, and southern
 Oklahoma.
@@ -230,14 +230,14 @@ get_weather_imagery({
 
 ## 🎬 Animation Frames (13 frames)
 
-### Frame 1 - 2026-08-13T18:30:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/061f0cb2acc8/512/6/14/25/4/1_1.png
+### Frame 1 - 2026-08-14T16:00:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/f6081e2877c2/512/6/14/25/4/1_1.png
 
-### Frame 7 - 2026-08-13T19:30:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/8fdb47068a61/512/6/14/25/4/1_1.png
+### Frame 7 - 2026-08-14T17:00:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/7fcf71dea4f5/512/6/14/25/4/1_1.png
 
-### Frame 13 - 2026-08-13T20:30:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/155731d3c90c/512/6/14/25/4/1_1.png
+### Frame 13 - 2026-08-14T18:00:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/976bc5372bde/512/6/14/25/4/1_1.png
 
 *Showing 3 of 13 frames for brevity — use detail="full" for all frames*
 
@@ -249,7 +249,7 @@ get_weather_imagery({
 ⚠️ **DISCLAIMER:** RainViewer provides global precipitation radar. Data may have 5-10 minute delay. For official forecasts, consult local meteorological services.
 
 ---
-*Generated: 2026-08-13T20:36:46.024Z*
+*Generated: 2026-08-14T18:03:21.395Z*
 *Data source: RainViewer*
 ````
 
@@ -261,5 +261,5 @@ get_weather_imagery({
 **Features shown:** `get_weather_summary` one-call overview (current + forecast + alerts) · `get_alerts` `detail` levels (`standard` vs `full` alert text) · `get_weather_imagery` animated radar (RainViewer).
 
 <!-- capture-stamp -->
-*Captured 2026-08-13 with weather-mcp v1.18.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

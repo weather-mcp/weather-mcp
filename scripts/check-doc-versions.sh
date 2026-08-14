@@ -82,9 +82,23 @@ fi
 # Check test count consistency
 echo ""
 echo "🧪 Checking test count consistency..."
-TEST_COUNT=$(npm test 2>&1 | grep -E "Tests.*[0-9]+ passed" | grep -oE '[0-9]+' | head -1)
+# Vitest prints "Tests  1930 passed (1930)" when green, but
+# "Tests  1 failed | 1929 passed (1930)" when anything fails. The
+# parenthetical total is the count the docs quote in both cases, so anchor
+# on it — reading the first number in the line makes one flaky live-network
+# test report a suite of 1 and three phantom doc mismatches.
+# `|| true` keeps a red suite from aborting the script under `set -e`.
+TEST_OUTPUT=$(npm test 2>&1 || true)
+TEST_SUMMARY=$(echo "$TEST_OUTPUT" | grep -E "Tests[[:space:]]+[0-9]" | tail -1)
+TEST_COUNT=$(echo "$TEST_SUMMARY" | grep -oE '\([0-9]+\)' | tail -1 | tr -d '()')
 if [ -n "$TEST_COUNT" ]; then
   echo "📊 Actual test count: ${GREEN}${TEST_COUNT}${NC}"
+
+  # Documentation can be perfectly consistent while the suite is red — that
+  # is a test problem, not a doc problem, so say so without failing here.
+  if echo "$TEST_SUMMARY" | grep -q "failed"; then
+    echo "⚠️  ${YELLOW}Test suite is not green${NC} — counts checked against the total; run 'npm test'"
+  fi
 
   # Check README.md test count
   README_TEST_COUNT=$(grep -E "[0-9,]+ (automated )?tests" README.md | head -1 | tr -d ',' | grep -oE '[0-9]+' | head -1)

@@ -476,18 +476,211 @@ describe('handleGetCurrentConditions — Open-Meteo formatter', () => {
 // ---------------------------------------------------------------------------
 
 describe('handleGetCurrentConditions — include_fire_weather (non-US)', () => {
-  it('emits the US-only note and makes no gridpoint call', async () => {
-    const fakes = buildFakes();
+  it('renders the computed Fosberg section and makes no NOAA call', async () => {
+    // Default builder: 60°F, 55% RH, 10 mph — a mid-range index.
+    const response = buildOpenMeteoCurrentResponse({
+      vapour_pressure_deficit: 3.7,
+      soil_moisture_0_to_1cm: 0.18,
+    });
+    const fakes = buildFakes(response);
     const result = await callCurrentConditions(
       { ...LONDON, include_fire_weather: true },
       fakes
     );
     const text = textOf(result);
 
-    expect(text).toContain('Fire weather indices are currently available for US locations only.');
+    expect(text).toContain('## Fire Weather');
+    expect(text).toMatch(/\*\*.. Fosberg Fire Weather Index:\*\* \d+ \(/);
+    expect(text).toContain(
+      'Computed from current temperature, humidity, and sustained wind.'
+    );
+    expect(text).toContain('**Dryness context:**');
+    expect(text).toContain('**Vapour-pressure deficit:** 3.7 kPa (extreme drying power)');
+    expect(text).toContain('**Topsoil moisture (top 1 cm):** 0.18 m³/m³ (dry)');
+    expect(text).toContain(
+      '*Derived by this server from Open-Meteo model data — not an official fire-danger rating. Heed warnings from your national fire authority.*'
+    );
+    // The US-only stub is gone.
+    expect(text).not.toContain('Fire weather indices are currently available for US locations only.');
+
+    // The non-US path still makes no NOAA call of any kind.
     expect(fakes.noaa.getGridpointDataByCoordinates).not.toHaveBeenCalled();
     expect(fakes.noaa.getCurrentConditions).not.toHaveBeenCalled();
     expect(fakes.noaa.getStations).not.toHaveBeenCalled();
+  });
+
+  it('omits a single dryness line whose value is null and keeps the block', async () => {
+    const response = buildOpenMeteoCurrentResponse({
+      vapour_pressure_deficit: 2.4,
+      soil_moisture_0_to_1cm: null,
+    });
+    const result = await callCurrentConditions(
+      { ...LONDON, include_fire_weather: true },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    expect(text).toContain('**Dryness context:**');
+    expect(text).toContain('**Vapour-pressure deficit:** 2.4 kPa (high drying power)');
+    expect(text).not.toContain('Topsoil moisture');
+    expect(text).toContain('Fosberg Fire Weather Index:');
+  });
+
+  it('omits the whole dryness block when both values are null, index still renders', async () => {
+    const response = buildOpenMeteoCurrentResponse({
+      vapour_pressure_deficit: null,
+      soil_moisture_0_to_1cm: null,
+    });
+    const result = await callCurrentConditions(
+      { ...LONDON, include_fire_weather: true },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    expect(text).not.toContain('**Dryness context:**');
+    expect(text).toContain('Fosberg Fire Weather Index:');
+    expect(text).toContain('*Derived by this server from Open-Meteo model data');
+  });
+
+  it('renders the unavailable note when a core input is missing', async () => {
+    const response = buildOpenMeteoCurrentResponse({
+      relative_humidity_2m: undefined,
+    });
+    const result = await callCurrentConditions(
+      { ...LONDON, include_fire_weather: true },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    expect(text).toContain('## Fire Weather');
+    expect(text).toContain('⚠️ Fire weather inputs unavailable for this location.');
+    expect(text).not.toContain('Fosberg Fire Weather Index:');
+    expect(text).not.toContain('NaN');
+  });
+
+  it('renders Low rather than suppressing it for cool, humid, light-wind conditions', async () => {
+    const response = buildOpenMeteoCurrentResponse({
+      temperature_2m: 45,
+      relative_humidity_2m: 92,
+      wind_speed_10m: 2,
+    });
+    const result = await callCurrentConditions(
+      { ...LONDON, include_fire_weather: true },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    expect(text).toMatch(/Fosberg Fire Weather Index:\*\* \d+ \(Low\)/);
+  });
+
+  it('produces the same index from metric prefs as from imperial (normalization is pure)', async () => {
+    // 15.5 °C ≡ 59.9 °F, 16.09 km/h ≡ 10.0 mph — the same weather, expressed
+    // in the units Open-Meteo would return for each preference set.
+    const imperial = await callCurrentConditions(
+      { ...LONDON, include_fire_weather: true, units: 'imperial' },
+      buildFakes(
+        buildOpenMeteoCurrentResponse({
+          temperature_2m: 59.9,
+          relative_humidity_2m: 40,
+          wind_speed_10m: 10,
+        })
+      )
+    );
+    const metric = await callCurrentConditions(
+      { ...LONDON, include_fire_weather: true, units: 'metric' },
+      buildFakes(
+        buildOpenMeteoCurrentResponse({
+          temperature_2m: 15.5,
+          relative_humidity_2m: 40,
+          wind_speed_10m: 16.09,
+        })
+      )
+    );
+
+    const indexOf = (text: string): string => {
+      const match = text.match(/Fosberg Fire Weather Index:\*\* (\d+) \((\w+)\)/);
+      expect(match).not.toBeNull();
+      return `${match![1]} ${match![2]}`;
+    };
+
+    expect(indexOf(textOf(metric))).toBe(indexOf(textOf(imperial)));
+  });
+
+  it('passes the fire-weather flag through to the Open-Meteo service', async () => {
+    const fakes = buildFakes();
+    await callCurrentConditions({ ...LONDON, include_fire_weather: true }, fakes);
+
+    expect(fakes.openMeteo.getCurrentConditions).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      expect.anything(),
+      true
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4b. F1 — null (not just undefined) core fire-weather inputs, both unit
+// systems. Open-Meteo returns `null` for absent values; under metric prefs a
+// null temperature/wind used to survive unit conversion
+// (celsiusToFahrenheit(null) -> 32, kphToMph(null) -> 0) and render a
+// fabricated index instead of the unavailable note. See docs/
+// release-review-hardening-plan.md F1/D1.
+// ---------------------------------------------------------------------------
+
+describe('handleGetCurrentConditions — include_fire_weather null core inputs (F1)', () => {
+  it.each([
+    ['temperature_2m', 'imperial'],
+    ['temperature_2m', 'metric'],
+    ['relative_humidity_2m', 'imperial'],
+    ['relative_humidity_2m', 'metric'],
+    ['wind_speed_10m', 'imperial'],
+    ['wind_speed_10m', 'metric'],
+  ] as const)(
+    'renders the unavailable note, never an index, when %s is null under %s prefs',
+    async (field, units) => {
+      const response = buildOpenMeteoCurrentResponse({ [field]: null });
+      const result = await callCurrentConditions(
+        { ...LONDON, include_fire_weather: true, units },
+        buildFakes(response)
+      );
+      const text = textOf(result);
+
+      expect(text).toContain('## Fire Weather');
+      expect(text).toContain('⚠️ Fire weather inputs unavailable for this location.');
+      expect(text).not.toContain('Fosberg Fire Weather Index:');
+      expect(text).not.toContain('NaN');
+    }
+  );
+
+  it('renders the index with dryness omitted when all three core inputs are present but dryness fields are null (imperial)', async () => {
+    const response = buildOpenMeteoCurrentResponse({
+      vapour_pressure_deficit: null,
+      soil_moisture_0_to_1cm: null,
+    });
+    const result = await callCurrentConditions(
+      { ...LONDON, include_fire_weather: true, units: 'imperial' },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    expect(text).toContain('Fosberg Fire Weather Index:');
+    expect(text).not.toContain('**Dryness context:**');
+  });
+
+  it('renders the index with dryness omitted when all three core inputs are present but dryness fields are null (metric)', async () => {
+    const response = buildOpenMeteoCurrentResponse({
+      vapour_pressure_deficit: null,
+      soil_moisture_0_to_1cm: null,
+    });
+    const result = await callCurrentConditions(
+      { ...LONDON, include_fire_weather: true, units: 'metric' },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    expect(text).toContain('Fosberg Fire Weather Index:');
+    expect(text).not.toContain('**Dryness context:**');
   });
 });
 

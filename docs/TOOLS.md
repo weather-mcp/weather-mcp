@@ -24,7 +24,7 @@ Complete reference for all 17 MCP tools provided by the Weather MCP Server.
 10. [get_weather_imagery](#10-get_weather_imagery) — Radar, precipitation, and satellite imagery
 11. [get_lightning_activity](#11-get_lightning_activity) — Strike detection, global
 12. [get_river_conditions](#12-get_river_conditions) — River levels/flooding, global
-13. [get_wildfire_info](#13-get_wildfire_info) — Active fires, US
+13. [get_wildfire_info](#13-get_wildfire_info) — Active fires, global (US: NIFC incidents; elsewhere: NASA FIRMS satellite detections)
 
 **Saved Locations**
 
@@ -92,7 +92,7 @@ Get current weather conditions for a location (global).
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `include_fire_weather` (optional): Include fire weather indices (default: false, US only)
+- `include_fire_weather` (optional): Include fire weather (default: false). US locations get NOAA's published indices; elsewhere a Fosberg Fire Weather Index computed by this server, with dryness context
 - `include_normals` (optional): Include climate normals for comparison (default: false). For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
 - `source` (optional): `"auto"` (default), `"noaa"`, `"openmeteo"`, or `"metar"` — see Description
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
@@ -154,7 +154,7 @@ What's the weather right now in Tokyo?
 - Cloud cover and visibility
 - Snow depth on ground (when available)
 - Climate normals comparison (when `include_normals=true`), plus the US record high/low for today's date with attribution "Records: NOAA Regional Climate Centers (ACIS)"
-- Fire weather indices (when `include_fire_weather=true`) — Haines Index, Grassland Fire Danger, Red Flag Threat, mixing height, transport winds
+- Fire weather indices (when `include_fire_weather=true`) — Haines Index, Grassland Fire Danger, Red Flag Threat, mixing height, transport winds, as published by NOAA
 - All timestamps in local timezone
 
 **Returns (international, via Open-Meteo):**
@@ -163,10 +163,20 @@ What's the weather right now in Tokyo?
 - Dewpoint, humidity, wind with gusts, pressure, cloud cover percentage
 - Recent precipitation (broken out into rain/showers/snowfall when present)
 - Climate normals comparison (when `include_normals=true`)
+- Fire weather (when `include_fire_weather=true`) — a **Fosberg Fire Weather
+  Index computed by this server** from the current temperature, humidity, and
+  sustained wind, with its category, plus a dryness-context block (vapour-pressure
+  deficit, topsoil moisture) when the model reports those values
 - All timestamps in the location's local timezone
 
-Visibility, snow depth, cloud layer detail, and fire weather indices are not
-available on the international path.
+Visibility, snow depth, and cloud layer detail are not available on the
+international path. Neither are NOAA's published fire-danger indices (Haines,
+grassland, red-flag): those are agency products computed on NOAA's gridpoint
+API, and no equivalent exists globally. The Fosberg index shown instead is
+**derived by this server from model data, not an official fire-danger rating** —
+the output says so and defers to national fire authorities, and its category
+bands are a project heuristic rather than an agency scale. It renders anywhere
+the model path runs, including US locations queried with `source="openmeteo"`.
 
 **Returns (worldwide, via `source="metar"`):**
 - Station name, ICAO identifier, distance and bearing from the requested
@@ -588,7 +598,7 @@ Monitor river levels and flood status worldwide — NOAA gauge observations in t
 **Note:** US data provided by NOAA National Water Prediction Service (NWPS). Non-US data provided by the Open-Meteo Flood API (GloFAS v4), licensed CC-BY 4.0 and credited in the output as *"River discharge data by Open-Meteo.com (CC-BY 4.0)"*. Model discharge is **not** a gauge observation and carries no official flood-stage thresholds — do not substitute it for national flood warnings. Border cities that fall inside the US routing boxes (Toronto, Vancouver) route to NOAA and find no gauges; pass `source: "openmeteo"` explicitly for model data there.
 
 ### 13. get_wildfire_info
-Monitor active wildfires and fire perimeters for safety and evacuation planning.
+Monitor active wildfires and fire activity for safety and evacuation planning, worldwide.
 
 **Parameters:**
 - `latitude` (required*): Latitude coordinate (-90 to 90)
@@ -596,22 +606,29 @@ Monitor active wildfires and fire perimeters for safety and evacuation planning.
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `radius` (optional): Search radius in kilometers (1-500, default: 100)
-- `detail` (optional): `"summary"`, `"standard"` (default), or `"full"` — `full` shows up to 25 nearest fires instead of 5
+- `source` (optional): `"auto"` (default — routes by country: NIFC for the US, NASA FIRMS elsewhere), `"nifc"` (US named incidents only; finds nothing outside the US), or `"firms"` (satellite detections, works anywhere including the US — useful for fires not yet catalogued as incidents). There is deliberately no automatic cross-fallback: incidents and detections are different claims.
+- `day_range` (optional): Days of detection history (1-5, default: 1). FIRMS path only; more than 1 day requires a configured `FIRMS_MAP_KEY` (keyless data covers the last 24 hours — the output says so). The NIFC path ignores it.
+- `detail` (optional): `"summary"`, `"standard"` (default), or `"full"` — `full` shows up to 25 nearest fires/clusters instead of 5
 
 *Coordinates not required when `location_name` or `city_name` is provided.
 
-**Description:**
-Provides critical wildfire monitoring and safety information using NIFC (National Interagency Fire Center) data. If the NIFC service truncates its response (ArcGIS transfer limit), the report says so explicitly at every detail level. Reports active wildfires and prescribed burns within the specified radius, including fire size, containment status, and proximity-based safety assessments. Essential for residents in fire-prone regions and outdoor activity planning.
+**Description — two data modes:**
+
+**US locations (NIFC):** critical wildfire monitoring using NIFC (National Interagency Fire Center) WFIGS data — named incidents with fire size, containment status, and proximity-based safety assessments. If the NIFC service truncates its response (ArcGIS transfer limit), the report says so explicitly at every detail level.
+
+**Everywhere else (NASA FIRMS):** near-real-time satellite fire detections from VIIRS (Suomi NPP), landing within ~3 hours of a satellite overpass. These are **heat detections, not managed incidents** — no fire names, sizes, or containment percentages exist, and detections can include industrial heat sources, gas flares, or agricultural burns; the output states this up front. Detections are clustered (2 km radius) so a large fire reads as one entry with a detection count, distance and 16-point bearing, peak fire radiative power (MW) as the intensity signal, newest-detection age, day/night mix, and confidence summary. A result with no detections carries an explicit not-all-clear caveat — cloud cover can hide fires, and small or new fires may evade detection. Works with **zero configuration** (keyless 24 h regional data files); an optional free [`FIRMS_MAP_KEY`](https://firms.modaps.eosdis.nasa.gov/api/map_key/) upgrades to targeted queries and `day_range` up to 5. A rejected key falls back to keyless data with a disclosure note.
+
+Country routing matches `get_alerts`: saved/geocoded locations use their known country, coordinate-only requests use a cached country-level reverse lookup, and border cities inside the approximate US bounding boxes (Toronto, Vancouver) route correctly to FIRMS.
 
 **Examples:**
 ```
 "Are there any wildfires near Los Angeles?" (latitude: 34.0522, longitude: -118.2437)
-"Check for active fires in Colorado"
+"Check for active fires near Athens, Greece"
 "How close is the nearest wildfire?"
-"Show me fire perimeters and containment status"
+"Any satellite fire detections near my location in the last 3 days?" (day_range: 3)
 ```
 
-**Returns:**
+**Returns (US / NIFC):**
 - Active wildfire locations within search radius
 - Fire size in acres and hectares
 - Containment percentage with visual indicator
@@ -619,14 +636,18 @@ Provides critical wildfire monitoring and safety information using NIFC (Nationa
 - Discovery date and days active
 - Fire type (Wildfire vs Prescribed Fire)
 - Location details (state, county, city)
-- 4-level safety assessment:
-  - **EXTREME DANGER** (<5km): Evacuate if advised
-  - **HIGH ALERT** (5-25km): Prepare for evacuation
-  - **CAUTION** (25-50km): Monitor conditions
-  - **AWARENESS** (>50km): Stay informed
-- Evacuation recommendations and safety guidance
 
-**Note:** Data from NIFC WFIGS (Wildland Fire Interagency Geospatial Services). Always consult official sources for evacuation orders at https://inciweb.nwcg.gov/
+**Returns (elsewhere / FIRMS):**
+- Detection clusters within search radius, nearest first
+- Per cluster: detection count, distance + bearing, centroid, peak fire radiative power (MW), newest detection age, day/night mix, confidence summary, satellite
+
+**Both modes** include the 4-level safety assessment (keyed on the nearest uncontained fire for NIFC, the nearest detection cluster for FIRMS):
+- **EXTREME DANGER** (<5km): Evacuate if advised
+- **HIGH ALERT** (5-25km): Prepare for evacuation
+- **CAUTION** (25-50km): Monitor conditions
+- **AWARENESS** (>50km): Stay informed
+
+**Note:** US data from NIFC WFIGS (Wildland Fire Interagency Geospatial Services); global detections from NASA FIRMS (Fire Information for Resource Management System). Always consult official sources for evacuation orders — in the US, https://inciweb.nwcg.gov/
 
 ### 14. save_location
 Save a location with an alias for easy reuse in weather queries.

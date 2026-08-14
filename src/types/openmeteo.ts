@@ -273,8 +273,10 @@ export interface OpenMeteoForecastDailyUnits {
 export interface OpenMeteoCurrentWeather {
   time: string;
   interval: number;
-  temperature_2m?: number;
-  relative_humidity_2m?: number;
+  /** Fire-weather input (Fosberg index). Open-Meteo returns `null` when absent. */
+  temperature_2m?: number | null;
+  /** Fire-weather input (Fosberg index). Open-Meteo returns `null` when absent. */
+  relative_humidity_2m?: number | null;
   apparent_temperature?: number;
   dew_point_2m?: number;
   is_day?: number;
@@ -285,9 +287,14 @@ export interface OpenMeteoCurrentWeather {
   weather_code?: number;
   cloud_cover?: number;
   pressure_msl?: number;
-  wind_speed_10m?: number;
+  /** Fire-weather input (Fosberg index). Open-Meteo returns `null` when absent. */
+  wind_speed_10m?: number | null;
   wind_direction_10m?: number;
   wind_gusts_10m?: number;
+  /** Fire-weather input (Fosberg index). Fixed units (m³/m³), only present when requested. */
+  soil_moisture_0_to_1cm?: number | null;
+  /** Fire-weather input (Fosberg index). Fixed units (kPa), only present when requested. */
+  vapour_pressure_deficit?: number | null;
 }
 
 /**
@@ -311,6 +318,8 @@ export interface OpenMeteoCurrentWeatherUnits {
   wind_speed_10m?: string;
   wind_direction_10m?: string;
   wind_gusts_10m?: string;
+  soil_moisture_0_to_1cm?: string;
+  vapour_pressure_deficit?: string;
 }
 
 /**
