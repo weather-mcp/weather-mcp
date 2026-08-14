@@ -348,7 +348,7 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T1 — Fosberg + dryness-context pure functions (`sonnet`) — `ffafede`
 - [x] T2 — `knotsToMph` (`haiku`) — `745e2f2`
 - [x] T3 — Fire-weather variables on the Open-Meteo current request (`sonnet`) — `14f99bc`
-- [ ] T4 — Fosberg rendering on the Open-Meteo path (`opus`)
+- [x] T4 — Fosberg rendering on the Open-Meteo path (`opus`) — `4b201b8`
 - [ ] T5 — Schema and tool-description updates (`haiku`)
 - [ ] T6 — Integration coverage: mocked end-to-end + tolerant live smoke (`sonnet`)
 - [ ] T7 — Byte-identical sweep + documentation checklist (`opus`)
