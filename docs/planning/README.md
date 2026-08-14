@@ -33,7 +33,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 |------|--------|--------|
 | Global river/flood via Open-Meteo Flood API | ✅ | Shipped in v1.18.0 (developed on `feat/global-rivers` as the v1.15.0 milestone); [`docs/plans/global-rivers-plan.md`](../plans/global-rivers-plan.md); ICR Phase 2; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #1 |
 | UK Environment Agency gauge supplement | 💡 | Descoped from the global-rivers work (2026-08-12) to keep v1.15.0 to one provider; England-only, keyless, OGL v3, 15-min real-time observations |
-| International alerts (MeteoAlarm, MSC GeoMet, WMO CAP) | 💡 | ICR Phase 3 |
+| International alerts (MeteoAlarm, MSC GeoMet, WMO CAP) | 📝 | [`docs/international-alerts-plan.md`](../international-alerts-plan.md) (settled 2026-08-13); ICR Phase 3; rest-of-world stays out (WMO feeds not production-usable) |
 | Global wildfire via NASA FIRMS (optional MAP_KEY) | 💡 | ICR Phase 4; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #2 |
 | met.no Locationforecast as fallback/second-opinion source | 💡 | ICR Phase 5 |
 | Global climate normals (Open-Meteo archive outside US) | 💡 | ICR Phase 5 |
