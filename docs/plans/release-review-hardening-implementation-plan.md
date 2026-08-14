@@ -360,7 +360,9 @@ Three parallel lanes (disjoint files), then a docs/verification close-out:
       asserted the old all-clear — the exact behaviour D3 changes)
 - [x] T5 — F6: split keyed FIRMS bbox queries across the antimeridian (`sonnet`) — `5d81446`
 - [x] T6 — F5: retry without fire variables on a 400 (`sonnet`) — `9180be0`
-- [ ] T7 — Edge-case sweep + documentation checklist (`opus`)
+- [x] T7 — Edge-case sweep + documentation checklist (`opus`) — `93640c8`
+      (all 8 sweep rows pass; a `docs/planning/README.md` row *did* exist,
+      contrary to the assumption above — updated 📝 → ✅ rather than skipped)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T7 sweep covers all
