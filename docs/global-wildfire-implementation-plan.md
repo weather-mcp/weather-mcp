@@ -405,8 +405,8 @@ Spot-checks against the code, reconciled into the tasks below:
 
 ## Progress Tracker
 
-- [ ] T1 — `FIRMS_MAP_KEY` config + `.env.example` (`haiku`)
-- [ ] T2 — FIRMS types + pure hotspot module (`sonnet`)
+- [x] T1 — `FIRMS_MAP_KEY` config + `.env.example` (`haiku`) — `3d2d579`
+- [x] T2 — FIRMS types + pure hotspot module (`sonnet`) — `1e520a8` (orchestrator tightened the US–Canada border-band insets: Canada south bound 50°N, CONUS split at −95° with a 47°N/41°N cap, border cities → Global)
 - [ ] T3 — `FIRMSService` + cache TTLs (`sonnet`)
 - [ ] T4 — Country routing + FIRMS renderer in `get_wildfire_info` (`opus`)
 - [ ] T5 — Routing unit tests (`sonnet`)
