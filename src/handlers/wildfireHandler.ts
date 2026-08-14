@@ -50,6 +50,22 @@ interface WildfireArgs {
 
 type HandlerResult = { content: Array<{ type: string; text: string }> };
 
+/**
+ * Country codes NIFC/WFIGS actually publishes incidents for — the criterion
+ * is WFIGS *coverage*, not political status, so this is evidence-gated
+ * rather than "every US territory".
+ *
+ * Verified live against the WFIGS ArcGIS services on 2026-08-14. Distinct
+ * `POOState` values over the all-years layers
+ * (`WFIGS_Interagency_Perimeters`, `WFIGS_Incident_Locations`) carry
+ * `US-PR` (4 perimeters), `US-VI` (5) and `US-GU` (90); `US-AS` (American
+ * Samoa) and `US-MP` (Northern Mariana Islands) return **zero** rows in
+ * either layer, so they are deliberately excluded and route to FIRMS
+ * satellite detections, which is the honest answer where WFIGS has nothing
+ * to say.
+ */
+const NIFC_COVERED_COUNTRIES = new Set(['us', 'pr', 'vi', 'gu']);
+
 export async function handleGetWildfireInfo(
   args: unknown,
   nifcService: NIFCService,
@@ -121,7 +137,11 @@ export async function handleGetWildfireInfo(
     //    water, absent service, or a failed lookup) falls back to the
     //    bounding boxes.
     if (countryCode) {
-      useFirms = countryCode !== 'us';
+      // NIFC covers the US *and* the territories WFIGS publishes for
+      // (Puerto Rico, the US Virgin Islands, Guam) — testing `!== 'us'`
+      // regressed those to anonymous satellite hotspots even though WFIGS
+      // carries named incidents there.
+      useFirms = !NIFC_COVERED_COUNTRIES.has(countryCode);
     } else {
       useFirms = !isInUS(latitude, longitude);
     }

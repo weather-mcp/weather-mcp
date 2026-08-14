@@ -366,6 +366,133 @@ describe('handleGetWildfireInfo — country routing (D1)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// US territory routing (F2/D2) — WFIGS coverage, not political status.
+// Verified live 2026-08-14 against the all-years WFIGS layers: PR/VI/GU carry
+// incidents, AS/MP carry none.
+// ---------------------------------------------------------------------------
+
+describe('handleGetWildfireInfo — NIFC-covered US territories (F2/D2)', () => {
+  it.each([
+    ['pr', 'Puerto Rico'],
+    ['vi', 'US Virgin Islands'],
+    ['gu', 'Guam']
+  ])('routes a %s reverse-geocode answer (%s) to NIFC, never FIRMS', async (code) => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: false });
+    const nominatim = makeNominatimFake(async () => code);
+
+    const result = await handleGetWildfireInfo(
+      // San Juan PR — outside every isInUS box except Puerto Rico's, so the
+      // reverse answer is what has to carry these cases.
+      { latitude: 18.4655, longitude: -66.1057 },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+
+    expect(nifc.queryFirePerimeters).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByBbox).not.toHaveBeenCalled();
+    expect(firms.getDetectionsByRegion).not.toHaveBeenCalled();
+    expect(result.content[0].text).not.toContain('**Source:** NASA FIRMS');
+    expect(result.content[0].text).toContain('NIFC (National Interagency Fire Center) WFIGS');
+  });
+
+  it.each([
+    ['as', 'American Samoa'],
+    ['mp', 'Northern Mariana Islands']
+  ])('routes %s (%s) to FIRMS — WFIGS publishes no incidents there', async (code) => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: false });
+    const nominatim = makeNominatimFake(async () => code);
+
+    const result = await handleGetWildfireInfo(
+      { latitude: -14.28, longitude: -170.7 },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+
+    expect(firms.getDetectionsByRegion).toHaveBeenCalled();
+    expect(nifc.queryFirePerimeters).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain('**Source:** NASA FIRMS');
+  });
+
+  it('still routes a non-US country code (gr) to FIRMS', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: false });
+    const nominatim = makeNominatimFake(async () => 'gr');
+
+    const result = await handleGetWildfireInfo(
+      { latitude: 37.98, longitude: 23.73 },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+
+    expect(firms.getDetectionsByRegion).toHaveBeenCalled();
+    expect(nifc.queryFirePerimeters).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain('**Source:** NASA FIRMS');
+  });
+
+  it('leaves a bare us answer on the NIFC path, unchanged', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: false });
+    const nominatim = makeNominatimFake(async () => 'us');
+
+    await handleGetWildfireInfo(
+      { latitude: SACRAMENTO.latitude, longitude: SACRAMENTO.longitude },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+
+    expect(nifc.queryFirePerimeters).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByBbox).not.toHaveBeenCalled();
+    expect(firms.getDetectionsByRegion).not.toHaveBeenCalled();
+  });
+
+  it('honours an uppercase country_code carried by a saved location (PR)', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: false });
+    const nominatim = makeNominatimFake(async () => 'zz'); // would be wrong if consulted
+
+    const savedLocation: SavedLocation = {
+      name: 'San Juan, Puerto Rico',
+      latitude: 18.4655,
+      longitude: -66.1057,
+      country_code: 'PR',
+      saved_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z'
+    };
+    const store = {
+      get: vi.fn(() => savedLocation),
+      getAll: vi.fn(() => ({ sanjuan: savedLocation }))
+    } as unknown as LocationStore;
+
+    await handleGetWildfireInfo(
+      { location_name: 'sanjuan' },
+      nifc.service,
+      store,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+
+    expect(nominatim.reverseCountry).not.toHaveBeenCalled();
+    expect(nifc.queryFirePerimeters).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByRegion).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // FIRMS renderer behavior
 // ---------------------------------------------------------------------------
 
