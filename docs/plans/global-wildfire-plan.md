@@ -1,6 +1,6 @@
 # Global Wildfire — Design Plan
 
-**Status:** PLANNED (2026-08-14)
+**Status:** IMPLEMENTED (2026-08-14, on `feat/global-wildfire` targeting v1.20.0)
 **Parent:** `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md` (Phase 4 — the last US-only safety tool)
 **Target release:** v1.20.0
 **Branch (for /impl-plan):** `feat/global-wildfire`
@@ -321,4 +321,40 @@ Performed with the real `FIRMS_MAP_KEY` (in the gitignored `.env`):
 
 ## Implementation notes (added at completion)
 
-*(to be filled in by the implementation run)*
+Implemented 2026-08-14 on `feat/global-wildfire` via
+`docs/plans/global-wildfire-implementation-plan.md` (T1–T7, all gates green;
+commit SHAs in its Progress Tracker). D1–D8 shipped as designed. Deviations
+and findings beyond the plan:
+
+- **Area-API day semantics (the one real upstream surprise):** the Area
+  API's `day_range` counts **calendar UTC days including today**, while the
+  keyless flat files serve a **rolling 24 h** window (which itself lags —
+  live capture showed rows up to ~28 h old in a "24h" file). A keyed
+  `day_range: 1` query at midday returned 0 detections where keyless
+  returned 11. The keyed path therefore requests `min(day_range + 1, 5)`
+  days and filters to the true rolling window (`wildfireHandler.ts`),
+  keeping the "last 24 h" label honest; at `day_range: 5` the window can
+  run up to a day short at the tail (API max is 5 — live-verified 6 → 400).
+- **Region insets:** the US–Canada border band (47–50°N west, 41–50°N
+  around the Great Lakes and east) belongs to **no** inset — regional cuts
+  stop at the border and no rectangle separates southern Ontario from the
+  US Northeast, so Toronto/Vancouver/Seattle/Boston all take the Global
+  file (bandwidth cost, never a data cost). Europe's east bound was
+  shrunk to 35°E to match the live file's observed extent.
+- **Bbox clamping:** the keyed path clamps its bbox corners to ±90/±180
+  before `getDetectionsByBbox` — the service validates coordinates, which
+  the NIFC path's raw bbox math never had to satisfy.
+- **Key hygiene is structural:** `firms.ts` never interpolates axios error
+  content into thrown messages (every error is a fixed pre-written string)
+  and never logs request URLs or raw error objects, so the in-URL key
+  cannot leak even through future logging changes; a unit test forces nine
+  failure modes and asserts the key never appears.
+- **Live sweep (2026-08-14, built dist, real + bogus + absent key):**
+  Toronto → FIRMS via reverse-country (Global file); Sacramento auto →
+  byte-identical to `main`; Sacramento `source:'firms'` → FIRMS in the US;
+  southern Africa keyed vs keyless comparable (keyed rolling-24h found
+  exactly the ≤24 h subset of the laggy keyless file); all three key modes
+  (multi-day result / upgrade note / rejection note + keyless data);
+  mid-ocean → not-all-clear caveat; Riyadh → Global fallback; two nearby
+  European queries → one fetch + cache hit; 5/25 display caps + remainder
+  notes verified live.

@@ -2,7 +2,7 @@
 
 **Status:** READY (2026-08-14)
 
-Execution plan for `docs/global-wildfire-plan.md` (the WHAT/WHY); rules live in
+Execution plan for `docs/plans/global-wildfire-plan.md` (the WHAT/WHY); rules live in
 `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ Execution plan for `docs/global-wildfire-plan.md` (the WHAT/WHY); rules live in
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/global-wildfire-implementation-plan.md
+/run-plan docs/plans/global-wildfire-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/global-wildfire-plan.md` (design),
+Or, equivalently: read `docs/plans/global-wildfire-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review
 the diff, run the gate yourself, commit, tick the tracker, push.
@@ -327,7 +327,7 @@ Spot-checks against the code, reconciled into the tasks below:
 - Files: `CHANGELOG.md`, `README.md`, `docs/TOOLS.md`, `CLAUDE.md`,
   `docs/planning/README.md`,
   `docs/planning/INTERNATIONAL_COVERAGE_ROADMAP.md`,
-  `docs/global-wildfire-plan.md` (status + move to `docs/plans/`)
+  `docs/plans/global-wildfire-plan.md` (status + move to `docs/plans/`)
 - **Live sweep against the built dist**, run by the orchestrator personally
   (the real `FIRMS_MAP_KEY` is in the gitignored `.env`; remember the
   standing driver caveat — dist drivers need `process.exit(0)`, don't run
@@ -419,5 +419,5 @@ points are demonstrably met against the built dist (Toronto → FIRMS,
 Sacramento byte-identical vs `main`, US `source: 'firms'`, active-region
 clusters, all three key modes, ocean not-all-clear, Global-file gap fallback,
 regional-file cache single-fetch), `tests/unit/wildfire-handler.test.ts`
-passes unedited, and `docs/global-wildfire-plan.md` is marked `IMPLEMENTED`
+passes unedited, and `docs/plans/global-wildfire-plan.md` is marked `IMPLEMENTED`
 with the plan set moved to `docs/plans/`. Opening the PR is the human's call.

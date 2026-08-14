@@ -4,7 +4,7 @@
  *
  * Pure, deterministic, no I/O and no mocks. CSV fixtures are small inline
  * excerpts that preserve the shape of both live-captured header variants
- * (see docs/global-wildfire-plan.md "Live re-verification notes") — never
+ * (see docs/plans/global-wildfire-plan.md "Live re-verification notes") — never
  * multi-MB payloads.
  */
 

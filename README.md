@@ -3,12 +3,12 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1%2C812%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-1%2C888%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
 
-Weather MCP is a [Model Context Protocol](https://modelcontextprotocol.io) server that connects AI assistants (Claude, Cursor, Cline, Zed, and any other MCP client) to live weather data: forecasts, current conditions, alerts, air quality, marine conditions, lightning, radar, rivers, wildfires, and 85+ years of historical weather. It's built entirely on free public data sources — NOAA, Open-Meteo, USGS, NIFC, RainViewer, and Blitzortung.org — so there is nothing to sign up for and no key to paste in.
+Weather MCP is a [Model Context Protocol](https://modelcontextprotocol.io) server that connects AI assistants (Claude, Cursor, Cline, Zed, and any other MCP client) to live weather data: forecasts, current conditions, alerts, air quality, marine conditions, lightning, radar, rivers, wildfires, and 85+ years of historical weather. It's built entirely on free public data sources — NOAA, Open-Meteo, USGS, NIFC, NASA FIRMS, RainViewer, and Blitzortung.org — so there is nothing to sign up for and no key to paste in.
 
 ```bash
 claude mcp add weather -- npx -y @dangahagan/weather-mcp@latest
@@ -50,7 +50,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
-- **Fully open source** — MIT licensed, readable TypeScript, 1,812 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 1,888 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -73,7 +73,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery; `composite: true` returns a finished radar map over a base map as an image | 🌍 Global |
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
 | `get_river_conditions` | US: NWPS gauge levels, flood stages, streamflow, rise/fall trends, forecast series. Elsewhere: GloFAS modeled discharge snapped to the nearest river channel, with ensemble forecast | 🌍 Global |
-| `get_wildfire_info` | Active fires, containment, size, safety guidance from the nearest *uncontained* fire (fully contained fires are listed but don't drive danger levels) | 🇺🇸 US |
+| `get_wildfire_info` | US: named incidents with containment, size, and safety guidance from the nearest *uncontained* fire. Elsewhere: NASA FIRMS satellite heat detections (VIIRS, near real-time), clustered with distance, bearing, and intensity | 🌍 Global |
 | `check_service_status` | Health checks for all upstream APIs plus cache statistics | — |
 | `save_location` | Save places as aliases ("home", "cabin") with optional activity tags | — |
 | `list_saved_locations` | List all saved locations | — |
@@ -114,6 +114,7 @@ All free, all public, no authentication required:
 | [EUMETNET MeteoAlarm](https://meteoalarm.org/) | Official national weather warnings (38 European countries) | Europe |
 | [MSC GeoMet](https://api.weather.gc.ca/) | Environment and Climate Change Canada weather alerts | Canada |
 | [NIFC WFIGS](https://data-nifc.opendata.arcgis.com/) | Active wildfire perimeters and incidents | US |
+| [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) | Satellite fire detections (VIIRS, near real-time) | Global |
 | [RainViewer](https://www.rainviewer.com/api.html) | Precipitation radar imagery | Global |
 | [NASA GIBS](https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api) | GOES GeoColor satellite imagery; base map for composited radar | Western Hemisphere (satellite), Global (base map) |
 | [Blitzortung.org](https://www.blitzortung.org/) | Community lightning detection network | Global |
@@ -266,11 +267,12 @@ Being honest about what free public data can and can't do:
 | Current conditions | ✅ (model data, or real station observations via `source="metar"`) | Station observations via NOAA (richer detail) |
 | Weather alerts | ✅ US, Canada, and 38 European countries | NWS zone-level precision; Europe is matched at country level |
 | River conditions | ✅ (GloFAS modeled discharge) | Gauge observations + official flood stages via NWPS |
-| Wildfires | ❌ | ✅ |
+| Wildfires | ✅ (FIRMS satellite detections) | Named incidents with acreage + containment via NIFC |
 
 - European alerts are matched at **country level** — the keyless MeteoAlarm feeds carry no region polygons, so warnings for a large country may not affect the requested point; the output says so. Canadian alerts use a real bbox query with polygon-backed features.
 - International current conditions default to **model-interpolated** values at the exact coordinates. `source="metar"` returns a **real instrument reading** instead — but from the nearest airport, which may be tens of km away and up to an hour old. The output always names the station, its distance and bearing, and the observation age, so the tradeoff is visible rather than assumed. METAR coverage follows airports, so remote land and open ocean have real gaps.
 - Historical data older than 7 days comes from reanalysis models (9–25km grid), not direct station observations, and trails real time by ~5 days.
+- Non-US wildfire results are **satellite heat detections, not managed incidents** — no fire names, sizes, or containment percentages exist in the data, detections can include industrial heat sources or agricultural burns, and a clear result is not an all-clear (cloud cover hides fires; small or new fires evade detection). The output frames all of this explicitly. Keyless data covers the last 24 hours; an optional free [`FIRMS_MAP_KEY`](https://firms.modaps.eosdis.nasa.gov/api/map_key/) unlocks targeted queries and up to 5 days of detection history (`day_range`).
 - Non-US river discharge is **modeled**, not observed, and has no official flood-stage thresholds — levels are shown relative to recent history and the forecast ensemble. The ~5km model grid means the reported channel may be a few km from the requested point; the output says so when it is.
 - Marine data has limited coastal accuracy and is **not suitable for navigation**.
 - Lightning coverage varies by region (community-operated detector network).
@@ -281,7 +283,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 1,812 tests
+npm test               # Run all 1,888 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

@@ -3,7 +3,7 @@
  * satellite fire-detection data — VIIRS near-real-time hotspots, keyed
  * (Area API) and keyless (regional flat CSV files) paths.
  *
- * See `docs/global-wildfire-plan.md` D4/D5 and the "Live re-verification
+ * See `docs/plans/global-wildfire-plan.md` D4/D5 and the "Live re-verification
  * notes" at the end of that doc: the two ingestion paths emit **different
  * CSV shapes** (Area API adds an `instrument` column and abbreviates
  * `confidence`; flat files omit `instrument`, spell confidence out, and

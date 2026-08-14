@@ -78,14 +78,22 @@ Route by country code (already available from Nominatim results and stored on sa
 - Effort: Medium. New `meteoalarm.ts` and `geomet.ts` services + country routing in `alertsHandler.ts`; graceful "not yet covered" message elsewhere.
 - Watch later: KDE FOSS Public Alert Server (open-source global CAP aggregator with JSON API, pre-production as of mid-2026): https://github.com/KDE/foss-public-alert-server
 
-## Priority 4 — Global wildfire (NASA FIRMS)
+## Priority 4 — Global wildfire (NASA FIRMS) ✅ DONE (v1.20.0)
 
 **API:** NASA FIRMS — global MODIS/VIIRS satellite fire detections within ~3 hours. Area and country endpoints, CSV/JSON. https://firms.modaps.eosdis.nasa.gov/api/
 
-- Free MAP_KEY required; 5,000 requests / 10 min.
-- **This would be the project's first API key.** Make it optional via env var (e.g. `FIRMS_MAP_KEY`); without it, `get_wildfire_info` stays US-only (NIFC).
-- Output note: FIRMS returns satellite *hotspots* (lat/lon, brightness, confidence, FRP) — not named incidents with acreage/containment like NIFC. Needs a distinct output format; consider clustering nearby detections.
-- Europe supplement: Copernicus EFFIS fire-danger forecast (free, open data, but WMS-based — clunkier): https://forest-fire.emergency.copernicus.eu/applications/data-and-services
+Shipped on `feat/global-wildfire` targeting v1.20.0 — see
+[`docs/plans/global-wildfire-plan.md`](../plans/global-wildfire-plan.md).
+The implementation went **keyless-first** (better than planned here): the
+tool works globally with zero keys via FIRMS' keyless 24 h regional flat
+CSVs, and the optional `FIRMS_MAP_KEY` upgrades to Area-API bbox queries
+with `day_range` 1–5 — the "without it, stays US-only" fallback in the
+original note below never became necessary. Detections are clustered (2 km,
+FRP-descending) with an honest hotspots-not-incidents framing.
+
+- Free MAP_KEY optional; 5,000 requests / 10 min (keyed path).
+- Output note: FIRMS returns satellite *hotspots* (lat/lon, brightness, confidence, FRP) — not named incidents with acreage/containment like NIFC. Shipped with a distinct clustered output format.
+- Europe supplement (still open): Copernicus EFFIS fire-danger forecast (free, open data, but WMS-based — clunkier): https://forest-fire.emergency.copernicus.eu/applications/data-and-services
 
 ## Priority 5 — Polish items (small, independent)
 
@@ -116,7 +124,7 @@ All options preserve the zero-cost model; only FIRMS breaks the zero-key model (
 | ~~1~~ ✅ | ~~Open-Meteo fallback in `get_current_conditions`~~ — shipped in v1.12.0 | No | Small |
 | ~~2~~ ✅ | ~~Open-Meteo Flood API in `get_river_conditions`~~ — implemented for v1.15.0 (channel snapping per the live finding below). The **UK Environment Agency gauge supplement remains open** and moves to Phase 5. | No (new endpoint) | Small–medium |
 | ~~3~~ ✅ | ~~MeteoAlarm + GeoMet alerts routing~~ — implemented for v1.19.0 (country routing via a cached Nominatim reverse lookup; all 38 MeteoAlarm slugs live-verified) | Yes (2, keyless) | Medium |
-| 4 | NASA FIRMS in `get_wildfire_info` | Yes (free key, optional) | Medium |
+| ~~4~~ ✅ | ~~NASA FIRMS in `get_wildfire_info`~~ — implemented for v1.20.0 (keyless-first: regional flat CSVs with conservative inset region picking; optional key upgrades to Area-API bbox + multi-day, with a rolling-window correction for the API's calendar-day semantics) | Yes (free key, optional) | Medium |
 | 5 | Polish: met.no fallback, global normals/FWI, UK gauges | Yes (keyless) | Small each |
 
 Each phase is independently shippable as a minor release, following the existing pattern: types → validation → service → handler → registration in `src/index.ts` → tests → docs.

@@ -2,7 +2,7 @@
  * Service for fetching NASA FIRMS (Fire Information for Resource Management
  * System) satellite fire-detection data — VIIRS near-real-time hotspots.
  *
- * Two ingestion paths (see `docs/global-wildfire-plan.md` D3/D4):
+ * Two ingestion paths (see `docs/plans/global-wildfire-plan.md` D3/D4):
  *
  * - **Keyed Area API** (`getDetectionsByBbox`): targeted bbox query,
  *   `day_range` 1-5, requires `FIRMS_MAP_KEY`. The map key is embedded in
