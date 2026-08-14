@@ -350,12 +350,12 @@ Three parallel lanes (disjoint files), then a docs/verification close-out:
 
 ## Progress Tracker
 
-- [ ] T1 — F1: null-safe Fosberg core inputs (`sonnet`)
+- [x] T1 — F1: null-safe Fosberg core inputs (`sonnet`) — `65f962a`
 - [ ] T2 — F4: correct the METAR fire-weather note's advice (`haiku`)
 - [ ] T3 — F2: route US territories to NIFC (`opus`)
 - [ ] T4 — F3: coverage disclosure on forced-NIFC empty results (`opus`)
 - [ ] T5 — F6: split keyed FIRMS bbox queries across the antimeridian (`sonnet`)
-- [ ] T6 — F5: retry without fire variables on a 400 (`sonnet`)
+- [x] T6 — F5: retry without fire variables on a 400 (`sonnet`) — `9180be0`
 - [ ] T7 — Edge-case sweep + documentation checklist (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
