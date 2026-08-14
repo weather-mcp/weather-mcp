@@ -475,9 +475,9 @@ Spot-checks against the code, reconciled into the tasks below:
 
 - [x] T1 — `NominatimService.reverseCountry` + permanent cache (`sonnet`) — `279d4ad`
 - [x] T2 — Thread `country_code` through `ResolvedLocation` (`sonnet`) — `c53f729`
-- [ ] T3 — MeteoAlarm types, service, and filter pipeline (`opus`)
-- [ ] T4 — Live-verify the full MeteoAlarm slug map (`sonnet`)
-- [ ] T5 — GeoMet types, service, and filtering (`sonnet`)
+- [x] T3 — MeteoAlarm types, service, and filter pipeline (`opus`) — `0f4c554`
+- [x] T4 — Live-verify the full MeteoAlarm slug map (orchestrator-run sweep: 38/38 verified, `mk` slug corrected to `republic-of-north-macedonia`) — `2bece5b`
+- [x] T5 — GeoMet types, service, and filtering (`sonnet`) — `ccb4953`
 - [ ] T6 — Country routing + per-source renderers in `get_alerts` (`opus`)
 - [ ] T7 — `get_weather_summary`: drop the US-only short-circuit (`sonnet`)
 - [ ] T8 — Routing unit tests (`sonnet`)
