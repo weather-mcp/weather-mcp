@@ -778,7 +778,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_weather_summary':
         return await withAnalytics('get_weather_summary', async () =>
-          handleGetWeatherSummary(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService)
+          handleGetWeatherSummary(
+            args, noaaService, openMeteoService, nceiService, locationStore, geocodingService,
+            meteoAlarmService, geoMetService, nominatimService
+          )
         );
 
       case 'check_service_status':
