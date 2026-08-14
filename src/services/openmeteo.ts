@@ -675,23 +675,35 @@ export class OpenMeteoService {
    * @param latitude - Latitude coordinate (-90 to 90)
    * @param longitude - Longitude coordinate (-180 to 180)
    * @param prefs - Unit preferences (default: imperial)
+   * @param includeFireWeather - When true, also request soil moisture and vapour-pressure
+   *   deficit (used to compute the Fosberg Fire Weather Index). Defaults to false so every
+   *   existing caller's request URL is unchanged.
    * @returns Forecast response populated with current conditions
    */
   async getCurrentConditions(
     latitude: number,
     longitude: number,
-    prefs: UnitPreferences = IMPERIAL_PREFERENCES
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES,
+    includeFireWeather = false
   ): Promise<OpenMeteoForecastResponse> {
     // Validate coordinates
     validateLatitude(latitude);
     validateLongitude(longitude);
 
     // Build parameters
-    const params = this.buildCurrentParams(latitude, longitude, prefs);
+    const params = this.buildCurrentParams(latitude, longitude, prefs, includeFireWeather);
 
-    // Check cache first (unit signature keeps imperial/metric responses distinct)
+    // Check cache first (unit signature keeps imperial/metric responses distinct; the
+    // fire-weather flag keeps requests with the extra variables from serving/being served
+    // by a cache entry that lacks them)
     if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('openmeteo-current', latitude, longitude, unitSignature(prefs));
+      const cacheKey = Cache.generateKey(
+        'openmeteo-current',
+        latitude,
+        longitude,
+        unitSignature(prefs),
+        includeFireWeather
+      );
       const cached = this.cache.get(cacheKey);
       if (cached) {
         return cached as OpenMeteoForecastResponse;
@@ -714,12 +726,17 @@ export class OpenMeteoService {
 
   /**
    * Build request parameters for current conditions data
+   *
+   * @param includeFireWeather - When true, appends soil moisture and vapour-pressure
+   *   deficit to the `current` variable list. These two variables are always returned
+   *   in fixed units (m³/m³ and kPa) — they are not affected by `openMeteoUnitParams`.
    * @private
    */
   private buildCurrentParams(
     latitude: number,
     longitude: number,
-    prefs: UnitPreferences = IMPERIAL_PREFERENCES
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES,
+    includeFireWeather = false
   ): Record<string, string | number> {
     const params: Record<string, string | number> = {
       latitude,
@@ -729,7 +746,7 @@ export class OpenMeteoService {
       timezone: 'auto'
     };
 
-    params.current = [
+    const currentVariables = [
       'temperature_2m',
       'relative_humidity_2m',
       'apparent_temperature',
@@ -745,7 +762,13 @@ export class OpenMeteoService {
       'wind_speed_10m',
       'wind_direction_10m',
       'wind_gusts_10m'
-    ].join(',');
+    ];
+
+    if (includeFireWeather) {
+      currentVariables.push('soil_moisture_0_to_1cm', 'vapour_pressure_deficit');
+    }
+
+    params.current = currentVariables.join(',');
 
     params.daily = 'temperature_2m_max,temperature_2m_min';
 

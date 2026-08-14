@@ -288,6 +288,10 @@ export interface OpenMeteoCurrentWeather {
   wind_speed_10m?: number;
   wind_direction_10m?: number;
   wind_gusts_10m?: number;
+  /** Fire-weather input (Fosberg index). Fixed units (m³/m³), only present when requested. */
+  soil_moisture_0_to_1cm?: number | null;
+  /** Fire-weather input (Fosberg index). Fixed units (kPa), only present when requested. */
+  vapour_pressure_deficit?: number | null;
 }
 
 /**
@@ -311,6 +315,8 @@ export interface OpenMeteoCurrentWeatherUnits {
   wind_speed_10m?: string;
   wind_direction_10m?: string;
   wind_gusts_10m?: string;
+  soil_moisture_0_to_1cm?: string;
+  vapour_pressure_deficit?: string;
 }
 
 /**
