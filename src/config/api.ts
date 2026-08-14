@@ -31,3 +31,29 @@ export const NCEI_API_TOKEN = process.env.NCEI_API_TOKEN;
 export function isNCEIAvailable(): boolean {
   return !!NCEI_API_TOKEN && NCEI_API_TOKEN.trim().length > 0;
 }
+
+/**
+ * FIRMS (Fire Information for Resource Management System) API map key
+ *
+ * OPTIONAL: Get a free key at https://firms.modaps.eosdis.nasa.gov/api/map_key/
+ *
+ * Benefits of providing a key:
+ * - Access to targeted NASA FIRMS Area-API bbox queries
+ * - Query wildfire data with custom day_range (1–5 days)
+ *
+ * If not provided:
+ * - Keyless 24-hour regional flat CSV files
+ * - Tool still works globally without the key
+ * - No setup required
+ *
+ * Rate limits with key:
+ * - 5,000 transactions per 10 minutes
+ */
+export const FIRMS_MAP_KEY = process.env.FIRMS_MAP_KEY;
+
+/**
+ * Check if FIRMS API key is available (key configured)
+ */
+export function isFIRMSKeyAvailable(): boolean {
+  return !!FIRMS_MAP_KEY && FIRMS_MAP_KEY.trim().length > 0;
+}
