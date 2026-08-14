@@ -1,6 +1,6 @@
 # v1.20.0 Pre-Release Review Hardening — Design Plan
 
-**Status:** DESIGN — settled, ready for `/impl-plan`
+**Status:** IMPLEMENTED (2026-08-14) — see [Implementation notes](#implementation-notes)
 **Parent:** Pre-release code review + security review of `main...feat/global-fire-weather`
 (2026-08-14), covering both v1.20.0 features: global wildfire (NASA FIRMS) and
 global fire weather (computed Fosberg FFWI).
@@ -204,14 +204,114 @@ clamping stays as-is (latitude genuinely ends at ±90).
 
 ## Documentation / registration checklist (for /run-plan tracking)
 
-- [ ] `src/handlers/currentConditionsHandler.ts` — D1 null guards, D4 note
-- [ ] `src/types/openmeteo.ts` — D1 nullable core fields
-- [ ] `src/handlers/wildfireHandler.ts` — D2 territory routing, D3 disclosure, D6 bbox split
-- [ ] `src/services/openmeteo.ts` — D5 best-effort fire variables
-- [ ] Tests per §Testing
-- [ ] CHANGELOG under `[Unreleased]` (rides v1.20.0 — these are pre-tag fixes,
+- [x] `src/handlers/currentConditionsHandler.ts` — D1 null guards, D4 note
+- [x] `src/types/openmeteo.ts` — D1 nullable core fields
+- [x] `src/handlers/wildfireHandler.ts` — D2 territory routing, D3 disclosure, D6 bbox split
+- [x] `src/services/openmeteo.ts` — D5 best-effort fire variables
+- [x] Tests per §Testing
+- [x] CHANGELOG under `[Unreleased]` (rides v1.20.0 — these are pre-tag fixes,
       so they fold into the existing entries rather than announcing themselves)
-- [ ] Move this doc to `docs/plans/` at completion
+- [x] Move this doc to `docs/plans/` at completion
+
+## Implementation notes
+
+Executed on `fix/release-review-hardening` off `feat/global-fire-weather`
+(2026-08-14), one commit per finding:
+
+| Finding | Commit | Notes |
+|---------|--------|-------|
+| F1 / D1 | `65f962a` | Widening the three `OpenMeteoCurrentWeather` fields to `?: number \| null` compile-forced `!= null` guards at the main formatter's temperature/humidity/wind display lines too — a null now omits its line instead of rendering a converted zero. Necessary mechanical consequence, taken deliberately. |
+| F5 / D5 | `9180be0` | The retry lives in a private `fetchCurrentConditions` helper shared by the cached and uncached branches. Only `InvalidLocationError` (the 400 mapping) triggers it; `validateCurrentResponse` throws `DataNotFoundError`, so a validation failure never retries. |
+| F4 / D4 | `40e60fc` | A3 held: `tests/unit/metar-handler.test.ts` asserts only the surviving leading clause, so the change was additive — three assertions appended, none rewritten. |
+| F2 / D2 | `456a6a6` | **Territory set is evidence-gated (A5).** Verified live against the WFIGS ArcGIS all-years layers (`WFIGS_Interagency_Perimeters`, `WFIGS_Incident_Locations`): distinct `POOState` carries `US-GU` (90 perimeters), `US-VI` (5), `US-PR` (4); `US-AS` and `US-MP` return **zero** rows in either layer. The design's nominal `us, pr, vi, gu, as, mp` therefore ships as **`us, pr, vi, gu`** — American Samoa and the Northern Marianas route to FIRMS, which is the honest answer where WFIGS publishes nothing. |
+| F3 / D3 | `ddf713f` | Country resolution extracted to a `resolveCountryCode` helper; the forced-`nifc` branch now resolves too (A4). One pre-existing `wildfire-routing.test.ts` case asserted the old all-clear and no lookup — precisely the behaviour D3 changes — and was updated. `wildfire-handler.test.ts` passed unedited. |
+| F6 / D6 | `5d81446` | Longitude is sliced rather than clamped; latitude clamps stay. Slices awaited sequentially and concatenated before the existing rolling-window and radius filters. |
+
+**Locked files held:** `tests/unit/fireWeatherContext.test.ts` and
+`tests/unit/wildfire-handler.test.ts` are absent from the branch diff
+(`git diff feat/global-fire-weather...HEAD --stat`).
+
+### Edge-case sweep (2026-08-14, against the built dist)
+
+All eight rows of the edge-case table pass:
+
+| # | Case | Result |
+|---|------|--------|
+| 1 | Null `temperature_2m`, metric prefs | Unavailable note, no index, no `NaN` — the reproduced F1 case, now fixed |
+| 2 | Null `temperature_2m`, imperial prefs | Unavailable note (unchanged) |
+| 3 | Core inputs present, dryness null | Index renders, dryness omitted |
+| 4 | San Juan PR, coordinate-only | NIFC path, FIRMS never touched |
+| 5 | Athens + `source: 'nifc'`, empty | Coverage disclosure, no ✅, no "currently clear", `source: "firms"` suggested, no cross-fallback |
+| 6 | Non-US + `source: 'metar'` + `include_fire_weather` | Note names both routes |
+| 7 | Degraded (retried) fire-variable response | Conditions render in full; index renders, dryness omitted (A2) |
+| 8 | Fiji 178°E, 500 km, keyed | Two slices `[173.27, 180]` / `[-180, -177.27]`, both corners valid, detections merged |
+
+Row 8 was checked both mocked (both-slice merge, in the unit tests) **and
+live** with `FIRMS_MAP_KEY` set: the handler issued exactly the two slices
+above, the keyed and keyless paths agreed on the 83 in-radius western
+detections, and the eastern slice happened to be empty at Fiji that day — so
+the live run proves the split is issued and merged correctly, while the mocked
+test covers the recovered-detection case. (Incidental observation, not acted
+on: for that bbox the keyless 24 h `Global` file and a keyed `day_range` 2
+fetch both returned 83 rows, of which 23 fell inside the rolling 24 h window.
+The `fetchDays` compensation was a declared non-goal, already verified live
+this review pass.)
+
+### Live MCP verification (2026-08-14, over the real protocol)
+
+Run after restarting the MCP servers against the rebuilt `dist/` — all four
+weather server configs point at the same `dist/index.js`, and `FIRMS_MAP_KEY`
+loaded from `.env` (confirmed by a `day_range: 3` Athens query being honored
+with no keyless-upgrade note), so the keyed FIRMS path was genuinely exercised.
+
+**New features**
+
+| Case | Result |
+|------|--------|
+| Athens, coords only | FIRMS — 3 detections / 3 clusters, disclosure header, per-cluster distance + bearing, peak FRP, age, confidence, satellite |
+| Sacramento, 300 km | NIFC — 13 named incidents with acreage/containment, cap-5 + remainder note; tier correctly **AWARENESS** (the 96 %-contained CHUTE did not drive it) |
+| Sacramento + `source: "firms"` | FIRMS in the US — 9 detections / 5 clusters |
+| Reykjavík (no fires) | Not-all-clear caveat, no ✅ |
+| Athens, `include_fire_weather` | Fosberg **11 (Low)**, dryness context (VPD 2.0 kPa, topsoil 0.07 m³/m³), derivation disclosure |
+| Denver, `include_fire_weather` | NOAA published indices (seasonal risk, mixing height, transport wind) — US path unchanged |
+| Sydney, `include_fire_weather` | Fosberg **3 (Low)** at 50 °F / 92 % RH — southern-hemisphere winter read from actual conditions, no northern seasonality wording |
+
+**Fixes exercised live**
+
+- **F2** — San Juan PR, coordinate-only → NIFC (WFIGS footer, no FIRMS source
+  line). The ✅ is correct here: PR is *inside* coverage and genuinely clear.
+- **F3** — Athens + `source: "nifc"` → no ✅, no "currently clear", explicit
+  coverage statement, `source: "firms"` suggested, no cross-fallback.
+- **F4** — Paris + `source: "metar"` + `include_fire_weather` → the note names
+  both routes.
+- **F6** — Fiji 178°E / 500 km keyed → 23 detections / 16 clusters, matching the
+  standalone driver exactly. The eastern slice was legitimately empty that day;
+  the driver separately confirmed both slices are issued at `[173.27, 180]` and
+  `[-180, -177.27]`.
+
+**F1's strongest live evidence is indirect but decisive:** Athens returned the
+**same index — 11 (Low)** — on the imperial and metric servers, with identical
+dryness values, while displayed temperature and wind differed (77 °F / 5 mph vs
+25 °C / 8 km/h). The bug class F1 describes is a safety number that changes with
+the caller's unit preference; that is now demonstrably gone. It is *not* the
+null path itself, which stays covered by the 6-cell unit matrix and sweep rows
+1–2.
+
+**Not live-triggerable, by nature:** F1's null path (needs Open-Meteo to return
+`null` for a core input) and F5's retry (needs a 400 on a fire variable).
+Neither can be provoked on demand against the live API; both rest on unit tests
+plus the dist sweep.
+
+**Regressions checked, all clean:** US alerts (NOAA), Canada alerts (Toronto →
+ECCC, so the reverse-geocode answer still beats `isInUS`), non-US
+`get_weather_summary` (current + forecast + Greek MeteoAlarm warnings), US
+current conditions without the flag, and `composite: true` radar (image block
+returned, correctly centered on the marker).
+
+**Unrelated cosmetic observation, not from this branch:** the Paris METAR
+station renders as `Paris/De Gaulle Arpt, ID, FR` — the `, ID,` comes from the
+upstream AWC `name` field, passed through verbatim since v1.17. Recorded here
+so it isn't mistaken for release fallout; not a tag blocker.
 
 ## Follow-ups (not tasked here)
 

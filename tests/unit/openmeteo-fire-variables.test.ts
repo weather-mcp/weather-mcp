@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenMeteoService } from '../../src/services/openmeteo.js';
 import type { OpenMeteoForecastResponse } from '../../src/types/openmeteo.js';
+import { InvalidLocationError, ServiceUnavailableError } from '../../src/errors/ApiError.js';
 
 /**
  * OpenMeteoService.getCurrentConditions() — fire-weather variable tests
@@ -130,5 +131,72 @@ describe('OpenMeteoService.getCurrentConditions() — fire-weather variables', (
 
     const secondCallParams = spy.mock.calls[1][1] as Record<string, string | number>;
     expect(secondCallParams.current).toBe(FIRE_CURRENT_PARAMS);
+  });
+});
+
+describe('OpenMeteoService.getCurrentConditions() — 400 retry without fire variables', () => {
+  let service: OpenMeteoService;
+
+  beforeEach(() => {
+    service = new OpenMeteoService();
+    service.clearCache();
+  });
+
+  it('retries once without the fire variables when the flagged request 400s, and returns the retry response', async () => {
+    const rejectedError = new InvalidLocationError('OpenMeteo', 'Invalid request parameters');
+    const spy = vi
+      .spyOn(service as any, 'makeRequestToForecast')
+      .mockRejectedValueOnce(rejectedError)
+      .mockResolvedValueOnce(buildValidResponse());
+
+    const result = await service.getCurrentConditions(37.7749, -122.4194, undefined, true);
+
+    expect(result).toEqual(buildValidResponse());
+    expect(spy).toHaveBeenCalledTimes(2);
+
+    const firstCallParams = spy.mock.calls[0][1] as Record<string, string | number>;
+    expect(firstCallParams.current).toBe(FIRE_CURRENT_PARAMS);
+
+    const retryCallParams = spy.mock.calls[1][1] as Record<string, string | number>;
+    expect(retryCallParams.current).toBe(NO_FIRE_CURRENT_PARAMS);
+  });
+
+  it('propagates the retry error when both the flagged request and the retry 400', async () => {
+    const firstError = new InvalidLocationError('OpenMeteo', 'first rejection');
+    const retryError = new InvalidLocationError('OpenMeteo', 'retry rejection');
+    const spy = vi
+      .spyOn(service as any, 'makeRequestToForecast')
+      .mockRejectedValueOnce(firstError)
+      .mockRejectedValueOnce(retryError);
+
+    await expect(
+      service.getCurrentConditions(37.7749, -122.4194, undefined, true)
+    ).rejects.toBe(retryError);
+
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('issues exactly one request on the happy path (flagged request succeeds)', async () => {
+    const spy = vi
+      .spyOn(service as any, 'makeRequestToForecast')
+      .mockResolvedValue(buildValidResponse());
+
+    const result = await service.getCurrentConditions(37.7749, -122.4194, undefined, true);
+
+    expect(result).toEqual(buildValidResponse());
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry without fire variables on a non-400 error', async () => {
+    const serverError = new ServiceUnavailableError('OpenMeteo');
+    const spy = vi
+      .spyOn(service as any, 'makeRequestToForecast')
+      .mockRejectedValueOnce(serverError);
+
+    await expect(
+      service.getCurrentConditions(37.7749, -122.4194, undefined, true)
+    ).rejects.toBe(serverError);
+
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

@@ -617,6 +617,9 @@ describe('handleGetCurrentConditions — include_fire_weather on the METAR path'
     const text = textOf(result);
 
     expect(text).toContain('Fire weather indices are not available on the METAR source');
+    expect(text).toContain('source: "noaa"');
+    expect(text).toContain('omit `source`');
+    expect(text).toContain('server-computed Fosberg index');
   });
 });
 

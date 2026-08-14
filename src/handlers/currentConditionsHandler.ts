@@ -693,9 +693,9 @@ function prefsWindToMph(value: number, prefs: UnitPreferences): number {
  * already rendered above, so inputs are not repeated in this section.
  */
 function formatOpenMeteoFireWeather(
-  temperature: number | undefined,
-  relativeHumidity: number | undefined,
-  windSpeed: number | undefined,
+  temperature: number | null | undefined,
+  relativeHumidity: number | null | undefined,
+  windSpeed: number | null | undefined,
   vpdKPa: number | null | undefined,
   topsoilMoisture: number | null | undefined,
   prefs: UnitPreferences
@@ -703,7 +703,7 @@ function formatOpenMeteoFireWeather(
   let output = `\n## Fire Weather\n\n`;
 
   const ffwi =
-    temperature !== undefined && relativeHumidity !== undefined && windSpeed !== undefined
+    temperature != null && relativeHumidity != null && windSpeed != null
       ? calculateFosbergIndex(
           prefsTempToFahrenheit(temperature, prefs),
           relativeHumidity,
@@ -789,7 +789,7 @@ async function formatOpenMeteoCurrentConditions(
     output += `**Conditions:** ${openMeteoService.getWeatherDescription(current.weather_code)}\n`;
   }
 
-  if (current.temperature_2m !== undefined) {
+  if (current.temperature_2m != null) {
     output += `**Temperature:** ${Math.round(current.temperature_2m)}${tempU}\n`;
 
     // Feels-like only earns a line when it diverges meaningfully from actual.
@@ -817,11 +817,11 @@ async function formatOpenMeteoCurrentConditions(
     output += `**Dewpoint:** ${Math.round(current.dew_point_2m)}${tempU}\n`;
   }
 
-  if (current.relative_humidity_2m !== undefined) {
+  if (current.relative_humidity_2m != null) {
     output += `**Humidity:** ${Math.round(current.relative_humidity_2m)}%\n`;
   }
 
-  if (current.wind_speed_10m !== undefined) {
+  if (current.wind_speed_10m != null) {
     output += `**Wind:** ${Math.round(current.wind_speed_10m)} ${windU}`;
     if (current.wind_direction_10m !== undefined) {
       output += ` from ${Math.round(current.wind_direction_10m)}°`;
@@ -1211,7 +1211,8 @@ async function formatMetarCurrentConditions(
   if (includeFireWeather) {
     output += `\n## Fire Weather\n\n`;
     output += `Fire weather indices are not available on the METAR source — they `;
-    output += `require NOAA gridpoint data. Use \`source: "noaa"\` for a US location.\n`;
+    output += `require NOAA gridpoint data. Use \`source: "noaa"\` for a US location, `;
+    output += `or omit \`source\` to get a server-computed Fosberg index from model data elsewhere.\n`;
   }
 
   // Climate normals (optional) — supported here exactly as on the other two

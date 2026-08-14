@@ -50,7 +50,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
-- **Fully open source** — MIT licensed, readable TypeScript, 1,930 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 1,961 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -285,7 +285,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 1,930 tests
+npm test               # Run all 1,961 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```
