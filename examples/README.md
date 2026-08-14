@@ -13,7 +13,7 @@ Each file in this folder is a realistic session: a user prompt, the answer **Cla
 | [A day on the water](./boating-and-marine.md) | Sydney | Marine forecast (waves, swell, currents), real-time lightning detection, metric units |
 | [Traveling abroad](./international-travel.md) | Paris | Real airport station observations anywhere on earth (`source: "metar"`), European pollen levels |
 | [River levels, two ways](./river-and-flood.md) | Memphis + Manaus | US flood-stage gauges vs. global modeled river discharge — same tool, honest about the difference |
-| [Wildfire season check-in](./wildfire-awareness.md) | Denver | Active fires with containment & distance, smoke via US AQI |
+| [Wildfire season check-in](./wildfire-awareness.md) | Denver + Athens | US named incidents (containment, distance) vs. global satellite hotspots — plus NOAA's published fire indices vs. a server-computed Fosberg index, each labeled for what it is |
 | [Reaching into the past](./historical-climate.md) | Berlin 1945 + Chicago | Historical archive back to 1940, climate normals & US record high/low for the date |
 | [Saving your places](./saved-locations-workflow.md) | Lake Tahoe | Save a location once ("cabin"), then ask about it by name |
 
@@ -24,7 +24,7 @@ All 17 tools appear across these examples:
 | Tool | Shown in |
 |---|---|
 | `get_forecast` | [trip planning](./weekend-trip-planning.md), [saved locations](./saved-locations-workflow.md) |
-| `get_current_conditions` | [international travel](./international-travel.md) (METAR), [historical & climate](./historical-climate.md) (normals + records) |
+| `get_current_conditions` | [international travel](./international-travel.md) (METAR), [historical & climate](./historical-climate.md) (normals + records), [wildfire](./wildfire-awareness.md) (fire weather, both paths) |
 | `get_alerts` | [severe weather](./severe-weather-day.md) |
 | `get_historical_weather` | [historical & climate](./historical-climate.md) |
 | `get_weather_summary` | [severe weather](./severe-weather-day.md) |
@@ -35,7 +35,7 @@ All 17 tools appear across these examples:
 | `get_weather_imagery` | [trip planning](./weekend-trip-planning.md) (with snapshot), [severe weather](./severe-weather-day.md) |
 | `get_lightning_activity` | [boating](./boating-and-marine.md) |
 | `get_river_conditions` | [rivers & flood](./river-and-flood.md) (both US and global paths) |
-| `get_wildfire_info` | [wildfire](./wildfire-awareness.md) |
+| `get_wildfire_info` | [wildfire](./wildfire-awareness.md) (both the NIFC and FIRMS paths) |
 | `save_location`, `list_saved_locations`, `get_saved_location`, `remove_saved_location` | [saved locations](./saved-locations-workflow.md) |
 
 ## Bonus: is everything up?
