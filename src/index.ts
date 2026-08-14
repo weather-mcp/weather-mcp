@@ -414,7 +414,7 @@ const TOOL_DEFINITIONS = {
 
   get_weather_summary: {
     name: 'get_weather_summary' as const,
-    description: 'Get a combined weather overview for a location in a SINGLE call. Best for broad questions like "What\'s the weather like in Seattle?", "Is it safe to hike today?", or "Give me a weather rundown". Aggregates current conditions, forecast, and active alerts by default, and can also include air quality and lightning. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For a single specific data product (just the forecast, just alerts, etc.), call that specialized tool directly. Sections that are unavailable for a location (e.g. US-only alerts abroad) are noted rather than failing the whole summary.',
+    description: 'Get a combined weather overview for a location in a SINGLE call. Best for broad questions like "What\'s the weather like in Seattle?", "Is it safe to hike today?", or "Give me a weather rundown". Aggregates current conditions, forecast, and active alerts by default, and can also include air quality and lightning. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For a single specific data product (just the forecast, just alerts, etc.), call that specialized tool directly. Sections that are unavailable for a location (e.g. alerts in a country not yet covered) are noted rather than failing the whole summary.',
     inputSchema: {
       type: 'object' as const,
       properties: {
