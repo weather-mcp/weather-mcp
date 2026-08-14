@@ -846,3 +846,140 @@ describe('handleGetWildfireInfo — FIRMS renderer', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Keyed FIRMS bbox antimeridian splitting (T5/F6/D6)
+// ---------------------------------------------------------------------------
+
+describe('handleGetWildfireInfo — keyed FIRMS antimeridian bbox splitting (F6/D6)', () => {
+  /** Fiji, near 178°E — a 500 km query's raw window crosses the antimeridian. */
+  const FIJI = { latitude: -17.7, longitude: 178 };
+  /** Near the north pole — cos(latitude) blows lonOffset well past 180. */
+  const POLE_ADJACENT = { latitude: 89, longitude: 0 };
+
+  it('splits a dateline-crossing keyed query into two bbox slices that meet at ±180', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: true, bboxImpl: async () => [] });
+    const nominatim = makeNominatimFake(async () => 'fj');
+
+    await handleGetWildfireInfo(
+      { latitude: FIJI.latitude, longitude: FIJI.longitude, radius: 500 },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+
+    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(2);
+    const calls = firms.getDetectionsByBbox.mock.calls as unknown as Array<
+      [number, number, number, number, number]
+    >;
+
+    for (const [west, , east] of calls) {
+      expect(west).toBeLessThan(east);
+      expect(west).toBeGreaterThanOrEqual(-180);
+      expect(west).toBeLessThanOrEqual(180);
+      expect(east).toBeGreaterThanOrEqual(-180);
+      expect(east).toBeLessThanOrEqual(180);
+    }
+
+    // The two slices meet at the antimeridian: one ends at 180, the other
+    // starts at -180.
+    const easts = calls.map(([, , east]) => east);
+    const wests = calls.map(([west]) => west);
+    expect(easts).toContain(180);
+    expect(wests).toContain(-180);
+  });
+
+  it('merges detections returned from both dateline slices before clustering', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    let callCount = 0;
+    const firms = makeFirmsFake({
+      keyAvailable: true,
+      bboxImpl: async () => {
+        callCount += 1;
+        // Same coordinates as the query point regardless of which slice
+        // returned them — only merging behavior is under test here, not
+        // real antimeridian geometry.
+        return [
+          makeDetection({
+            latitude: FIJI.latitude,
+            longitude: FIJI.longitude,
+            frp: callCount === 1 ? 10 : 20
+          })
+        ];
+      }
+    });
+    const nominatim = makeNominatimFake(async () => 'fj');
+
+    const result = await handleGetWildfireInfo(
+      { latitude: FIJI.latitude, longitude: FIJI.longitude, radius: 500 },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+
+    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(2);
+    expect(result.content[0].text).toContain('2 satellite fire detections');
+  });
+
+  it('issues exactly one bbox call, with the unwrapped bbox, for a non-dateline keyed point', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: true, bboxImpl: async () => [] });
+    const nominatim = makeNominatimFake(async () => 'pt');
+
+    await handleGetWildfireInfo(
+      { latitude: LISBON.latitude, longitude: LISBON.longitude, radius: 500 },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+
+    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(1);
+    const [west, south, east, north] = firms.getDetectionsByBbox.mock.calls[0] as [
+      number,
+      number,
+      number,
+      number,
+      number
+    ];
+
+    const latOffset = 500 / 111;
+    const lonOffset = 500 / (111 * Math.cos((LISBON.latitude * Math.PI) / 180));
+    expect(west).toBeCloseTo(LISBON.longitude - lonOffset, 6);
+    expect(east).toBeCloseTo(LISBON.longitude + lonOffset, 6);
+    expect(south).toBeCloseTo(LISBON.latitude - latOffset, 6);
+    expect(north).toBeCloseTo(LISBON.latitude + latOffset, 6);
+  });
+
+  it('issues a single full-range [-180, 180] longitude span for a pole-adjacent keyed query', async () => {
+    const nifc = makeNifcFake({ features: [] });
+    const firms = makeFirmsFake({ keyAvailable: true, bboxImpl: async () => [] });
+    const nominatim = makeNominatimFake(async () => 'ru');
+
+    await handleGetWildfireInfo(
+      { latitude: POLE_ADJACENT.latitude, longitude: POLE_ADJACENT.longitude, radius: 500 },
+      nifc.service,
+      emptyStore,
+      emptyGeocoding,
+      firms.service,
+      nominatim.service
+    );
+
+    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(1);
+    const [west, , east] = firms.getDetectionsByBbox.mock.calls[0] as [
+      number,
+      number,
+      number,
+      number,
+      number
+    ];
+    expect(west).toBe(-180);
+    expect(east).toBe(180);
+  });
+});

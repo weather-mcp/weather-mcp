@@ -456,14 +456,15 @@ async function formatFIRMSWildfire(
 
     if (firmsService.isKeyAvailable()) {
       try {
-        // Same bbox math as the NIFC path, clamped to valid coordinate
-        // ranges (the Area API rejects out-of-range corners; near the poles
-        // or the antimeridian the clamp just widens the post-filter's job).
+        // Same bbox math as the NIFC path. Latitude is clamped to valid
+        // coordinate range (the pole genuinely ends at ±90). Longitude is
+        // *sliced*, not clamped (F6): clamping truncated the query near the
+        // antimeridian instead of wrapping it, silently dropping detections
+        // across the dateline that the keyless path (whole-region haversine
+        // filter) found fine. See docs/release-review-hardening-plan.md D6.
         const latOffset = radius / 111;
         const lonOffset = radius / (111 * Math.cos(latitude * Math.PI / 180));
-        const west = Math.max(-180, longitude - lonOffset);
         const south = Math.max(-90, latitude - latOffset);
-        const east = Math.min(180, longitude + lonOffset);
         const north = Math.min(90, latitude + latOffset);
 
         // Upstream semantics (live-verified 2026-08-14): the Area API's day
@@ -476,7 +477,34 @@ async function formatFIRMSWildfire(
         // request can't widen further, so the tail of the window may fall up
         // to a day short — acceptable for multi-day history.
         const fetchDays = Math.min(dayRange + 1, 5);
-        const raw = await firmsService.getDetectionsByBbox(west, south, east, north, fetchDays);
+
+        // Longitude slices: near the poles cos(latitude) blows up and
+        // lonOffset can reach or exceed 180 (including Infinity) — one query
+        // spanning the full longitude range. Otherwise, if the raw ±lonOffset
+        // window crosses the antimeridian, two disjoint slices that meet at
+        // ±180. Otherwise, today's single-query window, unchanged.
+        const rawWest = longitude - lonOffset;
+        const rawEast = longitude + lonOffset;
+        let lonSlices: Array<[west: number, east: number]>;
+        if (lonOffset >= 180) {
+          lonSlices = [[-180, 180]];
+        } else if (rawWest < -180) {
+          lonSlices = [[rawWest + 360, 180], [-180, rawEast]];
+        } else if (rawEast > 180) {
+          lonSlices = [[rawWest, 180], [-180, rawEast - 360]];
+        } else {
+          lonSlices = [[rawWest, rawEast]];
+        }
+
+        // Slices are disjoint, so the raw detections are concatenated
+        // without dedup. Awaited sequentially — a FIRMSKeyRejectedError from
+        // either call propagates out of this try unchanged, straight to the
+        // keyless-fallback catch below.
+        let raw: FIRMSDetection[] = [];
+        for (const [west, east] of lonSlices) {
+          const slice = await firmsService.getDetectionsByBbox(west, south, east, north, fetchDays);
+          raw = raw.concat(slice);
+        }
         const cutoffMs = Date.now() - dayRange * 24 * 60 * 60 * 1000;
         const withinWindow = raw.filter(
           d => new Date(d.acquiredAt).getTime() >= cutoffMs
