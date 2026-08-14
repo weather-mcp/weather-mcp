@@ -26,7 +26,26 @@ export interface WeatherImageryParams {
   longitude: number;
   type: ImageryType;
   animated?: boolean;
+  /**
+   * Opt in to a finished picture: the radar overlay composited onto a NASA
+   * GIBS base map with a location marker, returned as an MCP image content
+   * block alongside the text. Radar/precipitation only, latest frame only —
+   * see docs/plans/composited-imagery-plan.md (D1, D3).
+   */
+  composite?: boolean;
 }
+
+/**
+ * A content block in a get_weather_imagery result.
+ *
+ * MCP allows mixed content arrays, so a composited request returns
+ * `[text, image]`: clients that render images show the finished map, and
+ * text-only clients ignore the image block per protocol and still get the
+ * complete URL-based answer (D4).
+ */
+export type ImageryContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string };
 
 /**
  * Single imagery frame

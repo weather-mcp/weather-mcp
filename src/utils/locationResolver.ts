@@ -58,16 +58,22 @@ export function formatLocationLine(resolved: ResolvedLocation): string {
  * so name-based lookups (saved location or geocoded city) surface what matched.
  * A no-op for direct-coordinate requests.
  *
+ * `text` is optional in the constraint because a handler may return mixed
+ * content — get_weather_imagery's composite branch returns `[text, image]`,
+ * and an image block carries no `text`. The runtime guard below already
+ * checks for a leading text block, so behaviour is unchanged.
+ *
  * @param result - Handler result whose first text block will be prefixed
  * @param resolved - Result from resolveLocationAsync
  * @returns The same result object (for convenient chaining)
  */
 export function prependLocationLine<
-  T extends { content: Array<{ type: string; text: string }> }
+  T extends { content: Array<{ type: string; text?: string }> }
 >(result: T, resolved: ResolvedLocation): T {
   const locationLine = formatLocationLine(resolved);
-  if (locationLine && result.content.length > 0 && result.content[0]?.type === 'text') {
-    result.content[0].text = locationLine + result.content[0].text;
+  const first = result.content[0];
+  if (locationLine && first?.type === 'text' && typeof first.text === 'string') {
+    first.text = locationLine + first.text;
   }
   return result;
 }

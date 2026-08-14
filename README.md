@@ -70,7 +70,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `search_location` | Geocode place names to coordinates ("Paris" → 48.85, 2.35) | 🌍 Global |
 | `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance; current pollen levels for European locations; optional day-grouped forecast up to 7 days with per-day peak AQI and UV | 🌍 Global |
 | `get_marine_conditions` | Wave height, swell, ocean currents, Douglas Sea Scale — includes Great Lakes and major US bays; forecast up to 16 days | 🌍 Global |
-| `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery | 🌍 Global |
+| `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery; `composite: true` returns a finished radar map over a base map as an image | 🌍 Global |
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
 | `get_river_conditions` | US: NWPS gauge levels, flood stages, streamflow, rise/fall trends, forecast series. Elsewhere: GloFAS modeled discharge snapped to the nearest river channel, with ensemble forecast | 🌍 Global |
 | `get_wildfire_info` | Active fires, containment, size, safety guidance from the nearest *uncontained* fire (fully contained fires are listed but don't drive danger levels) | 🇺🇸 US |
@@ -112,10 +112,14 @@ All free, all public, no authentication required:
 | [RCC ACIS](https://www.rcc-acis.org/) | Daily record high/low temperatures | US |
 | [NIFC WFIGS](https://data-nifc.opendata.arcgis.com/) | Active wildfire perimeters and incidents | US |
 | [RainViewer](https://www.rainviewer.com/api.html) | Precipitation radar imagery | Global |
-| [NASA GIBS](https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api) | GOES GeoColor satellite imagery | Western Hemisphere |
+| [NASA GIBS](https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api) | GOES GeoColor satellite imagery; base map for composited radar | Western Hemisphere (satellite), Global (base map) |
 | [Blitzortung.org](https://www.blitzortung.org/) | Community lightning detection network | Global |
 
 Open-Meteo allows 10,000 requests/day for non-commercial use; caching keeps typical AI usage far below that. Please respect the upstream providers' fair-use terms.
+
+Composited radar maps (`get_weather_imagery` with `composite: true`) carry the acknowledgment NASA requests for GIBS imagery, alongside the RainViewer radar credit:
+
+> Imagery provided by services from NASA's Global Imagery Browse Services (GIBS), part of NASA's Earth Science Data and Information System (ESDIS).
 
 ## Installation
 

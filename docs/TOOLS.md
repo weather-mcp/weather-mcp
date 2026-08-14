@@ -431,6 +431,7 @@ Get weather radar, precipitation, and satellite imagery for visual weather analy
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `type` (optional): Imagery type - "precipitation" (default), "radar", or "satellite"
 - `animated` (optional): Return animated loop vs static image (default: false)
+- `composite` (optional): Return a finished radar map as an image content block alongside the text (default: false) — see **Composited maps** below
 - `detail` (optional): `summary`/`standard` (default) surface direct image URLs and show 3 representative frames of longer animations; `full` embeds Markdown images and lists every animation frame
 
 *Coordinates not required when `location_name` or `city_name` is provided.
@@ -457,7 +458,22 @@ Provides access to weather imagery from two sources: precipitation/radar tiles f
 - Up to 2 hours of historical radar frames when animated
 - An interactive-map link (RainViewer's live map for radar/precipitation, NASA Worldview for satellite) for viewing the imagery layered over a base map in the browser
 
-**Note:** Precipitation/radar coverage is global (RainViewer). Satellite coverage is Western Hemisphere only (GOES GeoColor via NASA GIBS). Tile URLs are transparent overlays (blank where there is no precipitation) and RainViewer frames expire after roughly 2 hours — for a durable, human-viewable picture, use the interactive-map link.
+**Note:** Precipitation/radar coverage is global (RainViewer). Satellite coverage is Western Hemisphere only (GOES GeoColor via NASA GIBS). Tile URLs are transparent overlays (blank where there is no precipitation) and RainViewer frames expire after roughly 2 hours — for a durable, human-viewable picture, use `composite: true` or the interactive-map link.
+
+**Composited maps (`composite: true`):**
+
+Returns a finished 512×512 PNG as an MCP image content block *alongside* the usual text, so the response is `[text, image]`.
+
+The image contains three layers: a NASA GIBS land/water base map, coastline and border outlines over it, and the radar/precipitation overlay on top — plus a high-contrast crosshair marking the requested coordinates. That marker is what makes an echo-free result readable: instead of a blank square, you get recognizable geography with your location on it.
+
+The map is **centered on the requested coordinates**, so the marker sits at the middle of the image and you see roughly equal weather in every direction. (Near a pole the window is clamped to the edge of the Web Mercator projection, so the marker sits off-center — there is no imagery beyond the edge to center it against.)
+
+Rules and caveats:
+- **Radar/precipitation only.** `type: "satellite"` with `composite` returns a note, not an error — GOES GeoColor is already a complete picture and needs no base map.
+- **Latest observed frame only.** With `animated: true` the animation frames stay URL-based and only the newest observed frame is composited (forecast/nowcast frames are never used as "the latest radar"). Compositing a full 13-frame loop would be a multi-megabyte payload.
+- **Client rendering varies.** The assistant always receives the image and can describe what it shows; whether it displays inline is up to the MCP client. Text-only clients ignore image blocks per protocol and still get the complete text answer.
+- **Degrades quietly.** If any step of the composite fails, the response is the normal URL-based text plus a one-line note. The tool call itself never fails because compositing failed.
+- Typical payloads run 30–97 KB (PNG) / 40–129 KB (base64). Attribution for both RainViewer and NASA GIBS/ESDIS is included in the text block.
 
 ### 11. get_lightning_activity
 Get real-time lightning strike detection and safety assessment for outdoor activity planning.
