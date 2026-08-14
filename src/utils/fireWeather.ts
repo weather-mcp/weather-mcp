@@ -273,3 +273,144 @@ export function getFireWeatherContext(
     explanatoryText
   };
 }
+
+/**
+ * Calculate the Fosberg Fire Weather Index (FFWI) from surface observations.
+ *
+ * Reference: Fosberg, M.A. (1978), "Weather in wildland fire management: the
+ * fire weather index," as implemented in NWS/WFAS (Wildland Fire Assessment
+ * System) documentation. This is the standard surface-inputs formulation:
+ *
+ * 1. Equilibrium moisture content (EMC, `m`) from relative humidity and
+ *    temperature, via a three-branch piecewise fit:
+ *    - RH < 10:        m = 0.03229 + 0.281073*RH - 0.000578*RH*T
+ *    - 10 <= RH <= 50:  m = 2.22749 + 0.160107*RH - 0.014784*T
+ *    - RH > 50:        m = 21.0606 + 0.005565*RH^2 - 0.00035*RH*T - 0.483199*RH
+ * 2. Moisture damping coefficient:
+ *    eta = 1 - 2*(m/30) + 1.5*(m/30)^2 - 0.5*(m/30)^3, clamped to >= 0.
+ * 3. FFWI = eta * sqrt(1 + U^2) / 0.3002, clamped to the published 0-100
+ *    range (U is sustained wind speed in mph).
+ *
+ * This is a pure math transcription with no input range validation — the
+ * caller is expected to pass sane meteorological values. Any non-finite
+ * input (NaN or +/-Infinity, in tempF, rhPercent, or windMph) returns `NaN`;
+ * callers must check `Number.isFinite()` on the result before rendering it
+ * and fall back to an "unavailable" message rather than surfacing NaN.
+ *
+ * @param tempF Temperature in degrees Fahrenheit
+ * @param rhPercent Relative humidity as a percentage (0-100 in normal use)
+ * @param windMph Sustained wind speed in miles per hour
+ * @returns FFWI on a 0-100 scale, or NaN if any input is non-finite
+ */
+export function calculateFosbergIndex(tempF: number, rhPercent: number, windMph: number): number {
+  if (!Number.isFinite(tempF) || !Number.isFinite(rhPercent) || !Number.isFinite(windMph)) {
+    return NaN;
+  }
+
+  let moistureContent: number;
+  if (rhPercent < 10) {
+    moistureContent = 0.03229 + 0.281073 * rhPercent - 0.000578 * rhPercent * tempF;
+  } else if (rhPercent <= 50) {
+    moistureContent = 2.22749 + 0.160107 * rhPercent - 0.014784 * tempF;
+  } else {
+    moistureContent =
+      21.0606 +
+      0.005565 * rhPercent * rhPercent -
+      0.00035 * rhPercent * tempF -
+      0.483199 * rhPercent;
+  }
+
+  const x = moistureContent / 30;
+  let eta = 1 - 2 * x + 1.5 * x * x - 0.5 * x * x * x;
+  if (eta < 0) {
+    eta = 0;
+  }
+
+  let ffwi = (eta * Math.sqrt(1 + windMph * windMph)) / 0.3002;
+  if (ffwi < 0) {
+    ffwi = 0;
+  } else if (ffwi > 100) {
+    ffwi = 100;
+  }
+
+  return ffwi;
+}
+
+/**
+ * Get Fosberg Fire Weather Index (FFWI) category.
+ *
+ * Band boundaries (`< 25` Low, `25-39` Moderate, `40-49` High, `>= 50`
+ * Extreme) are a **project heuristic**, not an agency-published scale —
+ * published FFWI usage generally treats values >= 50 as significant fire
+ * weather, but there is no single universally standardized banding below
+ * that threshold. Disclose this derivation to users alongside the number.
+ */
+export function getFosbergCategory(ffwi: number): {
+  level: string;
+  description: string;
+  color: string;
+} {
+  if (ffwi < 25) {
+    return {
+      level: 'Low',
+      description: 'Low potential for rapid fire spread in fine fuels',
+      color: 'Green'
+    };
+  } else if (ffwi < 40) {
+    return {
+      level: 'Moderate',
+      description: 'Moderate potential for rapid fire spread in fine fuels',
+      color: 'Yellow'
+    };
+  } else if (ffwi < 50) {
+    return {
+      level: 'High',
+      description: 'High potential for rapid fire spread in fine fuels',
+      color: 'Orange'
+    };
+  } else {
+    return {
+      level: 'Extreme',
+      description: 'Extreme potential for rapid fire spread in fine fuels',
+      color: 'Red'
+    };
+  }
+}
+
+/**
+ * Describe vapour-pressure deficit (VPD) drying power for a fire-weather
+ * dryness-context line.
+ *
+ * Bands (`< 1` low, `1-2` moderate, `2-3` high, `> 3` extreme kPa) are a
+ * **project heuristic** for narrating drying power, not an agency scale.
+ */
+export function describeVpd(kPa: number): string {
+  if (kPa < 1) {
+    return 'low drying power';
+  } else if (kPa < 2) {
+    return 'moderate drying power';
+  } else if (kPa < 3) {
+    return 'high drying power';
+  } else {
+    return 'extreme drying power';
+  }
+}
+
+/**
+ * Describe topsoil (0-1 cm) volumetric moisture content for a fire-weather
+ * dryness-context line.
+ *
+ * Bands (`< 0.1` very dry, `0.1-0.2` dry, `0.2-0.3` moist, `> 0.3` wet
+ * m^3/m^3) are a **project heuristic**, not an agency scale.
+ */
+export function describeTopsoilMoisture(m3m3: number): string {
+  if (m3m3 < 0.1) {
+    return 'very dry';
+  } else if (m3m3 < 0.2) {
+    return 'dry';
+  } else if (m3m3 < 0.3) {
+    return 'moist';
+  } else {
+    return 'wet';
+  }
+}
