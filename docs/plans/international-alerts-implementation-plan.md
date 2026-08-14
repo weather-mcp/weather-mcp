@@ -482,7 +482,7 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T7 — `get_weather_summary`: drop the US-only short-circuit (`sonnet`) — `4007526`
 - [x] T8 — Routing unit tests (`sonnet`, 14 tests) — `fbd46f6`
 - [x] T9 — Integration tests: captured shapes + tolerant live smoke (`sonnet`, 5 tests; instance-scoped axios spies so the live block stays genuinely live) — `adc9e13`
-- [x] T10 — Live acceptance sweep + documentation checklist (`opus`) — see sweep record below; SHA in the tracker-tick commit
+- [x] T10 — Live acceptance sweep + documentation checklist (`opus`) — `327f47d`; sweep record below
 
 **T10 live acceptance sweep (2026-08-13, orchestrator-run against the built dist):**
 
