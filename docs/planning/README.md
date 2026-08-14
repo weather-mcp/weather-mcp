@@ -37,7 +37,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 | Global wildfire via NASA FIRMS (optional MAP_KEY) | ✅ | Shipped on `feat/global-wildfire` targeting v1.20.0; [`docs/plans/global-wildfire-plan.md`](../plans/global-wildfire-plan.md) (keyless-first — flat regional CSVs, key upgrades to Area-API bbox + multi-day); ICR Phase 4; [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #2 |
 | met.no Locationforecast as fallback/second-opinion source | 💡 | ICR Phase 5 |
 | Global climate normals (Open-Meteo archive outside US) | 💡 | ICR Phase 5 |
-| Global fire weather indices (Open-Meteo hourly outside US) | 💡 | ICR Phase 5 |
+| Global fire weather indices (computed Fosberg FFWI outside US) | 📝 | [`docs/global-fire-weather-plan.md`](../global-fire-weather-plan.md) (2026-08-14); ICR Phase 5. Design correction: `fireWeather.ts` has no formulas to reuse — NOAA supplies pre-computed indices — so the global path computes Fosberg in-house from Open-Meteo current values (not hourly) |
 | UK river gauges (Environment Agency flood-monitoring API) | 💡 | ICR Phase 2 supplement |
 | Real station observations worldwide (aviationweather.gov METARs) | ✅ | Shipped in v1.18.0 (developed on `feat/metar` as the v1.17.0 milestone); [`docs/plans/metar-plan.md`](../plans/metar-plan.md). Shipped as `source: 'metar'` on `get_current_conditions` — not a new tool — with `auto` byte-for-byte unchanged. Closes the ICR Phase 1 leftover and the observation half of [FUTURE_ENHANCEMENTS](./FUTURE_ENHANCEMENTS.md) §4 |
 
