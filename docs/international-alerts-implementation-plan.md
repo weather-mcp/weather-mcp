@@ -479,9 +479,9 @@ Spot-checks against the code, reconciled into the tasks below:
 - [x] T4 — Live-verify the full MeteoAlarm slug map (orchestrator-run sweep: 38/38 verified, `mk` slug corrected to `republic-of-north-macedonia`) — `2bece5b`
 - [x] T5 — GeoMet types, service, and filtering (`sonnet`) — `ccb4953`
 - [x] T6 — Country routing + per-source renderers in `get_alerts` (`opus`; live sanity: Munich → 51 DWD warnings + attribution, Toronto → GeoMet clean-empty not NOAA, Seattle built-dist output diffed byte-identical vs `main`) — `e1dba84`
-- [ ] T7 — `get_weather_summary`: drop the US-only short-circuit (`sonnet`)
-- [ ] T8 — Routing unit tests (`sonnet`)
-- [ ] T9 — Integration tests: captured shapes + tolerant live smoke (`sonnet`)
+- [x] T7 — `get_weather_summary`: drop the US-only short-circuit (`sonnet`) — `4007526`
+- [x] T8 — Routing unit tests (`sonnet`, 14 tests) — `fbd46f6`
+- [x] T9 — Integration tests: captured shapes + tolerant live smoke (`sonnet`, 5 tests; instance-scoped axios spies so the live block stays genuinely live) — `adc9e13`
 - [ ] T10 — Live acceptance sweep + documentation checklist (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
