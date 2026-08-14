@@ -21,6 +21,14 @@ export interface ResolvedLocation {
   longitude: number;
   source: 'coordinates' | 'saved_location' | 'geocoded' | 'default';
   location_name?: string;
+  /**
+   * ISO country code, when known from the resolution path (saved location or
+   * geocoded city_name). Casing follows the upstream source as-is (e.g. saved
+   * locations store uppercase "US"/"GB"; geocoding providers vary) — consumers
+   * normalize as needed. Unset for raw coordinates and for defaults that are
+   * not themselves a saved/geocoded location.
+   */
+  country_code?: string;
 }
 
 /**
@@ -87,6 +95,7 @@ interface CachedCityGeocode {
   latitude: number;
   longitude: number;
   display_name: string;
+  country_code?: string;
 }
 
 // Module-level cache for city_name -> coordinates lookups.
@@ -166,7 +175,8 @@ export function resolveLocation(
       latitude: savedLocation.latitude,
       longitude: savedLocation.longitude,
       source: 'saved_location',
-      location_name: matchedAlias
+      location_name: matchedAlias,
+      country_code: savedLocation.country_code
     };
   }
 
@@ -247,7 +257,8 @@ export async function resolveLocationAsync(
           latitude: cached.latitude,
           longitude: cached.longitude,
           source: 'geocoded',
-          location_name: cached.display_name
+          location_name: cached.display_name,
+          country_code: cached.country_code
         };
       }
     }
@@ -270,7 +281,8 @@ export async function resolveLocationAsync(
         {
           latitude: best.latitude,
           longitude: best.longitude,
-          display_name: best.display_name
+          display_name: best.display_name,
+          country_code: best.country_code
         },
         CacheConfig.ttl.geocoding
       );
@@ -280,7 +292,8 @@ export async function resolveLocationAsync(
       latitude: best.latitude,
       longitude: best.longitude,
       source: 'geocoded',
-      location_name: best.display_name
+      location_name: best.display_name,
+      country_code: best.country_code
     };
   }
 
