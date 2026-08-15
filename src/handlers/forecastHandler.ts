@@ -46,6 +46,15 @@ import {
   formatNextQuarters,
 } from '../utils/astronomy.js';
 import { isInUS } from '../utils/geography.js';
+import {
+  COMPARISON_MODELS,
+  buildModelComparison,
+} from '../utils/modelComparison.js';
+import type {
+  ModelComparisonResult,
+  DayComparison,
+  WeatherCodeBucket,
+} from '../utils/modelComparison.js';
 import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
 
 /** Note shown when an auto-routed NOAA request falls back to Open-Meteo. */
@@ -76,6 +85,7 @@ interface ForecastArgs extends UnitArgs {
   include_severe_weather?: boolean;
   include_normals?: boolean;
   include_astronomy?: boolean;
+  compare_models?: boolean;
   source?: 'auto' | 'noaa' | 'openmeteo';
   detail?: DetailLevel;
 }
@@ -243,6 +253,14 @@ export async function handleGetForecast(
     'include_astronomy',
     false
   );
+  // Multi-model agreement view (D1). Unlike include_astronomy/include_normals,
+  // this is not garnish — it replaces the forecast product entirely, so its
+  // parameter conflicts are errors rather than silent no-ops (see below).
+  const compare_models = validateOptionalBoolean(
+    (args as ForecastArgs)?.compare_models,
+    'compare_models',
+    false
+  );
   // Output verbosity: caps hourly output unless detail="full" (see hourlyEntryCap)
   const detail = validateDetail((args as ForecastArgs)?.detail);
 
@@ -251,6 +269,19 @@ export async function handleGetForecast(
 
   // Get source preference or auto-detect
   const requestedSource = (args as ForecastArgs)?.source || 'auto';
+
+  // Comparison interactions, thrown before any service call (D1). Silently
+  // returning a plain forecast to someone who asked "do the models agree?"
+  // would be dishonest, so these conflicts fail loudly instead of degrading.
+  if (compare_models) {
+    if (granularity === 'hourly') {
+      throw new Error('compare_models requires daily granularity');
+    }
+    if (requestedSource === 'noaa') {
+      throw new Error('compare_models uses Open-Meteo model data; use source "auto" or "openmeteo"');
+    }
+  }
+
   let useNOAA: boolean;
 
   if (requestedSource === 'auto') {
@@ -262,7 +293,21 @@ export async function handleGetForecast(
 
   // Use NOAA for US locations or if explicitly requested
   let result: { content: Array<{ type: string; text: string }> };
-  if (useNOAA) {
+  if (compare_models) {
+    // The comparison short-circuits routing entirely (D2): NOAA is never
+    // called, so none of the auto-fallback logic below applies — there is
+    // nothing to fall back from. US points still get a comparison, with the
+    // NWS-not-compared disclosure in the footer.
+    result = await formatModelComparisonForecast(
+      openMeteoService,
+      latitude,
+      longitude,
+      days,
+      include_precipitation_probability,
+      prefs,
+      detail
+    );
+  } else if (useNOAA) {
     try {
       result = await formatNOAAForecast(
         noaaService,
@@ -805,6 +850,365 @@ async function formatOpenMeteoForecast(
       }
     ]
   };
+}
+
+// ---------------------------------------------------------------------------
+// Multi-model comparison rendering (D5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Short display names for the curated comparison models, used in per-day
+ * lines and dissenter callouts. Keyed by the Open-Meteo model id.
+ */
+const MODEL_SHORT_NAMES: Record<string, string> = {
+  gfs_seamless: 'GFS',
+  ecmwf_ifs025: 'ECMWF',
+  icon_seamless: 'ICON',
+  gem_seamless: 'GEM',
+  ukmo_seamless: 'UKMO'
+};
+
+/** Long-form model names with their issuing centre, for the header line. */
+const MODEL_LONG_NAMES: Record<string, string> = {
+  gfs_seamless: 'GFS (NOAA)',
+  ecmwf_ifs025: 'ECMWF IFS',
+  icon_seamless: 'ICON (DWD)',
+  gem_seamless: 'GEM (Canada)',
+  ukmo_seamless: 'UKMO (UK Met Office)'
+};
+
+function modelShortName(model: string): string {
+  return MODEL_SHORT_NAMES[model] ?? model;
+}
+
+/** Human label for a coarse weather-code bucket (see `weatherCodeBucket`). */
+const BUCKET_LABELS: Record<WeatherCodeBucket, string> = {
+  clear: 'clear',
+  cloudy: 'cloudy',
+  fog: 'fog',
+  rain: 'rain',
+  snow: 'snow',
+  thunderstorm: 'thunderstorms',
+  other: 'mixed conditions'
+};
+
+/** Round a displayed temperature/wind figure the way the standard views do. */
+function r0(value: number): string {
+  return `${Math.round(value)}`;
+}
+
+/**
+ * Render a min–max range, collapsing to a single figure when every model
+ * agreed exactly — "82–82°F" reads as a formatting bug, "82°F" reads as
+ * unanimity.
+ */
+function rangeText(min: number, max: number, unit: string): string {
+  return Math.round(min) === Math.round(max)
+    ? `${r0(min)}${unit}`
+    : `${r0(min)}–${r0(max)}${unit}`;
+}
+
+function precipRangeText(min: number, max: number, unit: string): string {
+  return min.toFixed(2) === max.toFixed(2)
+    ? `${min.toFixed(2)} ${unit}`
+    : `${min.toFixed(2)}–${max.toFixed(2)} ${unit}`;
+}
+
+function plural(count: number, singular: string, pluralForm: string): string {
+  return count === 1 ? singular : pluralForm;
+}
+
+/**
+ * Overall-agreement sentence shown under the header. Built deterministically
+ * from the per-day labels: a leading run of good days is called out where one
+ * exists, otherwise the day counts are stated plainly. The maximum daily-high
+ * spread is always given so the reader can size the disagreement themselves.
+ */
+function overallAgreementLine(
+  result: ModelComparisonResult,
+  timezone: string,
+  tempU: string
+): string {
+  const days = result.days;
+  const assessable = days.filter(d => d.participantCount >= 2);
+  const good = assessable.filter(d => d.agreement === 'Good').length;
+  const moderate = assessable.filter(d => d.agreement === 'Moderate').length;
+  const low = assessable.filter(d => d.agreement === 'Low').length;
+
+  if (assessable.length === 0) {
+    return `**Model agreement:** Not assessable — too few models returned data for these days.\n`;
+  }
+
+  const maxSpread = Math.max(...assessable.map(d => d.temperature.high.range));
+  const spreadText = `temperature spread up to ${r0(maxSpread)}${tempU}`;
+
+  let summary: string;
+  if (good === assessable.length) {
+    summary = `Good across all ${assessable.length} ${plural(assessable.length, 'day', 'days')}`;
+  } else {
+    // Leading run of good days — the practically useful shape of the answer
+    // ("trust the next three days, watch the weekend").
+    let run = 0;
+    while (run < days.length && days[run].participantCount >= 2 && days[run].agreement === 'Good') {
+      run++;
+    }
+    if (run > 0) {
+      summary = `Good through ${shortDayLabel(days[run - 1].date, timezone)}, then `;
+      summary += low > 0
+        ? `diverging — ${low} low-agreement ${plural(low, 'day', 'days')}`
+        : `less certain — ${moderate} moderate ${plural(moderate, 'day', 'days')}`;
+    } else {
+      summary = `${good} good, ${moderate} moderate, ${low} low-agreement `;
+      summary += `${plural(assessable.length, 'day', 'days')} of ${assessable.length}`;
+    }
+  }
+
+  return `**Model agreement:** ${summary} (${spreadText}).\n`;
+}
+
+function fullDayLabel(date: string, timezone: string): string {
+  return DateTime.fromISO(date, { zone: timezone }).toLocaleString({
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+function shortDayLabel(date: string, timezone: string): string {
+  return DateTime.fromISO(date, { zone: timezone }).toLocaleString({ weekday: 'short' });
+}
+
+/**
+ * One compact line per day for `detail: "summary"`.
+ */
+function summaryDayLine(
+  day: DayComparison,
+  timezone: string,
+  tempU: string,
+  describeCode: (code: number) => string
+): string {
+  const label = shortDayLabel(day.date, timezone);
+  if (day.participantCount < 2) {
+    return `- **${label}:** only ${day.participantCount} ${plural(day.participantCount, 'model', 'models')} with data\n`;
+  }
+  const conditions = day.bestMatch?.code !== null && day.bestMatch !== null
+    ? describeCode(day.bestMatch.code as number)
+    : BUCKET_LABELS[day.conditions.bucket];
+  const highs = rangeText(day.temperature.high.min, day.temperature.high.max, tempU);
+  return `- **${label}:** ${conditions}, high ${highs} — ${day.agreement} agreement\n`;
+}
+
+/**
+ * Full per-day block for `detail: "standard"` and `"full"` (the D5 sketch).
+ */
+function standardDayBlock(
+  day: DayComparison,
+  timezone: string,
+  detail: DetailLevel,
+  includeProbability: boolean,
+  prefs: UnitPreferences,
+  describeCode: (code: number) => string
+): string {
+  const tempU = temperatureLabel(prefs);
+  const windU = windSpeedLabel(prefs);
+  const precipU = precipitationLabel(prefs);
+
+  // Reduced participation is stated in the heading so a shorter spread is
+  // never mistaken for stronger agreement.
+  const countSuffix = day.participantCount < day.totalModels
+    ? ` (${day.participantCount} of ${day.totalModels} models)`
+    : '';
+  let output = `## ${fullDayLabel(day.date, timezone)}${countSuffix}\n`;
+
+  if (day.bestMatch) {
+    const low = day.bestMatch.low !== null ? ` / Low ${r0(day.bestMatch.low)}${tempU}` : '';
+    const conditions = day.bestMatch.code !== null ? ` — ${describeCode(day.bestMatch.code)}` : '';
+    output += `**Best match:** High ${r0(day.bestMatch.high)}${tempU}${low}${conditions}\n`;
+  }
+
+  // A single model is not a spread. Say so rather than rendering a zero-width
+  // range that would read as perfect agreement.
+  if (day.participantCount < 2) {
+    output += `*Only ${day.participantCount} ${plural(day.participantCount, 'model', 'models')} returned data for this day — no spread to compare.*\n\n`;
+    return output;
+  }
+
+  let agreementLine = `**Agreement:** ${day.agreement}`;
+  if (day.temperature.outlierModel) {
+    agreementLine += ` — driven by ${modelShortName(day.temperature.outlierModel)}`;
+  } else if (day.temperature.outlierUnnamed) {
+    agreementLine += ` — models broadly split`;
+  }
+  output += `${agreementLine}\n`;
+
+  const high = day.temperature.high;
+  let tempLine = `**Temperature (${high.count} ${plural(high.count, 'model', 'models')}):** `;
+  tempLine += `high ${rangeText(high.min, high.max, tempU)} (spread ${r0(high.range)}${tempU} — ${day.temperature.band})`;
+  if (day.temperature.low.count > 0) {
+    tempLine += `, low ${rangeText(day.temperature.low.min, day.temperature.low.max, tempU)}`;
+  }
+  output += `${tempLine}\n`;
+
+  const precip = day.precipitation;
+  if (precip.wetParticipantCount > 0) {
+    let precipLine = `**Precipitation:** ${precip.wetCount} of ${precip.wetParticipantCount} models `;
+    precipLine += `${plural(precip.wetCount, 'predicts', 'predict')} measurable precipitation`;
+    if (precip.wetCount > 0) {
+      // The amount range covers only the models predicting precipitation.
+      // Including the dry ones would pin every minimum to 0.00 and make a
+      // confident 0.20–0.31 in forecast read as "anywhere from nothing".
+      // "Wet" is a >= threshold test, so the wetCount largest values are
+      // exactly the wet set.
+      const wetValues = precip.perModelSum
+        .map(v => v.value)
+        .sort((a, b) => b - a)
+        .slice(0, precip.wetCount);
+      precipLine += ` (${precipRangeText(Math.min(...wetValues), Math.max(...wetValues), precipU)})`;
+    }
+    if (includeProbability && precip.probability && precip.probability.count > 0) {
+      precipLine += `; probability ${r0(precip.probability.min)}–${r0(precip.probability.max)}%`;
+      precipLine += ` (${precip.probability.count} ${plural(precip.probability.count, 'model', 'models')})`;
+    }
+    output += `${precipLine}\n`;
+  }
+
+  if (day.wind.max.count > 0) {
+    output += `**Wind:** max ${rangeText(day.wind.max.min, day.wind.max.max, ` ${windU}`)}\n`;
+  }
+
+  if (day.conditions.participantCount > 0) {
+    let conditionsLine = `**Conditions:** ${day.conditions.count} of ${day.conditions.participantCount} models `;
+    conditionsLine += BUCKET_LABELS[day.conditions.bucket];
+    if (day.conditions.dissenters.length > 0) {
+      const named = day.conditions.dissenters
+        .map(d => `${modelShortName(d.model)}: ${describeCode(d.code)}`)
+        .join('; ');
+      conditionsLine += `; ${named}`;
+    }
+    output += `${conditionsLine}\n`;
+  }
+
+  // detail="full" adds the per-model values behind each range — still one
+  // compact line per variable group, never six full forecasts (D1).
+  if (detail === 'full') {
+    if (day.temperature.perModelHigh.length > 0) {
+      const highs = day.temperature.perModelHigh.map(v => `${modelShortName(v.model)} ${r0(v.value)}`).join(', ');
+      output += `**Per-model highs:** ${highs} ${tempU}\n`;
+    }
+    if (day.temperature.perModelLow.length > 0) {
+      const lows = day.temperature.perModelLow.map(v => `${modelShortName(v.model)} ${r0(v.value)}`).join(', ');
+      output += `**Per-model lows:** ${lows} ${tempU}\n`;
+    }
+    if (day.precipitation.perModelSum.length > 0) {
+      const sums = day.precipitation.perModelSum.map(v => `${modelShortName(v.model)} ${v.value.toFixed(2)}`).join(', ');
+      output += `**Per-model precipitation:** ${sums} ${precipU}\n`;
+    }
+    if (day.wind.perModel.length > 0) {
+      const winds = day.wind.perModel.map(v => `${modelShortName(v.model)} ${r0(v.value)}`).join(', ');
+      output += `**Per-model wind:** ${winds} ${windU}\n`;
+    }
+  }
+
+  output += `\n`;
+  return output;
+}
+
+/**
+ * Format a multi-model agreement comparison for `get_forecast`'s
+ * `compare_models` flag (design D5). Summarizes agreement and divergence
+ * across the curated global model set — deliberately never N full forecasts.
+ *
+ * The honest-framing footer follows the FIRMS hotspots-not-incidents / GloFAS
+ * model-not-gauge / Fosberg derived-not-official precedents: a tight spread is
+ * a proxy for confidence, not a guarantee of accuracy.
+ */
+async function formatModelComparisonForecast(
+  openMeteoService: OpenMeteoService,
+  latitude: number,
+  longitude: number,
+  days: number,
+  includeProbability: boolean,
+  prefs: UnitPreferences,
+  detail: DetailLevel
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  const tempU = temperatureLabel(prefs);
+
+  // Contract, not garnish (D7) — a transport failure propagates sanitized
+  // rather than degrading to a plain single-model forecast.
+  const response = await openMeteoService.getModelComparison(latitude, longitude, days, prefs);
+
+  const comparison = buildModelComparison(response.daily, prefs.temperature, prefs.precipitation);
+
+  // Fewer than 2 surviving comparison models, or nothing left after trimming,
+  // is not a comparison — say so rather than render a one-model "spread" (D7).
+  const survivingModels = comparison.totalModels - comparison.droppedModels.length;
+  if (survivingModels < 2 || comparison.days.length === 0) {
+    throw new DataNotFoundError('OpenMeteo', 'Model comparison data is unavailable for this location');
+  }
+
+  const timezone = response.timezone;
+  const describeCode = (code: number): string => openMeteoService.getWeatherDescription(code);
+
+  const comparedModels = COMPARISON_MODELS.filter(
+    m => m !== 'best_match' && !comparison.droppedModels.includes(m)
+  );
+
+  let output = `# Weather Forecast (Model Comparison)\n\n`;
+  output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
+  output += `**Timezone:** ${timezone}\n`;
+  output += `**Forecast Days:** ${days}\n`;
+  output += `**Models compared:** ${comparedModels.map(m => MODEL_LONG_NAMES[m] ?? m).join(', ')}\n`;
+  output += `**Reference:** Open-Meteo best_match blend\n\n`;
+
+  // Never trust the HTTP 200 — a model can return all-null arrays at a given
+  // location (live-verified), and silently comparing four models under a
+  // "5 models" heading would overstate the sample.
+  if (comparison.droppedModels.length > 0) {
+    const dropped = comparison.droppedModels.map(modelShortName).join(', ');
+    output += `*${dropped} returned no data for this location and ${plural(comparison.droppedModels.length, 'was', 'were')} excluded.*\n\n`;
+  }
+
+  output += overallAgreementLine(comparison, timezone, tempU);
+  output += `\n`;
+
+  if (detail === 'summary') {
+    for (const day of comparison.days) {
+      output += summaryDayLine(day, timezone, tempU, describeCode);
+    }
+    output += `\n`;
+  } else {
+    for (const day of comparison.days) {
+      output += standardDayBlock(day, timezone, detail, includeProbability, prefs, describeCode);
+    }
+  }
+
+  if (comparison.trimmedDays > 0) {
+    output += `*Note: ${comparison.trimmedDays} further ${plural(comparison.trimmedDays, 'day', 'days')} beyond most models' horizon ${plural(comparison.trimmedDays, 'was', 'were')} omitted*\n\n`;
+  }
+
+  // Not every model publishes every product — UKMO has no precipitation
+  // probability at all, so a short probability count is expected, not a fault.
+  const probabilityShort = comparison.days.some(
+    d => d.precipitation.wetParticipantCount > 0 &&
+      (d.precipitation.probability?.count ?? 0) < d.precipitation.wetParticipantCount
+  );
+  if (includeProbability && probabilityShort) {
+    output += `*Not every model publishes a precipitation probability (UKMO does not), so probability counts can be lower than the model count.*\n\n`;
+  }
+
+  output += `---\n`;
+  let footer = `*Data source: Open-Meteo (Global). Compared models: `;
+  footer += `${comparedModels.map(modelShortName).join(', ')}; reference line is Open-Meteo's `;
+  footer += `best_match blend (not counted in spreads). Forecast spread across models is a proxy `;
+  footer += `for uncertainty, not a guarantee — a tight spread can still be wrong. Model run times `;
+  footer += `differ and are not shown.`;
+  if (isInUS(latitude, longitude)) {
+    footer += ` The NOAA/NWS point forecast is not among the compared models.`;
+  }
+  footer += `*\n`;
+  output += footer;
+
+  return { content: [{ type: 'text', text: output }] };
 }
 
 /**
