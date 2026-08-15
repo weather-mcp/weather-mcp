@@ -399,7 +399,13 @@ unrelated to this branch, and not a product bug.
   `days: []` — the handler must treat that like the D7 `< 2 models` case rather
   than render an empty comparison, and an interior day with
   `participantCount < 2` must not render a spread as if it were agreement.
-- [ ] T2 — Service method + types (`sonnet`)
+- [x] T2 — Service method + types (`sonnet`) — `32e43f4` (19 tests; suite 2028)
+
+  `getModelComparison(latitude, longitude, days = 7, prefs = IMPERIAL_PREFERENCES)`.
+  `getForecast` verified unchanged by an explicit diff-lock describe block
+  (its 19-variable `daily` list, absence of a `models` param, and its
+  `openmeteo-forecast` key + hardcoded 2 h TTL), in addition to the existing
+  `openmeteo-*.test.ts` files passing unedited.
 - [ ] T3 — Forecast handler: validation, routing, rendering (`opus`)
 - [ ] T4 — get_weather_summary flag strip (`sonnet`)
 - [ ] T5 — Schema + tool description (`haiku`)
