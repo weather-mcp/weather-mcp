@@ -417,9 +417,21 @@ unrelated to this branch, and not a product bug.
   the D5 sketch's "(0.05–0.31 in)"; locked by two new tests. Also: singular verb
   agreement at one wet model, and the overall-agreement line no longer emits a
   double parenthetical.
-- [ ] T4 — get_weather_summary flag strip (`sonnet`)
-- [ ] T5 — Schema + tool description (`haiku`)
-- [ ] T6 — Integration live smoke (`sonnet`)
+- [x] T4 — get_weather_summary flag strip (`sonnet`) — `1b061de` (append-only: 59 insertions, 0 deletions)
+
+  The file mocks `forecastHandler.js` at module level, which would have made
+  "`getModelComparison` never called" vacuously true. The lock test unmocks and
+  re-imports so it drives the *real* `handleGetForecast`, restoring the shared
+  mock in a `finally`.
+- [x] T5 — Schema + tool description (`haiku`) — `0c529c3` (diff = one property + one sentence)
+- [x] T6 — Integration live smoke (`sonnet`) — `03060eb` (live: 5/5 models, 7 days)
+
+  **Deliberate deviation from the sibling live files:** their blanket
+  `catch` swallows assertion failures too, so such a test can never fail. This
+  one re-throws `AssertionError` and tolerates only transport failures — the
+  plan's acceptance is "never fails on a *network* error", not "never fails".
+  Verified both directions: forced threshold breach turns the suite red; an
+  unroutable endpoint passes with a logged skip.
 - [ ] T7 — Byte-identical sweep + documentation checklist (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
