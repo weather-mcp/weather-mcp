@@ -110,6 +110,9 @@ export async function handleGetWeatherSummary(
     longitude: resolved.longitude,
     location_name: undefined,
     city_name: undefined,
+    // A comparison block is the wrong shape inside a summary; users wanting
+    // a comparison call get_forecast directly.
+    compare_models: undefined,
     detail
   };
 
