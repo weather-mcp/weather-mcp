@@ -388,7 +388,17 @@ builds its ACIS records slot from local `new Date()` while the handler derives
 month/day from the observation timestamp (20 min earlier), so the file fails
 deterministically in the ~20-minute window after local midnight. Pre-existing,
 unrelated to this branch, and not a product bug.
-- [ ] T1 — Pure comparison module (`sonnet`)
+- [x] T1 — Pure comparison module (`sonnet`) — `46d06f8` (48 tests; suite 2009)
+
+  Entry point is `buildModelComparison(daily, tempUnit, precipUnit)` (the design
+  left the name open). `ModelComparisonResult { days, droppedModels,
+  trimmedDays, totalModels }`; each `DayComparison` carries `date`, `bestMatch`,
+  `participantCount`/`totalModels`, `temperature`/`precipitation`/`wind`/
+  `conditions` blocks with `perModel*` arrays for `detail: "full"`, and
+  `agreement`. **Note for T3:** an all-days-trimmed response yields
+  `days: []` — the handler must treat that like the D7 `< 2 models` case rather
+  than render an empty comparison, and an interior day with
+  `participantCount < 2` must not render a spread as if it were agreement.
 - [ ] T2 — Service method + types (`sonnet`)
 - [ ] T3 — Forecast handler: validation, routing, rendering (`opus`)
 - [ ] T4 — get_weather_summary flag strip (`sonnet`)
