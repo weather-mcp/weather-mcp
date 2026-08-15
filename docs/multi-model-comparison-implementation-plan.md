@@ -377,7 +377,17 @@ Spot-checks against the code (2026-08-14), reconciled into the tasks below:
 
 ## Progress Tracker
 
-- [ ] T0 — Land design doc + planning edits as first `docs:` commit (orchestrator, with baseline)
+- [x] T0 — Land design doc + planning edits as first `docs:` commit (orchestrator, with baseline) — `ec5ea81`
+
+**Branch base:** `main` @ `bcb9672` (v1.20.0) — the T7 byte-identical sweep
+diffs against this SHA.
+
+**Baseline (2026-08-15):** `npm run build` 0 errors · `npm test` 1961/1961 ·
+`npm audit` 0 vulnerabilities. Gate runs use `TZ=UTC` — `metar-handler.test.ts`
+builds its ACIS records slot from local `new Date()` while the handler derives
+month/day from the observation timestamp (20 min earlier), so the file fails
+deterministically in the ~20-minute window after local midnight. Pre-existing,
+unrelated to this branch, and not a product bug.
 - [ ] T1 — Pure comparison module (`sonnet`)
 - [ ] T2 — Service method + types (`sonnet`)
 - [ ] T3 — Forecast handler: validation, routing, rendering (`opus`)
