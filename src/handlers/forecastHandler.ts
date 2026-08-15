@@ -958,8 +958,8 @@ function overallAgreementLine(
         ? `diverging — ${low} low-agreement ${plural(low, 'day', 'days')}`
         : `less certain — ${moderate} moderate ${plural(moderate, 'day', 'days')}`;
     } else {
-      summary = `${good} good, ${moderate} moderate, ${low} low-agreement `;
-      summary += `${plural(assessable.length, 'day', 'days')} of ${assessable.length}`;
+      summary = `Mixed across ${assessable.length} ${plural(assessable.length, 'day', 'days')} — `;
+      summary += `${good} good, ${moderate} moderate, ${low} low`;
     }
   }
 
