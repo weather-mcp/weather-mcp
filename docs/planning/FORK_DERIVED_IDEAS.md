@@ -69,8 +69,13 @@ instead of every client spawning its own process.
 
 ## 4. Multi-model forecast comparison
 
-> **Design settled 2026-08-14:** see [`docs/multi-model-comparison-plan.md`](../multi-model-comparison-plan.md)
+> **✅ Shipped for v1.21.0** on `feat/multi-model-comparison` — see
+> [`docs/plans/multi-model-comparison-plan.md`](../plans/multi-model-comparison-plan.md)
 > (`compare_models` parameter on `get_forecast`, fixed six-model Open-Meteo set, agreement-summary output).
+> The fork's NOMADS/GRIB approach stayed rejected: Open-Meteo's `models=` parameter
+> returns all five global models' daily series in a **single JSON call**, so the
+> whole feature is one request plus a pure computation module — no GRIB parsing,
+> and global rather than US-centric.
 
 **Source:** `dapcook/weather-mcp` (NOMADS GRIB handlers + `modelComparisonHandler`,
 ~900 lines against an April 2026 base)

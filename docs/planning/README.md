@@ -48,7 +48,9 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 | Idea | Status | Detail |
 |------|--------|--------|
 | Remote hosting: Streamable HTTP transport + OAuth | 💡 | [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #3 |
-| Multi-model forecast comparison (Open-Meteo `models` param) | 📝 | Design doc [`docs/multi-model-comparison-plan.md`](../multi-model-comparison-plan.md) (2026-08-14, upstream live-verified); [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #4 — *rejected in 2025 as "too complex" via NOMADS; reconsidered 2026-08 via Open-Meteo* |
+| Multi-model forecast comparison (Open-Meteo `models` param) | ✅ | Shipped on `feat/multi-model-comparison` targeting v1.21.0 as `compare_models: true` on `get_forecast` — not a new tool; [`docs/plans/multi-model-comparison-plan.md`](../plans/multi-model-comparison-plan.md); [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #4 — *rejected in 2025 as "too complex" via NOMADS; reconsidered 2026-08 via Open-Meteo, which returns all five models in one call*. `best_match` is a reference line only, excluded from every spread statistic |
+| Caller-selectable model list (`models:` override on `compare_models`) | 💡 | Descoped from the v1.21.0 comparison: the set is fixed and curated because regional models (e.g. `icon_eu`) error outside their domain and would break the anywhere-on-Earth contract. Revisit only with per-model domain gating |
+| Single-model ensemble spread (Open-Meteo ensemble API) | 💡 | Descoped from the v1.21.0 comparison — a different product (member spread *within* one model, vs. agreement *across* models). Would answer "how confident is GFS?" rather than "do the models agree?" |
 | ESLint in the toolchain / CI | 💡 | [FORK_DERIVED_IDEAS](./FORK_DERIVED_IDEAS.md) #5 |
 | Examples folder (`examples/` with captured real output, README-linked) | ✅ | Shipped 2026-08-13 (post-v1.18.0 docs); 8 conversation-first scenario files + regenerable raw output via `npm run examples` (`scripts/capture-examples.mjs`) |
 | Opt-in usage analytics integration | 🚧 | Backend is the separate [analytics-server](https://github.com/weather-mcp/analytics-server) repo; MCP-side plan in [archive/IMPLEMENTATION_PLAN.md](./archive/IMPLEMENTATION_PLAN.md) §6.3 |
@@ -73,7 +75,7 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Smoke forecasts (NOAA HRRR-Smoke) | 💡 | FE §7.2 |
 | Storm reports (NOAA SPC, post-storm verification) | 💡 | FE §8.2 |
 | Seasonal outlooks + ENSO status (NOAA CPC) | 💡 | FE §9 |
-| Forecast uncertainty/confidence | 💡 | FE §13.1 — substantially covered by the multi-model comparison design above (`docs/multi-model-comparison-plan.md`) |
+| Forecast uncertainty/confidence | ✅ | FE §13.1 — substantially covered by the multi-model comparison shipped for v1.21.0 ([`docs/plans/multi-model-comparison-plan.md`](../plans/multi-model-comparison-plan.md)): cross-model agreement bands, spreads, and per-day Good/Moderate/Low labels. What remains uncovered is *within*-model ensemble spread, tracked as its own 💡 row above |
 | Solar radiation / solar power forecasts | 💡 | FE §18.1 |
 | Heating/cooling degree days | 💡 | FE §18.2 |
 | Pollen & allergen forecasts | ✅ | Shipped in v1.18.0 (current-conditions block of `get_air_quality`, auto-shown when non-null; Europe-only via CAMS). FE §6.1's "no free API" blocker went stale — 6 species on the air-quality endpoint the tool already calls. Hourly/daily pollen *forecast* remains open if ever wanted |

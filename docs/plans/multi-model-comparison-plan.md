@@ -1,6 +1,7 @@
 # Multi-Model Forecast Comparison — Design Plan
 
-**Status:** Settled design — ready for `/impl-plan`
+**Status:** ✅ **IMPLEMENTED** (2026-08-15) — shipped on `feat/multi-model-comparison`
+for v1.21.0. See "Implementation notes" at the foot of this document.
 **Parent:** `docs/planning/FORK_DERIVED_IDEAS.md` §4 (Multi-model forecast comparison); `docs/planning/README.md` Active ideas → Architecture & tooling
 **Target release:** v1.21.0 (next minor)
 **Branch (for /impl-plan):** `feat/multi-model-comparison` — create off `main`
@@ -455,13 +456,62 @@ Dynamic suffixed access goes exclusively through the pure module's guarded
 
 ## Documentation / registration checklist (for /run-plan tracking)
 
-- [ ] `src/utils/modelComparison.ts` — D4 pure module + heuristic-band doc comments
-- [ ] `src/services/openmeteo.ts` — `COMPARISON_MODELS`, `getModelComparison`, `buildModelComparisonParams`, `validateModelComparisonResponse`, D8 cache
-- [ ] `src/types/openmeteo.ts` — D-types response interfaces
-- [ ] `src/handlers/forecastHandler.ts` — D1 arg + validation, D2 routing, D5 `formatModelComparisonForecast`
-- [ ] `src/handlers/weatherSummaryHandler.ts` — D9 strip
-- [ ] `src/index.ts` — D10 schema property + tool description
-- [ ] Tests per §Testing
-- [ ] README.md, CHANGELOG.md, CLAUDE.md, `docs/TOOLS.md`
-- [ ] `docs/planning/README.md` + `FORK_DERIVED_IDEAS.md` §4 — status flips, back-link, descoped 💡 rows
-- [ ] Move this doc to `docs/plans/` at completion (project convention)
+- [x] `src/utils/modelComparison.ts` — D4 pure module + heuristic-band doc comments
+- [x] `src/services/openmeteo.ts` — `COMPARISON_MODELS`, `getModelComparison`, `buildModelComparisonParams`, `validateModelComparisonResponse`, D8 cache
+- [x] `src/types/openmeteo.ts` — D-types response interfaces
+- [x] `src/handlers/forecastHandler.ts` — D1 arg + validation, D2 routing, D5 `formatModelComparisonForecast`
+- [x] `src/handlers/weatherSummaryHandler.ts` — D9 strip
+- [x] `src/index.ts` — D10 schema property + tool description
+- [x] Tests per §Testing
+- [x] README.md, CHANGELOG.md, CLAUDE.md, `docs/TOOLS.md`
+- [x] `docs/planning/README.md` + `FORK_DERIVED_IDEAS.md` §4 — status flips, back-link, descoped 💡 rows
+- [x] Move this doc to `docs/plans/` at completion (project convention)
+
+## Implementation notes (2026-08-15)
+
+Branch `feat/multi-model-comparison`, base `main` @ `bcb9672` (v1.20.0).
+Final gate: `npm run build` 0 errors · `npm test` **2,058 passing** (1,961
+baseline + 97 new) · `npm audit` 0 vulnerabilities.
+
+**Design points that moved during implementation:**
+
+- **`COMPARISON_MODELS` lives in the pure module, not the service.** D3's prose
+  placed it "on the service", but D4 forbids the pure module importing services.
+  The only compile-clean arrangement keeping a single source of truth is to
+  define it in `src/utils/modelComparison.ts` and have `openmeteo.ts` import it —
+  the normal service→util direction (cf. `openMeteoUnitParams`).
+- **Entry point named `buildModelComparison(daily, tempUnit, precipUnit)`** —
+  the design left the name open. It takes the two unit *fields* as plain
+  arguments rather than a `UnitPreferences` object, so the module keeps zero
+  imports.
+- **Precipitation amount ranges cover only the wet models.** D5's sketch showed
+  "(0.05–0.31 in)"; a naive implementation ranges over *all* participating
+  models, so dry models pin every minimum to `0.00` and a confident forecast
+  reads as "anywhere from nothing". Caught by reading real rendered output, not
+  by a failing assertion. Derived by taking the `wetCount` largest values, which
+  is exactly the wet set since "wet" is a `>=` threshold test.
+- **An all-days-trimmed response yields `days: []`**, which the handler treats
+  like the D7 `< 2 models` case rather than rendering an empty comparison. A day
+  with `participantCount < 2` states that plainly instead of rendering a
+  zero-width range that would read as perfect agreement.
+- **The live smoke test re-throws assertion failures.** The sibling live files
+  use a blanket `catch` that swallows them, leaving a test that can never fail.
+  This one tolerates only transport failures — proven both directions (a forced
+  threshold breach turns the suite red; an unroutable endpoint passes).
+
+**Byte-identical sweep** (built dist vs. `bcb9672`, run by the orchestrator):
+
+| # | Scenario | Result |
+|---|----------|--------|
+| 1 | No-flag US (Denver, 3 d) | **Byte-identical** to base |
+| 2 | No-flag non-US (Milan, 3 d) | **Byte-identical** to base |
+| 3 | Non-US + flag | Comparison renders; no NWS sentence |
+| 4 | US + flag (`source: "auto"`) | Comparison renders with NWS disclosure; NOAA never contacted |
+| 5 | `days: 16` (Seattle) | Per-day "(3 of 5 models)" → "(2 of 5)" counts; trim note fired for 1 day |
+| 6 | Metric vs imperial (Milan) | Values in caller's units; labels consistent (6 °F and 3.3 °C both *moderate*) |
+| 7 | `detail` summary / full | One line per day; per-model value lines |
+| 8 | `get_weather_summary` + flag | Standard daily forecast; zero comparison output (strip holds live) |
+
+Live behaviour observed during the sweep: 5/5 models returned data at Denver,
+Milan and Seattle; the UKMO no-probability disclosure and the ragged-horizon
+trim note both fired against real responses rather than only fixtures.

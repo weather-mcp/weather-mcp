@@ -2,7 +2,7 @@
 
 **Status:** READY (2026-08-14)
 
-Execution plan for `docs/multi-model-comparison-plan.md` (the WHAT/WHY); rules
+Execution plan for `docs/plans/multi-model-comparison-plan.md` (the WHAT/WHY); rules
 live in `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -13,7 +13,7 @@ A fresh Opus session should run this with:
 /run-plan docs/multi-model-comparison-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/multi-model-comparison-plan.md` (design),
+Or, equivalently: read `docs/plans/multi-model-comparison-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review
 the diff, run the gate yourself, commit, tick the tracker, push.
@@ -432,7 +432,17 @@ unrelated to this branch, and not a product bug.
   plan's acceptance is "never fails on a *network* error", not "never fails".
   Verified both directions: forced threshold breach turns the suite red; an
   unroutable endpoint passes with a logged skip.
-- [ ] T7 — Byte-identical sweep + documentation checklist (`opus`)
+- [x] T7 — Byte-identical sweep + documentation checklist (`opus`, orchestrator)
+
+  All 8 sweeps pass — recorded in the design plan's **Implementation notes**
+  table. Sweeps 1 and 2 confirmed **byte-identical** against `bcb9672` by
+  building the base in a throwaway worktree and diffing built-dist driver
+  output. Docs updated: CHANGELOG `[Unreleased]`, README (feature bullet, tool
+  table, three test counts, badge), CLAUDE.md (tool entry, v1.21.0 blurb,
+  utils tree, counts), `docs/TOOLS.md` (parameter + a Model-comparison section
+  with the full D1 interaction table), planning index (row 💡→✅, FE §13.1
+  annotated, two descoped 💡 rows), `FORK_DERIVED_IDEAS.md` §4 marked shipped.
+  Plan set moved to `docs/plans/`.
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T7 sweep is
