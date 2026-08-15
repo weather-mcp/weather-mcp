@@ -406,7 +406,17 @@ unrelated to this branch, and not a product bug.
   (its 19-variable `daily` list, absence of a `models` param, and its
   `openmeteo-forecast` key + hardcoded 2 h TTL), in addition to the existing
   `openmeteo-*.test.ts` files passing unedited.
-- [ ] T3 — Forecast handler: validation, routing, rendering (`opus`)
+- [x] T3 — Forecast handler: validation, routing, rendering (`opus`, orchestrator) — `0f57686` (28 tests; suite 2056)
+
+  All five flag-off lock files verified unedited (`git diff --name-only` empty)
+  and passing. **Rendering fix beyond the task text, made after eyeballing real
+  output:** the precipitation amount range was computed across *all*
+  participating models, so dry models pinned every minimum to `0.00` —
+  "3 of 5 models predict measurable precipitation (0.00–0.31 in)" where the wet
+  models were 0.05/0.20/0.31. The range now covers the wet models only, matching
+  the D5 sketch's "(0.05–0.31 in)"; locked by two new tests. Also: singular verb
+  agreement at one wet model, and the overall-agreement line no longer emits a
+  double parenthetical.
 - [ ] T4 — get_weather_summary flag strip (`sonnet`)
 - [ ] T5 — Schema + tool description (`haiku`)
 - [ ] T6 — Integration live smoke (`sonnet`)
