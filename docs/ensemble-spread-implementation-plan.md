@@ -493,9 +493,18 @@ merges**, re-verify at kickoff), reconciled into the tasks below:
     labelled. Fixed so the control's wording is borrowed only when the control
     falls in the modal bucket; otherwise the modal bucket's own label is used.
     Both directions locked by tests.
-- [ ] T4 — get_weather_summary flag strip (`sonnet`)
-- [ ] T5 — Schema + tool description (`haiku`)
-- [ ] T6 — Integration live smoke (`sonnet`)
+- [x] T4 — get_weather_summary flag strip (`sonnet`) — `cef36e2`
+  - The inherited caveat held: the test file mocks `forecastHandler.js` at
+    module level, so the lock test unmocks and re-imports to drive the real
+    handler. **Verified non-vacuous by mutation** — removing the strip makes
+    the new test fail, restoring it makes it pass. The test append is 60
+    insertions / 0 deletions, so no existing test was touched.
+- [x] T5 — Schema + tool description (`haiku`) — `fb286f4`
+  - Diff is the property block plus the one extended sentence, nothing else.
+- [x] T6 — Integration live smoke (`sonnet`) — `07b40f7`
+  - Live call genuinely succeeded when written: **50/50 member keys present,
+    50/50 non-null for day 1** at Denver. Follows the re-throw-assertions
+    convention, not the older swallow-everything live files.
 - [ ] T7 — Byte-identical sweep + documentation checklist (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
