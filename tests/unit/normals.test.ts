@@ -9,9 +9,68 @@ import {
   calculateDeparture,
   formatNormals,
   getDateComponents,
-  isLocationInUS
+  isLocationInUS,
+  computeNormalsTable,
+  getNormalsTableCacheKey,
+  type NormalsTable
 } from '../../src/utils/normals.js';
 import type { OpenMeteoHistoricalResponse } from '../../src/types/openmeteo.js';
+import { METRIC_PREFERENCES } from '../../src/config/units.js';
+
+/**
+ * Build a synthetic full-year(ish) archive response for `computeNormalsTable`.
+ * `entries` maps a `"MM-DD"` key to the per-year samples for that calendar
+ * date (temp high/low in °C, precipitation in mm); `null` in any position
+ * simulates Open-Meteo's null-padding. Each entry produces one `daily.time`
+ * row per array element, dated against a distinct fabricated year so the
+ * function under test never sees duplicate dates.
+ *
+ * The declared `OpenMeteoDailyData` fields are typed `number[]`, but the
+ * real API can return `null`s; the fixture is cast at the end (the
+ * `marine-forecast.test.ts` precedent) so tests can express that directly.
+ */
+function buildNormalsFixture(
+  entries: Record<string, { high: (number | null)[]; low: (number | null)[]; precip: (number | null)[] }>
+): OpenMeteoHistoricalResponse {
+  const time: string[] = [];
+  const temperature_2m_max: (number | null)[] = [];
+  const temperature_2m_min: (number | null)[] = [];
+  const precipitation_sum: (number | null)[] = [];
+
+  for (const [monthDay, samples] of Object.entries(entries)) {
+    const count = Math.max(samples.high.length, samples.low.length, samples.precip.length);
+    for (let i = 0; i < count; i++) {
+      // Fabricated distinct year per sample index, offset per monthDay so
+      // different entries never collide on the same date.
+      const year = 1991 + i;
+      time.push(`${year}-${monthDay}`);
+      temperature_2m_max.push(samples.high[i] ?? null);
+      temperature_2m_min.push(samples.low[i] ?? null);
+      precipitation_sum.push(samples.precip[i] ?? null);
+    }
+  }
+
+  return {
+    latitude: 35.0,
+    longitude: 139.0,
+    elevation: 10,
+    timezone: 'UTC',
+    timezone_abbreviation: 'UTC',
+    generationtime_ms: 0.5,
+    utc_offset_seconds: 0,
+    daily: {
+      time,
+      temperature_2m_max,
+      temperature_2m_min,
+      precipitation_sum
+    }
+  } as unknown as OpenMeteoHistoricalResponse;
+}
+
+/** Repeat a value `n` times into an array — shorthand for uniform fixtures. */
+function repeat<T>(value: T, n: number): T[] {
+  return new Array(n).fill(value);
+}
 
 describe('Climate Normals Utilities', () => {
   describe('computeNormalsFrom30YearData', () => {
@@ -342,6 +401,262 @@ describe('Climate Normals Utilities', () => {
 
       // Just outside northern border
       expect(isLocationInUS(50.5, -100)).toBe(false);
+    });
+  });
+
+  describe('computeNormalsTable', () => {
+    it('computes a slot mean from hand-computed fixtures (exact float)', () => {
+      const fixture = buildNormalsFixture({
+        '07-04': {
+          high: repeat(20, 15), // mean 20°C -> exactly 68°F
+          low: repeat(5, 15), // mean 5°C -> exactly 41°F
+          precip: repeat(25.4, 15) // mean 25.4mm -> exactly 1 inch
+        }
+      });
+
+      const table = computeNormalsTable(fixture);
+      const slot = table['07-04'];
+
+      expect(slot).not.toBeNull();
+      expect(slot!.tempHigh).toBe(68);
+      expect(slot!.tempLow).toBe(41);
+      // 25.4mm / 25.4 = 1 inch mathematically; asserted to full float
+      // precision (not rounded) since binary division leaves a residual.
+      expect(slot!.precipitation).toBeCloseTo(1, 10);
+      expect(slot!.sampleCount).toBe(15);
+    });
+
+    it('skips null samples rather than treating them as zero (D2 fix)', () => {
+      const fixture = buildNormalsFixture({
+        '03-10': {
+          // 15 real 40°C samples + 1 null. Null-as-zero would average to
+          // (15*40 + 0) / 16 = 37.5°C = 99.5°F; skipping the null correctly
+          // averages to 40°C = 104°F.
+          high: [...repeat(40, 15), null],
+          low: repeat(10, 16),
+          precip: repeat(12.7, 16)
+        }
+      });
+
+      const table = computeNormalsTable(fixture);
+      const slot = table['03-10'];
+
+      expect(slot).not.toBeNull();
+      expect(slot!.tempHigh).toBe(104);
+      expect(slot!.tempHigh).not.toBe(99.5); // would be the null-as-zero bug
+      expect(slot!.sampleCount).toBe(15); // the null sample doesn't count
+    });
+
+    it('marks a 14-sample slot unavailable', () => {
+      const fixture = buildNormalsFixture({
+        '04-01': {
+          high: repeat(20, 14),
+          low: repeat(5, 14),
+          precip: repeat(10, 14)
+        }
+      });
+
+      const table = computeNormalsTable(fixture);
+
+      expect(table['04-01']).toBeNull();
+    });
+
+    it('marks an exactly-15-sample slot available', () => {
+      const fixture = buildNormalsFixture({
+        '04-02': {
+          high: repeat(20, 15),
+          low: repeat(5, 15),
+          precip: repeat(10, 15)
+        }
+      });
+
+      const table = computeNormalsTable(fixture);
+
+      expect(table['04-02']).not.toBeNull();
+      expect(table['04-02']!.sampleCount).toBe(15);
+    });
+
+    it('applies the Feb 29 carve-out: available at 6 samples', () => {
+      const fixture = buildNormalsFixture({
+        '02-29': {
+          high: repeat(0, 6),
+          low: repeat(-5, 6),
+          precip: repeat(2.54, 6)
+        }
+      });
+
+      const table = computeNormalsTable(fixture);
+
+      expect(table['02-29']).not.toBeNull();
+      expect(table['02-29']!.sampleCount).toBe(6);
+    });
+
+    it('applies the Feb 29 carve-out: available at 8 samples (all leap days 1992-2020)', () => {
+      const fixture = buildNormalsFixture({
+        '02-29': {
+          high: repeat(0, 8),
+          low: repeat(-5, 8),
+          precip: repeat(2.54, 8)
+        }
+      });
+
+      const table = computeNormalsTable(fixture);
+
+      expect(table['02-29']).not.toBeNull();
+      expect(table['02-29']!.sampleCount).toBe(8);
+    });
+
+    it('marks Feb 29 unavailable below 6 samples', () => {
+      const fixture = buildNormalsFixture({
+        '02-29': {
+          high: repeat(0, 5),
+          low: repeat(-5, 5),
+          precip: repeat(2.54, 5)
+        }
+      });
+
+      const table = computeNormalsTable(fixture);
+
+      expect(table['02-29']).toBeNull();
+    });
+
+    it('would mark a non-leap-day slot unavailable at the Feb-29 sample count (15 still required)', () => {
+      const fixture = buildNormalsFixture({
+        '06-15': {
+          high: repeat(20, 6),
+          low: repeat(5, 6),
+          precip: repeat(10, 6)
+        }
+      });
+
+      const table = computeNormalsTable(fixture);
+
+      expect(table['06-15']).toBeNull();
+    });
+
+    it('stores unrounded floats, not compute-time-rounded values (D5)', () => {
+      const fixture = buildNormalsFixture({
+        '09-09': {
+          // 14 * 20 + 1 * 21 = 301; 301 / 15 = 20.0666...°C, a fractional mean.
+          high: [...repeat(20, 14), 21],
+          low: repeat(5, 15),
+          precip: repeat(10, 15)
+        }
+      });
+
+      const table = computeNormalsTable(fixture);
+      const slot = table['09-09'];
+
+      expect(slot).not.toBeNull();
+      expect(slot!.tempHigh).toBeCloseTo(68.12, 4);
+      expect(slot!.tempHigh).not.toBe(Math.round(slot!.tempHigh)); // proves it's unrounded
+    });
+
+    it('marks a slot unavailable when one variable is entirely null (open-ocean precedent)', () => {
+      const fixture = buildNormalsFixture({
+        '05-05': {
+          high: repeat(null, 15),
+          low: repeat(5, 15),
+          precip: repeat(10, 15)
+        }
+      });
+
+      const table = computeNormalsTable(fixture);
+
+      expect(table['05-05']).toBeNull();
+    });
+
+    it('returns an all-unavailable, fully-keyed table for a response with no daily data', () => {
+      const response: OpenMeteoHistoricalResponse = {
+        latitude: 0,
+        longitude: 0,
+        elevation: 0,
+        timezone: 'UTC',
+        timezone_abbreviation: 'UTC',
+        generationtime_ms: 0.5,
+        utc_offset_seconds: 0
+      };
+
+      const table: NormalsTable = computeNormalsTable(response);
+
+      expect(Object.keys(table)).toHaveLength(366);
+      expect(table['01-01']).toBeNull();
+      expect(table['02-29']).toBeNull();
+      expect(table['12-31']).toBeNull();
+      // A key that was never populated (not a real MM-DD) is genuinely
+      // absent, distinguishing "unavailable" (null) from "missing" (undefined).
+      expect(table['13-40']).toBeUndefined();
+    });
+
+    it('always populates all 366 MM-DD keys, including Feb 29', () => {
+      const fixture = buildNormalsFixture({
+        '01-01': { high: repeat(20, 15), low: repeat(5, 15), precip: repeat(10, 15) }
+      });
+
+      const table = computeNormalsTable(fixture);
+
+      expect(Object.keys(table)).toHaveLength(366);
+      expect(table['02-29']).toBeNull(); // present, but unavailable (no samples)
+    });
+  });
+
+  describe('getNormalsTableCacheKey', () => {
+    it('generates the per-location table cache key format', () => {
+      const key = getNormalsTableCacheKey(40.7128, -74.0060);
+
+      expect(key).toBe('normals-table:40.71:-74.01');
+    });
+
+    it('rounds coordinates to 2 decimals', () => {
+      const key = getNormalsTableCacheKey(40.71283847, -74.00601234);
+
+      expect(key).toBe('normals-table:40.71:-74.01');
+    });
+
+    it('is stable across repeated calls with the same coordinates', () => {
+      const key1 = getNormalsTableCacheKey(35.6762, 139.6503);
+      const key2 = getNormalsTableCacheKey(35.6762, 139.6503);
+
+      expect(key1).toBe(key2);
+    });
+
+    it('has no month/day component, unlike getNormalsCacheKey', () => {
+      const key = getNormalsTableCacheKey(35.6762, 139.6503);
+
+      expect(key).toBe('normals-table:35.68:139.65');
+      expect(key.split(':')).toHaveLength(3); // "normals-table", lat, lon only
+    });
+  });
+
+  describe('formatNormals precipitation rounding (D5/A4 render-time rounding)', () => {
+    it('rounds a raw unrounded inch value to 2 decimals at render time', () => {
+      const normals = {
+        tempHigh: 65,
+        tempLow: 45,
+        precipitation: 0.123456, // raw float, as the table would now store it
+        source: 'Open-Meteo' as const,
+        month: 6,
+        day: 15
+      };
+
+      const output = formatNormals(normals);
+
+      expect(output).toContain('**Normal Precipitation:** 0.12 in');
+    });
+
+    it('leaves the mm branch rounding behavior unchanged', () => {
+      const normals = {
+        tempHigh: 65,
+        tempLow: 45,
+        precipitation: 0.5, // inches, raw
+        source: 'Open-Meteo' as const,
+        month: 6,
+        day: 15
+      };
+
+      const output = formatNormals(normals, undefined, METRIC_PREFERENCES);
+
+      expect(output).toContain('**Normal Precipitation:** 12.7 mm');
     });
   });
 });

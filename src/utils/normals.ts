@@ -28,7 +28,7 @@ function normalTempToPref(fahrenheit: number, prefs: UnitPreferences): number {
 function normalPrecipToPref(inches: number, prefs: UnitPreferences): number {
   return prefs.precipitation === 'mm'
     ? Math.round(inches * 25.4 * 10) / 10
-    : inches;
+    : Math.round(inches * 100) / 100;
 }
 
 /**
@@ -125,6 +125,193 @@ export function getNormalsCacheKey(
   const lat = Math.round(latitude * 100) / 100;
   const lon = Math.round(longitude * 100) / 100;
   return `normals:${lat}:${lon}:${month}:${day}`;
+}
+
+// ---------------------------------------------------------------------------
+// Full-year normals table (D1/D2/D5) — one archive pull per location,
+// computing all 366 MM-DD slots in one pass. Types live here (not
+// `src/types/`), mirroring the `modelComparison.ts` exported-result
+// precedent for a pure util module (A3).
+// ---------------------------------------------------------------------------
+
+/**
+ * One slot of the 366-slot climate-normals table. Values are **unrounded**,
+ * canonical imperial (°F, inches) — D5 moves all rounding to render time, so
+ * these are the raw converted means, not the display-ready numbers
+ * `formatNormals`/`normalTempToPref`/`normalPrecipToPref` produce.
+ *
+ * `sampleCount` is the number of samples the slot's mean was computed from —
+ * specifically the minimum count across the three variables, since a slot is
+ * available only when *every* variable clears its minimum (A1, all-or-nothing:
+ * `ClimateNormals` has no partial-data shape), so the minimum is the binding
+ * constraint.
+ */
+export interface NormalsTableSlot {
+  tempHigh: number;
+  tempLow: number;
+  precipitation: number;
+  sampleCount: number;
+}
+
+/**
+ * A full climate-normals table, keyed `"MM-DD"` (zero-padded, e.g. `"01-05"`,
+ * `"02-29"`). `computeNormalsTable` always populates all 366 keys (using a
+ * leap-year calendar so `"02-29"` exists), so a valid key's value is always
+ * one of `NormalsTableSlot | null` — `null` marks an explicitly unavailable
+ * slot (too few qualifying samples), distinguishable from an absent/mistyped
+ * key, which would read `undefined` and never occurs for a real `"MM-DD"`.
+ */
+export type NormalsTable = Record<string, NormalsTableSlot | null>;
+
+/** Minimum non-null samples required for a slot to be available (D2, half of 30 years). */
+const NORMALS_MIN_SAMPLES = 15;
+
+/**
+ * Feb 29 carve-out (D2): only 8 leap days exist in 1991-2020, so the
+ * default 15-sample rule would make this slot permanently unavailable.
+ */
+const NORMALS_MIN_SAMPLES_FEB29 = 6;
+
+const FEB_29_KEY = '02-29';
+
+/** Reference leap year used only to enumerate every calendar MM-DD, including Feb 29. */
+const LEAP_YEAR_FOR_CALENDAR = 2020;
+
+/** Sum of a numeric array; only ever called with a non-empty array in this module. */
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+/**
+ * Extract a finite numeric sample at `index` from a possibly-absent,
+ * possibly-null-padded daily array. Open-Meteo's JSON `null`s (and a
+ * missing/short array) both read as "no sample" here — `typeof`-narrowed
+ * rather than trusting the declared `number[]` type, mirroring
+ * `modelComparison.ts`'s `extractModelSeries` guard. This is the D2 fix:
+ * the prior compute (`computeNormalsFrom30YearData`) filtered on
+ * `!== undefined` only, so a JSON `null` reached `reduce` and `sum + null`
+ * coerced to `+ 0`, dragging every mean down.
+ */
+function finiteSampleAt(series: number[] | undefined, index: number): number | undefined {
+  const value = series?.[index];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/** Build an empty table with all 366 `"MM-DD"` keys present and unavailable (`null`). */
+function buildEmptyNormalsTable(): NormalsTable {
+  const table: NormalsTable = {};
+  for (let month = 1; month <= 12; month++) {
+    const daysInMonth = new Date(LEAP_YEAR_FOR_CALENDAR, month, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const key = `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      table[key] = null;
+    }
+  }
+  return table;
+}
+
+interface NormalsSampleBucket {
+  tempHighC: number[];
+  tempLowC: number[];
+  precipitationMm: number[];
+}
+
+/**
+ * Compute a full 366-slot climate-normals table from one full-year
+ * (1991-01-01…2020-12-31) archive response, per D1/D2/D5.
+ *
+ * A single pass buckets each day's samples by its `"MM-DD"` key; each
+ * variable's mean uses only its own non-null, non-undefined samples (a day
+ * with a null precipitation reading still contributes its temperature
+ * samples). A slot is unavailable (`null`) when *any* of the three
+ * variables has fewer than `NORMALS_MIN_SAMPLES` (15) qualifying samples —
+ * except `"02-29"`, whose minimum is `NORMALS_MIN_SAMPLES_FEB29` (6).
+ * Available slots store unrounded canonical-imperial floats (°F/inches);
+ * rounding happens only at render time (D5).
+ *
+ * A response with no `daily`/`daily.time` returns the all-unavailable table
+ * defensively (the open-ocean HTTP-200-with-nulls precedent extended to a
+ * missing/malformed payload) rather than throwing — the table is garnish
+ * data indexed per-date downstream, and an all-null table degrades the same
+ * way a partially-null one does.
+ */
+export function computeNormalsTable(response: OpenMeteoHistoricalResponse): NormalsTable {
+  const table = buildEmptyNormalsTable();
+
+  const daily = response.daily;
+  if (!daily || !daily.time) {
+    return table;
+  }
+
+  const buckets = new Map<string, NormalsSampleBucket>();
+
+  for (let i = 0; i < daily.time.length; i++) {
+    const isoDate: string = daily.time[i]; // "YYYY-MM-DD"
+    const monthDay = isoDate.substring(5);
+
+    // Only real calendar MM-DD keys were pre-populated in the table; skip
+    // anything else defensively (malformed date strings).
+    if (table[monthDay] === undefined) {
+      continue;
+    }
+
+    let bucket = buckets.get(monthDay);
+    if (!bucket) {
+      bucket = { tempHighC: [], tempLowC: [], precipitationMm: [] };
+      buckets.set(monthDay, bucket);
+    }
+
+    const tempHighC = finiteSampleAt(daily.temperature_2m_max, i);
+    if (tempHighC !== undefined) bucket.tempHighC.push(tempHighC);
+
+    const tempLowC = finiteSampleAt(daily.temperature_2m_min, i);
+    if (tempLowC !== undefined) bucket.tempLowC.push(tempLowC);
+
+    const precipitationMm = finiteSampleAt(daily.precipitation_sum, i);
+    if (precipitationMm !== undefined) bucket.precipitationMm.push(precipitationMm);
+  }
+
+  for (const [monthDay, bucket] of buckets) {
+    const minSamples = monthDay === FEB_29_KEY ? NORMALS_MIN_SAMPLES_FEB29 : NORMALS_MIN_SAMPLES;
+    const sampleCount = Math.min(bucket.tempHighC.length, bucket.tempLowC.length, bucket.precipitationMm.length);
+
+    if (
+      bucket.tempHighC.length < minSamples ||
+      bucket.tempLowC.length < minSamples ||
+      bucket.precipitationMm.length < minSamples
+    ) {
+      // Already `null` from buildEmptyNormalsTable(); explicit for clarity.
+      table[monthDay] = null;
+      continue;
+    }
+
+    const avgTempHighC = sum(bucket.tempHighC) / bucket.tempHighC.length;
+    const avgTempLowC = sum(bucket.tempLowC) / bucket.tempLowC.length;
+    const avgPrecipitationMm = sum(bucket.precipitationMm) / bucket.precipitationMm.length;
+
+    table[monthDay] = {
+      tempHigh: celsiusToFahrenheit(avgTempHighC),
+      tempLow: celsiusToFahrenheit(avgTempLowC),
+      precipitation: millimetersToInches(avgPrecipitationMm),
+      sampleCount
+    };
+  }
+
+  return table;
+}
+
+/**
+ * Generate the per-location cache key for a full normals table (D1) — one
+ * entry per location instead of up to 366 per-date keys.
+ *
+ * @param latitude - Latitude (rounded to 2 decimals)
+ * @param longitude - Longitude (rounded to 2 decimals)
+ * @returns Cache key string
+ */
+export function getNormalsTableCacheKey(latitude: number, longitude: number): string {
+  const lat = Math.round(latitude * 100) / 100;
+  const lon = Math.round(longitude * 100) / 100;
+  return `normals-table:${lat}:${lon}`;
 }
 
 /**
