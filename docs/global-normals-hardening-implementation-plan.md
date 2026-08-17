@@ -407,7 +407,7 @@ passing, `npm audit` 0 vulnerabilities.
 - [x] T1 — Cache config entry (`haiku`) — `cd132a4`
 - [x] T2 — Pure table compute + render-precision groundwork (`sonnet`) — `888aaa2` (2,076 tests)
 - [x] T3 — Service switch to the per-location table (`sonnet`) — `864ece1` (2,074 tests)
-- [ ] T4 — In-flight dedupe + bounded 429 retry (`opus`)
+- [x] T4 — In-flight dedupe + bounded 429 retry (`opus`) — `16095ef` (2,079 tests)
 - [ ] T5 — One US predicate (`sonnet`)
 - [ ] T6 — Shared render helper + heading alignment (`opus`)
 - [ ] T7 — Tighten the international-normals lock (`sonnet`)
