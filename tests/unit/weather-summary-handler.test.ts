@@ -185,3 +185,62 @@ describe('handleGetWeatherSummary', () => {
     expect(alertsMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('D9: compare_models stripped from weather-summary sub-requests', () => {
+  it('never invokes getModelComparison and renders the standard forecast shape', async () => {
+    // Every other test in this file relies on the module-level mock of
+    // forecastHandler.js, which would make "getModelComparison never called"
+    // trivially true regardless of whether the strip actually works. This
+    // lock test needs the REAL handleGetForecast so a regression in the
+    // strip would genuinely route into the comparison branch and call
+    // getModelComparison — so it unmocks forecastHandler.js and re-imports
+    // fresh, using a local Open-Meteo fake instead of the shared mocks above.
+    vi.doUnmock('../../src/handlers/forecastHandler.js');
+    vi.resetModules();
+
+    const { handleGetWeatherSummary: freshHandleGetWeatherSummary } = await import(
+      '../../src/handlers/weatherSummaryHandler.js'
+    );
+
+    const getModelComparisonMock = vi.fn();
+    const fakeOpenMeteo = {
+      getForecast: vi.fn().mockResolvedValue({
+        elevation: 10,
+        timezone: 'Europe/London',
+        daily: { time: ['2026-08-16'] },
+      }),
+      getModelComparison: getModelComparisonMock,
+      getWeatherDescription: vi.fn().mockReturnValue('Clear'),
+    } as any;
+
+    try {
+      const result = await freshHandleGetWeatherSummary(
+        {
+          // London — non-US, so the real forecast handler auto-routes
+          // straight to Open-Meteo without touching NOAA at all.
+          latitude: 51.5074,
+          longitude: -0.1278,
+          include: ['forecast'],
+          compare_models: true,
+        },
+        {} as any, // noaaService — never touched on this non-US path
+        fakeOpenMeteo,
+        {} as any, // nceiService
+        {} as any, // locationStore
+        {} as any // geocodingService
+      );
+      const text = result.content[0].text;
+
+      expect(getModelComparisonMock).not.toHaveBeenCalled();
+      expect(fakeOpenMeteo.getForecast).toHaveBeenCalledTimes(1);
+      expect(text).toContain('# Weather Forecast (Daily)');
+      expect(text).not.toContain('Model Comparison');
+    } finally {
+      // Restore the shared module mock so it can't leak into any test that
+      // runs after this one in the same worker process.
+      vi.doMock('../../src/handlers/forecastHandler.js', () => ({
+        handleGetForecast: (...args: unknown[]) => forecastMock(...args),
+      }));
+    }
+  });
+});

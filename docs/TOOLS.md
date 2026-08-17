@@ -54,6 +54,7 @@ Get weather forecast for any location worldwide.
 - `include_precipitation_probability` (optional): Include rain chances (default: true)
 - `include_normals` (optional): Include climate normals for comparison (default: false). For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
 - `include_astronomy` (optional): Include a per-day astronomy block — moon phase name, illumination %, moonrise/moonset, and civil/nautical/astronomical twilight times — plus one next-full-moon / next-new-moon line per response (default: false, daily forecasts only; computed locally, no API calls). Polar days render explicit "none (polar day)" / "none (polar night)" wording
+- `compare_models` (optional): Compare five global weather models and summarize their agreement instead of returning a single forecast (default: false) — see **Model comparison** below
 - `source` (optional): "auto" (default), "noaa" (US only), or "openmeteo" (global)
 - `units` (optional): "imperial" (default) or "metric" — see [Units & Localization](#units--localization)
 - Unit overrides (optional): `temperature_unit`, `wind_speed_unit`, `precipitation_unit`, `pressure_unit`, `distance_unit`, `time_format`
@@ -62,6 +63,45 @@ Get weather forecast for any location worldwide.
 
 **Description:**
 Automatically selects the best data source: NOAA for US locations (more detailed) or Open-Meteo for international locations. Supports extended forecasts up to 16 days. Includes sunrise/sunset times, daylight duration, temperature, precipitation, wind, and UV index. When a location is resolved from `location_name` or `city_name`, the matched place is shown in a `**Location:**` header so ambiguous names are transparent.
+
+**Model comparison (`compare_models=true`).**
+Answers "how confident is this forecast?" — a question a single deterministic
+forecast cannot address. Fetches five global models in one request —
+**GFS** (NOAA/NCEP), **ECMWF IFS**, **ICON** (DWD), **GEM** (ECCC), and
+**UKMO** (UK Met Office) — and summarizes where they agree and where they
+diverge. It never dumps five forecasts: you get per-day temperature spreads
+with an agreement band, how many models predict measurable precipitation,
+wind ranges, and a conditions consensus with any dissenting models named.
+
+Open-Meteo's `best_match` blend is shown as a headline **Best match** reference
+line but is **excluded from every spread statistic** — it is a blend of
+(largely) these same models, so counting it would double-count and artificially
+tighten every spread.
+
+Honest framing is part of the output: spread across models is a *proxy* for
+uncertainty, not a guarantee — a tight spread can still be wrong, and model run
+times differ and are not shown.
+
+Interactions, each deliberate:
+
+| With | Behavior |
+|------|----------|
+| `granularity: "hourly"` | **Validation error.** The comparison is the requested product, so it fails loudly rather than silently returning a plain hourly forecast |
+| `source: "noaa"` | **Validation error** — the comparison is Open-Meteo-only. Use `"auto"` or `"openmeteo"` |
+| `source: "auto"` at a US point | Goes straight to the comparison; NOAA is never called. The footer discloses that the NOAA/NWS point forecast is not among the compared models (`gfs_seamless` represents the US global model) |
+| `include_normals`, `include_astronomy` | **Silently ignored** — the comparison is a focused agreement product; both remain available in the standard view |
+| `include_precipitation_probability: false` | Composes — the probability fragment is dropped from the precipitation line |
+| `detail` | `summary` → one compact line per day; `standard` → the per-day blocks; `full` → additionally one compact per-model values line per variable group |
+| `days` | Unchanged 1–16. Model horizons are ragged (ECMWF ~14 days, GFS 15), so each day shows its participation count (e.g. "(4 of 5 models)") and trailing days with fewer than 2 models are trimmed with a note |
+
+A model that returns no data for a location is dropped from the comparison and
+disclosed by name. Not every model publishes every product — UKMO has no
+precipitation probability at all — so probability counts can legitimately be
+lower than the model count, and the output says so. If fewer than two models
+survive, the tool errors rather than presenting a one-model "comparison".
+
+Note that `get_weather_summary` deliberately **strips** this flag: a comparison
+block is the wrong shape inside a summary. Call `get_forecast` directly.
 
 **Examples:**
 ```
@@ -81,6 +121,7 @@ Automatically selects the best data source: NOAA for US locations (more detailed
 - Humidity and atmospheric conditions
 - Climate normals comparison (when `include_normals=true`), plus the US record high/low for the first forecast date with attribution "Records: NOAA Regional Climate Centers (ACIS)"
 - Moon phase, moonrise/moonset, twilight times, and next full/new moon (when `include_astronomy=true`, daily only)
+- Model agreement/divergence instead of a single forecast (when `compare_models=true`)
 - Snow and ice accumulation forecasts (when available)
 - All timestamps in local timezone
 

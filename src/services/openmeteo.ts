@@ -17,6 +17,7 @@ import type {
   OpenMeteoAirQualityResponse,
   OpenMeteoMarineResponse,
   OpenMeteoFloodResponse,
+  OpenMeteoModelComparisonResponse,
   ClimateNormals
 } from '../types/openmeteo.js';
 import { Cache } from '../utils/cache.js';
@@ -27,6 +28,7 @@ import { computeNormalsFrom30YearData, getNormalsCacheKey } from '../utils/norma
 import { getUserAgent } from '../utils/version.js';
 import { UnitPreferences, IMPERIAL_PREFERENCES } from '../config/units.js';
 import { openMeteoUnitParams } from '../utils/unitFormat.js';
+import { COMPARISON_MODELS } from '../utils/modelComparison.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -968,6 +970,145 @@ export class OpenMeteoService {
       throw new DataNotFoundError(
         'OpenMeteo',
         'No daily forecast data available for the specified location'
+      );
+    }
+  }
+
+  /**
+   * Get a multi-model forecast comparison from the Open-Meteo Forecast API
+   * (`get_forecast`'s `compare_models` flag, `docs/multi-model-comparison-plan.md`
+   * D3).
+   *
+   * A distinct method from `getForecast` — not an option on it — because the
+   * `models=` parameter changes the shape of every `daily` key (suffixed per
+   * model) rather than adding new keys, and the comparison IS the requested
+   * product (D7): unlike the fire-weather flag on `getCurrentConditions`,
+   * there is no garnish-retry-without-the-extra-params fallback here. A
+   * failed request propagates sanitized via `makeRequestToForecast`'s
+   * existing error mapping.
+   *
+   * @param latitude - Latitude coordinate (-90 to 90)
+   * @param longitude - Longitude coordinate (-180 to 180)
+   * @param days - Number of forecast days (1-16, default: 7)
+   * @param prefs - Unit preferences (default: imperial)
+   * @returns Multi-model daily comparison data, suffixed per model
+   */
+  async getModelComparison(
+    latitude: number,
+    longitude: number,
+    days: number = 7,
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES
+  ): Promise<OpenMeteoModelComparisonResponse> {
+    // Validate coordinates
+    validateLatitude(latitude);
+    validateLongitude(longitude);
+
+    // Validate days (same 1-16 range as getForecast)
+    if (days < 1 || days > 16) {
+      throw new InvalidLocationError(
+        'OpenMeteo',
+        'Forecast days must be between 1 and 16'
+      );
+    }
+
+    // Build parameters
+    const params = this.buildModelComparisonParams(latitude, longitude, days, prefs);
+
+    // Check cache first (unit signature keeps imperial/metric responses distinct).
+    // Namespace is 'openmeteo-model-comparison' — distinct from 'openmeteo-forecast'
+    // so a comparison response can never serve or be served by a plain-forecast
+    // cache entry. The model set (COMPARISON_MODELS) is a fixed constant, so it is
+    // deliberately NOT a key component; the cache is in-process, so any future
+    // change to the set ships with a restart that clears it.
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('openmeteo-model-comparison', latitude, longitude, days, unitSignature(prefs));
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as OpenMeteoModelComparisonResponse;
+      }
+
+      const response = await this.makeRequestToForecast<OpenMeteoModelComparisonResponse>('/forecast', params);
+      this.validateModelComparisonResponse(response);
+
+      // TTL from config (not the getForecast's hardcoded 2h literal) — see D8;
+      // getForecast's own hardcoded TTL is intentionally left untouched.
+      this.cache.set(cacheKey, response, CacheConfig.ttl.forecast);
+
+      return response;
+    }
+
+    // No caching
+    const response = await this.makeRequestToForecast<OpenMeteoModelComparisonResponse>('/forecast', params);
+    this.validateModelComparisonResponse(response);
+    return response;
+  }
+
+  /**
+   * Build request parameters for a multi-model comparison request.
+   *
+   * Deliberately NOT built on top of `buildForecastParams` — that method's
+   * 19-variable daily list, multiplied across `COMPARISON_MODELS.length`
+   * models, would sextuple response size for variables the comparison view
+   * never renders (D3). Requests exactly the six verified daily variables in
+   * a fixed order, plus `models=<COMPARISON_MODELS joined>`.
+   * @private
+   */
+  private buildModelComparisonParams(
+    latitude: number,
+    longitude: number,
+    days: number,
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES
+  ): Record<string, string | number> {
+    return {
+      latitude,
+      longitude,
+      forecast_days: days,
+      ...openMeteoUnitParams(prefs),
+      timezone: 'auto',
+      daily: [
+        'weather_code',
+        'temperature_2m_max',
+        'temperature_2m_min',
+        'precipitation_sum',
+        'precipitation_probability_max',
+        'wind_speed_10m_max'
+      ].join(','),
+      models: COMPARISON_MODELS.join(',')
+    };
+  }
+
+  /**
+   * Validate that a multi-model comparison response contains usable data.
+   *
+   * Cannot reuse `validateForecastResponse`: with `models=` set to more than
+   * one model, `daily.time` is present but the *unsuffixed* keys that
+   * validator checks (e.g. plain `temperature_2m_max`) are absent — every key
+   * is suffixed per model instead. This validator instead requires
+   * non-empty `daily.time` AND at least one `temperature_2m_max_<model>` key
+   * present for a model in `COMPARISON_MODELS`.
+   *
+   * Defensive note (live-verified, design header fact (a)): a request naming
+   * exactly ONE model returns UNSUFFIXED keys — our curated list always
+   * requests six models, so that shape should never occur here, but this
+   * validator fails loudly with `DataNotFoundError` rather than silently
+   * mis-parsing if it ever does.
+   * @private
+   */
+  private validateModelComparisonResponse(response: OpenMeteoModelComparisonResponse): void {
+    if (!response.daily || !response.daily.time || response.daily.time.length === 0) {
+      throw new DataNotFoundError(
+        'OpenMeteo',
+        'No model comparison data available for the specified location'
+      );
+    }
+
+    const hasSuffixedTemperatureKey = COMPARISON_MODELS.some(
+      model => Array.isArray(response.daily[`temperature_2m_max_${model}`])
+    );
+    if (!hasSuffixedTemperatureKey) {
+      throw new DataNotFoundError(
+        'OpenMeteo',
+        'No model comparison data available for the specified location'
       );
     }
   }

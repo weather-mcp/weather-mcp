@@ -697,6 +697,39 @@ export interface OpenMeteoFloodResponse {
 }
 
 /**
+ * Daily data block from a multi-model comparison request (`models=` with more
+ * than one model, e.g. `get_forecast`'s `compare_models` flag). Deliberately
+ * **not** a widening of `OpenMeteoForecastDailyData` — with multiple models
+ * requested, Open-Meteo suffixes every key per model (e.g.
+ * `temperature_2m_max_gfs_seamless`), so the unsuffixed keys on the closed
+ * forecast-daily shape do not apply here. `time` is the only key whose name is
+ * known ahead of time; every other key is `<variable>_<model>` and is read
+ * exclusively through `extractModelSeries` (`src/utils/modelComparison.ts`,
+ * D-types) rather than by direct property access.
+ */
+export interface OpenMeteoModelComparisonDaily {
+  time: string[];
+  [key: string]: string[] | (number | null)[] | undefined;
+}
+
+/**
+ * Complete API response from an Open-Meteo multi-model comparison request
+ * (`OpenMeteoService.getModelComparison`). See `OpenMeteoModelComparisonDaily`
+ * for why this is a separate type from `OpenMeteoForecastResponse` rather than
+ * a reuse.
+ */
+export interface OpenMeteoModelComparisonResponse {
+  latitude: number;
+  longitude: number;
+  elevation: number;
+  timezone: string;
+  timezone_abbreviation: string;
+  utc_offset_seconds: number;
+  daily: OpenMeteoModelComparisonDaily;
+  daily_units?: Record<string, string>;
+}
+
+/**
  * Climate normals data (30-year averages)
  * Used for comparing current/forecast conditions to historical averages
  */
