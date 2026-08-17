@@ -403,7 +403,7 @@ Spot-checks against the code (2026-08-16), reconciled into the tasks below:
 Full gate green at kickoff — build 0 errors, **84 test files / 2,058 tests**
 passing, `npm audit` 0 vulnerabilities.
 
-- [ ] T0 — Land working-tree docs (orchestrator, with baseline)
+- [x] T0 — Land working-tree docs (orchestrator, with baseline) — `dc2fbb0`
 - [ ] T1 — Cache config entry (`haiku`)
 - [ ] T2 — Pure table compute + render-precision groundwork (`sonnet`)
 - [ ] T3 — Service switch to the per-location table (`sonnet`)
