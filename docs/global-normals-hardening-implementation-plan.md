@@ -410,7 +410,7 @@ passing, `npm audit` 0 vulnerabilities.
 - [x] T4 — In-flight dedupe + bounded 429 retry (`opus`) — `16095ef` (2,079 tests)
 - [x] T5 — One US predicate (`sonnet`) — `9de85d6` (2,072 tests)
 - [x] T6 — Shared render helper + heading alignment (`opus`) — `41b8920` (2,076 tests)
-- [ ] T7 — Tighten the international-normals lock (`sonnet`)
+- [x] T7 — Tighten the international-normals lock (`sonnet`) — `b926b2a` (2,077 tests)
 - [ ] T8 — Byte-stability check, live spot checks, docs (`opus`, orchestrator)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
