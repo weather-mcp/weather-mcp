@@ -102,6 +102,11 @@ export const CacheConfig = {
     // Historical data beyond 1 day is finalized and won't change
     historicalData: Infinity,
 
+    // Climate normals (1991–2020 baseline)
+    // Climate normals are static reference data that never change; the cached
+    // value is one full-year 366-slot table per location
+    normals: Infinity,
+
     // Service health check status
     // Check freshness periodically
     serviceStatus: 5 * MINUTE,

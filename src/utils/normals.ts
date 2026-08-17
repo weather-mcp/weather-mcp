@@ -16,6 +16,7 @@ import { temperatureLabel, precipitationLabel } from './unitFormat.js';
 import type { OpenMeteoService } from '../services/openmeteo.js';
 import type { NCEIService } from '../services/ncei.js';
 import { logger } from './logger.js';
+import { isInUS } from './geography.js';
 
 /**
  * Climate normals are stored canonically in imperial units (°F, inches).
@@ -28,7 +29,7 @@ function normalTempToPref(fahrenheit: number, prefs: UnitPreferences): number {
 function normalPrecipToPref(inches: number, prefs: UnitPreferences): number {
   return prefs.precipitation === 'mm'
     ? Math.round(inches * 25.4 * 10) / 10
-    : inches;
+    : Math.round(inches * 100) / 100;
 }
 
 /**
@@ -38,93 +39,191 @@ function millimetersToInches(mm: number): number {
   return mm / 25.4;
 }
 
+// ---------------------------------------------------------------------------
+// Full-year normals table (D1/D2/D5) — one archive pull per location,
+// computing all 366 MM-DD slots in one pass. Types live here (not
+// `src/types/`), mirroring the `modelComparison.ts` exported-result
+// precedent for a pure util module (A3).
+// ---------------------------------------------------------------------------
+
 /**
- * Compute climate normals from 30 years of historical data
+ * One slot of the 366-slot climate-normals table. Values are **unrounded**,
+ * canonical imperial (°F, inches) — D5 moves all rounding to render time, so
+ * these are the raw converted means, not the display-ready numbers
+ * `formatNormals`/`normalTempToPref`/`normalPrecipToPref` produce.
  *
- * @param historicalData - 30 years of daily historical weather data from Open-Meteo
- * @param targetMonth - Month (1-12) to compute normals for
- * @param targetDay - Day of month (1-31) to compute normals for
- * @returns Climate normals (30-year averages) for the specified date
+ * `sampleCount` is the number of samples the slot's mean was computed from —
+ * specifically the minimum count across the three variables, since a slot is
+ * available only when *every* variable clears its minimum (A1, all-or-nothing:
+ * `ClimateNormals` has no partial-data shape), so the minimum is the binding
+ * constraint.
  */
-export function computeNormalsFrom30YearData(
-  historicalData: OpenMeteoHistoricalResponse,
-  targetMonth: number,
-  targetDay: number
-): ClimateNormals {
-  if (!historicalData.daily || !historicalData.daily.time) {
-    throw new Error('Historical data does not contain daily data');
-  }
-
-  const daily = historicalData.daily;
-  const targetMonthDay = `${String(targetMonth).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
-
-  // Find all occurrences of this month/day across the 30-year period
-  const matchingDays: {
-    tempHigh?: number;
-    tempLow?: number;
-    precipitation?: number;
-  }[] = [];
-
-  for (let i = 0; i < daily.time.length; i++) {
-    const date = daily.time[i]; // Format: "YYYY-MM-DD"
-    const monthDay = date.substring(5); // Extract "MM-DD"
-
-    if (monthDay === targetMonthDay) {
-      matchingDays.push({
-        tempHigh: daily.temperature_2m_max?.[i],
-        tempLow: daily.temperature_2m_min?.[i],
-        precipitation: daily.precipitation_sum?.[i]
-      });
-    }
-  }
-
-  if (matchingDays.length === 0) {
-    throw new Error(`No historical data found for ${targetMonth}/${targetDay}`);
-  }
-
-  // Calculate averages
-  const tempHighValues = matchingDays.filter(d => d.tempHigh !== undefined).map(d => d.tempHigh!);
-  const tempLowValues = matchingDays.filter(d => d.tempLow !== undefined).map(d => d.tempLow!);
-  const precipitationValues = matchingDays.filter(d => d.precipitation !== undefined).map(d => d.precipitation!);
-
-  const avgTempHighC = tempHighValues.reduce((sum, val) => sum + val, 0) / tempHighValues.length;
-  const avgTempLowC = tempLowValues.reduce((sum, val) => sum + val, 0) / tempLowValues.length;
-  const avgPrecipitationMm = precipitationValues.reduce((sum, val) => sum + val, 0) / precipitationValues.length;
-
-  // Convert to US units (Fahrenheit, inches)
-  const tempHigh = Math.round(celsiusToFahrenheit(avgTempHighC));
-  const tempLow = Math.round(celsiusToFahrenheit(avgTempLowC));
-  const precipitation = Math.round(millimetersToInches(avgPrecipitationMm) * 100) / 100; // Round to 2 decimals
-
-  return {
-    tempHigh,
-    tempLow,
-    precipitation,
-    source: 'Open-Meteo',
-    month: targetMonth,
-    day: targetDay
-  };
+export interface NormalsTableSlot {
+  tempHigh: number;
+  tempLow: number;
+  precipitation: number;
+  sampleCount: number;
 }
 
 /**
- * Generate a cache key for climate normals
+ * A full climate-normals table, keyed `"MM-DD"` (zero-padded, e.g. `"01-05"`,
+ * `"02-29"`). `computeNormalsTable` always populates all 366 keys (using a
+ * leap-year calendar so `"02-29"` exists), so a valid key's value is always
+ * one of `NormalsTableSlot | null` — `null` marks an explicitly unavailable
+ * slot (too few qualifying samples), distinguishable from an absent/mistyped
+ * key, which would read `undefined` and never occurs for a real `"MM-DD"`.
+ */
+export type NormalsTable = Record<string, NormalsTableSlot | null>;
+
+/** Minimum non-null samples required for a slot to be available (D2, half of 30 years). */
+const NORMALS_MIN_SAMPLES = 15;
+
+/**
+ * Feb 29 carve-out (D2): only 8 leap days exist in 1991-2020, so the
+ * default 15-sample rule would make this slot permanently unavailable.
+ */
+const NORMALS_MIN_SAMPLES_FEB29 = 6;
+
+const FEB_29_KEY = '02-29';
+
+/** Reference leap year used only to enumerate every calendar MM-DD, including Feb 29. */
+const LEAP_YEAR_FOR_CALENDAR = 2020;
+
+/** Sum of a numeric array; only ever called with a non-empty array in this module. */
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+/**
+ * Extract a finite numeric sample at `index` from a possibly-absent,
+ * possibly-null-padded daily array. Open-Meteo's JSON `null`s (and a
+ * missing/short array) both read as "no sample" here — `typeof`-narrowed
+ * rather than trusting the declared `number[]` type, mirroring
+ * `modelComparison.ts`'s `extractModelSeries` guard. This is the D2 fix:
+ * the prior compute (`computeNormalsFrom30YearData`) filtered on
+ * `!== undefined` only, so a JSON `null` reached `reduce` and `sum + null`
+ * coerced to `+ 0`, dragging every mean down.
+ */
+function finiteSampleAt(series: number[] | undefined, index: number): number | undefined {
+  const value = series?.[index];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/** Build an empty table with all 366 `"MM-DD"` keys present and unavailable (`null`). */
+function buildEmptyNormalsTable(): NormalsTable {
+  const table: NormalsTable = {};
+  for (let month = 1; month <= 12; month++) {
+    const daysInMonth = new Date(LEAP_YEAR_FOR_CALENDAR, month, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const key = `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      table[key] = null;
+    }
+  }
+  return table;
+}
+
+interface NormalsSampleBucket {
+  tempHighC: number[];
+  tempLowC: number[];
+  precipitationMm: number[];
+}
+
+/**
+ * Compute a full 366-slot climate-normals table from one full-year
+ * (1991-01-01…2020-12-31) archive response, per D1/D2/D5.
+ *
+ * A single pass buckets each day's samples by its `"MM-DD"` key; each
+ * variable's mean uses only its own non-null, non-undefined samples (a day
+ * with a null precipitation reading still contributes its temperature
+ * samples). A slot is unavailable (`null`) when *any* of the three
+ * variables has fewer than `NORMALS_MIN_SAMPLES` (15) qualifying samples —
+ * except `"02-29"`, whose minimum is `NORMALS_MIN_SAMPLES_FEB29` (6).
+ * Available slots store unrounded canonical-imperial floats (°F/inches);
+ * rounding happens only at render time (D5).
+ *
+ * A response with no `daily`/`daily.time` returns the all-unavailable table
+ * defensively (the open-ocean HTTP-200-with-nulls precedent extended to a
+ * missing/malformed payload) rather than throwing — the table is garnish
+ * data indexed per-date downstream, and an all-null table degrades the same
+ * way a partially-null one does.
+ */
+export function computeNormalsTable(response: OpenMeteoHistoricalResponse): NormalsTable {
+  const table = buildEmptyNormalsTable();
+
+  const daily = response.daily;
+  if (!daily || !daily.time) {
+    return table;
+  }
+
+  const buckets = new Map<string, NormalsSampleBucket>();
+
+  for (let i = 0; i < daily.time.length; i++) {
+    const isoDate: string = daily.time[i]; // "YYYY-MM-DD"
+    const monthDay = isoDate.substring(5);
+
+    // Only real calendar MM-DD keys were pre-populated in the table; skip
+    // anything else defensively (malformed date strings).
+    if (table[monthDay] === undefined) {
+      continue;
+    }
+
+    let bucket = buckets.get(monthDay);
+    if (!bucket) {
+      bucket = { tempHighC: [], tempLowC: [], precipitationMm: [] };
+      buckets.set(monthDay, bucket);
+    }
+
+    const tempHighC = finiteSampleAt(daily.temperature_2m_max, i);
+    if (tempHighC !== undefined) bucket.tempHighC.push(tempHighC);
+
+    const tempLowC = finiteSampleAt(daily.temperature_2m_min, i);
+    if (tempLowC !== undefined) bucket.tempLowC.push(tempLowC);
+
+    const precipitationMm = finiteSampleAt(daily.precipitation_sum, i);
+    if (precipitationMm !== undefined) bucket.precipitationMm.push(precipitationMm);
+  }
+
+  for (const [monthDay, bucket] of buckets) {
+    const minSamples = monthDay === FEB_29_KEY ? NORMALS_MIN_SAMPLES_FEB29 : NORMALS_MIN_SAMPLES;
+    const sampleCount = Math.min(bucket.tempHighC.length, bucket.tempLowC.length, bucket.precipitationMm.length);
+
+    if (
+      bucket.tempHighC.length < minSamples ||
+      bucket.tempLowC.length < minSamples ||
+      bucket.precipitationMm.length < minSamples
+    ) {
+      // Already `null` from buildEmptyNormalsTable(); explicit for clarity.
+      table[monthDay] = null;
+      continue;
+    }
+
+    const avgTempHighC = sum(bucket.tempHighC) / bucket.tempHighC.length;
+    const avgTempLowC = sum(bucket.tempLowC) / bucket.tempLowC.length;
+    const avgPrecipitationMm = sum(bucket.precipitationMm) / bucket.precipitationMm.length;
+
+    table[monthDay] = {
+      tempHigh: celsiusToFahrenheit(avgTempHighC),
+      tempLow: celsiusToFahrenheit(avgTempLowC),
+      precipitation: millimetersToInches(avgPrecipitationMm),
+      sampleCount
+    };
+  }
+
+  return table;
+}
+
+/**
+ * Generate the per-location cache key for a full normals table (D1) — one
+ * entry per location instead of up to 366 per-date keys.
  *
  * @param latitude - Latitude (rounded to 2 decimals)
  * @param longitude - Longitude (rounded to 2 decimals)
- * @param month - Month (1-12)
- * @param day - Day of month (1-31)
  * @returns Cache key string
  */
-export function getNormalsCacheKey(
-  latitude: number,
-  longitude: number,
-  month: number,
-  day: number
-): string {
-  // Round coordinates to 2 decimals to increase cache hit rate
+export function getNormalsTableCacheKey(latitude: number, longitude: number): string {
   const lat = Math.round(latitude * 100) / 100;
   const lon = Math.round(longitude * 100) / 100;
-  return `normals:${lat}:${lon}:${month}:${day}`;
+  return `normals-table:${lat}:${lon}`;
 }
 
 /**
@@ -138,6 +237,15 @@ export function calculateDeparture(actual: number, normal: number): string {
   const departure = Math.round(actual - normal);
   return departure >= 0 ? `+${departure}` : `${departure}`;
 }
+
+/**
+ * The section heading used for climate normals — success and failure alike.
+ *
+ * Before D6 the success path rendered `## 📊 Climate Context` while all five
+ * failure blocks rendered `## Climate Normals`, so the same section changed
+ * name depending on whether the data arrived. One constant, one heading.
+ */
+const CLIMATE_SECTION_HEADING = '## 📊 Climate Context';
 
 /**
  * Format climate normals for display
@@ -157,7 +265,7 @@ export function formatNormals(
   const normalHigh = normalTempToPref(normals.tempHigh, prefs);
   const normalLow = normalTempToPref(normals.tempLow, prefs);
 
-  let output = `\n## 📊 Climate Context\n\n`;
+  let output = `\n${CLIMATE_SECTION_HEADING}\n\n`;
   output += `**Normal High:** ${normalHigh}${tempU}\n`;
   output += `**Normal Low:** ${normalLow}${tempU}\n`;
   output += `**Normal Precipitation:** ${normalPrecipToPref(normals.precipitation, prefs)} ${precipitationLabel(prefs)}\n`;
@@ -193,6 +301,51 @@ export function formatNormals(
 }
 
 /**
+ * Render the climate-normals section for a location and date, or the
+ * unavailable note if the normals can't be had (D6).
+ *
+ * This owns the try/catch, the `getClimateNormals` call, and both outcomes —
+ * the five handler blocks that used to duplicate it (two in
+ * `forecastHandler`, three in `currentConditionsHandler`) differ only in how
+ * they derive `month`/`day` and `currentTemps`, so that derivation stays with
+ * them and everything downstream of it lives here.
+ *
+ * Normals are garnish: this function never throws, so a failure renders the
+ * note and leaves the parent forecast/current response intact.
+ *
+ * @param currentTemps - Actual/forecast high and low **already in the
+ *   caller's units**, for the departure lines. Pass `{}` where no comparable
+ *   temperatures exist (the METAR path).
+ * @returns The section markdown, ready to append to the handler's output
+ */
+export async function renderNormalsSection(
+  openMeteoService: OpenMeteoService,
+  nceiService: NCEIService | undefined,
+  latitude: number,
+  longitude: number,
+  month: number,
+  day: number,
+  currentTemps: { high?: number; low?: number },
+  prefs: UnitPreferences = IMPERIAL_PREFERENCES
+): Promise<string> {
+  try {
+    const normals = await getClimateNormals(
+      openMeteoService,
+      nceiService,
+      latitude,
+      longitude,
+      month,
+      day
+    );
+
+    return formatNormals(normals, currentTemps, prefs);
+  } catch (error) {
+    // Normals failing must never fail the request that asked for them.
+    return `\n${CLIMATE_SECTION_HEADING}\n\n⚠️ Climate normals data not available for this location.\n`;
+  }
+}
+
+/**
  * Get date components from Date object or ISO string
  *
  * @param date - Date object or ISO string
@@ -204,25 +357,6 @@ export function getDateComponents(date: Date | string): { month: number; day: nu
     month: d.getMonth() + 1, // JavaScript months are 0-indexed
     day: d.getDate()
   };
-}
-
-/**
- * Check if coordinates are within the contiguous United States
- *
- * @param latitude - Latitude
- * @param longitude - Longitude
- * @returns true if location is in contiguous US
- */
-export function isLocationInUS(latitude: number, longitude: number): boolean {
-  // Contiguous US bounding box (approximate)
-  // Latitude: ~25°N (Florida) to ~49°N (Canada border)
-  // Longitude: ~-125°W (Pacific) to ~-66°W (Atlantic)
-  return (
-    latitude >= 24 &&
-    latitude <= 50 &&
-    longitude >= -125 &&
-    longitude <= -66
-  );
 }
 
 /**
@@ -249,7 +383,7 @@ export async function getClimateNormals(
   day: number
 ): Promise<ClimateNormals> {
   // Try NCEI if available and location is in US
-  if (nceiService && nceiService.isAvailable() && isLocationInUS(latitude, longitude)) {
+  if (nceiService && nceiService.isAvailable() && isInUS(latitude, longitude)) {
     try {
       logger.info('Attempting to fetch climate normals from NCEI', {
         latitude,
@@ -287,7 +421,7 @@ export async function getClimateNormals(
     day,
     reason: nceiService && nceiService.isAvailable()
       ? 'NCEI fallback'
-      : !isLocationInUS(latitude, longitude)
+      : !isInUS(latitude, longitude)
         ? 'Location outside US'
         : 'NCEI token not configured'
   });

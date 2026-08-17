@@ -36,6 +36,11 @@ mock HTTP per existing patterns in `tests/unit/`).
 
 ## Model policy
 
+Planning and execution are split: `/impl-plan` runs on the session model (the
+most capable available — currently Fable) to write the implementation plan;
+`/run-plan` is pinned to `opus`, which orchestrates and executes it. The table
+below governs the *execution* side — which model each task is assigned to.
+
 | Model | Use for |
 |-------|---------|
 | `opus` | Orchestration, design-sensitive logic, tricky state, final integration + docs. The orchestrator does `opus` tasks itself. |
