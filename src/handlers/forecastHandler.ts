@@ -37,7 +37,7 @@ import {
   hasWinterWeather
 } from '../utils/snow.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
-import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
+import { renderNormalsSection, getDateComponents } from '../utils/normals.js';
 import { getRecordsLine } from '../utils/records.js';
 import {
   computeDayAstronomy,
@@ -562,41 +562,29 @@ async function formatNOAAForecast(
     if (firstPeriod && firstPeriod.startTime) {
       const { month, day } = getDateComponents(firstPeriod.startTime);
 
-      try {
-        // Fetch climate normals using hybrid strategy
-        const normals = await getClimateNormals(
-          openMeteoService,
-          nceiService,
-          latitude,
-          longitude,
-          month,
-          day
-        );
+      // Get forecasted high/low for comparison (first day)
+      let forecastHigh: number | undefined;
+      let forecastLow: number | undefined;
 
-        // Get forecasted high/low for comparison (first day)
-        let forecastHigh: number | undefined;
-        let forecastLow: number | undefined;
-
-        // NOAA gives day/night periods, so we need to find high (day) and low (night)
-        for (const period of periods.slice(0, 2)) { // Check first 2 periods (day + night)
-          if (period.isDaytime && period.temperature !== undefined) {
-            forecastHigh = period.temperature;
-          } else if (!period.isDaytime && period.temperature !== undefined) {
-            forecastLow = period.temperature;
-          }
+      // NOAA gives day/night periods, so we need to find high (day) and low (night)
+      for (const period of periods.slice(0, 2)) { // Check first 2 periods (day + night)
+        if (period.isDaytime && period.temperature !== undefined) {
+          forecastHigh = period.temperature;
+        } else if (!period.isDaytime && period.temperature !== undefined) {
+          forecastLow = period.temperature;
         }
-
-        const currentTemps = {
-          high: forecastHigh,
-          low: forecastLow
-        };
-
-        output += formatNormals(normals, currentTemps, prefs);
-      } catch (error) {
-        // If normals fetch fails, just skip it (don't error the whole request)
-        output += `\n## Climate Normals\n\n`;
-        output += `⚠️ Climate normals data not available for this location.\n`;
       }
+
+      output += await renderNormalsSection(
+        openMeteoService,
+        nceiService,
+        latitude,
+        longitude,
+        month,
+        day,
+        { high: forecastHigh, low: forecastLow },
+        prefs
+      );
 
       // US temperature records: independent of the normals fetch above (D4/A5)
       // — a records line can render even if normals failed, and vice versa.
@@ -798,33 +786,26 @@ async function formatOpenMeteoForecast(
     if (firstDay) {
       const { month, day } = getDateComponents(firstDay);
 
-      try {
-        // Fetch climate normals using hybrid strategy
-        const normals = await getClimateNormals(
-          openMeteoService,
-          nceiService,
-          latitude,
-          longitude,
-          month,
-          day
-        );
+      // Get forecasted high/low for comparison (first day)
+      const currentTemps = {
+        high: forecast.daily.temperature_2m_max?.[0] !== undefined
+          ? Math.round(forecast.daily.temperature_2m_max[0])
+          : undefined,
+        low: forecast.daily.temperature_2m_min?.[0] !== undefined
+          ? Math.round(forecast.daily.temperature_2m_min[0])
+          : undefined
+      };
 
-        // Get forecasted high/low for comparison (first day)
-        const currentTemps = {
-          high: forecast.daily.temperature_2m_max?.[0] !== undefined
-            ? Math.round(forecast.daily.temperature_2m_max[0])
-            : undefined,
-          low: forecast.daily.temperature_2m_min?.[0] !== undefined
-            ? Math.round(forecast.daily.temperature_2m_min[0])
-            : undefined
-        };
-
-        output += formatNormals(normals, currentTemps, prefs);
-      } catch (error) {
-        // If normals fetch fails, just skip it (don't error the whole request)
-        output += `\n## Climate Normals\n\n`;
-        output += `⚠️ Climate normals data not available for this location.\n`;
-      }
+      output += await renderNormalsSection(
+        openMeteoService,
+        nceiService,
+        latitude,
+        longitude,
+        month,
+        day,
+        currentTemps,
+        prefs
+      );
 
       // US temperature records: independent of the normals fetch above (D4/A5)
       // — a records line can render even if normals failed, and vice versa.

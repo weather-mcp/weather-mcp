@@ -8,6 +8,7 @@ import {
   formatNormals,
   getDateComponents,
   getClimateNormals,
+  renderNormalsSection,
   computeNormalsTable,
   getNormalsTableCacheKey,
   type NormalsTable
@@ -558,6 +559,118 @@ describe('Climate Normals Utilities', () => {
       expect(ncei.getClimateNormals).not.toHaveBeenCalled();
       expect(openMeteo.getClimateNormals).toHaveBeenCalledWith(35.6762, 139.6503, 7, 15);
       expect(result.source).toBe('Open-Meteo');
+    });
+  });
+
+  /**
+   * D6: one shared renderer behind all five handler blocks (two in
+   * forecastHandler, three in currentConditionsHandler). Before this, the
+   * success path rendered `## 📊 Climate Context` while every failure path
+   * rendered `## Climate Normals` — the same section under two names.
+   */
+  describe('renderNormalsSection (D6: shared renderer + aligned heading)', () => {
+    function buildResolvingOpenMeteoFake() {
+      return {
+        getClimateNormals: vi.fn().mockResolvedValue({
+          tempHigh: 80,
+          tempLow: 60,
+          precipitation: 0.12,
+          source: 'Open-Meteo' as const,
+          month: 7,
+          day: 15
+        })
+      };
+    }
+
+    function buildRejectingOpenMeteoFake() {
+      return {
+        getClimateNormals: vi.fn().mockRejectedValue(new Error('no normals here'))
+      };
+    }
+
+    type RenderArgs = Parameters<typeof renderNormalsSection>;
+
+    it('renders the climate section with departures on success', async () => {
+      const openMeteo = buildResolvingOpenMeteoFake();
+
+      const output = await renderNormalsSection(
+        openMeteo as unknown as RenderArgs[0],
+        undefined,
+        35.6762,
+        139.6503,
+        7,
+        15,
+        { high: 90, low: 65 }
+      );
+
+      expect(output).toContain('## 📊 Climate Context');
+      expect(output).toContain('**Normal High:** 80°F');
+      expect(output).toContain('**Normal Low:** 60°F');
+      expect(output).toContain('**High Departure:** +10°F (warmer than normal)');
+      expect(output).toContain('**Low Departure:** +5°F (warmer than normal)');
+      expect(output).not.toContain('not available');
+    });
+
+    it('renders the aligned heading and the unchanged note on failure', async () => {
+      const openMeteo = buildRejectingOpenMeteoFake();
+
+      const output = await renderNormalsSection(
+        openMeteo as unknown as RenderArgs[0],
+        undefined,
+        0,
+        -160,
+        7,
+        15,
+        {}
+      );
+
+      expect(output).toContain('## 📊 Climate Context');
+      expect(output).toContain('⚠️ Climate normals data not available for this location.');
+      // The old failure-only heading is gone.
+      expect(output).not.toContain('## Climate Normals');
+    });
+
+    it('never throws when the normals fetch fails — normals are garnish', async () => {
+      const openMeteo = buildRejectingOpenMeteoFake();
+
+      await expect(
+        renderNormalsSection(
+          openMeteo as unknown as RenderArgs[0],
+          undefined,
+          0,
+          -160,
+          2,
+          29,
+          {}
+        )
+      ).resolves.toBeTypeOf('string');
+    });
+
+    it('uses the same heading on the success and failure paths', async () => {
+      const heading = (text: string): string | undefined =>
+        text.split('\n').find(line => line.startsWith('## '));
+
+      const success = await renderNormalsSection(
+        buildResolvingOpenMeteoFake() as unknown as RenderArgs[0],
+        undefined,
+        35.6762,
+        139.6503,
+        7,
+        15,
+        {}
+      );
+      const failure = await renderNormalsSection(
+        buildRejectingOpenMeteoFake() as unknown as RenderArgs[0],
+        undefined,
+        0,
+        -160,
+        7,
+        15,
+        {}
+      );
+
+      expect(heading(success)).toBeDefined();
+      expect(heading(failure)).toBe(heading(success));
     });
   });
 });

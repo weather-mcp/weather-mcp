@@ -239,6 +239,15 @@ export function calculateDeparture(actual: number, normal: number): string {
 }
 
 /**
+ * The section heading used for climate normals — success and failure alike.
+ *
+ * Before D6 the success path rendered `## 📊 Climate Context` while all five
+ * failure blocks rendered `## Climate Normals`, so the same section changed
+ * name depending on whether the data arrived. One constant, one heading.
+ */
+const CLIMATE_SECTION_HEADING = '## 📊 Climate Context';
+
+/**
  * Format climate normals for display
  *
  * @param normals - Climate normals data
@@ -256,7 +265,7 @@ export function formatNormals(
   const normalHigh = normalTempToPref(normals.tempHigh, prefs);
   const normalLow = normalTempToPref(normals.tempLow, prefs);
 
-  let output = `\n## 📊 Climate Context\n\n`;
+  let output = `\n${CLIMATE_SECTION_HEADING}\n\n`;
   output += `**Normal High:** ${normalHigh}${tempU}\n`;
   output += `**Normal Low:** ${normalLow}${tempU}\n`;
   output += `**Normal Precipitation:** ${normalPrecipToPref(normals.precipitation, prefs)} ${precipitationLabel(prefs)}\n`;
@@ -289,6 +298,51 @@ export function formatNormals(
   output += `*Source: ${normals.source}*\n`;
 
   return output;
+}
+
+/**
+ * Render the climate-normals section for a location and date, or the
+ * unavailable note if the normals can't be had (D6).
+ *
+ * This owns the try/catch, the `getClimateNormals` call, and both outcomes —
+ * the five handler blocks that used to duplicate it (two in
+ * `forecastHandler`, three in `currentConditionsHandler`) differ only in how
+ * they derive `month`/`day` and `currentTemps`, so that derivation stays with
+ * them and everything downstream of it lives here.
+ *
+ * Normals are garnish: this function never throws, so a failure renders the
+ * note and leaves the parent forecast/current response intact.
+ *
+ * @param currentTemps - Actual/forecast high and low **already in the
+ *   caller's units**, for the departure lines. Pass `{}` where no comparable
+ *   temperatures exist (the METAR path).
+ * @returns The section markdown, ready to append to the handler's output
+ */
+export async function renderNormalsSection(
+  openMeteoService: OpenMeteoService,
+  nceiService: NCEIService | undefined,
+  latitude: number,
+  longitude: number,
+  month: number,
+  day: number,
+  currentTemps: { high?: number; low?: number },
+  prefs: UnitPreferences = IMPERIAL_PREFERENCES
+): Promise<string> {
+  try {
+    const normals = await getClimateNormals(
+      openMeteoService,
+      nceiService,
+      latitude,
+      longitude,
+      month,
+      day
+    );
+
+    return formatNormals(normals, currentTemps, prefs);
+  } catch (error) {
+    // Normals failing must never fail the request that asked for them.
+    return `\n${CLIMATE_SECTION_HEADING}\n\n⚠️ Climate normals data not available for this location.\n`;
+  }
 }
 
 /**

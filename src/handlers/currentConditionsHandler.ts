@@ -73,7 +73,7 @@ import {
   getTimezoneAbbreviation,
   formatObservationAge
 } from '../utils/timezone.js';
-import { getClimateNormals, formatNormals, getDateComponents } from '../utils/normals.js';
+import { renderNormalsSection, getDateComponents } from '../utils/normals.js';
 import { getRecordsLine } from '../utils/records.js';
 import type { ObservationResponse, StationResponse } from '../types/noaa.js';
 
@@ -606,32 +606,24 @@ async function formatNOAACurrentConditions(
     // Get date components from observation timestamp
     const { month, day } = getDateComponents(props.timestamp);
 
-    try {
-      // Fetch climate normals using hybrid strategy
-      const normals = await getClimateNormals(
-        openMeteoService,
-        nceiService,
-        latitude,
-        longitude,
-        month,
-        day
-      );
+    // currentTemps must be in the caller's units to match the rendered normals.
+    const toPref = (f: number): number =>
+      prefs.temperature === 'C' ? Math.round(((f - 32) * 5) / 9) : Math.round(f);
+    const currentTemps = {
+      high: max24F !== null ? toPref(max24F) : undefined,
+      low: min24F !== null ? toPref(min24F) : undefined
+    };
 
-      // Format and display normals with current temperature for comparison.
-      // currentTemps must be in the caller's units to match formatNormals output.
-      const toPref = (f: number): number =>
-        prefs.temperature === 'C' ? Math.round(((f - 32) * 5) / 9) : Math.round(f);
-      const currentTemps = {
-        high: max24F !== null ? toPref(max24F) : undefined,
-        low: min24F !== null ? toPref(min24F) : undefined
-      };
-
-      output += formatNormals(normals, currentTemps, prefs);
-    } catch (error) {
-      // If normals fetch fails, just skip it (don't error the whole request)
-      output += `\n## Climate Normals\n\n`;
-      output += `⚠️ Climate normals data not available for this location.\n`;
-    }
+    output += await renderNormalsSection(
+      openMeteoService,
+      nceiService,
+      latitude,
+      longitude,
+      month,
+      day,
+      currentTemps,
+      prefs
+    );
 
     // US temperature records: independent of the normals fetch above (D4/A5)
     // — a records line can render even if normals failed, and vice versa.
@@ -890,28 +882,22 @@ async function formatOpenMeteoCurrentConditions(
   if (includeNormals) {
     const { month, day } = getDateComponents(current.time);
 
-    try {
-      const normals = await getClimateNormals(
-        openMeteoService,
-        nceiService,
-        latitude,
-        longitude,
-        month,
-        day
-      );
+    // Daily values are already in the caller's units — no conversion needed.
+    const currentTemps = {
+      high: high !== undefined ? Math.round(high) : undefined,
+      low: low !== undefined ? Math.round(low) : undefined
+    };
 
-      // Daily values are already in the caller's units — no conversion needed.
-      const currentTemps = {
-        high: high !== undefined ? Math.round(high) : undefined,
-        low: low !== undefined ? Math.round(low) : undefined
-      };
-
-      output += formatNormals(normals, currentTemps, prefs);
-    } catch (error) {
-      // If normals fetch fails, just skip it (don't error the whole request)
-      output += `\n## Climate Normals\n\n`;
-      output += `⚠️ Climate normals data not available for this location.\n`;
-    }
+    output += await renderNormalsSection(
+      openMeteoService,
+      nceiService,
+      latitude,
+      longitude,
+      month,
+      day,
+      currentTemps,
+      prefs
+    );
 
     // US temperature records: independent of the normals fetch above (D4/A5)
     // — a records line can render even if normals failed, and vice versa.
@@ -1220,20 +1206,17 @@ async function formatMetarCurrentConditions(
   if (includeNormals) {
     const { month, day } = getDateComponents(observedIso);
 
-    try {
-      const normals = await getClimateNormals(
-        openMeteoService,
-        nceiService,
-        latitude,
-        longitude,
-        month,
-        day
-      );
-      output += formatNormals(normals, {}, prefs);
-    } catch (error) {
-      output += `\n## Climate Normals\n\n`;
-      output += `⚠️ Climate normals data not available for this location.\n`;
-    }
+    // No comparable station high/low on this path — normals render on their own.
+    output += await renderNormalsSection(
+      openMeteoService,
+      nceiService,
+      latitude,
+      longitude,
+      month,
+      day,
+      {},
+      prefs
+    );
 
     // US temperature records, independent of the normals fetch above — either
     // can render without the other. Non-US makes no ACIS request at all.
