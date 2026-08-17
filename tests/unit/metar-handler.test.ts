@@ -555,11 +555,18 @@ describe('handleGetCurrentConditions — no METAR station within any tier', () =
 describe('handleGetCurrentConditions — include_normals on the METAR path', () => {
   it('renders normals + US records for a US point when an acisService is supplied', async () => {
     const fakes = buildFakes();
-    const aviation = buildAviationFake([buildMetarObservation()]);
+    const observation = buildMetarObservation();
+    const aviation = buildAviationFake([observation]);
     // The observation's obsTime is relative to "now" (see obsTimeMinutesAgo),
-    // so the records slot must be built for today's month/day, not a fixed date.
-    const now = new Date();
-    const records = buildDailyRecords(now.getMonth() + 1, now.getDate(), {
+    // so the records slot must be built for the observation's month/day, not a
+    // fixed date. It must come from the OBSERVATION rather than from `now`:
+    // the handler derives the slot from `observedIso`
+    // (`new Date(obs.obsTime * 1000)`, currentConditionsHandler.ts:1081) and
+    // `getDateComponents` reads it in the local zone, so a run inside the first
+    // `ageMinutes` after local midnight puts "now" and the observation on
+    // different calendar dates and the slot lookup misses.
+    const observed = new Date(observation.obsTime * 1000);
+    const records = buildDailyRecords(observed.getMonth() + 1, observed.getDate(), {
       high: { value: 96, year: 1977 },
       low: { value: 49, year: 1953 },
     });
