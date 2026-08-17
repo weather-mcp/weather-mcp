@@ -730,6 +730,40 @@ export interface OpenMeteoModelComparisonResponse {
 }
 
 /**
+ * Daily data block from a single-model ensemble request
+ * (`OpenMeteoService.getEnsembleSpread`, `get_forecast`'s `ensemble_spread`
+ * flag). Deliberately **not** a widening of `OpenMeteoForecastDailyData` —
+ * the ensemble endpoint returns one unsuffixed control-run series per
+ * variable plus `<variable>_memberNN` series (zero-padded from `member01`,
+ * design "Upstream verification" b), so most keys are not known ahead of
+ * time. `time` is the only key whose name is fixed; every other key is read
+ * exclusively through `extractMemberSeries` (`src/utils/ensembleSpread.ts`,
+ * D-types) rather than by direct property access — mirroring
+ * `OpenMeteoModelComparisonDaily`.
+ */
+export interface OpenMeteoEnsembleDaily {
+  time: string[];
+  [key: string]: string[] | (number | null)[] | undefined;
+}
+
+/**
+ * Complete API response from an Open-Meteo single-model ensemble request
+ * (`OpenMeteoService.getEnsembleSpread`). See `OpenMeteoEnsembleDaily` for why
+ * this is a separate type from `OpenMeteoForecastResponse` and
+ * `OpenMeteoModelComparisonResponse` rather than a reuse of either.
+ */
+export interface OpenMeteoEnsembleResponse {
+  latitude: number;
+  longitude: number;
+  elevation: number;
+  timezone: string;
+  timezone_abbreviation: string;
+  utc_offset_seconds: number;
+  daily: OpenMeteoEnsembleDaily;
+  daily_units?: Record<string, string>;
+}
+
+/**
  * Climate normals data (30-year averages)
  * Used for comparing current/forecast conditions to historical averages
  */
