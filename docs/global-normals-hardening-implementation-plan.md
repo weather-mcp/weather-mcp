@@ -404,8 +404,8 @@ Full gate green at kickoff — build 0 errors, **84 test files / 2,058 tests**
 passing, `npm audit` 0 vulnerabilities.
 
 - [x] T0 — Land working-tree docs (orchestrator, with baseline) — `dc2fbb0`
-- [ ] T1 — Cache config entry (`haiku`)
-- [ ] T2 — Pure table compute + render-precision groundwork (`sonnet`)
+- [x] T1 — Cache config entry (`haiku`) — `cd132a4`
+- [x] T2 — Pure table compute + render-precision groundwork (`sonnet`) — `888aaa2` (2,076 tests)
 - [ ] T3 — Service switch to the per-location table (`sonnet`)
 - [ ] T4 — In-flight dedupe + bounded 429 retry (`opus`)
 - [ ] T5 — One US predicate (`sonnet`)
