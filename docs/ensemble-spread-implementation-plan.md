@@ -457,7 +457,23 @@ merges**, re-verify at kickoff), reconciled into the tasks below:
 ## Progress Tracker
 
 - [x] T0 — Land design doc + planning edit as first `docs:` commit (orchestrator, with baseline) — `d5c157e`
-- [ ] T1 — Pure spread module (`sonnet`)
+- [x] T1 — Pure spread module (`sonnet`) — `38ae647`
+  - Orchestrator hand-checks (acceptance): percentile verified independently
+    against the built dist — `[83,84,85,86]` → p25 83.75, p75 85.25, median
+    84.5 (numpy-default `rank = q*(n-1)` interpolation); trim verified —
+    participant counts `[3,3,1,3,0]` yield 4 days with the interior 1-member
+    gap retained and `trimmedDays: 1`; control exclusion verified — a 9999
+    control moves no statistic while still rendering as the reference.
+  - **Gate detour (pre-existing, unrelated):**
+    `tests/unit/metar-handler.test.ts` failed the gate because it built its
+    ACIS records slot from `new Date()` while the handler derives the slot
+    from the observation's timestamp — a nightly ~20-minute window after
+    local midnight where the two land on different calendar dates. Confirmed
+    pre-existing on a clean tree (the branch baseline at 23:47 passed; the
+    same code failed at 00:11), fixed test-only in `be03155` and verified
+    *inside* the failing window. The two `tests/integration/safety-hazards`
+    failures in the same run were the documented live-network flake and
+    passed on re-run.
 - [ ] T2 — Service method + types (`sonnet`)
 - [ ] T3 — Forecast handler: validation, routing, rendering (`opus`)
 - [ ] T4 — get_weather_summary flag strip (`sonnet`)
