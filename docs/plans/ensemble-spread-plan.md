@@ -1,6 +1,7 @@
 # Single-Model Ensemble Spread — Design Plan
 
-**Status:** 📝 Design — awaiting review, then `/impl-plan` + `/run-plan`
+**Status:** ✅ IMPLEMENTED (2026-08-17) — shipped on `feat/ensemble-spread` for
+v1.22.0; see **Implementation notes** at the end of this document
 **Parent:** `docs/planning/README.md` Active ideas → Architecture & tooling
 ("Single-model ensemble spread"); closes the *within*-model half of
 `docs/planning/FUTURE_ENHANCEMENTS.md` §13.1 (the *across*-model half shipped
@@ -373,7 +374,7 @@ Dynamic member-key access goes exclusively through the guarded
   this doc landing (done with this commit), → ✅ at completion; on ship, add
   the descoped 💡 row for caller-selectable ensemble model, and annotate FE
   §13.1 as fully covered.
-- Move this doc to `docs/plans/` at completion (project convention).
+- Move this doc to `docs/plans/` at completion (project convention). **Done.**
 
 ## Edge cases
 
@@ -434,13 +435,106 @@ Dynamic member-key access goes exclusively through the guarded
 
 ## Documentation / registration checklist (for /run-plan tracking)
 
-- [ ] `src/utils/ensembleSpread.ts` — D4 pure module (+ export wet threshold from `modelComparison.ts` if private)
-- [ ] `src/services/openmeteo.ts` — `ensembleURL`, `makeRequestToEnsemble`, `getEnsembleSpread`, `buildEnsembleParams`, `validateEnsembleResponse`, D8 cache
-- [ ] `src/types/openmeteo.ts` — D-types
-- [ ] `src/handlers/forecastHandler.ts` — D1 arg + guards, D2 routing, D5 `formatEnsembleSpreadForecast`
-- [ ] `src/handlers/weatherSummaryHandler.ts` — D9 strip
-- [ ] `src/index.ts` — D10 schema property + tool-description clause
-- [ ] Tests per §Testing
-- [ ] README.md, CHANGELOG.md, CLAUDE.md, `docs/TOOLS.md`
-- [ ] `docs/planning/README.md` — status flips + descoped 💡 row + FE §13.1 annotation
-- [ ] Move this doc to `docs/plans/` at completion
+- [x] `src/utils/ensembleSpread.ts` — D4 pure module (+ export wet threshold from `modelComparison.ts` if private)
+- [x] `src/services/openmeteo.ts` — `ensembleURL`, `makeRequestToEnsemble`, `getEnsembleSpread`, `buildEnsembleParams`, `validateEnsembleResponse`, D8 cache
+- [x] `src/types/openmeteo.ts` — D-types
+- [x] `src/handlers/forecastHandler.ts` — D1 arg + guards, D2 routing, D5 `formatEnsembleSpreadForecast`
+- [x] `src/handlers/weatherSummaryHandler.ts` — D9 strip
+- [x] `src/index.ts` — D10 schema property + tool-description clause
+- [x] Tests per §Testing
+- [x] README.md, CHANGELOG.md, CLAUDE.md, `docs/TOOLS.md`
+- [x] `docs/planning/README.md` — status flips + descoped 💡 row + FE §13.1 annotation
+- [x] Move this doc to `docs/plans/` at completion
+
+
+---
+
+## Implementation notes (2026-08-17)
+
+Executed via `/run-plan` against `docs/plans/ensemble-spread-implementation-plan.md`
+(T0–T7). Branch `feat/ensemble-spread`, base `5995b80`.
+
+### Branch precondition resolved by merging first
+
+A1 was **not** met at kickoff: `main` was still at v1.20.0 with no
+`src/utils/modelComparison.ts`, and both v1.21.0 branches were unmerged with
+no open PRs. Per the plan's instruction the run stopped and asked rather than
+branching off a feature branch. On the human's decision the stack was
+squash-merged to `main` first — PR #62 (comparison) then PR #63 (normals
+hardening). #63 needed a **rebase onto the squashed `main`**
+(`git rebase --onto origin/main feat/multi-model-comparison
+feat/global-normals-hardening`): the squash orphaned its merge base, so GitHub
+reported `CONFLICTING` with a wrong 30-file diff. The rebase was verified
+content-identical to the pre-rebase tip and reduced the diff to the correct 18
+files. Worth remembering for the next stacked pair: **squash-merging the
+lower branch always orphans the upper one's merge base.**
+
+### What the design got right
+
+Every upstream fact in the header held under live implementation, including
+the two that most shaped the code: the `precipitation_probability_max`
+all-null trap (never requested), and the ~14-day ECMWF daily horizon — the T7
+sweep requested `days: 16` and got exactly **14 rendered, 2 trimmed**. The
+`isInUS`/`unitSignature`/`makeRequestToFlood` seams were all where the plan
+said, and `precipThreshold` did need only the `export` keyword.
+
+### Corrections and findings
+
+- **A rendering defect the tests would not have caught.** `detail: "summary"`
+  paired the *control run's* weather description with the *members' modal
+  bucket* percentage. Rendered against a fixture whose control forecast rain
+  while 37 of 50 members were cloudy, it produced
+  `Slight rain (74% of members)` — the number contradicting the words it
+  labelled. Found by rendering real output before writing assertions, which is
+  the same way the `compare_models` dry-member precipitation bug was found.
+  Fixed so the control's wording is borrowed only when the control falls in
+  the modal bucket; otherwise the bucket's own label is used. **General
+  lesson: any figure and any phrase rendered adjacently must be derived from
+  the same population.**
+- **A pre-existing test bug surfaced by the gate.**
+  `tests/unit/metar-handler.test.ts` built its ACIS records slot from
+  `new Date()` while the handler derives it from the *observation's*
+  timestamp — a nightly ~20-minute window after local midnight in which they
+  land on different calendar dates. Unrelated to this feature; the branch
+  baseline passed at 23:47 and the identical code failed at 00:11. Fixed
+  test-only in `be03155`, verified *inside* the failing window rather than
+  waited out.
+- **A subagent's self-report is not the gate, empirically.** T1's agent
+  reported both of its gate failures as pre-existing. It was right about the
+  live-network `safety-hazards` flake and wrong about `metar-handler`, which
+  had genuinely passed 20 minutes earlier. Running the gate independently is
+  what surfaced the real cause.
+- **The D9 lock test was verified non-vacuous by mutation** rather than
+  trusted: removing the strip makes it fail, restoring it makes it pass. The
+  file mocks `forecastHandler.js` at module level, so without the
+  unmock/re-import the assertion would have been trivially true.
+- **`computeConditionsSpread` returns bucket `clear` (not `other`) for a day
+  with zero reporting members**, differing cosmetically from
+  `modelComparison.ts`. Harmless because every renderer gates the conditions
+  line on `participantCount > 0`, but worth knowing before reusing the
+  function elsewhere.
+
+### Verification
+
+Full gate green throughout; final **2,161 tests**, build clean, 0
+vulnerabilities. The T7 sweep ran against the built dist personally:
+
+1. **No-flag output byte-identical to base `5995b80`** across six cases — US,
+   non-US, `include_normals`, `include_astronomy`, hourly, and
+   `compare_models` (`diff` empty, 19,348 bytes each).
+2. Non-US + flag renders with no NWS sentence; **NOAA trip-wire recorded zero
+   calls** on every flag-on case.
+3. US + flag renders with the NWS disclosure, still with no NOAA contact.
+4. `days: 16` → 14 days rendered, trim note for 2.
+5. Metric → °C/mm/km·h⁻¹ with the 0.25 mm wet threshold honoured.
+6. `detail` summary/standard/full all per D1.
+7. All three validation errors exact, no request made.
+8. `get_weather_summary` with the flag is **identical** to without it, and
+   `getEnsembleSpread` was never invoked.
+
+### Descoped, unchanged
+
+Caller-selectable ensemble model (recorded as a 💡 planning-index row —
+`gfs_seamless` would extend the horizon to ~33 days), hourly member spread,
+combining with `compare_models`, probability calibration, and beyond-16-day
+horizons.

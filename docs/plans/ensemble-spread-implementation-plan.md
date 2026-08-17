@@ -2,7 +2,7 @@
 
 **Status:** READY (2026-08-16)
 
-Execution plan for `docs/ensemble-spread-plan.md` (the WHAT/WHY); rules live in
+Execution plan for `docs/plans/ensemble-spread-plan.md` (the WHAT/WHY); rules live in
 `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ Execution plan for `docs/ensemble-spread-plan.md` (the WHAT/WHY); rules live in
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/ensemble-spread-implementation-plan.md
+/run-plan docs/plans/ensemble-spread-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/ensemble-spread-plan.md` (design),
+Or, equivalently: read `docs/plans/ensemble-spread-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review
 the diff, run the gate yourself, commit, tick the tracker, push.
@@ -56,7 +56,8 @@ ask the human** — do not branch off a feature branch. Record the actual base
 SHA at kickoff for the T7 sweep. Target release: v1.22.0.
 
 **Working-tree note (first commit, T0):** the design doc
-(`docs/ensemble-spread-plan.md`, untracked) and the planning-index edit
+(`docs/ensemble-spread-plan.md`, untracked at plan time; now moved to
+`docs/plans/`) and the planning-index edit
 (`docs/planning/README.md:54` row 💡 → 📝 with design link) are **uncommitted**
 in the working tree at plan time — on the `feat/global-normals-hardening`
 checkout. They must survive the branch switch (untracked + modified files
@@ -349,7 +350,7 @@ merges**, re-verify at kickoff), reconciled into the tasks below:
 **T7 — Byte-identical sweep + documentation/registration checklist** (`opus`)
 
 - Files: `CHANGELOG.md`, `README.md`, `CLAUDE.md`, `docs/TOOLS.md`,
-  `docs/planning/README.md`, `docs/ensemble-spread-plan.md` (status +
+  `docs/planning/README.md`, `docs/plans/ensemble-spread-plan.md` (status +
   move), this file (move)
 - **Sweep against the built dist**, run by the orchestrator personally
   (branch-base SHA recorded at kickoff; `process.exit(0)` in drivers; no
@@ -505,7 +506,24 @@ merges**, re-verify at kickoff), reconciled into the tasks below:
   - Live call genuinely succeeded when written: **50/50 member keys present,
     50/50 non-null for day 1** at Denver. Follows the re-throw-assertions
     convention, not the older swallow-everything live files.
-- [ ] T7 — Byte-identical sweep + documentation checklist (`opus`)
+- [x] T7 — Byte-identical sweep + documentation checklist (`opus`) — see below
+  - **Sweep (orchestrator, against built dist, base `5995b80`):** (1)+(2) no-flag
+    output **byte-identical** across six cases — US, non-US, `include_normals`,
+    `include_astronomy`, hourly, and `compare_models` (19,348 bytes each, `diff`
+    empty). (3) non-US + flag renders, no NWS sentence. (4) US + flag renders
+    with the NWS disclosure. A **NOAA trip-wire wrapping every network method
+    recorded zero calls on all nine flag-on cases.** (5) `days: 16` → 14 days
+    rendered, 2 trimmed with the note — confirming the design's live-verified
+    horizon fact from real data. (6) metric → °C/mm/km·h⁻¹ with the 0.25 mm wet
+    threshold. (7) summary/standard/full per D1. (8) all three validation errors
+    exact, no request made. (9) `get_weather_summary` with the flag is
+    **identical** to without it and `getEnsembleSpread` was never invoked.
+  - Docs: CHANGELOG `[Unreleased]`, README (feature bullet + test badge 2,077 →
+    2,161), CLAUDE.md (tool entry, utils tree, v1.22.0 blurb, test count),
+    `docs/TOOLS.md` (parameter, full interaction table, returns), planning index
+    (📝 → ✅, Shipped rows for v1.21.0 and v1.22.0, descoped 💡 row, FE §13.1 now
+    fully covered). Design plan marked `IMPLEMENTED` with implementation notes;
+    plan set moved to `docs/plans/` with internal path references updated.
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T7 sweep is
@@ -515,6 +533,6 @@ summary strip and mutual exclusion hold live), the flag-off lock files
 (`forecast-fallback.test.ts`, `forecast-model-comparison.test.ts`,
 `astronomy.test.ts`, `normals.test.ts`, `almanac-handler.test.ts`,
 `weather-summary-handler.test.ts` — appended-to only where a task says so,
-never edited) pass, and `docs/ensemble-spread-plan.md` is marked
+never edited) pass, and `docs/plans/ensemble-spread-plan.md` is marked
 `IMPLEMENTED` with the plan set moved to `docs/plans/`. Opening the PR is the
 human's call.
