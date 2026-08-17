@@ -481,7 +481,18 @@ merges**, re-verify at kickoff), reconciled into the tasks below:
     directly. Endpoint resolves to
     `https://ensemble-api.open-meteo.com/v1/ensemble`, matching the design
     header's live-verified URL. Gate: 2132/2132 (+21).
-- [ ] T3 — Forecast handler: validation, routing, rendering (`opus`)
+- [x] T3 — Forecast handler: validation, routing, rendering (`opus`) — `4b6525d`
+  - All six flag-off lock files verified untouched via `git diff --name-only`
+    against the branch base. Gate: 2159/2159 (+27).
+  - **Rendering defect found by reading real output** (the compare_models
+    lesson repeating, and again not caught by any test that was going to be
+    written): `detail: "summary"` paired the *control run's* description with
+    the *members' modal-bucket* percentage. Rendered against a fixture whose
+    control forecast rain while 37 of 50 members were cloudy, the line read
+    `Slight rain (74% of members)` — the figure contradicting the words it
+    labelled. Fixed so the control's wording is borrowed only when the control
+    falls in the modal bucket; otherwise the modal bucket's own label is used.
+    Both directions locked by tests.
 - [ ] T4 — get_weather_summary flag strip (`sonnet`)
 - [ ] T5 — Schema + tool description (`haiku`)
 - [ ] T6 — Integration live smoke (`sonnet`)
