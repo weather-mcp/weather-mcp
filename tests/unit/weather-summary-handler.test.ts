@@ -244,3 +244,63 @@ describe('D9: compare_models stripped from weather-summary sub-requests', () => 
     }
   });
 });
+
+describe('D9: ensemble_spread stripped from weather-summary sub-requests', () => {
+  it('never invokes getEnsembleSpread and renders the standard forecast shape', async () => {
+    // Same caveat as the compare_models lock test above: every other test in
+    // this file relies on the module-level mock of forecastHandler.js, which
+    // would make "getEnsembleSpread never called" trivially true regardless of
+    // whether the strip actually works. This lock test needs the REAL
+    // handleGetForecast so a regression in the strip would genuinely route
+    // into the ensemble-spread branch and call getEnsembleSpread — so it
+    // unmocks forecastHandler.js and re-imports fresh, using a local
+    // Open-Meteo fake instead of the shared mocks above.
+    vi.doUnmock('../../src/handlers/forecastHandler.js');
+    vi.resetModules();
+
+    const { handleGetWeatherSummary: freshHandleGetWeatherSummary } = await import(
+      '../../src/handlers/weatherSummaryHandler.js'
+    );
+
+    const getEnsembleSpreadMock = vi.fn();
+    const fakeOpenMeteo = {
+      getForecast: vi.fn().mockResolvedValue({
+        elevation: 10,
+        timezone: 'Europe/London',
+        daily: { time: ['2026-08-16'] },
+      }),
+      getEnsembleSpread: getEnsembleSpreadMock,
+      getWeatherDescription: vi.fn().mockReturnValue('Clear'),
+    } as any;
+
+    try {
+      const result = await freshHandleGetWeatherSummary(
+        {
+          // London — non-US, so the real forecast handler auto-routes
+          // straight to Open-Meteo without touching NOAA at all.
+          latitude: 51.5074,
+          longitude: -0.1278,
+          include: ['forecast'],
+          ensemble_spread: true,
+        },
+        {} as any, // noaaService — never touched on this non-US path
+        fakeOpenMeteo,
+        {} as any, // nceiService
+        {} as any, // locationStore
+        {} as any // geocodingService
+      );
+      const text = result.content[0].text;
+
+      expect(getEnsembleSpreadMock).not.toHaveBeenCalled();
+      expect(fakeOpenMeteo.getForecast).toHaveBeenCalledTimes(1);
+      expect(text).toContain('# Weather Forecast (Daily)');
+      expect(text).not.toContain('# Weather Forecast (Ensemble Spread)');
+    } finally {
+      // Restore the shared module mock so it can't leak into any test that
+      // runs after this one in the same worker process.
+      vi.doMock('../../src/handlers/forecastHandler.js', () => ({
+        handleGetForecast: (...args: unknown[]) => forecastMock(...args),
+      }));
+    }
+  });
+});
