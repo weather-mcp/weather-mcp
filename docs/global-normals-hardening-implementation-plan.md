@@ -408,7 +408,7 @@ passing, `npm audit` 0 vulnerabilities.
 - [x] T2 — Pure table compute + render-precision groundwork (`sonnet`) — `888aaa2` (2,076 tests)
 - [x] T3 — Service switch to the per-location table (`sonnet`) — `864ece1` (2,074 tests)
 - [x] T4 — In-flight dedupe + bounded 429 retry (`opus`) — `16095ef` (2,079 tests)
-- [ ] T5 — One US predicate (`sonnet`)
+- [x] T5 — One US predicate (`sonnet`) — `9de85d6` (2,072 tests)
 - [ ] T6 — Shared render helper + heading alignment (`opus`)
 - [ ] T7 — Tighten the international-normals lock (`sonnet`)
 - [ ] T8 — Byte-stability check, live spot checks, docs (`opus`, orchestrator)
