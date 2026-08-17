@@ -689,15 +689,37 @@ describe('handleGetCurrentConditions — include_fire_weather null core inputs (
 // ---------------------------------------------------------------------------
 
 describe('handleGetCurrentConditions — include_normals (non-US)', () => {
-  it('resolves without throwing and includes normals output or a not-available note', async () => {
+  it('renders the Climate Context section with the fetched normal high/low when getClimateNormals resolves', async () => {
     const fakes = buildFakes();
+    // The shared Open-Meteo fake already resolves getClimateNormals to
+    // { tempHigh: 65, tempLow: 45, precipitation: 0.1, source: 'Open-Meteo',
+    // month: 1, day: 1 } — assert the render is real, not just "didn't throw".
 
-    const result = await callCurrentConditions({ ...TOKYO, include_normals: true }, fakes);
+    const result = await callCurrentConditions(
+      { ...TOKYO, include_normals: true, units: 'imperial' },
+      fakes
+    );
     const text = textOf(result);
 
-    const hasNormalsOutput = text.includes('Climate Context');
-    const hasUnavailableNote = text.includes('Climate normals data not available for this location');
-    expect(hasNormalsOutput || hasUnavailableNote).toBe(true);
+    expect(text).toContain('## 📊 Climate Context');
+    expect(text).toContain('**Normal High:** 65°F');
+    expect(text).toContain('**Normal Low:** 45°F');
+    expect(text).not.toContain('Climate normals data not available for this location');
+  });
+
+  it('soft-fails to the aligned heading and unavailable note when getClimateNormals rejects, without failing the response', async () => {
+    const fakes = buildFakes();
+    fakes.openMeteo.getClimateNormals.mockRejectedValue(new Error('no data'));
+
+    const result = await callCurrentConditions(
+      { ...TOKYO, include_normals: true, units: 'imperial' },
+      fakes
+    );
+    const text = textOf(result);
+
+    // Normals are garnish: the parent response still resolves successfully.
+    expect(text).toContain('## 📊 Climate Context');
+    expect(text).toContain('⚠️ Climate normals data not available for this location.');
   });
 });
 
