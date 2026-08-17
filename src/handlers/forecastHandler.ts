@@ -49,12 +49,21 @@ import { isInUS } from '../utils/geography.js';
 import {
   COMPARISON_MODELS,
   buildModelComparison,
+  weatherCodeBucket,
 } from '../utils/modelComparison.js';
 import type {
   ModelComparisonResult,
   DayComparison,
   WeatherCodeBucket,
 } from '../utils/modelComparison.js';
+import {
+  ENSEMBLE_MODEL_LABEL,
+  buildEnsembleSpread,
+} from '../utils/ensembleSpread.js';
+import type {
+  EnsembleSpreadResult,
+  EnsembleDay,
+} from '../utils/ensembleSpread.js';
 import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
 
 /** Note shown when an auto-routed NOAA request falls back to Open-Meteo. */
@@ -86,6 +95,7 @@ interface ForecastArgs extends UnitArgs {
   include_normals?: boolean;
   include_astronomy?: boolean;
   compare_models?: boolean;
+  ensemble_spread?: boolean;
   source?: 'auto' | 'noaa' | 'openmeteo';
   detail?: DetailLevel;
 }
@@ -261,6 +271,14 @@ export async function handleGetForecast(
     'compare_models',
     false
   );
+  // Single-model member spread (D1). Like compare_models — and unlike the
+  // include_* garnish flags — this replaces the forecast product entirely,
+  // so its parameter conflicts are errors rather than silent no-ops.
+  const ensemble_spread = validateOptionalBoolean(
+    (args as ForecastArgs)?.ensemble_spread,
+    'ensemble_spread',
+    false
+  );
   // Output verbosity: caps hourly output unless detail="full" (see hourlyEntryCap)
   const detail = validateDetail((args as ForecastArgs)?.detail);
 
@@ -273,12 +291,32 @@ export async function handleGetForecast(
   // Comparison interactions, thrown before any service call (D1). Silently
   // returning a plain forecast to someone who asked "do the models agree?"
   // would be dishonest, so these conflicts fail loudly instead of degrading.
+  // The two spread views answer different questions — "do the models agree?"
+  // versus "how confident is this one model?" — from different endpoints, and
+  // neither is a superset of the other, so asking for both is a request we
+  // cannot honour rather than one we should silently pick a winner for (D1).
+  if (compare_models && ensemble_spread) {
+    throw new Error('ensemble_spread and compare_models are mutually exclusive; request one view at a time');
+  }
+
   if (compare_models) {
     if (granularity === 'hourly') {
       throw new Error('compare_models requires daily granularity');
     }
     if (requestedSource === 'noaa') {
       throw new Error('compare_models uses Open-Meteo model data; use source "auto" or "openmeteo"');
+    }
+  }
+
+  // Same posture as the comparison guards above: silently returning a plain
+  // forecast to someone who asked how certain the forecast is would be
+  // dishonest, so these conflicts fail loudly instead of degrading (D1).
+  if (ensemble_spread) {
+    if (granularity === 'hourly') {
+      throw new Error('ensemble_spread requires daily granularity');
+    }
+    if (requestedSource === 'noaa') {
+      throw new Error('ensemble_spread uses Open-Meteo ensemble data; use source "auto" or "openmeteo"');
     }
   }
 
@@ -293,7 +331,20 @@ export async function handleGetForecast(
 
   // Use NOAA for US locations or if explicitly requested
   let result: { content: Array<{ type: string; text: string }> };
-  if (compare_models) {
+  if (ensemble_spread) {
+    // The spread short-circuits routing exactly as the comparison does (D2):
+    // NOAA is never called, so none of the auto-fallback logic below applies.
+    // US points still get a spread, with the NWS-not-the-model-shown
+    // disclosure in the footer.
+    result = await formatEnsembleSpreadForecast(
+      openMeteoService,
+      latitude,
+      longitude,
+      days,
+      prefs,
+      detail
+    );
+  } else if (compare_models) {
     // The comparison short-circuits routing entirely (D2): NOAA is never
     // called, so none of the auto-fallback logic below applies — there is
     // nothing to fall back from. US points still get a comparison, with the
@@ -1185,6 +1236,264 @@ async function formatModelComparisonForecast(
   footer += `differ and are not shown.`;
   if (isInUS(latitude, longitude)) {
     footer += ` The NOAA/NWS point forecast is not among the compared models.`;
+  }
+  footer += `*\n`;
+  output += footer;
+
+  return { content: [{ type: 'text', text: output }] };
+}
+
+/**
+ * Overall-confidence sentence shown under the ensemble header. Built
+ * deterministically from the per-day labels, mirroring
+ * `overallAgreementLine`'s shape: a leading run of high-confidence days is
+ * called out where one exists, otherwise the day counts are stated plainly.
+ * The widest daily-high interquartile spread is always given so the reader
+ * can size the uncertainty themselves.
+ */
+function ensembleOverallLine(
+  result: EnsembleSpreadResult,
+  timezone: string,
+  tempU: string
+): string {
+  const days = result.days;
+  const assessable = days.filter(d => d.participantCount >= 2);
+  const high = assessable.filter(d => d.confidence === 'High').length;
+  const moderate = assessable.filter(d => d.confidence === 'Moderate').length;
+  const low = assessable.filter(d => d.confidence === 'Low').length;
+
+  if (assessable.length === 0) {
+    return `**Forecast confidence:** Not assessable — too few members returned data for these days.\n`;
+  }
+
+  const maxSpread = Math.max(...assessable.map(d => d.temperature.high.p75 - d.temperature.high.p25));
+  const spreadText = `temperature spread up to ${r0(maxSpread)}${tempU}`;
+
+  let summary: string;
+  if (high === assessable.length) {
+    summary = `High across all ${assessable.length} ${plural(assessable.length, 'day', 'days')}`;
+  } else {
+    // Leading run of high-confidence days — the practically useful shape of
+    // the answer ("trust the next three days, watch the weekend").
+    let run = 0;
+    while (run < days.length && days[run].participantCount >= 2 && days[run].confidence === 'High') {
+      run++;
+    }
+    if (run > 0) {
+      summary = `High through ${shortDayLabel(days[run - 1].date, timezone)}, then `;
+      summary += low > 0
+        ? `decreasing — ${low} low-confidence ${plural(low, 'day', 'days')}`
+        : `less certain — ${moderate} moderate ${plural(moderate, 'day', 'days')}`;
+    } else {
+      summary = `Mixed across ${assessable.length} ${plural(assessable.length, 'day', 'days')} — `;
+      summary += `${high} high, ${moderate} moderate, ${low} low`;
+    }
+  }
+
+  return `**Forecast confidence:** ${summary} (${spreadText}).\n`;
+}
+
+/**
+ * One compact line per day for `detail: "summary"`.
+ */
+function ensembleSummaryDayLine(
+  day: EnsembleDay,
+  timezone: string,
+  tempU: string,
+  describeCode: (code: number) => string
+): string {
+  const label = shortDayLabel(day.date, timezone);
+  if (day.participantCount < 2) {
+    return `- **${label}:** only ${day.participantCount} ${plural(day.participantCount, 'member', 'members')} with data\n`;
+  }
+  // The percentage counts members in the MODAL bucket, so the words it is
+  // attached to have to be that bucket's. The control run's nicer wording is
+  // borrowed only when the control falls in the modal bucket too — otherwise
+  // the line would read "Slight rain (74% of members)" on a day when 74% of
+  // members are cloudy and only 26% forecast rain.
+  const controlBucket = day.control?.code != null ? weatherCodeBucket(day.control.code) : undefined;
+  const conditions = controlBucket === day.conditions.bucket && day.control?.code != null
+    ? describeCode(day.control.code)
+    : BUCKET_LABELS[day.conditions.bucket];
+  const pct = Math.round(day.conditions.percentage);
+  const highs = rangeText(day.temperature.high.p25, day.temperature.high.p75, tempU);
+  return `- **${label}:** ${conditions} (${pct}% of members), high ${highs} — ${day.confidence} confidence\n`;
+}
+
+/**
+ * Full per-day block for `detail: "standard"` and `"full"` (the D5 sketch).
+ *
+ * Every range shown is the p25-p75 interquartile band rather than the
+ * absolute envelope: with 50 members the extremes are single outlying runs,
+ * so min-max would read as far more uncertainty than the ensemble actually
+ * carries. `detail: "full"` adds the absolute envelope as its own line for
+ * readers who want it.
+ */
+function ensembleDayBlock(
+  day: EnsembleDay,
+  timezone: string,
+  detail: DetailLevel,
+  prefs: UnitPreferences,
+  describeCode: (code: number) => string
+): string {
+  const tempU = temperatureLabel(prefs);
+  const windU = windSpeedLabel(prefs);
+  const precipU = precipitationLabel(prefs);
+
+  let output = `## ${fullDayLabel(day.date, timezone)}\n`;
+
+  // The control run is the unperturbed reference, never counted in any
+  // spread below (D6). A day whose control is null simply omits the line.
+  if (day.control) {
+    const low = day.control.low !== null ? ` / Low ${r0(day.control.low)}${tempU}` : '';
+    const conditions = day.control.code !== null ? ` — ${describeCode(day.control.code)}` : '';
+    output += `**Control run:** High ${r0(day.control.high)}${tempU}${low}${conditions}\n`;
+  }
+
+  // One member is not a spread. Say so rather than rendering a zero-width
+  // band that would read as perfect confidence.
+  if (day.participantCount < 2) {
+    output += `*Only ${day.participantCount} ${plural(day.participantCount, 'member', 'members')} returned data for this day — no spread to summarize.*\n\n`;
+    return output;
+  }
+
+  output += `**Confidence:** ${day.confidence}\n`;
+
+  const high = day.temperature.high;
+  let tempLine = `**Temperature (${high.count} ${plural(high.count, 'member', 'members')}):** `;
+  tempLine += `high ${rangeText(high.p25, high.p75, tempU)} likely (p25–p75), median ${r0(high.median)}${tempU}`;
+  if (day.temperature.low.count > 0) {
+    tempLine += `; low ${rangeText(day.temperature.low.p25, day.temperature.low.p75, tempU)} likely`;
+  }
+  output += `${tempLine}\n`;
+
+  const precip = day.precipitation;
+  if (precip.participantCount > 0) {
+    const pct = Math.round(precip.fraction * 100);
+    let precipLine = `**Precipitation:** ${precip.wetCount} of ${precip.participantCount} members (${pct}%) `;
+    precipLine += `produce measurable precipitation`;
+    if (precip.wetCount > 0) {
+      // Wet members only — including the dry ones would pin every minimum to
+      // 0.00 and make a confident 0.05–0.31 in forecast read as "anywhere
+      // from nothing" (the inherited compare_models gotcha).
+      precipLine += `; ${precipRangeText(precip.amounts.min, precip.amounts.max, precipU)} among those`;
+    }
+    output += `${precipLine}\n`;
+  }
+
+  if (day.wind.max.count > 0) {
+    output += `**Wind:** max typically ${rangeText(day.wind.max.p25, day.wind.max.p75, ` ${windU}`)}\n`;
+  }
+
+  if (day.conditions.participantCount > 0) {
+    const pct = Math.round(day.conditions.percentage);
+    let conditionsLine = `**Conditions:** ${pct}% of members ${BUCKET_LABELS[day.conditions.bucket]}`;
+    if (day.conditions.runnerUp) {
+      conditionsLine += `; ${Math.round(day.conditions.runnerUp.percentage)}% ${BUCKET_LABELS[day.conditions.runnerUp.bucket]}`;
+    }
+    output += `${conditionsLine}\n`;
+  }
+
+  // detail="full" adds the absolute envelope behind the interquartile bands —
+  // still one compact line, never fifty member forecasts (D1).
+  if (detail === 'full') {
+    const parts: string[] = [`high ${rangeText(high.min, high.max, tempU)}`];
+    if (day.temperature.low.count > 0) {
+      parts.push(`low ${rangeText(day.temperature.low.min, day.temperature.low.max, tempU)}`);
+    }
+    if (day.wind.max.count > 0) {
+      parts.push(`wind up to ${r0(day.wind.max.max)} ${windU}`);
+    }
+    if (day.precipitation.wetCount > 0) {
+      parts.push(`precipitation up to ${day.precipitation.amounts.max.toFixed(2)} ${precipU}`);
+    }
+    output += `**Full range:** ${parts.join(', ')}\n`;
+  }
+
+  output += `\n`;
+  return output;
+}
+
+/**
+ * Format a single-model ensemble spread for `get_forecast`'s
+ * `ensemble_spread` flag (design D5). Summarizes the distribution of the
+ * model's perturbed members — deliberately never N member forecasts.
+ *
+ * The honest-framing footer follows the same precedents as the model
+ * comparison (FIRMS hotspots-not-incidents, GloFAS model-not-gauge, Fosberg
+ * derived-not-official): member fractions are raw model output, not
+ * calibrated probabilities, and a confident ensemble can still be wrong.
+ */
+async function formatEnsembleSpreadForecast(
+  openMeteoService: OpenMeteoService,
+  latitude: number,
+  longitude: number,
+  days: number,
+  prefs: UnitPreferences,
+  detail: DetailLevel
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  const tempU = temperatureLabel(prefs);
+
+  // Contract, not garnish (D7) — a transport failure propagates sanitized
+  // rather than degrading to a plain single-model forecast.
+  const response = await openMeteoService.getEnsembleSpread(latitude, longitude, days, prefs);
+
+  const spread = buildEnsembleSpread(response.daily, prefs.temperature, prefs.precipitation);
+
+  // The pure module stays logger-free, so the defensive member ceiling it
+  // reports is logged here (assumption A6).
+  if (spread.truncatedMembers) {
+    logger.warn('Ensemble member series exceeded the parse ceiling', {
+      latitude,
+      longitude,
+      memberCount: spread.memberCount,
+      securityEvent: true
+    });
+  }
+
+  // Fewer than 2 perturbed members, or nothing left after trimming, is not a
+  // spread — say so rather than render a one-member "distribution" (D7).
+  if (spread.memberCount < 2 || spread.days.length === 0) {
+    throw new DataNotFoundError('OpenMeteo', 'Ensemble spread data is unavailable for this location');
+  }
+
+  const timezone = response.timezone;
+  const describeCode = (code: number): string => openMeteoService.getWeatherDescription(code);
+
+  let output = `# Weather Forecast (Ensemble Spread)\n\n`;
+  output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
+  output += `**Timezone:** ${timezone}\n`;
+  output += `**Forecast Days:** ${days}\n`;
+  // Member count comes from the response, never from ENSEMBLE_MEMBER_COUNT —
+  // a live run can publish a different number than the documentation does.
+  output += `**Model:** ${ENSEMBLE_MODEL_LABEL} — ${spread.memberCount} perturbed members + control run\n\n`;
+
+  output += ensembleOverallLine(spread, timezone, tempU);
+  output += `\n`;
+
+  if (detail === 'summary') {
+    for (const day of spread.days) {
+      output += ensembleSummaryDayLine(day, timezone, tempU, describeCode);
+    }
+    output += `\n`;
+  } else {
+    for (const day of spread.days) {
+      output += ensembleDayBlock(day, timezone, detail, prefs, describeCode);
+    }
+  }
+
+  if (spread.trimmedDays > 0) {
+    output += `*Note: ${spread.trimmedDays} further ${plural(spread.trimmedDays, 'day', 'days')} beyond the model's horizon ${plural(spread.trimmedDays, 'was', 'were')} omitted*\n\n`;
+  }
+
+  output += `---\n`;
+  let footer = `*Data source: Open-Meteo (Ensemble API). Single-model spread: `;
+  footer += `${ENSEMBLE_MODEL_LABEL}, ${spread.memberCount} perturbed members; the control run is `;
+  footer += `shown as reference and not counted in spreads. Member fractions are raw model output, `;
+  footer += `not calibrated probabilities — a confident ensemble can still be wrong. Confidence `;
+  footer += `labels and spread bands are project heuristics.`;
+  if (isInUS(latitude, longitude)) {
+    footer += ` The NOAA/NWS point forecast is not the model shown.`;
   }
   footer += `*\n`;
   output += footer;
