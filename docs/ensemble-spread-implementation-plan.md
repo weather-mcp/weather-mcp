@@ -474,7 +474,13 @@ merges**, re-verify at kickoff), reconciled into the tasks below:
     *inside* the failing window. The two `tests/integration/safety-hazards`
     failures in the same run were the documented live-network flake and
     passed on re-run.
-- [ ] T2 — Service method + types (`sonnet`)
+- [x] T2 — Service method + types (`sonnet`) — `893a73d`
+  - Byte-untouched guarantee verified structurally: the `openmeteo.ts` diff is
+    **197 insertions, 0 deletions**, so `getForecast`/`getModelComparison`
+    cannot have changed; the new tests also assert their params and cache keys
+    directly. Endpoint resolves to
+    `https://ensemble-api.open-meteo.com/v1/ensemble`, matching the design
+    header's live-verified URL. Gate: 2132/2132 (+21).
 - [ ] T3 — Forecast handler: validation, routing, rendering (`opus`)
 - [ ] T4 — get_weather_summary flag strip (`sonnet`)
 - [ ] T5 — Schema + tool description (`haiku`)
