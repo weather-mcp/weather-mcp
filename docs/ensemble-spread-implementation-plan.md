@@ -424,9 +424,39 @@ merges**, re-verify at kickoff), reconciled into the tasks below:
   may shift after the merges; the orchestrator re-verifies anchors at
   kickoff rather than trusting the numbers.
 
+## Kickoff record (2026-08-16)
+
+- **A1 was NOT met at kickoff** and was resolved as the plan directs (stop and
+  ask): `main` was at `bcb9672` ("chore: Release v1.20.0") with no
+  `src/utils/modelComparison.ts`. Both v1.21.0 branches were unmerged with no
+  open PRs, and `feat/global-normals-hardening` was stacked on top of
+  `feat/multi-model-comparison`. On the human's instruction the stack was
+  squash-merged to `main` first: PR #62 (`292a901`) then PR #63 (`5995b80`).
+  #63 had to be **rebased onto the squashed `main`** (`git rebase --onto
+  origin/main feat/multi-model-comparison feat/global-normals-hardening`)
+  because the squash left its merge base behind and GitHub reported
+  `CONFLICTING`; the rebase was verified content-identical to the pre-rebase
+  tip (`git diff 72857b2 HEAD` empty) and reduced the PR diff from 30 files to
+  the correct 18.
+- **Branch base SHA (for the T7 sweep): `5995b80`** — `feat/ensemble-spread`
+  created off `main` at that commit.
+- **Green baseline on the branch before T1:** `npm run build` 0 errors ·
+  `npm test` 2077/2077 in 85 files · `npm audit` 0 vulnerabilities.
+- **A9 anchors re-verified on the merged base** — all current:
+  `precipThreshold` module-private at `modelComparison.ts:169`;
+  `classifyTempSpread` `:154` and `weatherCodeBucket` `:181` exported;
+  `ForecastArgs` `:77` with `compare_models` at `:88`; handler guards
+  `:276-281`; routing short-circuit `:296`; `formatModelComparisonForecast`
+  `:1106`; `isInUS` footer gate `:1186`; `unitSignature` `openmeteo.ts:44`;
+  URL defaults `:97-100`; `makeRequestToFlood` `:1592`; comparison cache
+  comment + key `:1042-1048`; summary strip `weatherSummaryHandler.ts:115`;
+  schema `index.ts:342` / `:347`, tool description `:298`.
+- **Housekeeping:** this file had been saved as `docs/.md` by the planning
+  session; renamed to its intended path before T0.
+
 ## Progress Tracker
 
-- [ ] T0 — Land design doc + planning edit as first `docs:` commit (orchestrator, with baseline)
+- [x] T0 — Land design doc + planning edit as first `docs:` commit (orchestrator, with baseline) — `d5c157e`
 - [ ] T1 — Pure spread module (`sonnet`)
 - [ ] T2 — Service method + types (`sonnet`)
 - [ ] T3 — Forecast handler: validation, routing, rendering (`opus`)
