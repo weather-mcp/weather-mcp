@@ -411,7 +411,16 @@ passing, `npm audit` 0 vulnerabilities.
 - [x] T5 — One US predicate (`sonnet`) — `9de85d6` (2,072 tests)
 - [x] T6 — Shared render helper + heading alignment (`opus`) — `41b8920` (2,076 tests)
 - [x] T7 — Tighten the international-normals lock (`sonnet`) — `b926b2a` (2,077 tests)
-- [ ] T8 — Byte-stability check, live spot checks, docs (`opus`, orchestrator)
+- [x] T8 — Byte-stability check, live spot checks, docs (`opus`, orchestrator) — `7fcf175` (2,077 tests)
+
+**All tasks complete.** Final gate green: build 0 errors, 85 files /
+2,077 tests, `npm audit` 0 vulnerabilities. Six live checks recorded in the
+design plan's §Implementation notes — US imperial byte-identical to base
+`1087267`, Tokyo renders, Paris metric shifted per D5, one pull per
+location confirmed, Feb 29 real, concurrent dedupe confirmed. Two design
+premises were falsified live and are documented rather than papered over
+(ERA5 covers open ocean; `get_weather_summary` awaits sequentially and so
+does not race).
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T8 checks are
