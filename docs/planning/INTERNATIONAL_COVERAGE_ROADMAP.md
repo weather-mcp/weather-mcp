@@ -28,7 +28,7 @@ US-only today:
 | `get_river_conditions` | NOAA NWPS + USGS | US gauges only |
 | `get_wildfire_info` | NIFC | US incidents only |
 | Fire weather indices | NOAA gridpoint | Computed from US-only data |
-| ~~Climate normals (`include_normals`)~~ | ~~NCEI~~ NCEI (token) / Open-Meteo hybrid | ~~US stations only~~ **This row was wrong** (corrected 2026-08-17): normals have been global since v1.2.0 — NCEI is only attempted with a token for US points, and the keyless default computes 1991–2020 normals from the Open-Meteo archive anywhere. Remaining work is hardening, not coverage: [`docs/global-normals-hardening-plan.md`](../global-normals-hardening-plan.md) |
+| ~~Climate normals (`include_normals`)~~ | ~~NCEI~~ NCEI (token) / Open-Meteo hybrid | ~~US stations only~~ **This row was wrong** (corrected 2026-08-17): normals have been global since v1.2.0 — NCEI is only attempted with a token for US points, and the keyless default computes 1991–2020 normals from the Open-Meteo archive anywhere. The hardening pass then shipped: [`docs/plans/global-normals-hardening-plan.md`](../plans/global-normals-hardening-plan.md) ✅ |
 
 The auto-select pattern to replicate everywhere: `forecastHandler.ts:235` (US → NOAA, elsewhere → Open-Meteo).
 
@@ -98,7 +98,7 @@ FRP-descending) with an honest hotspots-not-incidents framing.
 ## Priority 5 — Polish items (small, independent)
 
 1. **met.no Locationforecast as fallback/second-opinion forecast source** — free, global (ECMWF HRES), no key; requires identifying User-Agent (already sent for Nominatim) and CC-BY 4.0 attribution. https://api.met.no/weatherapi/locationforecast/2.0/documentation
-2. ~~**Global climate normals**~~ — ✅ **Stale: this already ships, and has since v1.2.0.** Design exploration (2026-08-17) found `getClimateNormals` (`src/utils/normals.ts`) falls back to Open-Meteo computed normals for any coordinates whenever NCEI is unavailable — and NCEI needs an optional token the keyless project doesn't ship with, so the "fallback" is the default path everywhere, US included. What remains is hardening the path (one full-year pull per location, 429 posture, predicate/render unification): [`docs/global-normals-hardening-plan.md`](../global-normals-hardening-plan.md) (📝).
+2. ~~**Global climate normals**~~ — ✅ **Stale: this already ships, and has since v1.2.0.** Design exploration (2026-08-17) found `getClimateNormals` (`src/utils/normals.ts`) falls back to Open-Meteo computed normals for any coordinates whenever NCEI is unavailable — and NCEI needs an optional token the keyless project doesn't ship with, so the "fallback" is the default path everywhere, US included. What remains is hardening the path (one full-year pull per location, 429 posture, predicate/render unification), which has now shipped: [`docs/plans/global-normals-hardening-plan.md`](../plans/global-normals-hardening-plan.md) (✅).
 3. ~~**Global fire weather indices**~~ — ✅ **Shipped** on `feat/global-fire-weather` targeting v1.20.0; [`docs/plans/global-fire-weather-plan.md`](../plans/global-fire-weather-plan.md). **The premise above was wrong** and design exploration corrected it: there were no `fireWeather.ts` formulas to run — that module *interprets* five indices NOAA pre-computes on its gridpoint API, and nothing in the codebase computed a fire-weather index. The global path therefore computes a **Fosberg Fire Weather Index in-house** from Open-Meteo *current* values (not hourly), with soil moisture and VPD as dryness context, framed in-output as server-derived rather than an agency rating. Descoped to ideas: global Haines via pressure-level variables, and Fosberg on the METAR source.
 4. **UK river gauges** — see Priority 2 supplement.
 
@@ -125,7 +125,7 @@ All options preserve the zero-cost model; only FIRMS breaks the zero-key model (
 | ~~2~~ ✅ | ~~Open-Meteo Flood API in `get_river_conditions`~~ — implemented for v1.15.0 (channel snapping per the live finding below). The **UK Environment Agency gauge supplement remains open** and moves to Phase 5. | No (new endpoint) | Small–medium |
 | ~~3~~ ✅ | ~~MeteoAlarm + GeoMet alerts routing~~ — implemented for v1.19.0 (country routing via a cached Nominatim reverse lookup; all 38 MeteoAlarm slugs live-verified) | Yes (2, keyless) | Medium |
 | ~~4~~ ✅ | ~~NASA FIRMS in `get_wildfire_info`~~ — implemented for v1.20.0 (keyless-first: regional flat CSVs with conservative inset region picking; optional key upgrades to Area-API bbox + multi-day, with a rolling-window correction for the API's calendar-day semantics) | Yes (free key, optional) | Medium |
-| 5 | Polish: met.no fallback, ~~global normals~~ (stale — shipped since v1.2.0; hardening planned, see item 2 above), ~~global FWI~~ ✅ (v1.20.0), UK gauges | Yes (keyless) | Small each |
+| 5 | Polish: met.no fallback, ~~global normals~~ (stale — shipped since v1.2.0; hardening shipped, see item 2 above), ~~global FWI~~ ✅ (v1.20.0), UK gauges | Yes (keyless) | Small each |
 
 Each phase is independently shippable as a minor release, following the existing pattern: types → validation → service → handler → registration in `src/index.ts` → tests → docs.
 
@@ -185,7 +185,7 @@ claimed:
   first-time pulls with 429 backoff. *(Update 2026-08-17: three consecutive
   30-year pulls succeeded with no rate-limit headers — the tripwire is
   intermittent; treat backoff as defensive. See
-  [`docs/global-normals-hardening-plan.md`](../global-normals-hardening-plan.md)
+  [`docs/plans/global-normals-hardening-plan.md`](../plans/global-normals-hardening-plan.md)
   §Live verification.)*
 - **Phase 5 (global FWI):** all Fosberg inputs (temp, RH, wind, gusts) are in
   Open-Meteo hourly globally, zero nulls observed, plus `soil_moisture_0_to_1cm`

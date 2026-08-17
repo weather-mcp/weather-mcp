@@ -1,6 +1,8 @@
 # Global Normals Hardening — Design Plan
 
-**Status:** 📝 Planned (see [planning index](./planning/README.md))
+**Status:** ✅ IMPLEMENTED (2026-08-16) — see [Implementation notes](#implementation-notes-2026-08-16)
+(planning index: [`docs/planning/README.md`](../planning/README.md);
+execution plan: [`global-normals-hardening-implementation-plan.md`](./global-normals-hardening-implementation-plan.md))
 **Target:** next minor release after v1.21.0
 **Prereq reading:** `src/utils/normals.ts`, `src/services/openmeteo.ts` `getClimateNormals`, ICR §Phase 5
 
@@ -222,18 +224,63 @@ the unavailable note text itself is unchanged. Success output is byte-identical
 
 ## Documentation / registration checklist (for /run-plan tracking)
 
-- [ ] `src/config/cache.ts` — `normals: Infinity` entry
-- [ ] `src/utils/normals.ts` — table compute, shared renderer, `isLocationInUS` removed
-- [ ] `src/services/openmeteo.ts` — full-year fetch, table cache, dedupe, 429 retry
-- [ ] Handlers (5 blocks) → shared helper
-- [ ] Tests per D7
-- [ ] `CHANGELOG.md` — hardening entry incl. the D5 metric disclosure
-- [ ] `CLAUDE.md` / `docs/TOOLS.md` — note normals are global (hybrid), correct any US-only phrasing
-- [ ] `docs/planning/README.md` + `INTERNATIONAL_COVERAGE_ROADMAP.md` — stale-row corrections (done alongside this doc)
-- [ ] Move this doc to `docs/plans/` on ship
+- [x] `src/config/cache.ts` — `normals: Infinity` entry
+- [x] `src/utils/normals.ts` — table compute, shared renderer, `isLocationInUS` removed
+- [x] `src/services/openmeteo.ts` — full-year fetch, table cache, dedupe, 429 retry
+- [x] Handlers (5 blocks) → shared helper
+- [x] Tests per D7
+- [x] `CHANGELOG.md` — hardening entry incl. the D5 metric disclosure
+- [x] `CLAUDE.md` / `docs/TOOLS.md` — note normals are global (hybrid), correct any US-only phrasing
+- [x] `docs/planning/README.md` + `INTERNATIONAL_COVERAGE_ROADMAP.md` — stale-row corrections (done alongside this doc)
+- [x] Move this doc to `docs/plans/` on ship
+
+## Implementation notes (2026-08-16)
+
+Executed on `feat/global-normals-hardening` off `1087267` as T0–T8 of the
+implementation plan. Gate green throughout; **2,058 → 2,077 tests**.
+`metar-handler.test.ts` and `almanac-handler.test.ts` — the service-boundary
+locks on `getClimateNormals`'s signature — were never edited.
+
+### Live checks against the built dist
+
+| Check | Result |
+|-------|--------|
+| 1. Kansas City, imperial, keyless | ✅ **Byte-identical** to the branch base (`diff` clean on the climate section) |
+| 2. Tokyo | ✅ Renders — normal high 86 °F, low 74 °F, with departures |
+| 3. Paris, `units: metric` | ✅ Renders; **shifted vs base**: normal high 24 → 25 °C, precipitation 1 → 0.9 mm (the D5 fix) |
+| 4. Open ocean (0, −160) | ⚠️ Premise falsified — renders *real normals*, see below; second date issued **no** second pull (1 total) |
+| 5. Feb 29 (direct at the service) | ✅ Real leap-day mean 55.67 °F, distinct from Feb 28's 47.79 °F; both dates = 1 pull |
+| 6. Concurrent same-location pulls | ✅ Two concurrent calls, different dates → **1** archive pull, both correct |
+
+### Three findings the live checks produced
+
+1. **ERA5 covers open ocean.** The edge-case table predicted "HTTP 200 with
+   nulls → unavailable note" at an open-ocean point; live, `0, -160` returns
+   real reanalysis values and renders normals. The unavailable path is
+   therefore not reachable that way and is locked by unit fixtures
+   (all-null response) plus the D7 rejecting-fake test instead. The
+   *caching* half of the check did hold: a second date made no second pull.
+2. **`get_weather_summary` does not race.** D3 justified dedupe partly by the
+   summary fan-out hitting forecast + current concurrently; that handler
+   actually `await`s each section in a sequential `for` loop, so the two
+   sub-handlers serialize and the second is a plain cache hit. The dedupe is
+   still correct and defensive — genuinely concurrent callers exist, and the
+   direct test above proves it collapses two pulls into one — but the
+   summary is not the scenario that exercises it.
+3. **The 429 is real.** T8's own verification tripped Open-Meteo's weighted
+   archive limit after a run of full-year pulls; the D3 retry fired, the
+   second attempt was also limited, and the error propagated to the
+   unavailable note exactly as specified. The limit is intermittent, as the
+   design's live verification concluded — a normal caller will not see it,
+   but a burst of first-time pulls can.
+
+**D5 disclosure precision:** the design says metric values may shift ≤ 0.5 °C.
+That is true of the underlying value; the *displayed* integer can therefore
+differ by a full degree where the old double-rounding sat near a boundary
+(Paris: 24 → 25 °C). The changelog states it that way.
 
 ---
 
 *Drafted 2026-08-17. Upstream claims live-verified same day (see §Live
-verification). Re-verify archive weighting behavior before implementation if
-significant time passes.*
+verification). Implemented 2026-08-16 with no elapsed-time re-verification
+needed.*

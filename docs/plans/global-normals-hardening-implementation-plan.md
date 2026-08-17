@@ -2,7 +2,7 @@
 
 **Status:** READY (2026-08-16)
 
-Execution plan for `docs/global-normals-hardening-plan.md` (the WHAT/WHY);
+Execution plan for `docs/plans/global-normals-hardening-plan.md` (the WHAT/WHY);
 rules live in `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ rules live in `docs/orchestration-playbook.md`.
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/global-normals-hardening-implementation-plan.md
+/run-plan docs/plans/global-normals-hardening-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/global-normals-hardening-plan.md` (design),
+Or, equivalently: read `docs/plans/global-normals-hardening-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review
 the diff, run the gate yourself, commit, tick the tracker, push.
@@ -146,7 +146,7 @@ Spot-checks against the code (2026-08-16), reconciled into the tasks below:
 **T0 — Land working-tree docs** (orchestrator, with baseline)
 
 - Files: `docs/orchestration-playbook.md` (uncommitted edit),
-  `docs/global-normals-hardening-implementation-plan.md` (this file)
+  `docs/plans/global-normals-hardening-implementation-plan.md` (this file)
 - Create `feat/global-normals-hardening` off the docs-branch tip, run the
   full gate for the baseline (record counts + base SHA in the tracker),
   commit both docs.
@@ -333,7 +333,7 @@ Spot-checks against the code (2026-08-16), reconciled into the tasks below:
 
 - Files: `CHANGELOG.md`, `CLAUDE.md`, `docs/TOOLS.md`, `README.md` (test
   counts), `docs/planning/README.md`,
-  `docs/global-normals-hardening-plan.md` (status + move), this file (move)
+  `docs/plans/global-normals-hardening-plan.md` (status + move), this file (move)
 - **Checks against the built dist**, run by the orchestrator personally
   (base SHA from T0; `process.exit(0)` in drivers; no parallel live
   drivers):
@@ -420,5 +420,5 @@ byte-identical to the branch base; Tokyo renders; open ocean soft-fails
 without refetching; the summary fan-out shares one pull), the
 service-boundary lock files (`metar-handler.test.ts`,
 `almanac-handler.test.ts` — never edited) pass, and
-`docs/global-normals-hardening-plan.md` is marked `IMPLEMENTED` with the
+`docs/plans/global-normals-hardening-plan.md` is marked `IMPLEMENTED` with the
 plan set moved to `docs/plans/`. Opening the PR is the human's call.

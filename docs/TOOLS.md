@@ -52,7 +52,7 @@ Get weather forecast for any location worldwide.
 - `days` (optional): Number of days in forecast (1-16, default: 7)
 - `granularity` (optional): "daily" or "hourly" (default: "daily")
 - `include_precipitation_probability` (optional): Include rain chances (default: true)
-- `include_normals` (optional): Include climate normals for comparison (default: false). For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
+- `include_normals` (optional): Include climate normals for comparison (default: false). Normals are **global**: official NCEI station normals when an `NCEI_API_TOKEN` is configured and the point is in the US, and 1991-2020 normals computed from the Open-Meteo archive everywhere else — which, since the server ships keyless, is the default path. One full-year archive pull is made per location and reused for every date there. For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
 - `include_astronomy` (optional): Include a per-day astronomy block — moon phase name, illumination %, moonrise/moonset, and civil/nautical/astronomical twilight times — plus one next-full-moon / next-new-moon line per response (default: false, daily forecasts only; computed locally, no API calls). Polar days render explicit "none (polar day)" / "none (polar night)" wording
 - `compare_models` (optional): Compare five global weather models and summarize their agreement instead of returning a single forecast (default: false) — see **Model comparison** below
 - `source` (optional): "auto" (default), "noaa" (US only), or "openmeteo" (global)
@@ -134,7 +134,7 @@ Get current weather conditions for a location (global).
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `include_fire_weather` (optional): Include fire weather (default: false). US locations get NOAA's published indices; elsewhere a Fosberg Fire Weather Index computed by this server, with dryness context
-- `include_normals` (optional): Include climate normals for comparison (default: false). For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
+- `include_normals` (optional): Include climate normals for comparison (default: false). Normals are **global**: official NCEI station normals when an `NCEI_API_TOKEN` is configured and the point is in the US, and 1991-2020 normals computed from the Open-Meteo archive everywhere else — which, since the server ships keyless, is the default path. One full-year archive pull is made per location and reused for every date there. For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
 - `source` (optional): `"auto"` (default), `"noaa"`, `"openmeteo"`, or `"metar"` — see Description
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 
