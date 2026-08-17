@@ -409,7 +409,7 @@ passing, `npm audit` 0 vulnerabilities.
 - [x] T3 — Service switch to the per-location table (`sonnet`) — `864ece1` (2,074 tests)
 - [x] T4 — In-flight dedupe + bounded 429 retry (`opus`) — `16095ef` (2,079 tests)
 - [x] T5 — One US predicate (`sonnet`) — `9de85d6` (2,072 tests)
-- [ ] T6 — Shared render helper + heading alignment (`opus`)
+- [x] T6 — Shared render helper + heading alignment (`opus`) — `41b8920` (2,076 tests)
 - [ ] T7 — Tighten the international-normals lock (`sonnet`)
 - [ ] T8 — Byte-stability check, live spot checks, docs (`opus`, orchestrator)
 
