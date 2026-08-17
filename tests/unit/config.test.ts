@@ -29,6 +29,7 @@ describe('Cache Configuration', () => {
       expect(CacheConfig.ttl.alerts).toBeGreaterThan(0);
       expect(CacheConfig.ttl.recentHistorical).toBeGreaterThan(0);
       expect(CacheConfig.ttl.historicalData).toBe(Infinity);
+      expect(CacheConfig.ttl.normals).toBe(Infinity);
       expect(CacheConfig.ttl.serviceStatus).toBeGreaterThan(0);
     });
 
