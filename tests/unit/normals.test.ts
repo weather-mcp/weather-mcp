@@ -2,12 +2,12 @@
  * Unit tests for climate normals utilities
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   calculateDeparture,
   formatNormals,
   getDateComponents,
-  isLocationInUS,
+  getClimateNormals,
   computeNormalsTable,
   getNormalsTableCacheKey,
   type NormalsTable
@@ -215,60 +215,6 @@ describe('Climate Normals Utilities', () => {
 
       expect(month).toBe(2);
       expect(day).toBe(29);
-    });
-  });
-
-  describe('isLocationInUS', () => {
-    it('should identify New York City as in US', () => {
-      expect(isLocationInUS(40.7128, -74.0060)).toBe(true);
-    });
-
-    it('should identify Los Angeles as in US', () => {
-      expect(isLocationInUS(34.0522, -118.2437)).toBe(true);
-    });
-
-    it('should identify Miami as in US', () => {
-      expect(isLocationInUS(25.7617, -80.1918)).toBe(true);
-    });
-
-    it('should identify Seattle as in US', () => {
-      expect(isLocationInUS(47.6062, -122.3321)).toBe(true);
-    });
-
-    it('should identify London as NOT in US', () => {
-      expect(isLocationInUS(51.5074, -0.1278)).toBe(false);
-    });
-
-    it('should identify Paris as NOT in US', () => {
-      expect(isLocationInUS(48.8566, 2.3522)).toBe(false);
-    });
-
-    it('should identify Tokyo as NOT in US', () => {
-      expect(isLocationInUS(35.6762, 139.6503)).toBe(false);
-    });
-
-    it('should identify Mexico City as NOT in US', () => {
-      expect(isLocationInUS(19.4326, -99.1332)).toBe(false);
-    });
-
-    it('should identify Toronto (edge case in bounding box)', () => {
-      // Note: Toronto falls within the simple bounding box used for US detection
-      // This is acceptable as the function is used only to decide whether to attempt NCEI
-      expect(isLocationInUS(43.6532, -79.3832)).toBe(true);
-    });
-
-    it('should handle edge cases at US borders', () => {
-      // Just inside southern border
-      expect(isLocationInUS(24.5, -100)).toBe(true);
-
-      // Just outside southern border
-      expect(isLocationInUS(23.5, -100)).toBe(false);
-
-      // Just inside northern border
-      expect(isLocationInUS(49.5, -100)).toBe(true);
-
-      // Just outside northern border
-      expect(isLocationInUS(50.5, -100)).toBe(false);
     });
   });
 
@@ -525,6 +471,93 @@ describe('Climate Normals Utilities', () => {
       const output = formatNormals(normals, undefined, METRIC_PREFERENCES);
 
       expect(output).toContain('**Normal Precipitation:** 12.7 mm');
+    });
+  });
+
+  describe('getClimateNormals (D4: NCEI gate on the shared isInUS predicate)', () => {
+    function buildOpenMeteoFake() {
+      return {
+        getClimateNormals: vi.fn().mockResolvedValue({
+          tempHigh: 65,
+          tempLow: 45,
+          precipitation: 0.1,
+          source: 'Open-Meteo' as const,
+          month: 7,
+          day: 15
+        })
+      };
+    }
+
+    function buildAvailableNceiFake() {
+      return {
+        isAvailable: vi.fn().mockReturnValue(true),
+        getClimateNormals: vi.fn().mockResolvedValue({
+          tempHigh: 68,
+          tempLow: 50,
+          precipitation: 0.05,
+          source: 'NCEI' as const,
+          month: 7,
+          day: 15
+        })
+      };
+    }
+
+    it('attempts NCEI for an Alaska point when NCEI is available (finding-4 delta)', async () => {
+      // Anchorage, AK — outside the old contiguous-US-only box (isLocationInUS
+      // required lat <= 50), but inside the shared isInUS Alaska band.
+      const openMeteo = buildOpenMeteoFake();
+      const ncei = buildAvailableNceiFake();
+
+      const result = await getClimateNormals(
+        openMeteo as unknown as Parameters<typeof getClimateNormals>[0],
+        ncei as unknown as Parameters<typeof getClimateNormals>[1],
+        61.2181,
+        -149.9003,
+        7,
+        15
+      );
+
+      expect(ncei.getClimateNormals).toHaveBeenCalledWith(61.2181, -149.9003, 7, 15);
+      expect(result.source).toBe('NCEI');
+      expect(openMeteo.getClimateNormals).not.toHaveBeenCalled();
+    });
+
+    it('attempts NCEI for a Hawaii point when NCEI is available (finding-4 delta)', async () => {
+      // Honolulu, HI — also outside the old contiguous-US-only box.
+      const openMeteo = buildOpenMeteoFake();
+      const ncei = buildAvailableNceiFake();
+
+      const result = await getClimateNormals(
+        openMeteo as unknown as Parameters<typeof getClimateNormals>[0],
+        ncei as unknown as Parameters<typeof getClimateNormals>[1],
+        21.3069,
+        -157.8583,
+        7,
+        15
+      );
+
+      expect(ncei.getClimateNormals).toHaveBeenCalledWith(21.3069, -157.8583, 7, 15);
+      expect(result.source).toBe('NCEI');
+      expect(openMeteo.getClimateNormals).not.toHaveBeenCalled();
+    });
+
+    it('never attempts NCEI for a non-US point, even when NCEI is available', async () => {
+      // Tokyo, Japan.
+      const openMeteo = buildOpenMeteoFake();
+      const ncei = buildAvailableNceiFake();
+
+      const result = await getClimateNormals(
+        openMeteo as unknown as Parameters<typeof getClimateNormals>[0],
+        ncei as unknown as Parameters<typeof getClimateNormals>[1],
+        35.6762,
+        139.6503,
+        7,
+        15
+      );
+
+      expect(ncei.getClimateNormals).not.toHaveBeenCalled();
+      expect(openMeteo.getClimateNormals).toHaveBeenCalledWith(35.6762, 139.6503, 7, 15);
+      expect(result.source).toBe('Open-Meteo');
     });
   });
 });

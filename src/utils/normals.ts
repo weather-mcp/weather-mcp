@@ -16,6 +16,7 @@ import { temperatureLabel, precipitationLabel } from './unitFormat.js';
 import type { OpenMeteoService } from '../services/openmeteo.js';
 import type { NCEIService } from '../services/ncei.js';
 import { logger } from './logger.js';
+import { isInUS } from './geography.js';
 
 /**
  * Climate normals are stored canonically in imperial units (°F, inches).
@@ -305,25 +306,6 @@ export function getDateComponents(date: Date | string): { month: number; day: nu
 }
 
 /**
- * Check if coordinates are within the contiguous United States
- *
- * @param latitude - Latitude
- * @param longitude - Longitude
- * @returns true if location is in contiguous US
- */
-export function isLocationInUS(latitude: number, longitude: number): boolean {
-  // Contiguous US bounding box (approximate)
-  // Latitude: ~25°N (Florida) to ~49°N (Canada border)
-  // Longitude: ~-125°W (Pacific) to ~-66°W (Atlantic)
-  return (
-    latitude >= 24 &&
-    latitude <= 50 &&
-    longitude >= -125 &&
-    longitude <= -66
-  );
-}
-
-/**
  * Get climate normals using hybrid strategy
  *
  * Strategy:
@@ -347,7 +329,7 @@ export async function getClimateNormals(
   day: number
 ): Promise<ClimateNormals> {
   // Try NCEI if available and location is in US
-  if (nceiService && nceiService.isAvailable() && isLocationInUS(latitude, longitude)) {
+  if (nceiService && nceiService.isAvailable() && isInUS(latitude, longitude)) {
     try {
       logger.info('Attempting to fetch climate normals from NCEI', {
         latitude,
@@ -385,7 +367,7 @@ export async function getClimateNormals(
     day,
     reason: nceiService && nceiService.isAvailable()
       ? 'NCEI fallback'
-      : !isLocationInUS(latitude, longitude)
+      : !isInUS(latitude, longitude)
         ? 'Location outside US'
         : 'NCEI token not configured'
   });
