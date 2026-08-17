@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OpenMeteoService } from '../../src/services/openmeteo.js';
 import type { OpenMeteoHistoricalResponse } from '../../src/types/openmeteo.js';
 import { CacheConfig } from '../../src/config/cache.js';
-import { DataNotFoundError } from '../../src/errors/ApiError.js';
+import { DataNotFoundError, RateLimitError, ServiceUnavailableError } from '../../src/errors/ApiError.js';
 
 /**
  * OpenMeteoService.getClimateNormals() — full-year normals table (D1)
@@ -177,6 +177,127 @@ describe('OpenMeteoService.getClimateNormals() — full-year normals table (D1)'
     expect(spy).toHaveBeenCalledTimes(1);
 
     await expect(service.getClimateNormals(0, -160, 6, 30)).rejects.toThrow(DataNotFoundError);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * In-flight dedupe + bounded 429 retry (D3).
+ *
+ * The dedupe scenario is real: `weatherSummaryHandler` spreads the caller's
+ * args into every sub-handler, so `include_normals: true` fans out to the
+ * forecast and current-conditions handlers concurrently for one location.
+ *
+ * The retry uses fake timers throughout — the suite stays deterministic and
+ * fast, with no real 2s sleeps.
+ */
+describe('OpenMeteoService.getClimateNormals() — dedupe and 429 retry (D3)', () => {
+  let service: OpenMeteoService;
+
+  beforeEach(() => {
+    service = new OpenMeteoService();
+    service.clearCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Two available slots, so concurrent callers can request different dates. */
+  function buildTwoDateFixture(): OpenMeteoHistoricalResponse {
+    return buildArchiveFixture({
+      '01-15': {
+        high: Array(20).fill(10), // 10°C -> 50°F
+        low: Array(20).fill(0), // 0°C -> 32°F
+        precip: Array(20).fill(5)
+      },
+      '06-30': {
+        high: Array(20).fill(30), // 30°C -> 86°F
+        low: Array(20).fill(20), // 20°C -> 68°F
+        precip: Array(20).fill(1)
+      }
+    });
+  }
+
+  it('shares one archive pull between concurrent calls for the same location', async () => {
+    const spy = vi.spyOn(service as any, 'makeRequest').mockResolvedValue(buildTwoDateFixture());
+
+    // Started without awaiting in between — the second call must join the
+    // first's in-flight pull rather than miss the not-yet-populated cache.
+    const [winter, summer] = await Promise.all([
+      service.getClimateNormals(39.0997, -94.5786, 1, 15),
+      service.getClimateNormals(39.0997, -94.5786, 6, 30)
+    ]);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    // Both resolve with their own date's values, not a shared one.
+    expect(winter.tempHigh).toBeCloseTo(50, 0);
+    expect(winter.day).toBe(15);
+    expect(summer.tempHigh).toBeCloseTo(86, 0);
+    expect(summer.day).toBe(30);
+  });
+
+  it('does not poison the in-flight map when a pull rejects', async () => {
+    const spy = vi
+      .spyOn(service as any, 'makeRequest')
+      .mockRejectedValueOnce(new ServiceUnavailableError('OpenMeteo'))
+      .mockResolvedValue(buildTwoDateFixture());
+
+    await expect(service.getClimateNormals(39.0997, -94.5786, 1, 15)).rejects.toThrow(
+      ServiceUnavailableError
+    );
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    // The rejected pull was never cached and left no map entry behind, so a
+    // follow-up call fetches afresh rather than joining a dead promise.
+    const retried = await service.getClimateNormals(39.0997, -94.5786, 1, 15);
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(retried.tempHigh).toBeCloseTo(50, 0);
+  });
+
+  it('retries once after a 429 and resolves, with exactly two transport calls', async () => {
+    vi.useFakeTimers();
+    const spy = vi
+      .spyOn(service as any, 'makeRequest')
+      .mockRejectedValueOnce(new RateLimitError('OpenMeteo'))
+      .mockResolvedValue(buildTwoDateFixture());
+
+    const pending = service.getClimateNormals(39.0997, -94.5786, 1, 15);
+
+    // Covers the 2s base plus the full jitter range.
+    await vi.advanceTimersByTimeAsync(3000);
+
+    const normals = await pending;
+    expect(normals.tempHigh).toBeCloseTo(50, 0);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('propagates a second 429 after exactly two transport calls', async () => {
+    vi.useFakeTimers();
+    const spy = vi
+      .spyOn(service as any, 'makeRequest')
+      .mockRejectedValue(new RateLimitError('OpenMeteo'));
+
+    const pending = service.getClimateNormals(39.0997, -94.5786, 1, 15);
+    const assertion = expect(pending).rejects.toThrow(RateLimitError);
+
+    await vi.advanceTimersByTimeAsync(3000);
+    await assertion;
+
+    // One retry is the whole budget — no third attempt.
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a non-rate-limit error', async () => {
+    const spy = vi
+      .spyOn(service as any, 'makeRequest')
+      .mockRejectedValue(new ServiceUnavailableError('OpenMeteo'));
+
+    await expect(service.getClimateNormals(39.0997, -94.5786, 1, 15)).rejects.toThrow(
+      ServiceUnavailableError
+    );
+
     expect(spy).toHaveBeenCalledTimes(1);
   });
 });

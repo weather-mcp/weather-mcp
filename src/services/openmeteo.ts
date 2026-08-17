@@ -45,6 +45,18 @@ function unitSignature(prefs: UnitPreferences): string {
   return `${prefs.temperature}-${prefs.windSpeed}-${prefs.precipitation}`;
 }
 
+/**
+ * Bounded 429 posture for the climate-normals archive pull (D3).
+ *
+ * Open-Meteo weights archive calls by period length, so a full-year normals
+ * pull is comparatively expensive; the limit was observed live once and did
+ * not reproduce across three consecutive 30-year pulls. One retry is the
+ * defensive sizing that matches that evidence — a second 429 propagates to
+ * the call site's existing catch, which renders the unavailable note.
+ */
+const NORMALS_RETRY_DELAY_MS = 2000;
+const NORMALS_RETRY_JITTER_MS = 500;
+
 export interface OpenMeteoServiceConfig {
   baseURL?: string;
   geocodingURL?: string;
@@ -65,6 +77,18 @@ export class OpenMeteoService {
   private floodClient: AxiosInstance;
   private maxRetries: number;
   private cache: Cache;
+
+  /**
+   * In-flight climate-normals table pulls, keyed by the table cache key (D3).
+   *
+   * `get_weather_summary` spreads the caller's args into every sub-handler, so
+   * `include_normals: true` fans out to the forecast and current-conditions
+   * handlers **concurrently** for the same coordinates — without this map both
+   * would miss the (not-yet-populated) cache and each issue a full-year
+   * archive pull. Entries are removed once settled, so a rejected pull is
+   * never cached and never left behind for the next caller to join.
+   */
+  private normalsTableInFlight = new Map<string, Promise<NormalsTable>>();
 
   constructor(config: OpenMeteoServiceConfig = {}) {
     const {
@@ -1665,6 +1689,36 @@ export class OpenMeteoService {
       }
     }
 
+    // Join a pull already running for this location rather than racing it (D3).
+    const inFlight = this.normalsTableInFlight.get(cacheKey);
+    if (inFlight) {
+      const redacted = redactCoordinatesForLogging(latitude, longitude);
+      logger.info('Joining in-flight climate normals table pull', { ...redacted });
+      return inFlight;
+    }
+
+    // `finally` runs whether the pull resolves or rejects, so a failed pull
+    // leaves nothing behind — the next caller starts a fresh one (A7).
+    const pull = this.fetchNormalsTable(latitude, longitude, cacheKey).finally(() => {
+      this.normalsTableInFlight.delete(cacheKey);
+    });
+    this.normalsTableInFlight.set(cacheKey, pull);
+
+    return pull;
+  }
+
+  /**
+   * Fetch and compute one location's full-year normals table, with a single
+   * bounded retry on a rate limit (D3). A second 429 — and every non-429
+   * error, immediately — propagates unchanged to the call site's existing
+   * catch, so normals stay garnish and never fail the parent response.
+   * @private
+   */
+  private async fetchNormalsTable(
+    latitude: number,
+    longitude: number,
+    cacheKey: string
+  ): Promise<NormalsTable> {
     const redacted = redactCoordinatesForLogging(latitude, longitude);
     logger.info('Fetching one full year of historical data for climate normals table', {
       ...redacted
@@ -1681,7 +1735,26 @@ export class OpenMeteoService {
     };
 
     try {
-      const response = await this.makeRequest<OpenMeteoHistoricalResponse>('/archive', params);
+      let response: OpenMeteoHistoricalResponse;
+      try {
+        response = await this.makeRequest<OpenMeteoHistoricalResponse>('/archive', params);
+      } catch (error) {
+        if (!(error instanceof RateLimitError)) {
+          throw error;
+        }
+
+        logger.warn('Climate normals archive pull rate-limited, retrying once', {
+          ...redacted,
+          service: 'OpenMeteo'
+        });
+
+        const delay = NORMALS_RETRY_DELAY_MS + Math.random() * NORMALS_RETRY_JITTER_MS;
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        // A second 429 propagates — one retry is the whole budget.
+        response = await this.makeRequest<OpenMeteoHistoricalResponse>('/archive', params);
+      }
+
       const table = computeNormalsTable(response);
 
       if (CacheConfig.enabled) {
