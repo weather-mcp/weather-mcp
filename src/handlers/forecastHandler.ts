@@ -950,6 +950,11 @@ function plural(count: number, singular: string, pluralForm: string): string {
   return count === 1 ? singular : pluralForm;
 }
 
+/** Capitalize the first character, for a label that opens a rendered line. */
+function sentenceCase(text: string): string {
+  return text.length === 0 ? text : text[0].toUpperCase() + text.slice(1);
+}
+
 /**
  * Overall-agreement sentence shown under the header. Built deterministically
  * from the per-day labels: a leading run of good days is called out where one
@@ -1312,9 +1317,12 @@ function ensembleSummaryDayLine(
   // the line would read "Slight rain (74% of members)" on a day when 74% of
   // members are cloudy and only 26% forecast rain.
   const controlBucket = day.control?.code != null ? weatherCodeBucket(day.control.code) : undefined;
+  // Bucket labels are written lowercase because their other use is mid-sentence
+  // ("74% of members cloudy"); here the label opens the line beside capitalized
+  // control descriptions, so it is sentence-cased to match.
   const conditions = controlBucket === day.conditions.bucket && day.control?.code != null
     ? describeCode(day.control.code)
-    : BUCKET_LABELS[day.conditions.bucket];
+    : sentenceCase(BUCKET_LABELS[day.conditions.bucket]);
   const pct = Math.round(day.conditions.percentage);
   const highs = rangeText(day.temperature.high.p25, day.temperature.high.p75, tempU);
   return `- **${label}:** ${conditions} (${pct}% of members), high ${highs} — ${day.confidence} confidence\n`;

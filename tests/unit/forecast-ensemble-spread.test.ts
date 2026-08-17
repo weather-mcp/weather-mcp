@@ -456,8 +456,9 @@ describe('handleGetForecast — conditions labelling', () => {
     );
 
     // The modal bucket is cloudy at 74%, so the 74% must be labelled "cloudy",
-    // not with the control's rain description.
-    expect(text).toContain('cloudy (74% of members)');
+    // not with the control's rain description. Sentence-cased, because it opens
+    // the line beside capitalized control descriptions on other days.
+    expect(text).toContain('Cloudy (74% of members)');
     expect(text).not.toContain('TESTWX-61 (74% of members)');
   });
 
