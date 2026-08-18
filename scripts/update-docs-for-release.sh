@@ -99,9 +99,28 @@ echo "🧪 Running tests to get current count..."
 # the pipe early (SIGPIPE makes the pipeline "fail" and silently killed the
 # script here during v1.14.0 prep). The empty-count check below still catches
 # a genuinely failed test run.
-TEST_COUNT=$(npm test 2>&1 | grep -E "Tests.*[0-9]+ passed" | grep -oE '[0-9]+' | head -1 || true)
-if [ -z "$TEST_COUNT" ]; then
+TEST_OUTPUT=$(npm test 2>&1 || true)
+TEST_SUMMARY=$(printf '%s\n' "$TEST_OUTPUT" | grep -E "^[[:space:]]*Tests[[:space:]]+[0-9]" | tail -1 || true)
+if [ -z "$TEST_SUMMARY" ]; then
   echo "❌ Could not determine test count — did npm test fail?"
+  exit 1
+fi
+# A red suite must stop the release. Before v1.23.0 prep this block only
+# checked for an *empty* count, so a single failing test sailed through — and
+# because the summary then reads "Tests  1 failed | 2273 passed (2274)", the
+# old "first number on the line" extraction wrote the **failure count** into
+# the README badge and CLAUDE.md ("1 tests, 100% pass rate"). Both halves are
+# fixed here: abort on failures, and read the number attached to "passed".
+if printf '%s' "$TEST_SUMMARY" | grep -qE "[0-9]+ failed"; then
+  echo "❌ Test suite is red — refusing to prepare a release:"
+  echo "   ${TEST_SUMMARY}"
+  echo "   (Six files under tests/integration/ make live network calls and flake."
+  echo "    Re-run npm test to tell a flake from a real regression.)"
+  exit 1
+fi
+TEST_COUNT=$(printf '%s' "$TEST_SUMMARY" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' | head -1 || true)
+if [ -z "$TEST_COUNT" ]; then
+  echo "❌ Could not parse a passing-test count from: ${TEST_SUMMARY}"
   exit 1
 fi
 TEST_COUNT_FMT=$(node -p "(${TEST_COUNT}).toLocaleString('en-US')")
