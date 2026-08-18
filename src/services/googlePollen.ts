@@ -6,7 +6,7 @@
  * *European* model: real grains/m³ in Europe, all-null everywhere else. This
  * service exists purely to fill that gap for the rest of the world when the
  * caller has configured a `GOOGLE_POLLEN_API_KEY` — see
- * `docs/global-pollen-fallback-plan.md` D2/D3. **Europe keeps the richer
+ * `docs/plans/global-pollen-fallback-plan.md` D2/D3. **Europe keeps the richer
  * keyless CAMS grains/m³ data and never contacts this service** — the
  * air-quality handler only calls in when every CAMS species comes back null.
  *

@@ -1,7 +1,9 @@
 # Global Pollen Fallback (Google Pollen API) — Design Plan
 
-**Status:** ✅ SETTLED — reviewed 2026-08-18 during implementation-plan
-authoring; execution plan at `docs/global-pollen-fallback-implementation-plan.md`.
+**Status:** ✅ **IMPLEMENTED** (2026-08-18, live-verified against a real key) —
+see [Implementation notes](#implementation-notes-2026-08-18) at the end of this
+document. Shipped on `feat/global-pollen-fallback` for v1.22.0; execution plan
+at `docs/plans/global-pollen-fallback-implementation-plan.md`.
 D8–D10 added post-review (key-setup doc + quarterly re-check, README
 "Optional API keys" section + standing key policy, per-feature key naming).
 **Related:** `docs/planning/GOOGLE_KEY_OPPORTUNITIES.md` — research register
@@ -346,3 +348,102 @@ old path). New `tests/unit/air-quality-google-pollen.test.ts`:
    on the upstream (f) to-verify list and adjust `mapPollenApiError` if the
    live shapes differ.
 4. Grep smoke-run output and logs for the key string — must appear nowhere.
+
+---
+
+## Implementation notes (2026-08-18)
+
+Shipped as designed across T1–T6 on `feat/global-pollen-fallback` (branch base
+`f895761`). Final gate: `npm run build` 0 errors, **2,204 tests** passing (up
+from 2,161), `npm audit` 0 vulnerabilities.
+
+### Keyless byte-identity — verified
+
+The real `dist/index.js` MCP server was driven over stdio JSON-RPC by one
+unchanged driver against both a `git worktree` build of base `f895761` and the
+branch build, with `GOOGLE_POLLEN_API_KEY` unset. `get_air_quality` output for
+Kansas City and Berlin was **byte-identical** — empty `diff`, matching md5
+`6f8784531d376735a0cf6f2b4a6f141d`. Confirmed non-vacuous: Berlin genuinely
+rendered CAMS grains/m³, Kansas City genuinely rendered no pollen section.
+`air-quality-pollen.test.ts`, `air-quality-forecast.test.ts`, `config.test.ts`,
+and `firms-service.test.ts` all passed **unedited** throughout.
+
+### Upstream (f) — all four items resolved live
+
+The key was provisioned by the human (billing account + Pollen API + key
+restricted to the Pollen API, per D8's walkthrough), then ~8 live calls resolved
+the to-verify list:
+
+1. **Rejected key — confirmed exactly as web-verified.** HTTP **400** with a
+   body carrying *both* `API key not valid` and `API_KEY_INVALID` (plus a
+   `google.rpc.ErrorInfo` detail with `reason: "API_KEY_INVALID"`).
+   `PERMISSION_DENIED` was **not** observed — it belongs to an
+   API-not-enabled / restricted-away project — and is kept as a defensive
+   third marker. No mapping change needed.
+2. **Uncovered region — the design's assumption was wrong, and it mattered.**
+   Open Pacific and Antarctica both return HTTP **400** `INVALID_ARGUMENT`
+   with `"Information is unavailable for this location."` — *not* the HTTP 200
+   with an empty `dailyInfo` the design anticipated (the plan allowed "likely
+   error status or empty `dailyInfo`", so the contract held: it landed at a
+   silent no-section either way). But because it **threw**, the null sentinel
+   was never cached and an uncovered location re-queried Google on *every*
+   call — defeating the very re-probe protection D2/D3 exist to provide, and
+   burning the 5,000/month quota. Fixed in `94e5669`: that answer now resolves
+   to `undefined` and caches. Matched on the **message, not the status**,
+   because a genuinely malformed request is also 400 `INVALID_ARGUMENT` and
+   caching that as "no pollen here" would mask a real bug for a whole TTL; if
+   Google rewords the message the match simply fails and the old throwing path
+   takes over, which still ends at a silent no-section. Live re-verified: two
+   consecutive calls for `(0, -160)` → one HTTP request, second a cache hit
+   (stats 1 hit / 1 miss / size 1), no throw.
+3. **Field casing — confirmed exactly as typed.** `dailyInfo`, `date`,
+   `pollenTypeInfo`, `plantInfo`, `code`, `displayName`, `inSeason`,
+   `indexInfo`, `value`, `category` all match `src/types/googlePollen.ts`. The
+   live response also carries fields the subset deliberately ignores
+   (`regionCode`, `indexInfo.code`/`displayName`/`indexDescription`/`color`,
+   `healthRecommendations`) — no change wanted; they are descoped.
+4. **Zero-UPI / `inSeason` — richer than the design assumed, and the guard was
+   already right.** `indexInfo` presence is **independent of `inSeason`**: in
+   Kansas City, `GRASS` carried *neither* `inSeason` nor `indexInfo`, while
+   `TREE` and `WEED` reported `inSeason: false` *with* real indices (2/Low,
+   3/Moderate). So "out-of-season types omit `indexInfo`" (upstream (c)) is
+   only half the story — omission tracks data availability, not season. The
+   implementation guards on `indexInfo.value` being finite, which handles every
+   combination correctly, and the `— in season` suffix renders only when
+   `inSeason === true`. A zero-with-`indexInfo` case did not appear in the live
+   sample, so it stays covered by unit fixtures; since presence is independent
+   of value, the value-based guard makes the question moot.
+
+### Live behavioral verification
+
+- **Kansas City (US), keyed** → Google section rendered in the CAMS slot ahead
+  of the secondary-AQI line: `**Tree:** 2 (Low)` / `**Weed:** 3 (Moderate)`,
+  Grass correctly omitted, no `In season:` line (no plant reported
+  `inSeason: true`), and the **exact** mandated attribution string.
+- **Berlin, keyed** → CAMS grains/m³ rendered and, at `LOG_LEVEL=0`,
+  **zero** Google-related log lines: Google was definitively not contacted.
+- **Garbage key** → the rejected-key note rendered, the air-quality call still
+  succeeded, and the logs carried only `{status: 400, code: 'ERR_BAD_REQUEST'}`
+  plus the `securityEvent` warn — no URL, no key.
+- **Key hygiene** → the real key appears **0 times** across all five driver
+  output/log files, and no `key=` URL fragment appears anywhere. The garbage
+  key likewise never echoed back.
+
+### Doc drift worth remembering
+
+Google's published docs proved unreliable twice while provisioning, which is
+why D8's freshness stamp is load-bearing: the Pollen billing page still
+advertises a "$200 monthly credit through February 28, 2025" that expired long
+ago, and the quota page documents only a per-minute limit while the console
+does expose an editable **per-day** cap. `docs/GOOGLE_POLLEN_KEY_SETUP.md` was
+corrected from the console rather than the docs, and gained the two things
+provisioning revealed the walkthrough had missed: that the key page has **two**
+restriction groups (Application restrictions must be **None** — HTTP-referrer
+and IP restrictions both break a local Node server) and concrete quota-capping
+values.
+
+### Deviations from the design
+
+One, above: the uncovered-region answer is an error status rather than an empty
+payload, so it needed explicit detection to be cacheable (item 2). Everything
+else shipped exactly as specified, and all descoped items stayed descoped.

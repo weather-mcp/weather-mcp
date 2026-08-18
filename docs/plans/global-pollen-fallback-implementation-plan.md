@@ -2,7 +2,7 @@
 
 **Status:** READY (2026-08-18)
 
-Execution plan for `docs/global-pollen-fallback-plan.md` (the WHAT/WHY); rules
+Execution plan for `docs/plans/global-pollen-fallback-plan.md` (the WHAT/WHY); rules
 live in `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ live in `docs/orchestration-playbook.md`.
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/global-pollen-fallback-implementation-plan.md
+/run-plan docs/plans/global-pollen-fallback-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/global-pollen-fallback-plan.md` (design),
+Or, equivalently: read `docs/plans/global-pollen-fallback-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review
 the diff, run the gate yourself, commit, tick the tracker, push.
@@ -48,7 +48,7 @@ released; tip `f895761` at plan time — record the actual base SHA at kickoff
 for the T5 sweep). Target release: v1.22.0.
 
 **Working-tree note (first commit):** the design doc
-(`docs/global-pollen-fallback-plan.md`) and the related research register
+(`docs/plans/global-pollen-fallback-plan.md`) and the related research register
 `docs/planning/GOOGLE_KEY_OPPORTUNITIES.md` (catalogues what else the Google
 key could unlock; its own header defers its index row to this branch) are
 **untracked** at plan time. The branch's first commit (T0) lands both plus
@@ -359,7 +359,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 
 - Files: possibly `src/services/googlePollen.ts` +
   `tests/unit/google-pollen-service.test.ts` (only if live shapes differ from
-  the web-verified mapping), `docs/global-pollen-fallback-plan.md` (status +
+  the web-verified mapping), `docs/plans/global-pollen-fallback-plan.md` (status +
   implementation notes + move), this file (move), `CHANGELOG.md` (amend if
   needed)
 - **Human gate first:** a real `GOOGLE_POLLEN_API_KEY` requires a Google
@@ -449,7 +449,37 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
     renders the CAMS section with real grains/m³ (Grass 0.8, Mugwort 5.3);
     Kansas City renders **zero** occurrences of "Pollen". Key string appears
     in neither stdout nor stderr.
-- [ ] T6 — T-live: keyed live verification + upstream (f) resolution (`opus`, orchestrator; human key gate)
+- [x] T6 — T-live: keyed live verification + upstream (f) resolution (`opus`, orchestrator; human key gate) — `94e5669` (fix) + the plan-set/docs commit below
+  - **Human key gate: resolved by provisioning** (option (a)) — the human created a
+    real key (billing account + Pollen API + key restricted to the Pollen API,
+    plus per-day/per-minute quota caps) and placed it in gitignored
+    `weather-mcp/.env`. No deferral needed.
+  - **All four upstream (f) items resolved live** — full detail in the design
+    plan's *Implementation notes*. Summary: rejected key = HTTP 400 with both
+    `API key not valid` and `API_KEY_INVALID` (**mapping confirmed as
+    web-verified**; `PERMISSION_DENIED` unobserved, kept defensively); field
+    casing **confirmed exactly as typed**; `indexInfo` presence is
+    **independent of `inSeason`** (so the finite-value guard is the right one,
+    and zero-UPI stays a unit-fixture case); **uncovered region = HTTP 400
+    `INVALID_ARGUMENT` "Information is unavailable for this location", not the
+    HTTP 200 + empty `dailyInfo` the design assumed** — the one real deviation,
+    fixed in `94e5669` so that answer caches instead of re-probing every call.
+  - **Live behavioral checks all pass:** Kansas City → Google section with the
+    exact attribution (`**Tree:** 2 (Low)`, `**Weed:** 3 (Moderate)`, Grass
+    omitted); Berlin → CAMS renders with **zero** Google log lines at
+    `LOG_LEVEL=0` (never contacted); garbage key → rejected-key note, call
+    still succeeds, logs carry only `{status, code}`.
+  - **Key-grep clean:** the real key appears **0 times** across all five
+    driver output/log files; no `key=` URL fragment anywhere; the garbage key
+    never echoed either.
+  - `docs/GOOGLE_POLLEN_KEY_SETUP.md` upgraded to
+    `**Last verified:** 2026-08-18 (live-verified)` and corrected from the
+    console: the key page has **two** restriction groups (Application
+    restrictions must be **None** — referrer/IP restrictions break a local Node
+    server), plus concrete quota-cap values. Two doc-drift findings recorded
+    (expired $200 credit; console exposes a per-day cap the docs omit).
+  - Final gate: build 0 errors, **2,204 tests** passing, `npm audit` clean.
+  - Plan set moved to `docs/plans/`; all inbound references repointed.
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T5 keyless sweep is
@@ -457,6 +487,6 @@ demonstrably byte-identical against the branch base for both points, the lock
 files (`air-quality-pollen.test.ts`, `air-quality-forecast.test.ts`,
 `config.test.ts`, `firms-service.test.ts`) pass **unedited**, T6's live items
 are resolved (or the deferred-by-human record is made), the key string appears
-in no output or log, and `docs/global-pollen-fallback-plan.md` is marked
+in no output or log, and `docs/plans/global-pollen-fallback-plan.md` is marked
 `IMPLEMENTED` with the plan set moved to `docs/plans/`. Opening the PR is the
 human's call.

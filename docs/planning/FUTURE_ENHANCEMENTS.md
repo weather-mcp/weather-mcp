@@ -368,7 +368,7 @@ pros/cons for each idea. Sections for ideas that have since shipped are marked
 > **v1.22.0** with an optional keyed Google Pollen fallback (grass/tree/weed
 > Universal Pollen Index for 65+ countries including the US; keyless behavior
 > byte-identical). See
-> [`docs/global-pollen-fallback-plan.md`](../global-pollen-fallback-plan.md)
+> [`docs/plans/global-pollen-fallback-plan.md`](../plans/global-pollen-fallback-plan.md)
 > and the pollen row in [README.md](./README.md). The notes below are kept as
 > the historical research record; a hourly/daily pollen *forecast* is the only
 > part still open.

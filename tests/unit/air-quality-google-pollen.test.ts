@@ -1,6 +1,6 @@
 /**
  * Unit tests for the optional keyed Google Pollen global fallback on
- * get_air_quality (design plan `docs/global-pollen-fallback-plan.md`
+ * get_air_quality (design plan `docs/plans/global-pollen-fallback-plan.md`
  * D1/D5/D6).
  *
  * The contract under test:

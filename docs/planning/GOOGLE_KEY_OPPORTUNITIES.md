@@ -2,7 +2,7 @@
 
 **Status:** 📋 RESEARCH — no feature designed; catalogue only
 **Researched:** 2026-08-18 (web; no live calls — no key on hand yet)
-**Builds on:** `docs/global-pollen-fallback-plan.md`, which introduces the project's
+**Builds on:** `docs/plans/global-pollen-fallback-plan.md`, which introduces the project's
 first Google Maps Platform key (`GOOGLE_POLLEN_API_KEY`) for global pollen on
 `get_air_quality`. This doc answers the follow-on question: *a user who creates a
 Google Cloud billing account to get pollen data has implicitly unlocked the entire
@@ -40,7 +40,7 @@ minted on the same project with zero new signup friction. Consequences:
   prefers a single unrestricted key can simply put the same string in every
   var. This also removes any migration/breaking-change pressure on the pollen
   key name after v1.22.0 ships. (Mirrored as D10 in
-  `docs/global-pollen-fallback-plan.md`.)
+  `docs/plans/global-pollen-fallback-plan.md`.)
 
 ## Ranked opportunities (Google key)
 
