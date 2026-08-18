@@ -499,7 +499,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 - [x] T0 — Land design doc + this file as first `docs:` commit; flip design status to SETTLED; record base SHA + baseline gate (orchestrator) — `f9b1eaa`
   - **Branch base SHA: `09cff0b`** (v1.22.0 release commit on `main`) — the T5 sweep diffs against this.
   - Baseline gate on the fresh branch: `npm run build` 0 errors; `npm test` 91 files / 2204 tests passed; `npm audit` 0 vulnerabilities.
-- [ ] T1 — Types, config key, .env.example (`haiku`)
+- [x] T1 — Types, config key, .env.example (`haiku`) — `8aff76e`
 - [ ] T2 — GoogleWeatherService: fetch, cache, error mapping, key hygiene (`sonnet`)
 - [ ] T3 — Alerts handler: elsewhere-branch routing + Google renderer (`opus`)
 - [ ] T4 — index.ts wiring, summary pass-through, tool description (`haiku`)
