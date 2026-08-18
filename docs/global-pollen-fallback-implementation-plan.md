@@ -434,7 +434,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 - [x] T1 — Types, config key, cache TTL, .env.example (`haiku`) — `aad8e13`
 - [x] T2 — GooglePollenService: fetch, cache, error mapping, key hygiene (`sonnet`) — `c247892`
 - [x] T3 — Air-quality handler: trigger, render, failure modes (`opus`) — `43417a8`
-- [ ] T4 — index.ts wiring + tool description (`haiku`)
+- [x] T4 — index.ts wiring + tool description (`haiku`) — `d9d3c0f`
 - [ ] T5 — Keyless byte-identity sweep + documentation checklist (`opus`, orchestrator)
 - [ ] T6 — T-live: keyed live verification + upstream (f) resolution (`opus`, orchestrator; human key gate)
 
