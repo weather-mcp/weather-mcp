@@ -11,7 +11,7 @@ Complete reference for all 17 MCP tools provided by the Weather MCP Server.
 **Core Weather**
 1. [get_forecast](#1-get_forecast) — Forecasts, global
 2. [get_current_conditions](#2-get_current_conditions) — Current weather, global
-3. [get_alerts](#3-get_alerts) — Watches/warnings/advisories: US, Canada, Europe
+3. [get_alerts](#3-get_alerts) — Watches/warnings/advisories: US, Canada, Europe (+ ~45 more territories with an optional key)
 4. [get_historical_weather](#4-get_historical_weather) — 1940–present, global
 5. [get_weather_summary](#5-get_weather_summary) — One-call combined overview, global
 6. [search_location](#6-search_location) — Geocoding, global
@@ -290,7 +290,7 @@ Any field the station did not report is omitted. Fire weather indices are not
 available on this source.
 
 ### 3. get_alerts
-Get active weather alerts, watches, warnings, and advisories. Coverage is routed by country: the United States (NOAA), Canada (Environment and Climate Change Canada via MSC GeoMet), and 38 European MeteoAlarm member countries (each country's official national warnings). Other regions receive a clean "not yet covered" message.
+Get active weather alerts, watches, warnings, and advisories. Coverage is routed by country: the United States (NOAA), Canada (Environment and Climate Change Canada via MSC GeoMet), and 38 European MeteoAlarm member countries (each country's official national warnings). Elsewhere, an optional `GOOGLE_WEATHER_API_KEY` adds official alerts for ~45+ more territories via the Google Weather API; without that key those regions receive a clean "not yet covered" message.
 
 **Parameters:**
 - `latitude` (required*): Latitude coordinate (-90 to 90)
@@ -310,12 +310,15 @@ Retrieves current weather alerts for safety-critical weather information, routed
 | United States | NOAA National Weather Service | Severity/urgency/certainty, effective/expiration times, affected zones, instructions — unchanged from previous releases |
 | Canada | Environment and Climate Change Canada (MSC GeoMet) | Alert name + type (warning > watch > advisory > statement), affected area, risk/confidence where provided, issued/ends times, full alert text verbatim — no invented severity fields |
 | Europe (38 MeteoAlarm members) | The country's national meteorological service, via EUMETNET MeteoAlarm | CAP severity/urgency/certainty, MeteoAlarm awareness colour, areas, issued/expires times as published, headline/description/instruction verbatim |
+| Elsewhere (~45+ territories, **needs `GOOGLE_WEATHER_API_KEY`**) | Official national weather services, aggregated by the Google Weather API | CAP severity/urgency/certainty, area name, effective/expires times in the alert's own timezone offset, description/instructions/safety recommendations verbatim, and the issuing publisher named per alert |
 
 Country resolution: a saved location or geocoded `city_name` that already knows its country is used directly; coordinate-only requests use a cached country-level reverse lookup (Nominatim, `zoom=3`). A "no country" answer (e.g. US coastal waters) falls back to the US bounding boxes, preserving NOAA marine alerts offshore.
 
+**The keyed fallback is the last branch only.** The US, Canada, and the MeteoAlarm countries are jurisdictional authorities and stay first choice — they **never contact Google**, key or no key — and without a key the elsewhere branch is byte-for-byte the message it has always returned. Google's coverage list ([authoritative here](https://developers.google.com/maps/documentation/weather/coverage)) includes Australia, Japan, Brazil and Mexico among others; any list in these docs is representative, not exhaustive. Matching is by **provider polygon**, so Google's own caveat applies — "country and region coverage alignment may not be exact" — and because Google returns the same answer for "no active alerts" and "region not covered", an empty result is reported as *no alerts found* rather than an all-clear, with the coverage caveat rendered on both empty and non-empty results. Alert text appears in the publisher's source language (only the title is translated — a provider restriction). Unlike the optional pollen key, a **key failure here surfaces loudly**: a rejected key, quota exhaustion, timeout, or network error returns an error rather than a possibly-false "no alerts", because alerts are this tool's entire answer.
+
 **European coverage is country-level**: the keyless MeteoAlarm feeds carry no region geometry, so all of a country's warnings are returned with an explicit coverage note — warnings may not affect the exact requested point. Alerts from all sources are sorted most-critical-first; European and Canadian lists cap at 10 (`standard`) / 25 (`full`) with a disclosed remainder, and `summary` returns counts only.
 
-**Licence attributions (rendered in the output, per source terms):** US: *NOAA National Weather Service*. Canada: *Environment and Climate Change Canada (MSC GeoMet)* — alert content shown unaltered. Europe: *EUMETNET – MeteoAlarm (national warnings: <service>)* — alerts shown unmodified as issued, times as published.
+**Licence attributions (rendered in the output, per source terms):** US: *NOAA National Weather Service*. Canada: *Environment and Climate Change Canada (MSC GeoMet)* — alert content shown unaltered. Europe: *EUMETNET – MeteoAlarm (national warnings: <service>)* — alerts shown unmodified as issued, times as published. Elsewhere (keyed): *Data source: official national weather services, aggregated by the Google Weather API* ending in the exact required string *Source: Includes weather data from Google*, plus a **per-alert** `**Source:**` line naming the original publisher and its authority URI — Google's terms require both layers.
 
 **Examples:**
 ```

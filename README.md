@@ -256,6 +256,7 @@ Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weath
 | `NCEI_API_TOKEN` | — | Optional [free NCEI token](https://www.ncdc.noaa.gov/cdo-web/token) for official NOAA climate normals (US); falls back to Open-Meteo automatically. See [Optional API keys](#optional-api-keys) |
 | `FIRMS_MAP_KEY` | — | Optional [free FIRMS key](https://firms.modaps.eosdis.nasa.gov/api/map_key/) for targeted wildfire queries and up to 5 days of detection history. See [Optional API keys](#optional-api-keys) |
 | `GOOGLE_POLLEN_API_KEY` | — | Optional key for pollen outside Europe (incl. the US). **Requires a Google Cloud billing account** — free tier is 5,000 lookups/month. See [Optional API keys](#optional-api-keys) and [the setup guide](./docs/GOOGLE_POLLEN_KEY_SETUP.md) |
+| `GOOGLE_WEATHER_API_KEY` | — | Optional key for official weather alerts beyond the US, Canada, and Europe (~45+ more territories). **Requires a Google Cloud billing account.** See [Optional API keys](#optional-api-keys) and [the setup guide](./docs/GOOGLE_WEATHER_KEY_SETUP.md) |
 
 For caching architecture details, see [.github/CACHING.md](./.github/CACHING.md).
 
@@ -266,7 +267,7 @@ zero signup, and zero cost — that is the configuration this project is built
 around and the one most people should use. If that's you, you can skip this
 section entirely.
 
-Three optional keys each unlock one extra. Without them the corresponding tool
+Four optional keys each unlock one extra. Without them the corresponding tool
 still works; it just returns the keyless answer.
 
 | Variable | What it costs | What it adds | Without it |
@@ -274,11 +275,15 @@ still works; it just returns the keyless answer.
 | [`NCEI_API_TOKEN`](https://www.ncdc.noaa.gov/cdo-web/token) | Free registration (email) | Official NOAA station climate normals for US locations | Normals are computed from the Open-Meteo reanalysis archive — global, and the path virtually every user is already on |
 | [`FIRMS_MAP_KEY`](https://firms.modaps.eosdis.nasa.gov/api/map_key/) | Free registration (email) | Targeted wildfire bbox queries with 1–5 days of detection history | Keyless 24-hour regional detection files — `get_wildfire_info` still works globally |
 | `GOOGLE_POLLEN_API_KEY` | **Free tier, but requires a Google Cloud billing account (credit card on file)** — 5,000 lookups/month free, ~$10/1,000 after. [Setup guide](./docs/GOOGLE_POLLEN_KEY_SETUP.md) | Grass/tree/weed Universal Pollen Index outside Europe, including the US (65+ countries) | European pollen via CAMS still works keyless; elsewhere no pollen section renders |
+| `GOOGLE_WEATHER_API_KEY` | **Free tier, but requires a Google Cloud billing account (credit card on file)** — the Weather API bills under a Maps Platform Essentials SKU; check Google's current allowance. [Setup guide](./docs/GOOGLE_WEATHER_KEY_SETUP.md) | Official weather alerts for ~45+ more territories — Australia, Japan, Brazil, Mexico and others ([Google's coverage list](https://developers.google.com/maps/documentation/weather/coverage) is authoritative) | US, Canadian, and European alerts still work keyless; elsewhere `get_alerts` returns today's not-covered message |
 
-The NCEI and FIRMS keys are true free registrations. **The Google Pollen key is
-not** — it has a free usage tier, but Google requires a billing account with a
-payment method to issue it at all. That's why it isn't described as simply
-"free" anywhere in these docs, and why it stays strictly optional.
+The NCEI and FIRMS keys are true free registrations. **The two Google keys are
+not** — each has a free usage tier, but Google requires a billing account with
+a payment method to issue them at all. That's why they aren't described as
+simply "free" anywhere in these docs, and why they stay strictly optional. They
+are separate variables on purpose: the recommended console restriction ties a
+key to one specific API, so a Pollen-restricted key cannot serve alerts and
+vice versa. If you prefer one unrestricted key, put the same string in both.
 
 ### Standing key policy
 
@@ -302,13 +307,14 @@ Being honest about what free public data can and can't do:
 | Historical weather (1940+) | ✅ (>7 days old) | Station-level detail for last 7 days |
 | Air quality, marine, radar, lightning | ✅ | — |
 | Current conditions | ✅ (model data, or real station observations via `source="metar"`) | Station observations via NOAA (richer detail) |
-| Weather alerts | ✅ US, Canada, and 38 European countries | NWS zone-level precision; Europe is matched at country level |
+| Weather alerts | ✅ US, Canada, and 38 European countries keyless; ~45+ more territories with an optional key | NWS zone-level precision; Europe is matched at country level |
 | River conditions | ✅ (GloFAS modeled discharge) | Gauge observations + official flood stages via NWPS |
 | Wildfires | ✅ (FIRMS satellite detections) | Named incidents with acreage + containment via NIFC |
 | Fire weather | ✅ (computed Fosberg index + dryness context) | NOAA-published Haines, grassland, red-flag indices |
 | Pollen | 🇪🇺 Europe keyless (CAMS, grains/m³); elsewhere needs an optional key | Universal Pollen Index with `GOOGLE_POLLEN_API_KEY` |
 
 - European alerts are matched at **country level** — the keyless MeteoAlarm feeds carry no region polygons, so warnings for a large country may not affect the requested point; the output says so. Canadian alerts use a real bbox query with polygon-backed features.
+- Outside the US, Canada, and Europe, alerts need an optional [`GOOGLE_WEATHER_API_KEY`](#optional-api-keys); without one `get_alerts` says plainly that the region isn't covered rather than guessing. With a key, Google aggregates official national feeds for roughly 45 more territories — Australia, Japan, Brazil and Mexico among them, with [Google's coverage page](https://developers.google.com/maps/documentation/weather/coverage) as the authoritative list. Matching is by **provider polygon**, so coverage alignment may not be exact and an empty answer means "no alerts found", not a guarantee of coverage; the output says so both ways. Alert text appears in the publisher's source language. **The US, Canada, and Europe never contact Google** — those authorities stay first choice, key or no key — and a key failure surfaces loudly rather than degrading to a possibly-false all-clear.
 - International current conditions default to **model-interpolated** values at the exact coordinates. `source="metar"` returns a **real instrument reading** instead — but from the nearest airport, which may be tens of km away and up to an hour old. The output always names the station, its distance and bearing, and the observation age, so the tradeoff is visible rather than assumed. METAR coverage follows airports, so remote land and open ocean have real gaps.
 - Historical data older than 7 days comes from reanalysis models (9–25km grid), not direct station observations, and trails real time by ~5 days.
 - Non-US wildfire results are **satellite heat detections, not managed incidents** — no fire names, sizes, or containment percentages exist in the data, detections can include industrial heat sources or agricultural burns, and a clear result is not an all-clear (cloud cover hides fires; small or new fires evade detection). The output frames all of this explicitly. Keyless data covers the last 24 hours; an optional free [`FIRMS_MAP_KEY`](https://firms.modaps.eosdis.nasa.gov/api/map_key/) unlocks targeted queries and up to 5 days of detection history (`day_range`).
