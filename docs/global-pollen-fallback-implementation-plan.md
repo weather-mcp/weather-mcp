@@ -432,7 +432,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
   - **Branch base SHA (for the T5 sweep): `f895761`** (`chore: Release v1.21.0`)
   - Baseline gate on `f895761`: `npm run build` 0 errors; `npm test` 89 files / 2161 tests passed; `npm audit` 0 vulnerabilities.
 - [x] T1 — Types, config key, cache TTL, .env.example (`haiku`) — `aad8e13`
-- [ ] T2 — GooglePollenService: fetch, cache, error mapping, key hygiene (`sonnet`)
+- [x] T2 — GooglePollenService: fetch, cache, error mapping, key hygiene (`sonnet`) — `c247892`
 - [ ] T3 — Air-quality handler: trigger, render, failure modes (`opus`)
 - [ ] T4 — index.ts wiring + tool description (`haiku`)
 - [ ] T5 — Keyless byte-identity sweep + documentation checklist (`opus`, orchestrator)
