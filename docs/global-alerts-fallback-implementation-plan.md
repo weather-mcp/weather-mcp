@@ -500,7 +500,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
   - **Branch base SHA: `09cff0b`** (v1.22.0 release commit on `main`) — the T5 sweep diffs against this.
   - Baseline gate on the fresh branch: `npm run build` 0 errors; `npm test` 91 files / 2204 tests passed; `npm audit` 0 vulnerabilities.
 - [x] T1 — Types, config key, .env.example (`haiku`) — `8aff76e`
-- [ ] T2 — GoogleWeatherService: fetch, cache, error mapping, key hygiene (`sonnet`)
+- [x] T2 — GoogleWeatherService: fetch, cache, error mapping, key hygiene (`sonnet`) — `bca769d`
 - [ ] T3 — Alerts handler: elsewhere-branch routing + Google renderer (`opus`)
 - [ ] T4 — index.ts wiring, summary pass-through, tool description (`haiku`)
 - [ ] T5 — Keyless byte-identity sweep + documentation checklist (`opus`, orchestrator)
