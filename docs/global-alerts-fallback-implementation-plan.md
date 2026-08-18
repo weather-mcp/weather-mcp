@@ -502,7 +502,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 - [x] T1 — Types, config key, .env.example (`haiku`) — `8aff76e`
 - [x] T2 — GoogleWeatherService: fetch, cache, error mapping, key hygiene (`sonnet`) — `bca769d`
 - [x] T3 — Alerts handler: elsewhere-branch routing + Google renderer (`opus`) — `99f5712`
-- [ ] T4 — index.ts wiring, summary pass-through, tool description (`haiku`)
+- [x] T4 — index.ts wiring, summary pass-through, tool description (`haiku`) — `e3d94e4`
 - [ ] T5 — Keyless byte-identity sweep + documentation checklist (`opus`, orchestrator)
 - [ ] T6 — T-live: keyed live verification + upstream (g) + D10 free-tier gate (`opus`, orchestrator; human key gate)
 
