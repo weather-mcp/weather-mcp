@@ -46,6 +46,16 @@ minted on the same project with zero new signup friction. Consequences:
 
 ### #1 — Global weather alerts fallback on `get_alerts` ⭐ strongest candidate
 
+**Status: ✅ shipped in v1.23.0** — `docs/plans/global-alerts-fallback-plan.md`
+(design) and `docs/plans/global-alerts-fallback-implementation-plan.md`
+(execution), on `feat/global-alerts-fallback`. The shape sketch below survived
+design review essentially intact, and the **free-tier gate passed**: the Weather
+API has a single Essentials-tier SKU with 10,000 free events/month, so alerts
+bill under it. The live to-verify list below was resolved at implementation and
+found **six** deviations from Google's published shapes — see the design plan's
+implementation notes. The most consequential: the response array field is
+`weatherAlerts`, not the documented `alerts`.
+
 **What it adds:** The Google Weather API (`weather.googleapis.com/v1`, GA June 2025)
 gained a **weather alerts endpoint on 2025-11-18** covering ~45 territories.
 Set-differenced against current coverage (US → NOAA, Canada → ECCC, 38 European

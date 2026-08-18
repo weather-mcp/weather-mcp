@@ -16,6 +16,7 @@ import { GeocodingService } from '../services/geocoding.js';
 import { MeteoAlarmService } from '../services/meteoalarm.js';
 import { GeoMetService } from '../services/geomet.js';
 import { NominatimService } from '../services/nominatim.js';
+import { GoogleWeatherService } from '../services/googleWeather.js';
 import { resolveLocationAsync, formatLocationLine } from '../utils/locationResolver.js';
 import { validateDetail, validateForecastDays, DetailLevel } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
@@ -91,7 +92,8 @@ export async function handleGetWeatherSummary(
   geocodingService: GeocodingService,
   meteoAlarmService?: MeteoAlarmService,
   geoMetService?: GeoMetService,
-  nominatimService?: NominatimService
+  nominatimService?: NominatimService,
+  googleWeatherService?: GoogleWeatherService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   const typedArgs = (args ?? {}) as WeatherSummaryArgs;
 
@@ -151,7 +153,7 @@ export async function handleGetWeatherSummary(
         case 'alerts':
           sectionResult = await handleGetAlerts(
             subArgs, noaaService, locationStore, geocodingService,
-            meteoAlarmService, geoMetService, nominatimService
+            meteoAlarmService, geoMetService, nominatimService, googleWeatherService
           );
           break;
         case 'air_quality':
