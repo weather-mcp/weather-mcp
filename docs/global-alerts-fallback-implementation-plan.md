@@ -503,7 +503,25 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 - [x] T2 — GoogleWeatherService: fetch, cache, error mapping, key hygiene (`sonnet`) — `bca769d`
 - [x] T3 — Alerts handler: elsewhere-branch routing + Google renderer (`opus`) — `99f5712`
 - [x] T4 — index.ts wiring, summary pass-through, tool description (`haiku`) — `e3d94e4`
-- [ ] T5 — Keyless byte-identity sweep + documentation checklist (`opus`, orchestrator)
+- [x] T5 — Keyless byte-identity sweep + documentation checklist (`opus`, orchestrator) — `8f9bac7`
+  - **Sweep result: all four points byte-identical** against branch base `09cff0b`.
+    Method: `git worktree` of the base, `npm ci` + `npm run build`, one stdio JSON-RPC
+    driver (`alerts-sweep.mjs`, unchanged across both builds) against the real
+    `dist/index.js`; `GOOGLE_WEATHER_API_KEY` explicitly unset,
+    `WEATHER_LIGHTNING_PREWARM=false`, `process.exit(0)`. Both outputs md5
+    `35f6174245b5f5eb779db2a0d3fc82a4`, `diff` empty.
+  - Paths verified genuinely exercised, not vacuously empty: Sydney →
+    `Weather alerts are not yet available for Australia.` (the elsewhere branch the
+    new code guards); Kansas City → NOAA renderer + NOAA attribution; Berlin →
+    ~115 lines of **real DWD MeteoAlarm warnings**; Toronto → GeoMet renderer
+    (also re-locks the CONUS-box overrun).
+  - Key-grep clean: zero case-insensitive matches for `google`/`AIza` in either
+    output; no `GOOGLE_WEATHER_API_KEY` in the environment or in `.env`.
+  - **TODO for the human (A7):** the quarterly key-doc re-check routine lives
+    outside the repo (created at pollen plan-authoring) and could not be located
+    or edited from this session. Please extend its prompt scope to
+    `docs/GOOGLE_WEATHER_KEY_SETUP.md` and Google's Weather API pricing/coverage
+    pages. Recorded rather than silently skipped.
 - [ ] T6 — T-live: keyed live verification + upstream (g) + D10 free-tier gate (`opus`, orchestrator; human key gate)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
