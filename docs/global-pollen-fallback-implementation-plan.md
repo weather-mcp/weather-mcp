@@ -428,7 +428,9 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 
 ## Progress Tracker
 
-- [ ] T0 — Land design doc + this file as first `docs:` commit; record base SHA + baseline gate (orchestrator)
+- [x] T0 — Land design doc + this file as first `docs:` commit; record base SHA + baseline gate (orchestrator) — `7ccf48c`
+  - **Branch base SHA (for the T5 sweep): `f895761`** (`chore: Release v1.21.0`)
+  - Baseline gate on `f895761`: `npm run build` 0 errors; `npm test` 89 files / 2161 tests passed; `npm audit` 0 vulnerabilities.
 - [ ] T1 — Types, config key, cache TTL, .env.example (`haiku`)
 - [ ] T2 — GooglePollenService: fetch, cache, error mapping, key hygiene (`sonnet`)
 - [ ] T3 — Air-quality handler: trigger, render, failure modes (`opus`)
