@@ -125,9 +125,9 @@ reports. In-flight plans live at the docs root until they ship.
 
 ## Version Information
 
-- **Current Version:** 1.21.0
+- **Current Version:** 1.22.0
 - **Security Posture:** A- (Excellent, 93/100)
-- **Test Coverage:** 2,161 tests, 100% pass rate
+- **Test Coverage:** 2,204 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
 - **Risk Level:** LOW
 

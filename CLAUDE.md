@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA and Open-Meteo APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, and severe weather alerts.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.21.0 (Production Ready)
+- **Version:** 1.22.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** @modelcontextprotocol/sdk v1.21.0
 
@@ -577,7 +577,7 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.21.0 — multi-model forecast comparison and single-model ensemble spread on `get_forecast`, plus global climate-normals hardening. (The ensemble-spread work below was developed against an internal v1.22.0 target and first shipped in the v1.21.0 consolidated release; likewise the v1.15–v1.17 content further below first shipped in v1.18.0.)
+- **Version:** 1.22.0 — global pollen fallback on `get_air_quality` (optional `GOOGLE_POLLEN_API_KEY`, Universal Pollen Index beyond Europe). (The ensemble-spread work below was developed against an internal v1.22.0 target and first shipped in the v1.21.0 consolidated release; likewise the v1.15–v1.17 content further below first shipped in v1.18.0.)
 - **Status:** Production Ready ✅
 - **New in v1.22.0:** Global pollen fallback — an optional `GOOGLE_POLLEN_API_KEY` extends `get_air_quality` pollen beyond Europe (Universal Pollen Index, 65+ countries incl. the US); keyless output byte-identical
 - **New in v1.21.0:** Multi-model forecast comparison and single-model ensemble spread on get_forecast, plus global climate-normals hardening
@@ -604,7 +604,7 @@ npm audit             # No critical vulnerabilities
 - **New in v1.10.0:** Unit localization — imperial/metric (plus per-unit overrides and 12h/24h) via `WEATHER_UNITS` env or a per-call `units` parameter on forecast/current/historical tools
 - **New in v1.9.0:** `city_name` parameter for `get_forecast` — request a forecast by free-text place name (geocoded on demand, with caching)
 - **Security Rating:** A- (Excellent, 93/100)
-- **Test Coverage:** 2,200 tests, 100% pass rate
+- **Test Coverage:** 2,204 tests, 100% pass rate
 - **Code Quality:** A+ (Excellent, 97.5/100)
 
 ## Useful References
@@ -628,6 +628,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2026-08-18 (v1.21.0)
+**Last Updated:** 2026-08-18 (v1.22.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced.
