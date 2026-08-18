@@ -15,7 +15,15 @@ import {
   formatPollutantConcentration,
   shouldUseUSAQI
 } from '../utils/airQuality.js';
-import type { OpenMeteoAirQualityResponse, OpenMeteoAirQualityHourlyData } from '../types/openmeteo.js';
+import type {
+  OpenMeteoAirQualityResponse,
+  OpenMeteoAirQualityHourlyData,
+  OpenMeteoAirQualityCurrentData
+} from '../types/openmeteo.js';
+import type { GooglePollenService } from '../services/googlePollen.js';
+import { GooglePollenKeyRejectedError } from '../services/googlePollen.js';
+import type { GooglePollenDailyInfo } from '../types/googlePollen.js';
+import { logger } from '../utils/logger.js';
 
 interface AirQualityArgs {
   latitude?: number;
@@ -29,11 +37,32 @@ interface AirQualityArgs {
 const DEFAULT_FORECAST_DAYS = 5;
 const MAX_FORECAST_DAYS = 7; // Open-Meteo air quality API limit (168 hours)
 
+/**
+ * The six CAMS European-model pollen species, filtered to those carrying a
+ * real number. Non-European points return HTTP 200 with every species null,
+ * so an empty result is the "no CAMS coverage here" signal — shared by the
+ * render block and the Google-fallback trigger so the two can never drift
+ * (design plan D1).
+ */
+function finiteCamsPollen(
+  current: OpenMeteoAirQualityCurrentData
+): Array<{ label: string; value: number | undefined }> {
+  return [
+    { label: 'Alder', value: current.alder_pollen },
+    { label: 'Birch', value: current.birch_pollen },
+    { label: 'Grass', value: current.grass_pollen },
+    { label: 'Mugwort', value: current.mugwort_pollen },
+    { label: 'Olive', value: current.olive_pollen },
+    { label: 'Ragweed', value: current.ragweed_pollen }
+  ].filter(species => typeof species.value === 'number' && Number.isFinite(species.value));
+}
+
 export async function handleGetAirQuality(
   args: unknown,
   openMeteoService: OpenMeteoService,
   locationStore: LocationStore,
-  geocodingService: GeocodingService
+  geocodingService: GeocodingService,
+  googlePollenService?: GooglePollenService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as AirQualityArgs, locationStore, geocodingService);
@@ -56,8 +85,53 @@ export async function handleGetAirQuality(
     forecastDays
   );
 
+  // Optional keyed global pollen fallback (design plan D1/D6). Fires only
+  // when a key is configured AND the CAMS European model returned nothing
+  // for this point — Europe keeps the richer keyless grains/m³ data and
+  // never contacts Google. Sequential by necessity: the trigger needs the
+  // CAMS answer first.
+  //
+  // The Google data is garnish, not contract: the whole fetch sits in one
+  // try/catch and the air-quality call never fails because of it.
+  let googlePollen: GooglePollenDailyInfo | undefined;
+  let googleKeyRejected = false;
+
+  if (
+    googlePollenService &&
+    googlePollenService.isKeyAvailable() &&
+    airQualityData.current &&
+    finiteCamsPollen(airQualityData.current).length === 0
+  ) {
+    try {
+      googlePollen = await googlePollenService.getCurrentPollen(latitude, longitude);
+      if (!googlePollen) {
+        // Expected outside Google's 65+ covered countries — not a fault.
+        logger.info('Google Pollen returned no data for this location');
+      }
+    } catch (error) {
+      if (error instanceof GooglePollenKeyRejectedError) {
+        googleKeyRejected = true;
+        logger.warn('Google Pollen API key was rejected', {
+          service: 'GooglePollen',
+          securityEvent: true
+        });
+      } else {
+        logger.warn('Google Pollen fallback failed; rendering no pollen section', {
+          service: 'GooglePollen'
+        });
+      }
+    }
+  }
+
   // Format the air quality data for display
-  const output = formatAirQuality(airQualityData, latitude, longitude, forecast);
+  const output = formatAirQuality(
+    airQualityData,
+    latitude,
+    longitude,
+    forecast,
+    googlePollen,
+    googleKeyRejected
+  );
 
   return prependLocationLine({
     content: [
@@ -76,7 +150,9 @@ function formatAirQuality(
   data: OpenMeteoAirQualityResponse,
   latitude: number,
   longitude: number,
-  includeForecast: boolean
+  includeForecast: boolean,
+  googlePollen?: GooglePollenDailyInfo,
+  googleKeyRejected?: boolean
 ): string {
   let output = `# Air Quality Report\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
@@ -184,14 +260,7 @@ function formatAirQuality(
   // every species null, so the section renders only when at least one species
   // carries a real value — never trust the 200 alone. In-season zeros are
   // meaningful ("none detected") and do render.
-  const pollenSpecies = [
-    { label: 'Alder', value: current.alder_pollen },
-    { label: 'Birch', value: current.birch_pollen },
-    { label: 'Grass', value: current.grass_pollen },
-    { label: 'Mugwort', value: current.mugwort_pollen },
-    { label: 'Olive', value: current.olive_pollen },
-    { label: 'Ragweed', value: current.ragweed_pollen }
-  ].filter(species => typeof species.value === 'number' && Number.isFinite(species.value));
+  const pollenSpecies = finiteCamsPollen(current);
 
   if (pollenSpecies.length > 0) {
     output += `## 🌾 Pollen\n\n`;
@@ -200,6 +269,17 @@ function formatAirQuality(
       output += `**${species.label}:** ${rounded} grains/m³\n`;
     }
     output += `\n*Pollen from the CAMS European forecast — available for European locations only.*\n\n`;
+  } else {
+    // No CAMS coverage here. Fall back to the optional keyed Google Pollen
+    // section, or — if the configured key was rejected — a single
+    // misconfiguration note (design plan D5/D6). Otherwise nothing renders,
+    // exactly as before.
+    const googleSection = formatGooglePollen(googlePollen);
+    if (googleSection) {
+      output += googleSection;
+    } else if (googleKeyRejected) {
+      output += `*Note: GOOGLE_POLLEN_API_KEY was rejected; global pollen data is unavailable.*\n\n`;
+    }
   }
 
   // Show secondary AQI for reference
@@ -217,6 +297,71 @@ function formatAirQuality(
   }
 
   return output;
+}
+
+/**
+ * Render the Google Pollen day-1 section that fills the CAMS slot outside
+ * Europe (design plan D5). Returns an empty string when there is nothing
+ * worth showing, so the caller can fall through to the key-rejected note.
+ *
+ * Only types whose `indexInfo.value` is a finite number render: Google omits
+ * `indexInfo` entirely for out-of-season types (upstream (c)), while a zero
+ * UPI that *does* carry `indexInfo` is meaningful ("none detected") and
+ * renders — mirroring the CAMS olive-0 rule.
+ *
+ * The attribution sentence is **mandatory and exact** — the Google Pollen
+ * API policies require the string "Source: Includes pollen data from Google"
+ * on or next to the data (upstream (d)). Do not reword it.
+ */
+function formatGooglePollen(daily: GooglePollenDailyInfo | undefined): string {
+  if (!daily) {
+    return '';
+  }
+
+  const types = (daily.pollenTypeInfo ?? []).filter(
+    type => typeof type.indexInfo?.value === 'number' && Number.isFinite(type.indexInfo.value)
+  );
+
+  if (types.length === 0) {
+    return '';
+  }
+
+  let section = `## 🌾 Pollen\n\n`;
+
+  for (const type of types) {
+    // Google sends "Grass"/"Tree"/"Weed" as displayName; fall back to the
+    // enum code (GRASS) title-cased if a response ever omits it.
+    const label = type.displayName ?? titleCase(type.code ?? 'Pollen');
+    const category = type.indexInfo?.category;
+    const seasonSuffix = type.inSeason === true ? ' — in season' : '';
+
+    section += `**${label}:** ${type.indexInfo?.value}`;
+    section += category ? ` (${category})` : '';
+    section += `${seasonSuffix}\n`;
+  }
+
+  const inSeasonPlants = (daily.plantInfo ?? [])
+    .filter(plant => plant.inSeason === true && plant.displayName)
+    .map(plant => {
+      const category = plant.indexInfo?.category;
+      return category ? `${plant.displayName} (${category})` : `${plant.displayName}`;
+    });
+
+  if (inSeasonPlants.length > 0) {
+    section += `\nIn season: ${inSeasonPlants.join(', ')}\n`;
+  }
+
+  section += `\n*Universal Pollen Index (0–5) for today. Source: Includes pollen data from Google.*\n\n`;
+
+  return section;
+}
+
+/**
+ * "GRASS" -> "Grass". Only used as a defensive fallback when a pollen type
+ * arrives without a displayName.
+ */
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
 /**
