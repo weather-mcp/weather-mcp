@@ -145,6 +145,79 @@ describe('GooglePollenService', () => {
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
+    // Live-verified 2026-08-18 (T6): an uncovered region answers HTTP 400
+    // INVALID_ARGUMENT with an "Information is unavailable" message, NOT the
+    // 200-with-empty-dailyInfo the design anticipated. It must resolve to
+    // undefined (no data) and cache, or a user in an uncovered country would
+    // re-query Google on every single call.
+    const UNAVAILABLE_BODY = {
+      error: {
+        code: 400,
+        message: 'Information is unavailable for this location. Please try a different location.',
+        status: 'INVALID_ARGUMENT'
+      }
+    };
+
+    it('treats the live uncovered-region 400 as no data rather than an error', async () => {
+      mockGet.mockImplementation(() =>
+        Promise.reject(axiosError({ status: 400, data: UNAVAILABLE_BODY }))
+      );
+      const service = new GooglePollenService({ apiKey: FAKE_KEY });
+
+      await expect(service.getCurrentPollen(0, -160)).resolves.toBeUndefined();
+    });
+
+    it('caches the uncovered-region 400 and does not re-probe', async () => {
+      mockGet.mockImplementation(() =>
+        Promise.reject(axiosError({ status: 400, data: UNAVAILABLE_BODY }))
+      );
+      const service = new GooglePollenService({ apiKey: FAKE_KEY });
+
+      const first = await service.getCurrentPollen(0, -160);
+      const second = await service.getCurrentPollen(0, -160);
+
+      expect(first).toBeUndefined();
+      expect(second).toBeUndefined();
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('still throws on a 400 that is NOT the unavailable message (never masks a real bug)', async () => {
+      mockGet.mockImplementation(() =>
+        Promise.reject(
+          axiosError({
+            status: 400,
+            data: { error: { code: 400, message: 'Request contains an invalid argument.', status: 'INVALID_ARGUMENT' } }
+          })
+        )
+      );
+      const service = new GooglePollenService({ apiKey: FAKE_KEY });
+
+      await expect(service.getCurrentPollen(39.1, -94.58)).rejects.toThrow(
+        'Invalid query parameters for Google Pollen API.'
+      );
+    });
+
+    it('a rejected key is still a rejection even if the body also mentions unavailability', async () => {
+      mockGet.mockImplementation(() =>
+        Promise.reject(
+          axiosError({
+            status: 400,
+            data: {
+              error: {
+                message: 'API key not valid. Information is unavailable for this location.',
+                status: 'INVALID_ARGUMENT'
+              }
+            }
+          })
+        )
+      );
+      const service = new GooglePollenService({ apiKey: FAKE_KEY });
+
+      await expect(service.getCurrentPollen(39.1, -94.58)).rejects.toBeInstanceOf(
+        GooglePollenKeyRejectedError
+      );
+    });
+
     it('caches an absent dailyInfo field (no key at all) as undefined and does not re-probe', async () => {
       mockGet.mockImplementation(() => jsonResponse({}));
       const service = new GooglePollenService({ apiKey: FAKE_KEY });

@@ -55,9 +55,27 @@ export interface GooglePollenServiceConfig {
 
 const POLLEN_API_URL = 'https://pollen.googleapis.com/v1/forecast:lookup';
 
-// Web-verified 2026-08-18 (upstream (f) in the design plan); to be
-// confirmed/adjusted at T6 live verification against a real key.
+// **Live-verified 2026-08-18** (upstream (f) in the design plan): a rejected
+// key returns HTTP 400 with a body carrying both `API key not valid` and
+// `API_KEY_INVALID`. `PERMISSION_DENIED` was not observed (it belongs to an
+// API-not-enabled / key-restricted-away project) and is kept as a defensive
+// third marker.
 const KEY_REJECTION_MARKERS = ['API_KEY_INVALID', 'API key not valid', 'PERMISSION_DENIED'];
+
+// **Live-verified 2026-08-18:** a region Google does not cover (open ocean,
+// Antarctica) answers HTTP 400 `INVALID_ARGUMENT` with this message — *not*
+// the HTTP 200 with an empty `dailyInfo` the design anticipated. That is a
+// "no data here" answer rather than a fault, so it resolves to `undefined`
+// and caches the null sentinel instead of throwing; otherwise an uncovered
+// location would re-query Google on every single call, burning quota the
+// TTL was meant to protect.
+//
+// Deliberately matched on this specific message, not on the status: a
+// genuinely malformed request is *also* 400 `INVALID_ARGUMENT`, and silently
+// caching that as "no pollen here" would mask a real bug for the whole TTL.
+// If Google rewords the message the match simply fails and the throwing path
+// takes over, which still ends at a silent no-section — safe degradation.
+const LOCATION_UNAVAILABLE_MARKER = 'Information is unavailable for this location';
 
 export class GooglePollenService {
   private client: AxiosInstance;
@@ -183,11 +201,63 @@ export class GooglePollenService {
       // fixed, sanitized fields are logged.
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
       const code = axios.isAxiosError(error) ? error.code : undefined;
+
+      // An uncovered region is expected, not a fault — resolve to "no data"
+      // so the caller caches the null sentinel and stops re-probing.
+      if (isLocationUnavailable(error)) {
+        logger.info('Google Pollen has no coverage for this location', { status });
+        return undefined;
+      }
+
       logger.error('Google Pollen API request failed', undefined, { status, code });
 
       throw mapPollenApiError(error);
     }
   }
+}
+
+/**
+ * Stringify an axios error's response body for marker searching. The body may
+ * arrive as a string, or as a JSON-parsed object shape like
+ * `{ error: { status: 'INVALID_ARGUMENT', message: '…' } }` — coerce both.
+ * Never includes the request URL, so this is safe to search but must never be
+ * logged or thrown.
+ */
+function responseBodyText(error: unknown): string {
+  if (!axios.isAxiosError(error)) {
+    return '';
+  }
+
+  const rawData = error.response?.data;
+  if (typeof rawData === 'object' && rawData !== null) {
+    try {
+      return JSON.stringify(rawData);
+    } catch {
+      // JSON.stringify can throw on circular structures.
+      return String(rawData);
+    }
+  }
+
+  return String(rawData ?? '');
+}
+
+/**
+ * True for the live-verified "this location has no pollen coverage" answer —
+ * HTTP 400 whose body carries `LOCATION_UNAVAILABLE_MARKER` and *no*
+ * key-rejection marker. See that constant for why the match is on the message
+ * rather than the status.
+ */
+function isLocationUnavailable(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 400) {
+    return false;
+  }
+
+  const bodyText = responseBodyText(error);
+  if (KEY_REJECTION_MARKERS.some(marker => bodyText.includes(marker))) {
+    return false;
+  }
+
+  return bodyText.includes(LOCATION_UNAVAILABLE_MARKER);
 }
 
 /**
@@ -211,19 +281,7 @@ function mapPollenApiError(error: unknown): Error {
 
     const status = error.response?.status;
     if (status === 400 || status === 403) {
-      // The rejection body may arrive as a string, or (defensively) as a
-      // JSON-parsed object shape like { error: { status: 'PERMISSION_DENIED' } }
-      // — coerce both forms before searching.
-      const rawData = error.response?.data;
-      let bodyText = String(rawData ?? '');
-      if (typeof rawData === 'object' && rawData !== null) {
-        try {
-          bodyText = JSON.stringify(rawData);
-        } catch {
-          // JSON.stringify can throw on circular structures; fall back to
-          // the String() coercion above.
-        }
-      }
+      const bodyText = responseBodyText(error);
 
       if (KEY_REJECTION_MARKERS.some(marker => bodyText.includes(marker))) {
         return new GooglePollenKeyRejectedError();
