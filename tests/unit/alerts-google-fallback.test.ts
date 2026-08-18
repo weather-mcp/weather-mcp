@@ -1,0 +1,457 @@
+/**
+ * Unit tests for the optional keyed Google Weather API alerts fallback
+ * (global-alerts-fallback feature, T3).
+ *
+ * Exercises handleGetAlerts with plain fake services (no HTTP, no live calls)
+ * to prove:
+ *   - D1 routing: the Google branch is reached **only** from the elsewhere
+ *     branch, and only when a key is available; the US, Canada, and
+ *     MeteoAlarm countries never contact Google
+ *   - the keyless path is byte-identical to the pre-fallback output
+ *   - D5 rendering: severity sort, emoji, detail caps, the two-layer
+ *     mandatory attribution, times in the alert's own offset
+ *   - D6 failure posture: honest-empty with the coverage caveat, and errors
+ *     that propagate rather than degrading to a fabricated all-clear
+ *
+ * See docs/global-alerts-fallback-plan.md D1, D5, D6.
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import { handleGetAlerts } from '../../src/handlers/alertsHandler.js';
+import { GoogleWeatherKeyRejectedError } from '../../src/services/googleWeather.js';
+import type { NOAAService } from '../../src/services/noaa.js';
+import type { LocationStore } from '../../src/services/locationStore.js';
+import type { GeocodingService } from '../../src/services/geocoding.js';
+import type { MeteoAlarmService } from '../../src/services/meteoalarm.js';
+import type { GeoMetService } from '../../src/services/geomet.js';
+import type { NominatimService } from '../../src/services/nominatim.js';
+import type { GoogleWeatherService } from '../../src/services/googleWeather.js';
+import type { GoogleWeatherAlert } from '../../src/types/googleWeather.js';
+
+// ---------------------------------------------------------------------------
+// Fixture coordinates
+// ---------------------------------------------------------------------------
+
+/** Outside the CONUS box and not a MeteoAlarm member — the elsewhere branch. */
+const SYDNEY = { latitude: -33.87, longitude: 151.21 };
+/** Genuinely US. */
+const SEATTLE = { latitude: 47.6, longitude: -122.3 };
+/** Inside the deliberately sloppy CONUS box, but actually Canada. */
+const TORONTO = { latitude: 43.6532, longitude: -79.3832 };
+/** MeteoAlarm member country. */
+const BERLIN = { latitude: 52.52, longitude: 13.405 };
+
+// ---------------------------------------------------------------------------
+// Fake service builders
+// ---------------------------------------------------------------------------
+
+function makeNoaaFake(): NOAAService {
+  return {
+    getStations: vi.fn(async () => ({ features: [] })),
+    getAlerts: vi.fn(async () => ({ updated: '2026-08-18T00:00:00Z', features: [] }))
+  } as unknown as NOAAService;
+}
+
+function makeGeoMetFake(): GeoMetService {
+  return {
+    getAlerts: vi.fn(async () => [])
+  } as unknown as GeoMetService;
+}
+
+function makeMeteoAlarmFake(): MeteoAlarmService {
+  return {
+    getWarnings: vi.fn(async () => [])
+  } as unknown as MeteoAlarmService;
+}
+
+function makeNominatimFake(country: string | null): NominatimService {
+  return {
+    reverseCountry: vi.fn(async () => country)
+  } as unknown as NominatimService;
+}
+
+interface GoogleFakeOptions {
+  keyAvailable?: boolean;
+  alerts?: GoogleWeatherAlert[];
+  error?: Error;
+}
+
+function makeGoogleFake(options: GoogleFakeOptions = {}): GoogleWeatherService {
+  const { keyAvailable = true, alerts = [], error } = options;
+  return {
+    isKeyAvailable: vi.fn(() => keyAvailable),
+    getPublicAlerts: vi.fn(async () => {
+      if (error) {
+        throw error;
+      }
+      return alerts;
+    })
+  } as unknown as GoogleWeatherService;
+}
+
+const emptyStore = {
+  get: vi.fn(() => undefined)
+} as unknown as LocationStore;
+
+const emptyGeocoding = {
+  search: vi.fn(async () => [])
+} as unknown as GeocodingService;
+
+// ---------------------------------------------------------------------------
+// Alert fixtures
+// ---------------------------------------------------------------------------
+
+function alertFixture(overrides: Partial<GoogleWeatherAlert> = {}): GoogleWeatherAlert {
+  return {
+    alertId: 'a1',
+    alertTitle: 'Severe Thunderstorm Warning',
+    eventType: 'SEVERE_THUNDERSTORM',
+    areaName: 'Greater Sydney',
+    description: 'Damaging winds and large hail expected.',
+    severity: 'Severe',
+    urgency: 'Immediate',
+    certainty: 'Likely',
+    instruction: ['Move vehicles under cover.'],
+    safetyRecommendations: ['Stay indoors.'],
+    startTime: '2026-08-18T02:00:00Z',
+    expirationTime: '2026-08-18T08:00:00Z',
+    timezoneOffset: '+10:00',
+    dataSource: {
+      name: 'BOM',
+      fullName: 'Australian Bureau of Meteorology',
+      authorityUri: 'https://www.bom.gov.au'
+    },
+    ...overrides
+  };
+}
+
+/** The exact mandatory attribution string (Weather API policies, layer 1). */
+const MANDATORY_ATTRIBUTION = 'Source: Includes weather data from Google';
+
+// ---------------------------------------------------------------------------
+// Routing (D1)
+// ---------------------------------------------------------------------------
+
+describe('get_alerts — Google Weather fallback routing (D1)', () => {
+  it('a non-covered country with a key routes to the Google renderer', async () => {
+    const google = makeGoogleFake({ alerts: [alertFixture()] });
+
+    const result = await handleGetAlerts(
+      SYDNEY, makeNoaaFake(), emptyStore, emptyGeocoding,
+      makeMeteoAlarmFake(), makeGeoMetFake(), makeNominatimFake('au'), google
+    );
+
+    const text = result.content[0].text;
+    expect(google.getPublicAlerts).toHaveBeenCalledWith(SYDNEY.latitude, SYDNEY.longitude);
+    expect(text).toContain('Weather Alerts — Australia');
+    expect(text).toContain(MANDATORY_ATTRIBUTION);
+  });
+
+  it('a non-covered country with an unavailable key renders the not-covered message and never calls Google', async () => {
+    const google = makeGoogleFake({ keyAvailable: false });
+
+    const result = await handleGetAlerts(
+      SYDNEY, makeNoaaFake(), emptyStore, emptyGeocoding,
+      makeMeteoAlarmFake(), makeGeoMetFake(), makeNominatimFake('au'), google
+    );
+
+    const text = result.content[0].text;
+    expect(google.getPublicAlerts).not.toHaveBeenCalled();
+    expect(text).toContain('not yet available');
+    expect(text).not.toContain('Google');
+  });
+
+  it('with no 8th argument the output is strictly identical to the keyless not-covered output', async () => {
+    const keyless = await handleGetAlerts(
+      SYDNEY, makeNoaaFake(), emptyStore, emptyGeocoding,
+      makeMeteoAlarmFake(), makeGeoMetFake(), makeNominatimFake('au')
+    );
+    const withUnavailableKey = await handleGetAlerts(
+      SYDNEY, makeNoaaFake(), emptyStore, emptyGeocoding,
+      makeMeteoAlarmFake(), makeGeoMetFake(), makeNominatimFake('au'),
+      makeGoogleFake({ keyAvailable: false })
+    );
+
+    expect(withUnavailableKey.content[0].text).toBe(keyless.content[0].text);
+  });
+
+  it('a US point with a key routes to NOAA and never calls Google', async () => {
+    const google = makeGoogleFake({ alerts: [alertFixture()] });
+    const noaa = makeNoaaFake();
+
+    const result = await handleGetAlerts(
+      SEATTLE, noaa, emptyStore, emptyGeocoding,
+      makeMeteoAlarmFake(), makeGeoMetFake(), makeNominatimFake('us'), google
+    );
+
+    expect(noaa.getAlerts).toHaveBeenCalled();
+    expect(google.getPublicAlerts).not.toHaveBeenCalled();
+    expect(result.content[0].text).not.toContain(MANDATORY_ATTRIBUTION);
+  });
+
+  it('a MeteoAlarm country with a key routes to MeteoAlarm and never calls Google', async () => {
+    const google = makeGoogleFake({ alerts: [alertFixture()] });
+    const meteoAlarm = makeMeteoAlarmFake();
+
+    const result = await handleGetAlerts(
+      BERLIN, makeNoaaFake(), emptyStore, emptyGeocoding,
+      meteoAlarm, makeGeoMetFake(), makeNominatimFake('de'), google
+    );
+
+    expect(meteoAlarm.getWarnings).toHaveBeenCalledWith('de');
+    expect(google.getPublicAlerts).not.toHaveBeenCalled();
+    expect(result.content[0].text).not.toContain(MANDATORY_ATTRIBUTION);
+  });
+
+  it('a Canadian point inside the CONUS box with a key routes to GeoMet and never calls Google', async () => {
+    const google = makeGoogleFake({ alerts: [alertFixture()] });
+    const geoMet = makeGeoMetFake();
+
+    const result = await handleGetAlerts(
+      TORONTO, makeNoaaFake(), emptyStore, emptyGeocoding,
+      makeMeteoAlarmFake(), geoMet, makeNominatimFake('ca'), google
+    );
+
+    expect(geoMet.getAlerts).toHaveBeenCalled();
+    expect(google.getPublicAlerts).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain('Weather Alerts — Canada');
+  });
+
+  it('an unresolved country (open ocean) with a key still reaches Google, with a generic header', async () => {
+    const google = makeGoogleFake({ alerts: [] });
+
+    const result = await handleGetAlerts(
+      { latitude: -20, longitude: -140 }, makeNoaaFake(), emptyStore, emptyGeocoding,
+      makeMeteoAlarmFake(), makeGeoMetFake(), makeNominatimFake(null), google
+    );
+
+    const text = result.content[0].text;
+    expect(google.getPublicAlerts).toHaveBeenCalled();
+    expect(text).toContain('# Weather Alerts\n');
+    expect(text).not.toContain('Weather Alerts —');
+  });
+
+  it('a failed reverse lookup still renders its one-line note on the Google path', async () => {
+    const nominatim = {
+      reverseCountry: vi.fn(async () => {
+        throw new Error('nominatim down');
+      })
+    } as unknown as NominatimService;
+
+    const result = await handleGetAlerts(
+      SYDNEY, makeNoaaFake(), emptyStore, emptyGeocoding,
+      makeMeteoAlarmFake(), makeGeoMetFake(), nominatim, makeGoogleFake({ alerts: [] })
+    );
+
+    expect(result.content[0].text).toContain('country lookup service was unavailable');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rendering (D5)
+// ---------------------------------------------------------------------------
+
+describe('get_alerts — Google Weather renderer (D5)', () => {
+  async function render(
+    alerts: GoogleWeatherAlert[],
+    args: Record<string, unknown> = {}
+  ): Promise<string> {
+    const result = await handleGetAlerts(
+      { ...SYDNEY, ...args }, makeNoaaFake(), emptyStore, emptyGeocoding,
+      makeMeteoAlarmFake(), makeGeoMetFake(), makeNominatimFake('au'),
+      makeGoogleFake({ alerts })
+    );
+    return result.content[0].text;
+  }
+
+  it('sorts by CAP severity and marks each alert with its severity emoji', async () => {
+    const text = await render([
+      alertFixture({ alertId: 'minor', alertTitle: 'Minor Flood Advisory', severity: 'Minor' }),
+      alertFixture({ alertId: 'extreme', alertTitle: 'Tsunami Warning', severity: 'Extreme' }),
+      alertFixture({ alertId: 'moderate', alertTitle: 'Wind Advisory', severity: 'Moderate' })
+    ]);
+
+    expect(text.indexOf('Tsunami Warning')).toBeLessThan(text.indexOf('Wind Advisory'));
+    expect(text.indexOf('Wind Advisory')).toBeLessThan(text.indexOf('Minor Flood Advisory'));
+    expect(text).toContain('🔴 **Tsunami Warning**');
+    expect(text).toContain('🟡 **Wind Advisory**');
+    expect(text).toContain('🔵 **Minor Flood Advisory**');
+  });
+
+  it('caps standard detail at 10 alerts and adds the remainder note', async () => {
+    const alerts = Array.from({ length: 14 }, (_, i) =>
+      alertFixture({ alertId: `a${i}`, alertTitle: `Alert ${i}`, severity: 'Minor' })
+    );
+
+    const text = await render(alerts);
+
+    expect(text).toContain('Alert 9');
+    expect(text).not.toContain('Alert 10');
+    expect(text).toContain('…and 4 more alerts, mostly Minor');
+  });
+
+  it('caps full detail at 25 alerts and adds the remainder note', async () => {
+    const alerts = Array.from({ length: 28 }, (_, i) =>
+      alertFixture({ alertId: `a${i}`, alertTitle: `Alert ${i}`, severity: 'Minor' })
+    );
+
+    const text = await render(alerts, { detail: 'full' });
+
+    expect(text).toContain('Alert 24');
+    expect(text).not.toContain('**Alert 25**');
+    expect(text).toContain('…and 3 more alerts, mostly Minor');
+  });
+
+  it('renders counts only at detail="summary"', async () => {
+    const text = await render(
+      [
+        alertFixture({ severity: 'Severe' }),
+        alertFixture({ alertId: 'a2', severity: 'Minor', eventType: 'FLOOD' })
+      ],
+      { detail: 'summary' }
+    );
+
+    expect(text).toContain('**By severity:** Severe: 1 | Minor: 1');
+    expect(text).toContain('Counts only at detail="summary"');
+    expect(text).not.toContain('Damaging winds');
+    expect(text).not.toContain('**Area:**');
+  });
+
+  it('renders times in the alert\'s own timezone offset', async () => {
+    const text = await render([alertFixture()]);
+
+    // 02:00Z at +10:00 is 12:00 local; 08:00Z is 18:00 local.
+    expect(text).toContain('**Effective:** 2026-08-18 12:00 (+10:00)');
+    expect(text).toContain('**Expires:** 2026-08-18 18:00 (+10:00)');
+  });
+
+  it('falls back to the published instant when timezoneOffset is absent', async () => {
+    const text = await render([alertFixture({ timezoneOffset: undefined })]);
+
+    expect(text).toContain('**Effective:** 2026-08-18 02:00 (UTC)');
+  });
+
+  it('omits the Expires line when expirationTime is null', async () => {
+    const text = await render([alertFixture({ expirationTime: null })]);
+
+    expect(text).toContain('**Effective:**');
+    expect(text).not.toContain('**Expires:**');
+  });
+
+  it('renders the per-alert dataSource attribution line (layer 2)', async () => {
+    const text = await render([alertFixture()]);
+
+    expect(text).toContain('**Source:** Australian Bureau of Meteorology (https://www.bom.gov.au)');
+  });
+
+  it('falls back to a humanized eventType when alertTitle is missing', async () => {
+    const text = await render([alertFixture({ alertTitle: undefined, eventType: 'FLASH_FLOOD' })]);
+
+    expect(text).toContain('**Flash Flood**');
+  });
+
+  it('falls back to "Weather alert" when both alertTitle and eventType are missing', async () => {
+    const text = await render([alertFixture({ alertTitle: undefined, eventType: undefined })]);
+
+    expect(text).toContain('**Weather alert**');
+  });
+
+  it('omits the event-type suffix when the title already says it, and keeps it otherwise', async () => {
+    const redundant = await render([
+      alertFixture({ alertTitle: 'Severe Thunderstorm Warning', eventType: 'SEVERE_THUNDERSTORM' })
+    ]);
+    const informative = await render([
+      alertFixture({ alertTitle: 'Coastal Hazard Advice', eventType: 'HIGH_WIND' })
+    ]);
+
+    expect(redundant).toContain('**Severe Thunderstorm Warning**\n');
+    expect(redundant).not.toContain('(Severe Thunderstorm)');
+    expect(informative).toContain('**Coastal Hazard Advice** (High Wind)');
+  });
+
+  it('accepts an object-shaped alertTitle', async () => {
+    const text = await render([
+      alertFixture({ alertTitle: { text: 'Cyclone Warning', languageCode: 'en' } })
+    ]);
+
+    expect(text).toContain('**Cyclone Warning**');
+  });
+
+  it('shows the description only at detail="full"', async () => {
+    const standard = await render([alertFixture()]);
+    const full = await render([alertFixture()], { detail: 'full' });
+
+    expect(standard).not.toContain('Damaging winds and large hail expected.');
+    expect(full).toContain('Damaging winds and large hail expected.');
+  });
+
+  it('shows instructions at standard and safety recommendations only at full', async () => {
+    const standard = await render([alertFixture()]);
+    const full = await render([alertFixture()], { detail: 'full' });
+
+    expect(standard).toContain('Move vehicles under cover.');
+    expect(standard).not.toContain('Stay indoors.');
+    expect(full).toContain('Stay indoors.');
+  });
+
+  it('omits instruction and safety lines when the arrays are empty', async () => {
+    const text = await render(
+      [alertFixture({ instruction: [], safetyRecommendations: [] })],
+      { detail: 'full' }
+    );
+
+    expect(text).not.toContain('**Instructions:**');
+    expect(text).not.toContain('**Safety recommendations:**');
+  });
+
+  it('renders the coverage caveat on both empty and non-empty results', async () => {
+    const nonEmpty = await render([alertFixture()]);
+    const empty = await render([]);
+
+    expect(nonEmpty).toContain('coverage alignment may not be exact');
+    expect(empty).toContain('coverage alignment may not be exact');
+  });
+
+  it('adds the historical-not-available note when active_only is false', async () => {
+    const text = await render([alertFixture()], { active_only: false });
+
+    expect(text).toContain('historical alerts are not available for this region');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Failure posture (D6) — contract, not garnish
+// ---------------------------------------------------------------------------
+
+describe('get_alerts — Google Weather failure posture (D6)', () => {
+  function callSydney(google: GoogleWeatherService) {
+    return handleGetAlerts(
+      SYDNEY, makeNoaaFake(), emptyStore, emptyGeocoding,
+      makeMeteoAlarmFake(), makeGeoMetFake(), makeNominatimFake('au'), google
+    );
+  }
+
+  it('an empty result renders the honest-empty message plus the caveat, never a bare all-clear', async () => {
+    const result = await callSydney(makeGoogleFake({ alerts: [] }));
+    const text = result.content[0].text;
+
+    expect(text).toContain('No active weather alerts found for this location via the Google Weather API');
+    expect(text).toContain('rather than a guarantee that this location is covered');
+    expect(text).toContain(MANDATORY_ATTRIBUTION);
+  });
+
+  it('a rejected key propagates with its fixed sanitized message — no silent degrade', async () => {
+    const google = makeGoogleFake({ error: new GoogleWeatherKeyRejectedError() });
+
+    await expect(callSydney(google)).rejects.toThrow(GoogleWeatherKeyRejectedError);
+    await expect(callSydney(google)).rejects.toThrow(/GOOGLE_WEATHER_API_KEY/);
+  });
+
+  it('a generic service error propagates rather than producing a fabricated all-clear', async () => {
+    const google = makeGoogleFake({
+      error: new Error('Google Weather API quota exceeded. Please try again later.')
+    });
+
+    await expect(callSydney(google)).rejects.toThrow('Google Weather API quota exceeded');
+  });
+});

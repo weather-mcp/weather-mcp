@@ -5,7 +5,14 @@
  *   US → NOAA (the original path, byte-identical output),
  *   Canada → MSC GeoMet (Environment and Climate Change Canada),
  *   MeteoAlarm member countries → the country's MeteoAlarm feed,
- *   elsewhere → a clean not-covered message.
+ *   elsewhere → the optional keyed Google Weather API fallback when a
+ *     `GOOGLE_WEATHER_API_KEY` is configured, else a clean not-covered
+ *     message (see docs/global-alerts-fallback-plan.md D1).
+ *
+ * The branch order is the invariant: a US, Canadian, or MeteoAlarm-country
+ * request never contacts Google, key or no key — those are jurisdictional
+ * authorities and stay first-choice. Without a key the elsewhere branch is
+ * byte-identical to before the fallback existed.
  *
  * Country resolution order: a `country_code` already carried by the resolved
  * location (saved location or geocoded city_name), else a cached
@@ -26,7 +33,8 @@ import {
 } from '../services/meteoalarm.js';
 import { GeoMetService } from '../services/geomet.js';
 import { NominatimService } from '../services/nominatim.js';
-import type { MeteoAlarmWarning } from '../types/meteoalarm.js';
+import { GoogleWeatherService } from '../services/googleWeather.js';
+import type { GoogleWeatherAlert } from '../types/googleWeather.js';
 import {
   resolveLocationAsync,
   prependLocationLine,
@@ -61,7 +69,8 @@ export async function handleGetAlerts(
   geocodingService: GeocodingService,
   meteoAlarmService?: MeteoAlarmService,
   geoMetService?: GeoMetService,
-  nominatimService?: NominatimService
+  nominatimService?: NominatimService,
+  googleWeatherService?: GoogleWeatherService
 ): Promise<HandlerResult> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as AlertsArgs, locationStore, geocodingService);
@@ -113,6 +122,22 @@ export async function handleGetAlerts(
 
   if (!countryCode && isInUS(latitude, longitude)) {
     return handleNoaaAlerts(resolved, noaaService, active_only, detail);
+  }
+
+  // 4. Elsewhere (D1): the optional keyed Google Weather API fallback. No
+  //    client-side country allowlist — Google answers the coverage question
+  //    per request, and a hardcoded list would drift and mis-gate border
+  //    regions. Reaching this line already proves the point is not US,
+  //    Canadian, or MeteoAlarm-covered.
+  if (googleWeatherService && googleWeatherService.isKeyAvailable()) {
+    return handleGoogleAlerts(
+      resolved,
+      googleWeatherService,
+      countryCode,
+      active_only,
+      detail,
+      reverseLookupFailed
+    );
   }
 
   return notCoveredResult(resolved, countryCode, reverseLookupFailed);
@@ -300,8 +325,12 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-/** "…and N more warnings, mostly Minor" remainder line for capped lists. */
-function remainderNote(remainder: MeteoAlarmWarning[]): string {
+/**
+ * "…and N more warnings, mostly Minor" remainder line for capped lists.
+ * Typed on the only field it reads so every CAP-shaped renderer can share it;
+ * `noun` defaults to the MeteoAlarm wording, keeping that output unchanged.
+ */
+function remainderNote(remainder: Array<{ severity?: string }>, noun = 'warning'): string {
   const counts = new Map<string, number>();
   for (const warning of remainder) {
     const severity = warning.severity ?? 'Unknown';
@@ -316,7 +345,7 @@ function remainderNote(remainder: MeteoAlarmWarning[]): string {
     }
   }
   const plural = remainder.length > 1 ? 's' : '';
-  return `*…and ${remainder.length} more warning${plural}, mostly ${top}. Use detail="full" to see more.*\n\n`;
+  return `*…and ${remainder.length} more ${noun}${plural}, mostly ${top}. Use detail="full" to see more.*\n\n`;
 }
 
 /**
@@ -569,6 +598,242 @@ async function handleGeoMetAlerts(
 
   output += `---\n`;
   output += `*Data source: Environment and Climate Change Canada (MSC GeoMet). Alert content shown unaltered.*\n`;
+
+  return prependLocationLine({
+    content: [{ type: 'text', text: output }]
+  }, resolved);
+}
+
+/**
+ * Coverage caveat shown on **both** empty and non-empty Google results (D5/D6).
+ * One constant serves both so the two paths cannot drift apart, and it does
+ * double duty: it explains why an alert may not match the exact point, and why
+ * an empty answer is "none found" rather than a guarantee of coverage.
+ */
+const GOOGLE_COVERAGE_CAVEAT =
+  `*Coverage note: Google aggregates official national alert feeds across ~45+ territories and ` +
+  `matches them by provider polygon, so country and region coverage alignment may not be exact — ` +
+  `warnings may not correspond to your exact point, and an empty result means no alerts were ` +
+  `found rather than a guarantee that this location is covered.*\n\n`;
+
+/**
+ * Google Weather API footer. The final sentence is the **exact mandatory
+ * attribution string** required by the Weather API policies — do not reword it
+ * (layer 1 of the two-layer attribution; layer 2 is the per-alert `dataSource`
+ * line rendered above).
+ */
+const GOOGLE_FOOTER =
+  `---\n` +
+  `*Data source: official national weather services, aggregated by the Google Weather API. ` +
+  `Alert text is shown in its source language, as issued. ` +
+  `Source: Includes weather data from Google*\n`;
+
+/**
+ * `alertTitle` is documented as an object but its exact shape is a live
+ * to-verify (design upstream (g)), so both a plain string and a `{ text }`
+ * object are accepted. Anything else falls through to the caller's fallback.
+ */
+function googleAlertTitle(alert: GoogleWeatherAlert): string {
+  const title = alert.alertTitle;
+  if (typeof title === 'string' && title.trim().length > 0) {
+    return title;
+  }
+  if (title && typeof title === 'object' && typeof title.text === 'string' && title.text.trim().length > 0) {
+    return title.text;
+  }
+  return humanizeEventType(alert.eventType) ?? 'Weather alert';
+}
+
+/** `FLASH_FLOOD` → `Flash Flood`. Returns undefined for an absent/blank enum value. */
+function humanizeEventType(eventType: string | undefined): string | undefined {
+  if (!eventType || eventType.trim().length === 0) {
+    return undefined;
+  }
+  return eventType
+    .toLowerCase()
+    .split(/[_\s]+/)
+    .filter(part => part.length > 0)
+    .map(capitalize)
+    .join(' ');
+}
+
+/**
+ * Render a UTC instant in the alert's own `timezoneOffset` (`±HH:MM`) — the
+ * "times as issued" doctrine applied to a source that publishes the instant
+ * and the offset in separate fields. Falls back to `formatPublishedTime`
+ * (which renders the instant as published) when the offset is absent or
+ * unparseable. Deliberately does all arithmetic in UTC so the rendered string
+ * never depends on the server's own timezone.
+ */
+function formatGoogleAlertTime(
+  iso: string | undefined | null,
+  timezoneOffset: string | undefined
+): string | undefined {
+  if (!iso) {
+    return undefined;
+  }
+  if (!timezoneOffset) {
+    return formatPublishedTime(iso);
+  }
+
+  const offsetMatch = /^([+-])(\d{2}):?(\d{2})$/.exec(timezoneOffset.trim());
+  const instant = Date.parse(iso);
+  if (!offsetMatch || Number.isNaN(instant)) {
+    return formatPublishedTime(iso);
+  }
+
+  const [, sign, hours, minutes] = offsetMatch;
+  const offsetMinutes = (sign === '-' ? -1 : 1) * (Number(hours) * 60 + Number(minutes));
+  const shifted = new Date(instant + offsetMinutes * 60_000);
+  const pad = (value: number): string => String(value).padStart(2, '0');
+
+  const date = `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+  const time = `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`;
+  return `${date} ${time} (${sign}${hours}:${minutes})`;
+}
+
+/**
+ * Google Weather API renderer (D5) — the fourth CAP-shaped renderer, kept
+ * deliberately close to the MeteoAlarm one and reusing the same severity rank,
+ * emoji, display caps, and remainder note (Google's severity enum is exactly
+ * NOAA's).
+ *
+ * **Failure posture is contract, not garnish (D6):** alerts *are* this tool's
+ * whole answer, so nothing here catches a service error. A rejected key, a
+ * timeout, a 429, or a network failure propagates with the service's fixed
+ * sanitized message, exactly as a GeoMet or MeteoAlarm failure surfaces today.
+ * A silent "✅ no alerts" produced by a failed fetch would be a dangerous lie
+ * on safety data.
+ */
+async function handleGoogleAlerts(
+  resolved: ResolvedLocation,
+  googleWeatherService: GoogleWeatherService,
+  countryCode: string | null,
+  active_only: boolean,
+  detail: Detail,
+  reverseLookupFailed: boolean
+): Promise<HandlerResult> {
+  const alerts = await googleWeatherService.getPublicAlerts(resolved.latitude, resolved.longitude);
+
+  const regionName = countryCode ? regionDisplayName(countryCode) : null;
+
+  let output = regionName ? `# Weather Alerts — ${regionName}\n\n` : `# Weather Alerts\n\n`;
+  output += `**Location:** ${resolved.latitude.toFixed(4)}, ${resolved.longitude.toFixed(4)}\n\n`;
+
+  if (reverseLookupFailed) {
+    output += `*Note: the country lookup service was unavailable, so routing fell back to coordinate checks.*\n\n`;
+  }
+
+  if (!active_only) {
+    output += `*Note: historical alerts are not available for this region — showing current alerts only.*\n\n`;
+  }
+
+  if (alerts.length === 0) {
+    // Honest empty (D6): Google does not distinguish "no active alerts" from
+    // "region not covered", so the message never claims an all-clear beyond
+    // what was actually asked — the FIRMS empty-result framing.
+    output += `✅ **No active weather alerts found for this location via the Google Weather API.**\n\n`;
+  } else {
+    output += `⚠️ **${alerts.length} active alert${alerts.length > 1 ? 's' : ''} found**\n\n`;
+
+    // Sort by CAP severity (the NOAA Extreme→Unknown order), then by expiry.
+    const sorted = [...alerts].sort((a, b) => {
+      const bySeverity = capSeverityRank(a.severity) - capSeverityRank(b.severity);
+      if (bySeverity !== 0) {
+        return bySeverity;
+      }
+      const aExpires = a.expirationTime ? new Date(a.expirationTime).getTime() : Infinity;
+      const bExpires = b.expirationTime ? new Date(b.expirationTime).getTime() : Infinity;
+      return aExpires - bExpires;
+    });
+
+    if (detail === 'summary') {
+      const bySeverity = new Map<string, number>();
+      const byEvent = new Map<string, number>();
+      for (const alert of sorted) {
+        const severity = alert.severity ?? 'Unknown';
+        bySeverity.set(severity, (bySeverity.get(severity) ?? 0) + 1);
+        const event = humanizeEventType(alert.eventType);
+        if (event) {
+          byEvent.set(event, (byEvent.get(event) ?? 0) + 1);
+        }
+      }
+      output += `**By severity:** ${[...bySeverity.entries()]
+        .map(([severity, count]) => `${severity}: ${count}`)
+        .join(' | ')}\n`;
+      if (byEvent.size > 0) {
+        output += `**By type:** ${[...byEvent.entries()]
+          .map(([event, count]) => `${event}: ${count}`)
+          .join(' | ')}\n`;
+      }
+      output += `\n*Counts only at detail="summary". Use detail="standard" or detail="full" for the alerts themselves.*\n\n`;
+    } else {
+      const cap = detail === 'full' ? FULL_DISPLAY_CAP : STANDARD_DISPLAY_CAP;
+      const shown = sorted.slice(0, cap);
+      const remainder = sorted.slice(cap);
+
+      for (const alert of shown) {
+        // The event-type suffix renders only when it says something the title
+        // does not already say — publishers routinely title an alert
+        // "Severe Thunderstorm Warning", and "(Severe Thunderstorm)" beside it
+        // is noise. (Found by reading real rendered output, not a failing test.)
+        const title = googleAlertTitle(alert);
+        const event = humanizeEventType(alert.eventType);
+        const eventSuffix =
+          event && !title.toLowerCase().includes(event.toLowerCase()) ? ` (${event})` : '';
+        output += `${capSeverityEmoji(alert.severity)} **${title}**${eventSuffix}\n`;
+        output += `---\n`;
+
+        output += `**Severity:** ${alert.severity ?? 'Unknown'} | **Urgency:** ${alert.urgency ?? 'Unknown'} | **Certainty:** ${alert.certainty ?? 'Unknown'}\n`;
+        if (alert.areaName) {
+          output += `**Area:** ${alert.areaName}\n`;
+        }
+
+        // Times render in the alert's own offset; a null expirationTime
+        // (documented as possible) simply omits its line.
+        const effective = formatGoogleAlertTime(alert.startTime, alert.timezoneOffset);
+        const expires = formatGoogleAlertTime(alert.expirationTime, alert.timezoneOffset);
+        if (effective) {
+          output += `**Effective:** ${effective}\n`;
+        }
+        if (expires) {
+          output += `**Expires:** ${expires}\n`;
+        }
+
+        // Source text renders verbatim, in the publisher's language: the full
+        // description at full only, instructions at standard+full, safety
+        // recommendations at full — the NOAA detail contract.
+        if (detail === 'full' && alert.description) {
+          output += `\n**Description:**\n${alert.description}\n`;
+        }
+        if (alert.instruction && alert.instruction.length > 0) {
+          output += `\n**Instructions:**\n${alert.instruction.map(line => `- ${line}`).join('\n')}\n`;
+        }
+        if (detail === 'full' && alert.safetyRecommendations && alert.safetyRecommendations.length > 0) {
+          output += `\n**Safety recommendations:**\n${alert.safetyRecommendations.map(line => `- ${line}`).join('\n')}\n`;
+        }
+
+        // Layer 2 of the mandatory attribution (upstream (d)): the original
+        // publisher of this alert, with its authority URI.
+        const publisher = alert.dataSource?.fullName ?? alert.dataSource?.name;
+        if (publisher) {
+          const uri = alert.dataSource?.authorityUri ? ` (${alert.dataSource.authorityUri})` : '';
+          output += `\n**Source:** ${publisher}${uri}\n`;
+        }
+        output += `\n`;
+      }
+
+      if (remainder.length > 0) {
+        output += remainderNote(remainder, 'alert');
+      }
+      if (detail !== 'full') {
+        output += `*Showing standard detail. Use detail="full" for complete alert descriptions.*\n\n`;
+      }
+    }
+  }
+
+  output += GOOGLE_COVERAGE_CAVEAT;
+  output += GOOGLE_FOOTER;
 
   return prependLocationLine({
     content: [{ type: 'text', text: output }]
