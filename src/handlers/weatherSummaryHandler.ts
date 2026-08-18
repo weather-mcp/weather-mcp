@@ -113,6 +113,10 @@ export async function handleGetWeatherSummary(
     // A comparison block is the wrong shape inside a summary; users wanting
     // a comparison call get_forecast directly.
     compare_models: undefined,
+    // Same reasoning as compare_models (D9): the summary's forecast section is
+    // a plain forecast, and a spread view would replace that section with a
+    // different product rather than compose with the summary's other sections.
+    ensemble_spread: undefined,
     detail
   };
 

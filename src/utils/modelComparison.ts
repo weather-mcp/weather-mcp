@@ -166,7 +166,7 @@ export function classifyTempSpread(range: number, tempUnit: 'F' | 'C'): TempSpre
  * `>= 0.25 mm` under metric — these are independently chosen round numbers
  * per unit, not a unit conversion of each other.
  */
-function precipThreshold(precipUnit: 'inch' | 'mm'): number {
+export function precipThreshold(precipUnit: 'inch' | 'mm'): number {
   return precipUnit === 'mm' ? 0.25 : 0.01;
 }
 

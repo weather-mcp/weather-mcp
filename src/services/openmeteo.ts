@@ -18,6 +18,7 @@ import type {
   OpenMeteoMarineResponse,
   OpenMeteoFloodResponse,
   OpenMeteoModelComparisonResponse,
+  OpenMeteoEnsembleResponse,
   ClimateNormals
 } from '../types/openmeteo.js';
 import { Cache } from '../utils/cache.js';
@@ -29,6 +30,7 @@ import { getUserAgent } from '../utils/version.js';
 import { UnitPreferences, IMPERIAL_PREFERENCES } from '../config/units.js';
 import { openMeteoUnitParams } from '../utils/unitFormat.js';
 import { COMPARISON_MODELS } from '../utils/modelComparison.js';
+import { ENSEMBLE_MODEL } from '../utils/ensembleSpread.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -64,6 +66,7 @@ export interface OpenMeteoServiceConfig {
   airQualityURL?: string;
   marineURL?: string;
   floodURL?: string;
+  ensembleURL?: string;
   timeout?: number;
   maxRetries?: number;
 }
@@ -75,6 +78,7 @@ export class OpenMeteoService {
   private airQualityClient: AxiosInstance;
   private marineClient: AxiosInstance;
   private floodClient: AxiosInstance;
+  private ensembleClient: AxiosInstance;
   private maxRetries: number;
   private cache: Cache;
 
@@ -98,6 +102,11 @@ export class OpenMeteoService {
       airQualityURL = 'https://air-quality-api.open-meteo.com/v1',
       marineURL = 'https://marine-api.open-meteo.com/v1',
       floodURL = 'https://flood-api.open-meteo.com/v1',
+      // The ensemble API is its own subdomain, distinct from the plain
+      // forecast host (D3) — a single model's perturbed-member daily
+      // aggregates are a different product from both a plain forecast and
+      // the multi-model comparison, both of which stay on forecastURL.
+      ensembleURL = 'https://ensemble-api.open-meteo.com/v1',
       timeout = CacheConfig.apiTimeoutMs,
       maxRetries = 3
     } = config;
@@ -165,6 +174,16 @@ export class OpenMeteoService {
       }
     });
 
+    // Ensemble client (single-model member spread)
+    this.ensembleClient = axios.create({
+      baseURL: ensembleURL,
+      timeout,
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': getUserAgent()
+      }
+    });
+
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       response => response,
@@ -192,6 +211,11 @@ export class OpenMeteoService {
     );
 
     this.floodClient.interceptors.response.use(
+      response => response,
+      error => this.handleError(error)
+    );
+
+    this.ensembleClient.interceptors.response.use(
       response => response,
       error => this.handleError(error)
     );
@@ -1133,6 +1157,179 @@ export class OpenMeteoService {
       throw new DataNotFoundError(
         'OpenMeteo',
         'No model comparison data available for the specified location'
+      );
+    }
+  }
+
+  /**
+   * Make request to the ensemble API with retry logic. Follows
+   * `makeRequestToFlood`'s shape exactly — retry/backoff/sanitization are
+   * shared via `handleError`, wired identically for every host client.
+   * @private
+   */
+  private async makeRequestToEnsemble<T>(
+    url: string,
+    params: Record<string, string | number>,
+    retries = 0
+  ): Promise<T> {
+    try {
+      const response = await this.ensembleClient.get<T>(url, { params });
+      return response.data;
+    } catch (error) {
+      // Retry on rate limit or server errors
+      if (retries < this.maxRetries) {
+        const shouldRetry =
+          (error as Error).message.includes('rate limit') ||
+          (error as Error).message.includes('server error') ||
+          (error as Error).message.includes('timed out');
+
+        if (shouldRetry) {
+          const baseDelay = Math.pow(2, retries) * 1000;
+          const delay = baseDelay * (0.5 + Math.random() * 0.5);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return this.makeRequestToEnsemble<T>(url, params, retries + 1);
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get a single-model ensemble spread from the Open-Meteo Ensemble API
+   * (`get_forecast`'s `ensemble_spread` flag, `docs/ensemble-spread-plan.md`
+   * D3). One fixed model (`ENSEMBLE_MODEL`, imported from the pure
+   * `ensembleSpread` util — the service imports the constant from the util,
+   * never the reverse, mirroring the corrected `compare_models` arrangement).
+   *
+   * This is **contract, not garnish** (D7): a failed request propagates
+   * sanitized via `makeRequestToEnsemble`'s shared error mapping — there is
+   * no retry-without-models and no degraded fallback to a plain forecast.
+   *
+   * @param latitude - Latitude coordinate (-90 to 90)
+   * @param longitude - Longitude coordinate (-180 to 180)
+   * @param days - Number of forecast days (1-16, default: 7)
+   * @param prefs - Unit preferences (default: imperial)
+   * @returns Single-model ensemble daily data: one unsuffixed control-run
+   *   series plus `_memberNN` perturbed-member series per variable
+   */
+  async getEnsembleSpread(
+    latitude: number,
+    longitude: number,
+    days: number = 7,
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES
+  ): Promise<OpenMeteoEnsembleResponse> {
+    // Validate coordinates
+    validateLatitude(latitude);
+    validateLongitude(longitude);
+
+    // Validate days (same 1-16 range as getForecast / getModelComparison)
+    if (days < 1 || days > 16) {
+      throw new InvalidLocationError(
+        'OpenMeteo',
+        'Forecast days must be between 1 and 16'
+      );
+    }
+
+    // Build parameters
+    const params = this.buildEnsembleParams(latitude, longitude, days, prefs);
+
+    // Check cache first (unit signature keeps imperial/metric responses distinct).
+    // Namespace is 'openmeteo-ensemble' — distinct from 'openmeteo-forecast' and
+    // 'openmeteo-model-comparison' so an ensemble response can never serve or be
+    // served by either. ENSEMBLE_MODEL is a fixed constant, so it is deliberately
+    // NOT a key component (D8); the cache is in-process, so any future change to
+    // the model ships with a restart that clears it.
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('openmeteo-ensemble', latitude, longitude, days, unitSignature(prefs));
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as OpenMeteoEnsembleResponse;
+      }
+
+      const response = await this.makeRequestToEnsemble<OpenMeteoEnsembleResponse>('/ensemble', params);
+      this.validateEnsembleResponse(response);
+
+      // TTL from config, matching getModelComparison's D8 pattern.
+      this.cache.set(cacheKey, response, CacheConfig.ttl.forecast);
+
+      return response;
+    }
+
+    // No caching
+    const response = await this.makeRequestToEnsemble<OpenMeteoEnsembleResponse>('/ensemble', params);
+    this.validateEnsembleResponse(response);
+    return response;
+  }
+
+  /**
+   * Build request parameters for a single-model ensemble request.
+   *
+   * Exactly five daily variables, in a fixed order — **never**
+   * `precipitation_probability_max`: verified live on the ensemble endpoint
+   * (design "Upstream verification" c) to return HTTP 200 with unit
+   * `"undefined"` and all-null control *and* member arrays, because
+   * probability is *derived from* ensembles rather than published by them —
+   * the wet-member fraction the pure module computes from `precipitation_sum`
+   * IS the probability product, so requesting the field would only add a
+   * useless all-null series to every response.
+   * @private
+   */
+  private buildEnsembleParams(
+    latitude: number,
+    longitude: number,
+    days: number,
+    prefs: UnitPreferences = IMPERIAL_PREFERENCES
+  ): Record<string, string | number> {
+    return {
+      latitude,
+      longitude,
+      daily: [
+        'weather_code',
+        'temperature_2m_max',
+        'temperature_2m_min',
+        'precipitation_sum',
+        'wind_speed_10m_max'
+      ].join(','),
+      models: ENSEMBLE_MODEL,
+      forecast_days: days,
+      timezone: 'auto',
+      ...openMeteoUnitParams(prefs)
+    };
+  }
+
+  /**
+   * Validate that a single-model ensemble response contains usable member
+   * data.
+   *
+   * Requires non-empty `daily.time` AND a `temperature_2m_max_member01` key.
+   * Fails loudly with `DataNotFoundError` rather than mis-parsing on two
+   * shapes it must never silently accept (design "Upstream verification" h):
+   *
+   * 1. A **memberless plain-forecast shape** — only unsuffixed keys, no
+   *    `_memberNN` series (e.g. if the ensemble host ever served a plain
+   *    forecast response for some request).
+   * 2. The **multi-model renamed-suffix shape** — with more than one model
+   *    requested, Open-Meteo suffixes member keys with *resolved internal
+   *    names* rather than the requested alias (e.g.
+   *    `temperature_2m_max_member01_ncep_gefs_seamless` instead of plain
+   *    `temperature_2m_max_member01`). This feature requests exactly one
+   *    model (`ENSEMBLE_MODEL`), so this shape is unreachable via our fixed
+   *    constant — guarded anyway, since a validator that mis-parses instead
+   *    of failing loudly is worse than one that's merely defensive.
+   * @private
+   */
+  private validateEnsembleResponse(response: OpenMeteoEnsembleResponse): void {
+    if (!response.daily || !response.daily.time || response.daily.time.length === 0) {
+      throw new DataNotFoundError(
+        'OpenMeteo',
+        'No ensemble spread data available for the specified location'
+      );
+    }
+
+    if (!Array.isArray(response.daily.temperature_2m_max_member01)) {
+      throw new DataNotFoundError(
+        'OpenMeteo',
+        'No ensemble spread data available for the specified location'
       );
     }
   }

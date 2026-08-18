@@ -55,6 +55,7 @@ Get weather forecast for any location worldwide.
 - `include_normals` (optional): Include climate normals for comparison (default: false). Normals are **global**: official NCEI station normals when an `NCEI_API_TOKEN` is configured and the point is in the US, and 1991-2020 normals computed from the Open-Meteo archive everywhere else — which, since the server ships keyless, is the default path. One full-year archive pull is made per location and reused for every date there. For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
 - `include_astronomy` (optional): Include a per-day astronomy block — moon phase name, illumination %, moonrise/moonset, and civil/nautical/astronomical twilight times — plus one next-full-moon / next-new-moon line per response (default: false, daily forecasts only; computed locally, no API calls). Polar days render explicit "none (polar day)" / "none (polar night)" wording
 - `compare_models` (optional): Compare five global weather models and summarize their agreement instead of returning a single forecast (default: false) — see **Model comparison** below
+- `ensemble_spread` (optional): Summarize one model's ensemble members instead of returning a single forecast (default: false) — see **Ensemble spread** below. Mutually exclusive with `compare_models`
 - `source` (optional): "auto" (default), "noaa" (US only), or "openmeteo" (global)
 - `units` (optional): "imperial" (default) or "metric" — see [Units & Localization](#units--localization)
 - Unit overrides (optional): `temperature_unit`, `wind_speed_unit`, `precipitation_unit`, `pressure_unit`, `distance_unit`, `time_format`
@@ -103,6 +104,57 @@ survive, the tool errors rather than presenting a one-model "comparison".
 Note that `get_weather_summary` deliberately **strips** this flag: a comparison
 block is the wrong shape inside a summary. Call `get_forecast` directly.
 
+**Ensemble spread (`ensemble_spread=true`).**
+The sibling question to model comparison: not "do the models agree?" but
+**"how confident is the model itself?"** A global ensemble runs the same model
+many times from slightly perturbed initial conditions, and the spread of those
+members is the model's own uncertainty estimate — one that widens with lead
+time in a way five deterministic models cannot show (5 samples versus 50).
+
+Uses one fixed model: **ECMWF IFS 0.25° (ENS)**, 50 perturbed members plus a
+control run, fetched in a single request. It never dumps 50 forecasts. Per day
+you get a **High/Moderate/Low confidence** label, the p25–p75 interquartile
+band for the daily high and low with the median, how many members produce
+measurable precipitation with the amount range **across the wet members only**,
+a typical wind band, and a conditions consensus with a runner-up bucket named
+when it holds at least a quarter of members.
+
+Every rendered range is the **interquartile band, not the absolute envelope**.
+With 50 members the extremes are single outlying runs, so min–max would read as
+far more uncertainty than the ensemble actually carries; `detail: "full"` adds
+the envelope as its own line.
+
+The **control run** is shown as a headline reference line but is **excluded
+from every statistic, fraction, band, and trimming decision** — it is the
+unperturbed higher-weight run, not an equal-probability member. Its line is
+simply omitted on a day where it has no value.
+
+Honest framing is part of the output: **member fractions are raw model output,
+not calibrated probabilities.** "26 of 50 members" is not "52% chance" in any
+calibrated sense — a confident ensemble can still be wrong. The confidence
+labels and spread bands are project heuristics, not a published standard, and
+the footer says so.
+
+Interactions, each deliberate:
+
+| With | Behavior |
+|------|----------|
+| `compare_models: true` | **Validation error** — the two are mutually exclusive. They are distinct products answering different questions; request one view at a time |
+| `granularity: "hourly"` | **Validation error.** The spread is the requested product, so it fails loudly rather than silently returning a plain hourly forecast |
+| `source: "noaa"` | **Validation error** — the ensemble is Open-Meteo-only. Use `"auto"` or `"openmeteo"` |
+| `source: "auto"` at a US point | Goes straight to the spread; NOAA is never called. The footer discloses that the NOAA/NWS point forecast is not the model being spread |
+| `include_normals`, `include_astronomy`, `include_severe_weather` | **Silently ignored** — the spread is a focused confidence product; all remain available in the standard view |
+| `include_precipitation_probability` | **Silently ignored.** Unlike `compare_models`, where probability was a separately fetched variable, the wet-member fraction *is* the precipitation story here — the ensemble endpoint publishes no probability of its own |
+| `detail` | `summary` → one compact line per day; `standard` → the per-day blocks; `full` → additionally one absolute-envelope line per day. Never member dumps at any level |
+| `days` | Unchanged 1–16. ECMWF's daily ensemble data ends around day 14, so `days: 16` renders what exists and trims the rest under a note; interior gaps are retained and render with their reduced member count |
+| `units` | Values in your units throughout; band thresholds scale for °C and the wet threshold is 0.25 mm rather than 0.01 in |
+
+If fewer than two perturbed members are available, or nothing survives
+trimming, the tool errors rather than presenting a one-member "distribution".
+
+`get_weather_summary` deliberately **strips** this flag too, for the same
+reason it strips `compare_models`.
+
 **Examples:**
 ```
 "Get a 7-day forecast for Paris (48.8534, 2.3488)"
@@ -122,6 +174,7 @@ block is the wrong shape inside a summary. Call `get_forecast` directly.
 - Climate normals comparison (when `include_normals=true`), plus the US record high/low for the first forecast date with attribution "Records: NOAA Regional Climate Centers (ACIS)"
 - Moon phase, moonrise/moonset, twilight times, and next full/new moon (when `include_astronomy=true`, daily only)
 - Model agreement/divergence instead of a single forecast (when `compare_models=true`)
+- Per-day ensemble confidence, interquartile bands, and wet-member fractions instead of a single forecast (when `ensemble_spread=true`)
 - Snow and ice accumulation forecasts (when available)
 - All timestamps in local timezone
 
