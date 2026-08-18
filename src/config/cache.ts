@@ -117,6 +117,12 @@ export const CacheConfig = {
     // grid cells in one request, so caching keeps repeat queries cheap).
     floodDischarge: 6 * HOUR,
 
+    // Google Pollen API (optional global pollen fallback)
+    // Pollen models update ~daily; 6h matches the daily-model posture and
+    // shields the 5,000/month free-tier quota once the 1h air-quality cache
+    // expires. In-memory only — nothing is persisted per Google Maps Platform ToS.
+    googlePollen: 6 * HOUR,
+
     // US daily temperature records (RCC ACIS) — the full 366-slot per-station
     // table. ACIS publishes no rate limits or ToS, so be a good citizen and
     // cache hard: a record changes at most when it is broken, so a stale

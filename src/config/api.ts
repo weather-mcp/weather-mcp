@@ -57,3 +57,35 @@ export const FIRMS_MAP_KEY = process.env.FIRMS_MAP_KEY;
 export function isFIRMSKeyAvailable(): boolean {
   return !!FIRMS_MAP_KEY && FIRMS_MAP_KEY.trim().length > 0;
 }
+
+/**
+ * Google Pollen API key
+ *
+ * OPTIONAL: Create a key in the Google Cloud console
+ * (https://console.cloud.google.com/). Unlike the NCEI and FIRMS keys above,
+ * this one is **not a free registration**: it has a free usage tier, but
+ * **requires a Google Cloud billing account** (credit card on file).
+ *
+ * Benefits of providing a key:
+ * - Global pollen data for 65+ countries including the US
+ * - Grass/Tree/Weed Universal Pollen Index (UPI 0–5)
+ *
+ * If not provided:
+ * - European pollen via CAMS model continues to work
+ * - Pollen outside Europe is unavailable
+ * - No setup required
+ *
+ * Rate limits with key:
+ * - 5,000 lookups per month (free tier)
+ * - ~$10 per 1,000 lookups after free tier
+ *
+ * Setup guide: docs/GOOGLE_POLLEN_KEY_SETUP.md
+ */
+export const GOOGLE_POLLEN_API_KEY = process.env.GOOGLE_POLLEN_API_KEY;
+
+/**
+ * Check if Google Pollen API key is available (key configured)
+ */
+export function isGooglePollenKeyAvailable(): boolean {
+  return !!GOOGLE_POLLEN_API_KEY && GOOGLE_POLLEN_API_KEY.trim().length > 0;
+}
