@@ -65,7 +65,7 @@ function axiosError(opts: { status?: number; data?: unknown; code?: string; mess
 }
 
 const SAMPLE_ALERTS_RESPONSE: GoogleWeatherAlertsResponse = {
-  alerts: [
+  weatherAlerts: [
     {
       alertId: 'abc-123',
       alertTitle: 'Severe Thunderstorm Warning',
@@ -126,7 +126,7 @@ describe('GoogleWeatherService', () => {
 
       const result = await service.getPublicAlerts(-33.8688, 151.2093);
 
-      expect(result).toEqual(SAMPLE_ALERTS_RESPONSE.alerts);
+      expect(result).toEqual(SAMPLE_ALERTS_RESPONSE.weatherAlerts);
     });
   });
 
@@ -141,7 +141,7 @@ describe('GoogleWeatherService', () => {
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
-    it('regionCode-only body (documented no-data shape) resolves to [] and is cached', async () => {
+    it('regionCode-only body resolves to [] and is cached', async () => {
       mockGet.mockImplementation(() => jsonResponse({ regionCode: 'AU' }));
       const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
 
@@ -153,7 +153,7 @@ describe('GoogleWeatherService', () => {
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
-    it('caches an absent alerts field (empty body) as [] and does not re-probe', async () => {
+    it('caches an absent weatherAlerts field (empty body) as [] and does not re-probe', async () => {
       mockGet.mockImplementation(() => jsonResponse({}));
       const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
 
@@ -165,8 +165,8 @@ describe('GoogleWeatherService', () => {
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
-    it('caches an empty alerts array as [] and does not re-probe', async () => {
-      mockGet.mockImplementation(() => jsonResponse({ alerts: [], regionCode: 'AU' }));
+    it('caches an empty weatherAlerts array as [] and does not re-probe', async () => {
+      mockGet.mockImplementation(() => jsonResponse({ weatherAlerts: [], regionCode: 'AU' }));
       const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
 
       const first = await service.getPublicAlerts(10, 10);
@@ -175,6 +175,74 @@ describe('GoogleWeatherService', () => {
       expect(first).toEqual([]);
       expect(second).toEqual([]);
       expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('live-verified shapes (T6)', () => {
+    it('reads weatherAlerts, not the documented alerts field', async () => {
+      // Regression lock: the design plan's web-verified shape said `alerts`.
+      // Reading that name returned [] for every location on Earth.
+      mockGet.mockImplementation(() =>
+        jsonResponse({
+          alerts: [{ alertId: 'wrong-field' }],
+          weatherAlerts: [{ alertId: 'right-field' }],
+          regionCode: 'PH'
+        })
+      );
+      const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
+
+      const result = await service.getPublicAlerts(14.6, 121.0);
+
+      expect(result).toEqual([{ alertId: 'right-field' }]);
+    });
+
+    it('treats the 404 uncovered-region answer as no data, and caches it', async () => {
+      mockGet.mockImplementation(() =>
+        Promise.reject(
+          axiosError({
+            status: 404,
+            data: {
+              error: {
+                code: 404,
+                message: 'Information is not supported for this location. Please try a different location.',
+                status: 'NOT_FOUND'
+              }
+            }
+          })
+        )
+      );
+      const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
+
+      const first = await service.getPublicAlerts(-30, -140);
+      const second = await service.getPublicAlerts(-30, -140);
+
+      expect(first).toEqual([]);
+      expect(second).toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('a 404 without the coverage marker still throws', async () => {
+      // A genuinely malformed request must not be silently cached as
+      // "no alerts here" for the whole TTL.
+      mockGet.mockImplementation(() =>
+        Promise.reject(axiosError({ status: 404, data: { error: { message: 'Not found' } } }))
+      );
+      const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
+
+      await expect(service.getPublicAlerts(1, 1)).rejects.toThrow(
+        'Google Weather API returned an error response.'
+      );
+    });
+
+    it('a 404 carrying a key-rejection marker is a rejected key, not a coverage gap', async () => {
+      mockGet.mockImplementation(() =>
+        Promise.reject(axiosError({ status: 404, data: 'API_KEY_INVALID' }))
+      );
+      const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
+
+      await expect(service.getPublicAlerts(1, 1)).rejects.toThrow(
+        'Google Weather API returned an error response.'
+      );
     });
   });
 

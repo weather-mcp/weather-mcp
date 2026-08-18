@@ -644,6 +644,23 @@ function googleAlertTitle(alert: GoogleWeatherAlert): string {
   return humanizeEventType(alert.eventType) ?? 'Weather alert';
 }
 
+/**
+ * Google publishes CAP-family enums in SCREAMING_CASE (`"MINOR"`,
+ * `"EXPECTED"`, `"POSSIBLE"`) — **live-verified 2026-08-18**, and contrary to
+ * the design's assumption that "Google's severity enum is exactly NOAA's".
+ * It is the same vocabulary in different casing, so it is normalized to the
+ * project's title-case form once, here, before it reaches `capSeverityRank`
+ * or `capSeverityEmoji` — which would otherwise rank every alert `Unknown`
+ * and mark every one ⚪.
+ */
+function capEnumValue(value: string | undefined): string | undefined {
+  if (!value || value.trim().length === 0) {
+    return undefined;
+  }
+  const cleaned = value.trim().toLowerCase().replace(/_/g, ' ');
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
 /** `FLASH_FLOOD` → `Flash Flood`. Returns undefined for an absent/blank enum value. */
 function humanizeEventType(eventType: string | undefined): string | undefined {
   if (!eventType || eventType.trim().length === 0) {
@@ -658,12 +675,40 @@ function humanizeEventType(eventType: string | undefined): string | undefined {
 }
 
 /**
- * Render a UTC instant in the alert's own `timezoneOffset` (`±HH:MM`) — the
- * "times as issued" doctrine applied to a source that publishes the instant
- * and the offset in separate fields. Falls back to `formatPublishedTime`
- * (which renders the instant as published) when the offset is absent or
- * unparseable. Deliberately does all arithmetic in UTC so the rendered string
- * never depends on the server's own timezone.
+ * Parse Google's `timezoneOffset` into minutes east of UTC.
+ *
+ * **Live-verified 2026-08-18:** it is a protobuf *Duration in seconds*
+ * (`"28800s"` for UTC+08:00), not the `±HH:MM` the design plan assumed. The
+ * `±HH:MM` form is still accepted defensively, since misreading an offset
+ * silently shifts a safety-critical expiry time rather than failing loudly.
+ */
+function parseTimezoneOffsetMinutes(timezoneOffset: string | undefined): number | undefined {
+  if (!timezoneOffset) {
+    return undefined;
+  }
+  const raw = timezoneOffset.trim();
+
+  const secondsMatch = /^(-?\d+)s$/.exec(raw);
+  if (secondsMatch) {
+    return Number(secondsMatch[1]) / 60;
+  }
+
+  const hhmmMatch = /^([+-])(\d{2}):?(\d{2})$/.exec(raw);
+  if (hhmmMatch) {
+    const [, sign, hours, minutes] = hhmmMatch;
+    return (sign === '-' ? -1 : 1) * (Number(hours) * 60 + Number(minutes));
+  }
+
+  return undefined;
+}
+
+/**
+ * Render a UTC instant in the alert's own timezone offset — the "times as
+ * issued" doctrine applied to a source that publishes the instant and the
+ * offset in separate fields. Falls back to `formatPublishedTime` (which
+ * renders the instant as published) when the offset is absent or unparseable.
+ * Deliberately does all arithmetic in UTC so the rendered string never depends
+ * on the server's own timezone.
  */
 function formatGoogleAlertTime(
   iso: string | undefined | null,
@@ -672,24 +717,23 @@ function formatGoogleAlertTime(
   if (!iso) {
     return undefined;
   }
-  if (!timezoneOffset) {
-    return formatPublishedTime(iso);
-  }
 
-  const offsetMatch = /^([+-])(\d{2}):?(\d{2})$/.exec(timezoneOffset.trim());
+  const offsetMinutes = parseTimezoneOffsetMinutes(timezoneOffset);
   const instant = Date.parse(iso);
-  if (!offsetMatch || Number.isNaN(instant)) {
+  if (offsetMinutes === undefined || Number.isNaN(instant)) {
     return formatPublishedTime(iso);
   }
 
-  const [, sign, hours, minutes] = offsetMatch;
-  const offsetMinutes = (sign === '-' ? -1 : 1) * (Number(hours) * 60 + Number(minutes));
   const shifted = new Date(instant + offsetMinutes * 60_000);
   const pad = (value: number): string => String(value).padStart(2, '0');
 
+  const sign = offsetMinutes < 0 ? '-' : '+';
+  const absolute = Math.abs(offsetMinutes);
+  const label = `${sign}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
+
   const date = `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
   const time = `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`;
-  return `${date} ${time} (${sign}${hours}:${minutes})`;
+  return `${date} ${time} (${label})`;
 }
 
 /**
@@ -738,7 +782,7 @@ async function handleGoogleAlerts(
 
     // Sort by CAP severity (the NOAA Extreme→Unknown order), then by expiry.
     const sorted = [...alerts].sort((a, b) => {
-      const bySeverity = capSeverityRank(a.severity) - capSeverityRank(b.severity);
+      const bySeverity = capSeverityRank(capEnumValue(a.severity)) - capSeverityRank(capEnumValue(b.severity));
       if (bySeverity !== 0) {
         return bySeverity;
       }
@@ -751,7 +795,7 @@ async function handleGoogleAlerts(
       const bySeverity = new Map<string, number>();
       const byEvent = new Map<string, number>();
       for (const alert of sorted) {
-        const severity = alert.severity ?? 'Unknown';
+        const severity = capEnumValue(alert.severity) ?? 'Unknown';
         bySeverity.set(severity, (bySeverity.get(severity) ?? 0) + 1);
         const event = humanizeEventType(alert.eventType);
         if (event) {
@@ -781,10 +825,19 @@ async function handleGoogleAlerts(
         const event = humanizeEventType(alert.eventType);
         const eventSuffix =
           event && !title.toLowerCase().includes(event.toLowerCase()) ? ` (${event})` : '';
-        output += `${capSeverityEmoji(alert.severity)} **${title}**${eventSuffix}\n`;
+        const severity = capEnumValue(alert.severity);
+        const urgency = capEnumValue(alert.urgency);
+        const certainty = capEnumValue(alert.certainty);
+
+        output += `${capSeverityEmoji(severity)} **${title}**${eventSuffix}\n`;
         output += `---\n`;
 
-        output += `**Severity:** ${alert.severity ?? 'Unknown'} | **Urgency:** ${alert.urgency ?? 'Unknown'} | **Certainty:** ${alert.certainty ?? 'Unknown'}\n`;
+        // Live sampling found publishers that omit all three CAP fields; a line
+        // reading "Unknown | Unknown | Unknown" is noise, so it renders only
+        // when at least one is actually supplied.
+        if (severity || urgency || certainty) {
+          output += `**Severity:** ${severity ?? 'Unknown'} | **Urgency:** ${urgency ?? 'Unknown'} | **Certainty:** ${certainty ?? 'Unknown'}\n`;
+        }
         if (alert.areaName) {
           output += `**Area:** ${alert.areaName}\n`;
         }
@@ -809,13 +862,34 @@ async function handleGoogleAlerts(
         if (alert.instruction && alert.instruction.length > 0) {
           output += `\n**Instructions:**\n${alert.instruction.map(line => `- ${line}`).join('\n')}\n`;
         }
+        // Live-verified as objects (`{ directive, subtext }`), not strings.
+        // The subtext is the publisher's own expansion of the directive, so it
+        // renders alongside rather than being dropped.
         if (detail === 'full' && alert.safetyRecommendations && alert.safetyRecommendations.length > 0) {
-          output += `\n**Safety recommendations:**\n${alert.safetyRecommendations.map(line => `- ${line}`).join('\n')}\n`;
+          const recommendations = alert.safetyRecommendations
+            .map(item => {
+              const directive = item?.directive?.trim();
+              const subtext = item?.subtext?.trim();
+              if (!directive && !subtext) {
+                return undefined;
+              }
+              if (directive && subtext) {
+                return `- ${directive} ${subtext}`;
+              }
+              return `- ${directive ?? subtext}`;
+            })
+            .filter((line): line is string => line !== undefined);
+          if (recommendations.length > 0) {
+            output += `\n**Safety recommendations:**\n${recommendations.join('\n')}\n`;
+          }
         }
 
         // Layer 2 of the mandatory attribution (upstream (d)): the original
         // publisher of this alert, with its authority URI.
-        const publisher = alert.dataSource?.fullName ?? alert.dataSource?.name;
+        // Live-verified shape: `{ publisher, name, authorityUri }` — there is no
+        // `fullName`. `name` is the human-readable short form ("PAGASA");
+        // `publisher` is the enum form, used only as a fallback.
+        const publisher = alert.dataSource?.name ?? alert.dataSource?.publisher;
         if (publisher) {
           const uri = alert.dataSource?.authorityUri ? ` (${alert.dataSource.authorityUri})` : '';
           output += `\n**Source:** ${publisher}${uri}\n`;
@@ -824,7 +898,12 @@ async function handleGoogleAlerts(
       }
 
       if (remainder.length > 0) {
-        output += remainderNote(remainder, 'alert');
+        // Normalized here too, so the remainder line reads "mostly Minor"
+        // rather than echoing Google's raw "MINOR".
+        output += remainderNote(
+          remainder.map(alert => ({ severity: capEnumValue(alert.severity) })),
+          'alert'
+        );
       }
       if (detail !== 'full') {
         output += `*Showing standard detail. Use detail="full" for complete alert descriptions.*\n\n`;

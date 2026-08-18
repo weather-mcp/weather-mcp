@@ -61,11 +61,29 @@ export interface GoogleWeatherServiceConfig {
 
 const PUBLIC_ALERTS_URL = 'https://weather.googleapis.com/v1/publicAlerts:lookup';
 
-// Key-rejection markers are **web-verified only** (design plan upstream (g))
-// — the same family observed live for the sibling Google Pollen service.
-// To be confirmed/adjusted once T6 runs live verification against a real
-// GOOGLE_WEATHER_API_KEY.
+// **Live-verified 2026-08-18** (T6): a rejected key returns HTTP 400 with a
+// body carrying both `API key not valid` and `API_KEY_INVALID`, the same
+// family as the sibling Google Pollen service. `PERMISSION_DENIED` belongs to
+// an API-not-enabled / key-restricted-away project and is kept as a defensive
+// third marker.
 const KEY_REJECTION_MARKERS = ['API_KEY_INVALID', 'API key not valid', 'PERMISSION_DENIED'];
+
+// **Live-verified 2026-08-18** (T6): a region Google does not cover (open
+// ocean, and by extension the excluded countries) answers **HTTP 404
+// `NOT_FOUND`** with this message — *not* the `regionCode`-only HTTP 200 the
+// documentation implied. That is a "no data here" answer rather than a fault,
+// so it resolves to `[]` and is cached; otherwise an uncovered location would
+// re-query Google on every call, burning the quota the TTL exists to protect,
+// and — because alerts are contract, not garnish — would surface a hard error
+// to a caller whose only mistake was asking about the middle of the Pacific.
+//
+// Deliberately matched on this specific message rather than on the status
+// alone: a genuinely malformed request could also 404, and silently caching
+// that as "no alerts here" would mask a real bug for the whole TTL. If Google
+// rewords the message the match simply fails and the throwing path takes over.
+// (Directly mirrors the pollen service's LOCATION_UNAVAILABLE_MARKER, which
+// was found the same way at that feature's live-verification task.)
+const LOCATION_UNSUPPORTED_MARKER = 'Information is not supported for this location';
 
 export class GoogleWeatherService {
   private client: AxiosInstance;
@@ -113,10 +131,12 @@ export class GoogleWeatherService {
   /**
    * Active public weather alerts for a location.
    *
-   * A `regionCode`-only response body (the documented no-data shape — no
-   * active alerts, or a region Google does not cover; Google does not
-   * distinguish the two) resolves to `[]`, and `[]` is cached so an
-   * uncovered region isn't re-probed for the TTL. **No retries.**
+   * Two distinct no-data answers both resolve to `[]`, and `[]` is cached so
+   * neither is re-probed for the TTL (**live-verified 2026-08-18**):
+   *   - a covered region with nothing active → HTTP 200, `weatherAlerts: []`;
+   *   - a region Google does not cover → HTTP 404 `NOT_FOUND` (not the
+   *     `regionCode`-only 200 the documentation implied).
+   * **No retries.**
    *
    * @throws {GoogleWeatherKeyRejectedError} the configured key was rejected
    * @throws {Error} no key configured, invalid coordinates, or any other failure
@@ -169,7 +189,10 @@ export class GoogleWeatherService {
         }
       });
 
-      const alerts = response.data?.alerts;
+      // **Live-verified 2026-08-18:** the array field is `weatherAlerts`, not
+      // the `alerts` the design plan's web-verified shape claimed. Reading the
+      // documented name returned an empty array for every location on Earth.
+      const alerts = response.data?.weatherAlerts;
       if (!alerts || alerts.length === 0) {
         logger.info('Google Weather API returned no active alerts for this location');
         return [];
@@ -182,6 +205,14 @@ export class GoogleWeatherService {
       // fixed, sanitized fields are logged.
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
       const code = axios.isAxiosError(error) ? error.code : undefined;
+
+      // An uncovered region is expected, not a fault — resolve to "no alerts"
+      // so the caller caches it and stops re-probing.
+      if (isLocationUnsupported(error)) {
+        logger.info('Google Weather has no alert coverage for this location', { status });
+        return [];
+      }
+
       logger.error('Google Weather API request failed', undefined, { status, code });
 
       throw mapPublicAlertsError(error);
@@ -215,15 +246,34 @@ function responseBodyText(error: unknown): string {
 }
 
 /**
+ * True for the live-verified "this location has no alert coverage" answer —
+ * HTTP 404 whose body carries `LOCATION_UNSUPPORTED_MARKER` and *no*
+ * key-rejection marker. See that constant for why the match is on the message
+ * rather than the status.
+ */
+function isLocationUnsupported(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 404) {
+    return false;
+  }
+
+  const bodyText = responseBodyText(error);
+  if (KEY_REJECTION_MARKERS.some(marker => bodyText.includes(marker))) {
+    return false;
+  }
+
+  return bodyText.includes(LOCATION_UNSUPPORTED_MARKER);
+}
+
+/**
  * Map a Google Weather API axios failure to a fixed, sanitized `Error` (or
  * `GoogleWeatherKeyRejectedError` for a confirmed key rejection). Copies the
  * `mapPollenApiError`/`mapAreaApiError` fixed-message-per-bucket style; never
  * interpolates `error.message` or the raw response body into a thrown
  * message.
  *
- * The key-rejection markers are **web-verified only** (design plan upstream
- * (g)) — to be confirmed/adjusted once T6 runs live verification against a
- * real key.
+ * The key-rejection markers were **confirmed live at T6**; see
+ * `KEY_REJECTION_MARKERS`. The uncovered-region 404 is handled before this
+ * function is reached (`isLocationUnsupported`).
  */
 function mapPublicAlertsError(error: unknown): Error {
   if (axios.isAxiosError(error)) {

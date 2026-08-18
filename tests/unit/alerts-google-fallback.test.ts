@@ -104,21 +104,23 @@ const emptyGeocoding = {
 function alertFixture(overrides: Partial<GoogleWeatherAlert> = {}): GoogleWeatherAlert {
   return {
     alertId: 'a1',
-    alertTitle: 'Severe Thunderstorm Warning',
+    alertTitle: { text: 'Severe Thunderstorm Warning', languageCode: 'en' },
     eventType: 'SEVERE_THUNDERSTORM',
     areaName: 'Greater Sydney',
     description: 'Damaging winds and large hail expected.',
-    severity: 'Severe',
-    urgency: 'Immediate',
-    certainty: 'Likely',
+    // SCREAMING_CASE, as the live API publishes them (T6).
+    severity: 'SEVERE',
+    urgency: 'IMMEDIATE',
+    certainty: 'LIKELY',
     instruction: ['Move vehicles under cover.'],
-    safetyRecommendations: ['Stay indoors.'],
+    safetyRecommendations: [{ directive: 'Stay indoors.' }],
     startTime: '2026-08-18T02:00:00Z',
     expirationTime: '2026-08-18T08:00:00Z',
-    timezoneOffset: '+10:00',
+    // Seconds duration, as the live API publishes it (T6): +10:00.
+    timezoneOffset: '36000s',
     dataSource: {
-      name: 'BOM',
-      fullName: 'Australian Bureau of Meteorology',
+      publisher: 'AUSTRALIA_BOM',
+      name: 'Australian Bureau of Meteorology',
       authorityUri: 'https://www.bom.gov.au'
     },
     ...overrides
@@ -266,9 +268,9 @@ describe('get_alerts — Google Weather renderer (D5)', () => {
 
   it('sorts by CAP severity and marks each alert with its severity emoji', async () => {
     const text = await render([
-      alertFixture({ alertId: 'minor', alertTitle: 'Minor Flood Advisory', severity: 'Minor' }),
-      alertFixture({ alertId: 'extreme', alertTitle: 'Tsunami Warning', severity: 'Extreme' }),
-      alertFixture({ alertId: 'moderate', alertTitle: 'Wind Advisory', severity: 'Moderate' })
+      alertFixture({ alertId: 'minor', alertTitle: 'Minor Flood Advisory', severity: 'MINOR' }),
+      alertFixture({ alertId: 'extreme', alertTitle: 'Tsunami Warning', severity: 'EXTREME' }),
+      alertFixture({ alertId: 'moderate', alertTitle: 'Wind Advisory', severity: 'MODERATE' })
     ]);
 
     expect(text.indexOf('Tsunami Warning')).toBeLessThan(text.indexOf('Wind Advisory'));
@@ -280,7 +282,7 @@ describe('get_alerts — Google Weather renderer (D5)', () => {
 
   it('caps standard detail at 10 alerts and adds the remainder note', async () => {
     const alerts = Array.from({ length: 14 }, (_, i) =>
-      alertFixture({ alertId: `a${i}`, alertTitle: `Alert ${i}`, severity: 'Minor' })
+      alertFixture({ alertId: `a${i}`, alertTitle: `Alert ${i}`, severity: 'MINOR' })
     );
 
     const text = await render(alerts);
@@ -292,7 +294,7 @@ describe('get_alerts — Google Weather renderer (D5)', () => {
 
   it('caps full detail at 25 alerts and adds the remainder note', async () => {
     const alerts = Array.from({ length: 28 }, (_, i) =>
-      alertFixture({ alertId: `a${i}`, alertTitle: `Alert ${i}`, severity: 'Minor' })
+      alertFixture({ alertId: `a${i}`, alertTitle: `Alert ${i}`, severity: 'MINOR' })
     );
 
     const text = await render(alerts, { detail: 'full' });
@@ -305,8 +307,8 @@ describe('get_alerts — Google Weather renderer (D5)', () => {
   it('renders counts only at detail="summary"', async () => {
     const text = await render(
       [
-        alertFixture({ severity: 'Severe' }),
-        alertFixture({ alertId: 'a2', severity: 'Minor', eventType: 'FLOOD' })
+        alertFixture({ severity: 'SEVERE' }),
+        alertFixture({ alertId: 'a2', severity: 'MINOR', eventType: 'FLOOD' })
       ],
       { detail: 'summary' }
     );
@@ -402,6 +404,103 @@ describe('get_alerts — Google Weather renderer (D5)', () => {
 
     expect(text).not.toContain('**Instructions:**');
     expect(text).not.toContain('**Safety recommendations:**');
+  });
+
+  // ---- Live-verified shape locks (T6) --------------------------------------
+
+  it('normalizes SCREAMING_CASE CAP enums to the project title-case form', async () => {
+    const text = await render([alertFixture()]);
+
+    expect(text).toContain('**Severity:** Severe | **Urgency:** Immediate | **Certainty:** Likely');
+    expect(text).not.toContain('SEVERE');
+    expect(text).not.toContain('IMMEDIATE');
+  });
+
+  it('ranks and colours by the normalized severity, not the raw enum', async () => {
+    // Regression: raw "EXTREME" misses CAP_SEVERITY_ORDER, which would rank
+    // every alert Unknown and mark every one ⚪.
+    const text = await render([alertFixture({ severity: 'EXTREME' })]);
+
+    expect(text).toContain('🔴 **Severe Thunderstorm Warning**');
+  });
+
+  it('omits the CAP line entirely when the publisher supplies none of the three fields', async () => {
+    const text = await render([
+      alertFixture({ severity: undefined, urgency: undefined, certainty: undefined })
+    ]);
+
+    expect(text).not.toContain('**Severity:**');
+    expect(text).toContain('**Area:** Greater Sydney');
+  });
+
+  it('parses timezoneOffset as a seconds duration', async () => {
+    // "36000s" is +10:00, so 02:00Z renders as 12:00 local.
+    const text = await render([alertFixture()]);
+
+    expect(text).toContain('**Effective:** 2026-08-18 12:00 (+10:00)');
+    expect(text).toContain('**Expires:** 2026-08-18 18:00 (+10:00)');
+  });
+
+  it('parses a negative seconds offset', async () => {
+    // -18000s is -05:00, so 02:00Z renders as 21:00 the previous day.
+    const text = await render([alertFixture({ timezoneOffset: '-18000s' })]);
+
+    expect(text).toContain('**Effective:** 2026-08-17 21:00 (-05:00)');
+  });
+
+  it('still accepts a ±HH:MM offset defensively', async () => {
+    const text = await render([alertFixture({ timezoneOffset: '+05:30' })]);
+
+    expect(text).toContain('**Effective:** 2026-08-18 07:30 (+05:30)');
+  });
+
+  it('renders object-shaped safety recommendations, including subtext', async () => {
+    const text = await render(
+      [
+        alertFixture({
+          safetyRecommendations: [
+            { directive: 'Turn on your TV/radio.', subtext: 'Listen for the latest updates.' },
+            { directive: 'Stay indoors.' }
+          ]
+        })
+      ],
+      { detail: 'full' }
+    );
+
+    expect(text).toContain('- Turn on your TV/radio. Listen for the latest updates.');
+    expect(text).toContain('- Stay indoors.');
+  });
+
+  it('drops safety recommendation entries carrying neither directive nor subtext', async () => {
+    const text = await render(
+      [alertFixture({ safetyRecommendations: [{}, { directive: 'Stay indoors.' }] })],
+      { detail: 'full' }
+    );
+
+    expect(text).toContain('- Stay indoors.');
+    expect(text).not.toContain('- undefined');
+  });
+
+  it('attributes to dataSource.name, falling back to publisher', async () => {
+    const named = await render([alertFixture()]);
+    const enumOnly = await render([
+      alertFixture({
+        dataSource: { publisher: 'PHILIPPINES_PAGASA', authorityUri: 'http://example.org' }
+      })
+    ]);
+
+    expect(named).toContain('**Source:** Australian Bureau of Meteorology (https://www.bom.gov.au)');
+    expect(enumOnly).toContain('**Source:** PHILIPPINES_PAGASA (http://example.org)');
+  });
+
+  it('renders an alert that omits times entirely', async () => {
+    const text = await render([
+      alertFixture({ startTime: undefined, expirationTime: undefined, timezoneOffset: undefined })
+    ]);
+
+    expect(text).not.toContain('**Effective:**');
+    expect(text).not.toContain('**Expires:**');
+    expect(text).toContain('**Severe Thunderstorm Warning**');
   });
 
   it('renders the coverage caveat on both empty and non-empty results', async () => {
