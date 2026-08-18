@@ -435,7 +435,20 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 - [x] T2 — GooglePollenService: fetch, cache, error mapping, key hygiene (`sonnet`) — `c247892`
 - [x] T3 — Air-quality handler: trigger, render, failure modes (`opus`) — `43417a8`
 - [x] T4 — index.ts wiring + tool description (`haiku`) — `d9d3c0f`
-- [ ] T5 — Keyless byte-identity sweep + documentation checklist (`opus`, orchestrator)
+- [x] T5 — Keyless byte-identity sweep + documentation checklist (`opus`, orchestrator) — `ba2f15b`
+  - **Keyless byte-identity sweep: PASSED, both points.** Method: `git worktree`
+    of base `f895761` built with `tsc`, then one driver
+    (`scratchpad/sweep.mjs`) spawning **the real `dist/index.js` MCP server**
+    over stdio JSON-RPC and issuing `tools/call get_air_quality` — the same
+    driver, unchanged, against both builds, with `GOOGLE_POLLEN_API_KEY`
+    explicitly unset (`WEATHER_LIGHTNING_PREWARM=false`, driver ends in
+    `process.exit(0)`).
+  - `diff base.out branch.out` → **empty**; md5 identical on both files
+    (`6f8784531d376735a0cf6f2b4a6f141d`).
+  - Both paths verified genuinely exercised, not vacuously empty: Berlin
+    renders the CAMS section with real grains/m³ (Grass 0.8, Mugwort 5.3);
+    Kansas City renders **zero** occurrences of "Pollen". Key string appears
+    in neither stdout nor stderr.
 - [ ] T6 — T-live: keyed live verification + upstream (f) resolution (`opus`, orchestrator; human key gate)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
