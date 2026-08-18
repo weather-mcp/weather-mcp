@@ -487,6 +487,14 @@ Get comprehensive air quality data for any location worldwide.
 **Description:**
 Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index. With `forecast=true`, the full forecast range is shown grouped by calendar day — each day gets a dated header with its peak AQI **and peak UV index** (e.g. `— peak US AQI 63 (Moderate) · UV 10 (Very High)`), plus 6-hour period ranges labeled by the period's peak AQI category. Hours already past are skipped; days with no UV data omit the UV clause.
 
+**Pollen — three states.** Pollen rides the CAMS *European* model on the same Open-Meteo endpoint, so it has exactly three behaviors:
+
+1. **European locations (keyless):** current levels for six species (alder, birch, grass, mugwort, olive, ragweed) in grains/m³, shown automatically. No key needed, and this path never contacts Google.
+2. **Elsewhere, with an optional `GOOGLE_POLLEN_API_KEY`:** a grass/tree/weed **Universal Pollen Index** (0–5) with category labels and an in-season plant list, from Google's Pollen API (65+ countries, including the US). The section carries the attribution line `Source: Includes pollen data from Google`, which Google's API terms require to appear with the data. Only types actually carrying an index render — Google omits the index entirely for out-of-season types. See [GOOGLE_POLLEN_KEY_SETUP.md](./GOOGLE_POLLEN_KEY_SETUP.md).
+3. **Elsewhere, without that key:** no pollen section renders.
+
+The Google fallback fires only when *every* CAMS species comes back empty, so partial European coverage keeps the richer keyless data. It is garnish, never contract: a quota error, timeout, or uncovered country degrades silently to no section and never fails the air-quality call. The one exception is a **rejected key**, which adds a single note (`*Note: GOOGLE_POLLEN_API_KEY was rejected; global pollen data is unavailable.*`) so a misconfiguration isn't hidden forever.
+
 **Examples:**
 ```
 "What's the air quality in Los Angeles?"
@@ -499,6 +507,7 @@ Provides current air quality conditions using the Open-Meteo Air Quality API wit
 - Health risk category and recommendations
 - Pollutant concentrations (PM2.5, PM10, O₃, NO₂, SO₂, CO, NH₃)
 - UV Index with sun protection guidance
+- Pollen — CAMS species in grains/m³ for Europe, or a Universal Pollen Index elsewhere when `GOOGLE_POLLEN_API_KEY` is set
 - Activity recommendations for sensitive groups
 - Optional 5-day hourly forecast
 
