@@ -10,6 +10,7 @@ their own status bookkeeping beyond a link back to this index.
 | Emoji | Meaning |
 |-------|---------|
 | 💡 | Idea — recorded, not yet committed |
+| 📋 | Research register — background catalogue, no feature designed |
 | 📝 | Planned — has a design doc (`docs/<name>-plan.md`) |
 | 🚧 | In progress |
 | ⛔ | Blocked — waiting on something external (noted inline) |
@@ -20,6 +21,14 @@ their own status bookkeeping beyond a link back to this index.
 (📝) → `/impl-plan` + `/run-plan` (🚧) → release (✅). Shipped detail lives in
 [CHANGELOG.md](../../CHANGELOG.md); this index only records that/when an idea
 shipped.
+
+**Standing key policy (applies to triage on this page):** optional API keys must
+always have a usable **free tier**; the server will never *require* a key for
+any tool — every feature keeps a keyless path, even when that path is "this
+data isn't available for your region"; and features that would require a
+**paid** key are out of scope unless there is significant user demand for that
+specific service. Recorded in the README's
+[Optional API keys](../../README.md#optional-api-keys) section.
 
 ---
 
@@ -57,6 +66,7 @@ Sequenced in [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMA
 | Examples folder (`examples/` with captured real output, README-linked) | ✅ | Shipped 2026-08-13 (post-v1.18.0 docs); 8 conversation-first scenario files + regenerable raw output via `npm run examples` (`scripts/capture-examples.mjs`) |
 | Opt-in usage analytics integration | 🚧 | Backend is the separate [analytics-server](https://github.com/weather-mcp/analytics-server) repo; MCP-side plan in [archive/IMPLEMENTATION_PLAN.md](./archive/IMPLEMENTATION_PLAN.md) §6.3 |
 | Split into domain MCP servers (climate, agriculture, …) if scope grows | 💡 | [archive/ROADMAP.md](./archive/ROADMAP.md) "Possible v2.0.0 Direction" |
+| What else the Google Maps Platform key could unlock | 📋 | Research register, catalogue only — no feature designed: [GOOGLE_KEY_OPPORTUNITIES.md](./GOOGLE_KEY_OPPORTUNITIES.md). Follow-on to the v1.22.0 pollen fallback, which introduced the project's first GMP key. Its **#1 candidate is a global weather-alerts fallback** (Google Weather API) — a possible future 💡, not committed. Anything promoted from here inherits the standing key policy above, and per the pollen plan's D10 each feature gets its **own** env var rather than sharing one key |
 
 ### Data & output enhancements
 
@@ -80,7 +90,7 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Forecast uncertainty/confidence | ✅ | FE §13.1 — **fully covered as of v1.21.0.** The *across*-model half shipped in v1.21.0 as `compare_models` ([`docs/plans/multi-model-comparison-plan.md`](../plans/multi-model-comparison-plan.md)): cross-model agreement bands, spreads, and per-day Good/Moderate/Low labels. The *within*-model half also shipped in v1.21.0 as `ensemble_spread` ([`docs/plans/ensemble-spread-plan.md`](../plans/ensemble-spread-plan.md)): ECMWF ENS member distribution, interquartile bands, wet-member fractions, and per-day High/Moderate/Low confidence |
 | Solar radiation / solar power forecasts | 💡 | FE §18.1 |
 | Heating/cooling degree days | 💡 | FE §18.2 |
-| Pollen & allergen forecasts | ✅ | Shipped in v1.18.0 (current-conditions block of `get_air_quality`, auto-shown when non-null; Europe-only via CAMS). FE §6.1's "no free API" blocker went stale — 6 species on the air-quality endpoint the tool already calls. Hourly/daily pollen *forecast* remains open if ever wanted |
+| Pollen & allergen forecasts | ✅ | Shipped in v1.18.0 (current-conditions block of `get_air_quality`, auto-shown when non-null; Europe-only via CAMS). FE §6.1's "no free API" blocker went stale — 6 species on the air-quality endpoint the tool already calls. **The global (non-Europe) gap closed in v1.22.0** via an optional keyed Google Pollen fallback ([`docs/plans/global-pollen-fallback-plan.md`](../plans/global-pollen-fallback-plan.md)): all-six-CAMS-null + `GOOGLE_POLLEN_API_KEY` → grass/tree/weed Universal Pollen Index for 65+ countries incl. the US; keyless behavior byte-identical. Hourly/daily pollen *forecast* remains open if ever wanted |
 
 ### Hardening & fixes
 
@@ -183,6 +193,7 @@ A rejection can be revisited — record the new evaluation here when it is
 | [INTERNATIONAL_COVERAGE_ROADMAP.md](./INTERNATIONAL_COVERAGE_ROADMAP.md) | Sequenced plan for taking the US-only tools global |
 | [FORK_DERIVED_IDEAS.md](./FORK_DERIVED_IDEAS.md) | Ideas surfaced from the 2026-08 review of public forks |
 | [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.md) | Raw idea pool — research notes, data sources, pros/cons per idea |
+| [GOOGLE_KEY_OPPORTUNITIES.md](./GOOGLE_KEY_OPPORTUNITIES.md) | Research register — what else the optional Google Maps Platform key could unlock, ranked; catalogue only |
 | [archive/](./archive/) | Historical documents kept for reference (original build plan, v0.x–v1.6 roadmap) |
 
 Design docs for individual features (`docs/<name>-plan.md`, plus their

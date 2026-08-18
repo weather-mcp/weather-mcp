@@ -359,6 +359,20 @@ pros/cons for each idea. Sections for ideas that have since shipped are marked
 ### 6. Health & Environmental
 
 #### 6.1 Pollen & Allergen Forecasts
+
+> **✅ RESOLVED — the blocker below is obsolete.** The "MAJOR ISSUE: Lack of
+> free, reliable API" con went stale in **v1.18.0**, when current pollen levels
+> shipped inside `get_air_quality` for European locations: six CAMS species in
+> grains/m³, on the Open-Meteo air-quality endpoint the tool *already calls* —
+> free, keyless, no new tool needed. The remaining non-Europe gap closed in
+> **v1.22.0** with an optional keyed Google Pollen fallback (grass/tree/weed
+> Universal Pollen Index for 65+ countries including the US; keyless behavior
+> byte-identical). See
+> [`docs/plans/global-pollen-fallback-plan.md`](../plans/global-pollen-fallback-plan.md)
+> and the pollen row in [README.md](./README.md). The notes below are kept as
+> the historical research record; a hourly/daily pollen *forecast* is the only
+> part still open.
+
 **Description:** Pollen counts and forecasts (tree, grass, weed), mold spore levels.
 
 **Use Cases:**
@@ -386,9 +400,9 @@ pros/cons for each idea. Sections for ideas that have since shipped are marked
 - ⚠️ Pollen data is often localized and incomplete
 - ⚠️ Seasonal relevance
 
-**Priority:** Medium (if free data source found), Low (otherwise)
+**Priority:** ~~Medium (if free data source found), Low (otherwise)~~ — **shipped**
 **Token Cost:** ~200 tokens (new tool)
-**Recommendation:** Research free data sources. If found, implement in v1.2+. Otherwise, skip.
+**Recommendation:** ~~Research free data sources. If found, implement in v1.2+. Otherwise, skip.~~ Superseded: no new tool was needed. Current levels ride `get_air_quality` (v1.18.0 Europe via CAMS, v1.22.0 worldwide via the optional Google key). Only the hourly/daily *forecast* remains open.
 
 ---
 

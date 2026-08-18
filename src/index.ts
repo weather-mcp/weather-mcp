@@ -24,6 +24,7 @@ import { MeteoAlarmService } from './services/meteoalarm.js';
 import { GeoMetService } from './services/geomet.js';
 import { NIFCService } from './services/nifc.js';
 import { FIRMSService } from './services/firms.js';
+import { GooglePollenService } from './services/googlePollen.js';
 import { GeocodingService } from './services/geocoding.js';
 import { LocationStore } from './services/locationStore.js';
 import { blitzortungService } from './services/blitzortung.js';
@@ -175,6 +176,13 @@ const nifcService = new NIFCService();
  * queries with day_range up to 5.
  */
 const firmsService = new FIRMSService();
+
+/**
+ * Initialize the Google Pollen API service for global pollen data fallback.
+ * Optional keyed global pollen fallback; without GOOGLE_POLLEN_API_KEY the
+ * service is never called and European pollen via CAMS continues to work unchanged.
+ */
+const googlePollenService = new GooglePollenService();
 
 /**
  * Initialize the Geocoding service with multi-provider support
@@ -494,7 +502,7 @@ const TOOL_DEFINITIONS = {
 
   get_air_quality: {
     name: 'get_air_quality' as const,
-    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", "pollen count", "allergy day", or health-related environmental conditions. Returns current conditions and an optional forecast grouped by day (up to 7 days / 168 hours via forecast_days). Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO. For European locations, current pollen levels (alder, birch, grass, mugwort, olive, ragweed) are included automatically; pollen data is not available outside Europe. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name.',
+    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", "pollen count", "allergy day", or health-related environmental conditions. Returns current conditions and an optional forecast grouped by day (up to 7 days / 168 hours via forecast_days). Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO. For European locations, current pollen levels (alder, birch, grass, mugwort, olive, ragweed) are included automatically in grains/m³ and no API key is required; elsewhere, a grass/tree/weed Universal Pollen Index (0–5) is included when an optional GOOGLE_POLLEN_API_KEY is configured; without that key, pollen data is not available outside Europe. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -828,7 +836,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_air_quality':
         return await withAnalytics('get_air_quality', async () =>
-          handleGetAirQuality(args, openMeteoService, locationStore, geocodingService)
+          handleGetAirQuality(args, openMeteoService, locationStore, geocodingService, googlePollenService)
         );
 
       case 'get_marine_conditions':

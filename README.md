@@ -8,7 +8,7 @@
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
 
-Weather MCP is a [Model Context Protocol](https://modelcontextprotocol.io) server that connects AI assistants (Claude, Cursor, Cline, Zed, and any other MCP client) to live weather data: forecasts, current conditions, alerts, air quality, marine conditions, lightning, radar, rivers, wildfires, and 85+ years of historical weather. It's built entirely on free public data sources — NOAA, Open-Meteo, USGS, NIFC, NASA FIRMS, RainViewer, and Blitzortung.org — so there is nothing to sign up for and no key to paste in.
+Weather MCP is a [Model Context Protocol](https://modelcontextprotocol.io) server that connects AI assistants (Claude, Cursor, Cline, Zed, and any other MCP client) to live weather data: forecasts, current conditions, alerts, air quality, marine conditions, lightning, radar, rivers, wildfires, and 85+ years of historical weather. It's built entirely on free public data sources — NOAA, Open-Meteo, USGS, NIFC, NASA FIRMS, RainViewer, and Blitzortung.org — so there is nothing to sign up for and no key to paste in. (A few optional keys unlock extras — see [Optional API keys](#optional-api-keys) — but no tool ever requires one.)
 
 ```bash
 claude mcp add weather -- npx -y @dangahagan/weather-mcp@latest
@@ -49,7 +49,7 @@ There are excellent commercial weather MCPs backed by paid APIs and full-time te
 Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
-- **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo.
+- **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Three optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
 - **Fully open source** — MIT licensed, readable TypeScript, 2,161 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
@@ -68,7 +68,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
 | `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
 | `search_location` | Geocode place names to coordinates ("Paris" → 48.85, 2.35) | 🌍 Global |
-| `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance; current pollen levels for European locations; optional day-grouped forecast up to 7 days with per-day peak AQI and UV | 🌍 Global |
+| `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance; current pollen levels for European locations (or worldwide with an optional key); optional day-grouped forecast up to 7 days with per-day peak AQI and UV | 🌍 Global |
 | `get_marine_conditions` | Wave height, swell, ocean currents, Douglas Sea Scale — includes Great Lakes and major US bays; forecast up to 16 days | 🌍 Global |
 | `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery; `composite: true` returns a finished radar map over a base map as an image | 🌍 Global |
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
@@ -166,7 +166,7 @@ npm run build
 
 Then point your MCP client at `node /absolute/path/to/weather-mcp/dist/index.js`.
 
-Requires Node.js 18+. No API keys, tokens, or accounts needed.
+Requires Node.js 18+. No API keys, tokens, or accounts needed — see [Optional API keys](#optional-api-keys) for the three that add optional extras.
 
 ### Works with
 
@@ -253,9 +253,44 @@ Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weath
 | `API_TIMEOUT_MS` | `30000` | Upstream API timeout (5000–120000) |
 | `WEATHER_LIGHTNING_PREWARM` | `true` | Subscribe saved locations' geohashes at startup so `get_lightning_activity` has coverage before the first query. Set `false` to skip this and avoid the persistent MQTT connection at startup. No effect when the lightning tool is disabled. |
 | `LOG_LEVEL` | `1` | 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR (logs go to stderr) |
-| `NCEI_API_TOKEN` | — | Optional [free NCEI token](https://www.ncdc.noaa.gov/cdo-web/token) for official NOAA climate normals (US); falls back to Open-Meteo automatically |
+| `NCEI_API_TOKEN` | — | Optional [free NCEI token](https://www.ncdc.noaa.gov/cdo-web/token) for official NOAA climate normals (US); falls back to Open-Meteo automatically. See [Optional API keys](#optional-api-keys) |
+| `FIRMS_MAP_KEY` | — | Optional [free FIRMS key](https://firms.modaps.eosdis.nasa.gov/api/map_key/) for targeted wildfire queries and up to 5 days of detection history. See [Optional API keys](#optional-api-keys) |
+| `GOOGLE_POLLEN_API_KEY` | — | Optional key for pollen outside Europe (incl. the US). **Requires a Google Cloud billing account** — free tier is 5,000 lookups/month. See [Optional API keys](#optional-api-keys) and [the setup guide](./docs/GOOGLE_POLLEN_KEY_SETUP.md) |
 
 For caching architecture details, see [.github/CACHING.md](./.github/CACHING.md).
+
+## Optional API keys
+
+**The default is the product.** Every one of the 17 tools works with zero keys,
+zero signup, and zero cost — that is the configuration this project is built
+around and the one most people should use. If that's you, you can skip this
+section entirely.
+
+Three optional keys each unlock one extra. Without them the corresponding tool
+still works; it just returns the keyless answer.
+
+| Variable | What it costs | What it adds | Without it |
+|----------|---------------|--------------|------------|
+| [`NCEI_API_TOKEN`](https://www.ncdc.noaa.gov/cdo-web/token) | Free registration (email) | Official NOAA station climate normals for US locations | Normals are computed from the Open-Meteo reanalysis archive — global, and the path virtually every user is already on |
+| [`FIRMS_MAP_KEY`](https://firms.modaps.eosdis.nasa.gov/api/map_key/) | Free registration (email) | Targeted wildfire bbox queries with 1–5 days of detection history | Keyless 24-hour regional detection files — `get_wildfire_info` still works globally |
+| `GOOGLE_POLLEN_API_KEY` | **Free tier, but requires a Google Cloud billing account (credit card on file)** — 5,000 lookups/month free, ~$10/1,000 after. [Setup guide](./docs/GOOGLE_POLLEN_KEY_SETUP.md) | Grass/tree/weed Universal Pollen Index outside Europe, including the US (65+ countries) | European pollen via CAMS still works keyless; elsewhere no pollen section renders |
+
+The NCEI and FIRMS keys are true free registrations. **The Google Pollen key is
+not** — it has a free usage tier, but Google requires a billing account with a
+payment method to issue it at all. That's why it isn't described as simply
+"free" anywhere in these docs, and why it stays strictly optional.
+
+### Standing key policy
+
+So the "genuinely free" promise above stays meaningful, this project holds to
+three rules:
+
+1. **Optional keys must always have a usable free tier.** A key that only makes
+   sense once you're paying doesn't belong here.
+2. **No tool will ever *require* a key.** Every feature has a keyless path, even
+   if that path is "this data isn't available for your region".
+3. **Features that would require a *paid* key are out of scope** unless there's
+   significant user demand for that specific service.
 
 ## Coverage & Limitations
 
@@ -271,6 +306,7 @@ Being honest about what free public data can and can't do:
 | River conditions | ✅ (GloFAS modeled discharge) | Gauge observations + official flood stages via NWPS |
 | Wildfires | ✅ (FIRMS satellite detections) | Named incidents with acreage + containment via NIFC |
 | Fire weather | ✅ (computed Fosberg index + dryness context) | NOAA-published Haines, grassland, red-flag indices |
+| Pollen | 🇪🇺 Europe keyless (CAMS, grains/m³); elsewhere needs an optional key | Universal Pollen Index with `GOOGLE_POLLEN_API_KEY` |
 
 - European alerts are matched at **country level** — the keyless MeteoAlarm feeds carry no region polygons, so warnings for a large country may not affect the requested point; the output says so. Canadian alerts use a real bbox query with polygon-backed features.
 - International current conditions default to **model-interpolated** values at the exact coordinates. `source="metar"` returns a **real instrument reading** instead — but from the nearest airport, which may be tens of km away and up to an hour old. The output always names the station, its distance and bearing, and the observation age, so the tradeoff is visible rather than assumed. METAR coverage follows airports, so remote land and open ocean have real gaps.
@@ -278,6 +314,7 @@ Being honest about what free public data can and can't do:
 - Non-US wildfire results are **satellite heat detections, not managed incidents** — no fire names, sizes, or containment percentages exist in the data, detections can include industrial heat sources or agricultural burns, and a clear result is not an all-clear (cloud cover hides fires; small or new fires evade detection). The output frames all of this explicitly. Keyless data covers the last 24 hours; an optional free [`FIRMS_MAP_KEY`](https://firms.modaps.eosdis.nasa.gov/api/map_key/) unlocks targeted queries and up to 5 days of detection history (`day_range`).
 - Non-US fire weather is a **Fosberg Fire Weather Index computed by this server** from current model values, not an agency-published rating — US locations get NOAA's own Haines/grassland/red-flag indices instead. The output says which it is and defers to national fire authorities; its category bands are a project heuristic.
 - Non-US river discharge is **modeled**, not observed, and has no official flood-stage thresholds — levels are shown relative to recent history and the forecast ensemble. The ~5km model grid means the reported channel may be a few km from the requested point; the output says so when it is.
+- Pollen is **Europe-only without a key**: it rides the CAMS European model on the air-quality endpoint, which returns real grains/m³ in Europe and nothing anywhere else. An optional [`GOOGLE_POLLEN_API_KEY`](#optional-api-keys) fills the gap for 65+ countries including the US, as a grass/tree/weed Universal Pollen Index (0–5) rather than per-species counts. Europe keeps the richer keyless data and never contacts Google.
 - Marine data has limited coastal accuracy and is **not suitable for navigation**.
 - Lightning coverage varies by region (community-operated detector network).
 - Open-Meteo's fair-use limit is 10,000 requests/day; the built-in cache makes this hard to hit in normal use.
