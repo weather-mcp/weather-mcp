@@ -522,7 +522,30 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
     or edited from this session. Please extend its prompt scope to
     `docs/GOOGLE_WEATHER_KEY_SETUP.md` and Google's Weather API pricing/coverage
     pages. Recorded rather than silently skipped.
-- [ ] T6 — T-live: keyed live verification + upstream (g) + D10 free-tier gate (`opus`, orchestrator; human key gate)
+- [x] T6 — T-live: keyed live verification + upstream (g) + D10 free-tier gate (`opus`, orchestrator; human key gate) — `7dcf4a5` (fix) + this commit (docs)
+  - **Human key gate: satisfied.** The maintainer enabled the Weather API and
+    minted a second key on the pollen project, restricted to the Weather API,
+    with per-day quotas capped at 300; stored in gitignored `.env`.
+  - **D10 free-tier gate: PASSED.** One SKU only — "Weather Usage"
+    (`9DB8-727A-ACFE`), Essentials tier, 10,000 free events/month. Resolves
+    upstream (f): there is no separate alerts SKU.
+  - **Upstream (g): resolved, six deviations found and fixed** (`7dcf4a5`) —
+    `weatherAlerts` not `alerts`; SCREAMING_CASE CAP enums; `timezoneOffset`
+    a seconds duration; `safetyRecommendations` objects vs `instruction`
+    strings; `dataSource` without `fullName`; uncovered region → HTTP 404.
+    Full table in the design plan's implementation notes.
+  - Live drivers (serial, `process.exit(0)`, frugal — 11 Google calls total):
+    Manila → 2 real PAGASA warnings with **both** attribution layers;
+    mid-Pacific → honest-empty + caveat (404 path); bogus key → the fixed
+    rejected-key error propagates as a tool error, logs carry only
+    `{status: 400, code: 'ERR_BAD_REQUEST'}`; US/Berlin/Toronto at
+    `LOG_LEVEL=0` → **zero** Google log lines, zero Google attribution.
+  - **Key-grep clean:** the key appears in no driver output, no log, nowhere
+    in the repo, and nowhere in git history.
+  - Setup doc upgraded to `**Last verified:** 2026-08-18 (live-verified)`,
+    correcting its own API-restrictions console path.
+  - **Open follow-up:** `nextPageToken` exists (pagination undocumented
+    upstream); not implemented, recorded in the design plan's follow-ups.
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T5 keyless sweep is

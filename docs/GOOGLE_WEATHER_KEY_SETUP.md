@@ -1,17 +1,20 @@
 # Google Weather API Key Setup
 
-**Last verified:** 2026-08-18 (web-verified; not yet tested against a live key)
+**Last verified:** 2026-08-18 (**live-verified** — key provisioned, every step
+below walked in the console, then exercised against the live API)
 
 > Google's signup flow, pricing, and free-tier terms change over time. This
 > walkthrough is re-verified quarterly by a scheduled check; if a step below
 > doesn't match what you see, the console is right and this doc is stale —
 > please open an issue.
 >
-> The sibling [Pollen key guide](./GOOGLE_POLLEN_KEY_SETUP.md) was walked in
-> the console during provisioning and carries two live-verified corrections to
-> Google's own documentation (an expired promotional credit still advertised,
-> and an editable per-day quota the docs don't mention). Those corrections
-> apply here too. **Trust the console over the docs — including over this one.**
+> The sibling [Pollen key guide](./GOOGLE_POLLEN_KEY_SETUP.md) carries two
+> live-verified corrections to Google's own documentation (an expired
+> promotional credit still advertised, and an editable per-day quota the docs
+> don't mention). Those apply here too. This guide picked up one of its own:
+> the **API restrictions** control is on the *Maps Platform* credentials page,
+> not the general Cloud one — see step 5. **Trust the console over the docs —
+> including over this one.**
 
 This key is **entirely optional**. Without it `get_alerts` still returns
 official warnings for the United States (NOAA), Canada (Environment and
@@ -35,11 +38,12 @@ free registrations), the Google Weather API **requires a Google Cloud billing
 account with a credit card on file**, even to use the free tier. That is the
 same caveat as the Pollen key, and the same billing account serves both.
 
-- **Free tier:** the Weather API bills under a Google Maps Platform Essentials
-  SKU, which includes a monthly allowance at no cost. Check the current SKU
-  and allowance on Google's pricing page before relying on it.
-- **Beyond the allowance:** per-call pricing applies — check Google's current
-  pricing.
+- **Free tier:** verified 2026-08-18 — the Weather API has exactly one SKU,
+  **"Weather Usage"** (`9DB8-727A-ACFE`), in the **Essentials** tier, with
+  **10,000 free events per month**. Alerts bill under it; there is no separate
+  alerts SKU.
+- **Beyond the allowance:** $0.12 per 1,000 events to 100k, dropping in tiers
+  after that. Check Google's current pricing before relying on these numbers.
 - This server caches alert responses in memory for 5 minutes per location, so
   normal personal use stays far inside the free tier.
 
@@ -82,13 +86,22 @@ API or a broader Maps product does not cover it.
 
 ### 4. Create an API key
 
-In **APIs & Services → Credentials**, choose **Create credentials → API key**.
-Copy the key that appears.
+On the [**Google Maps Platform → Credentials**](https://console.cloud.google.com/google/maps-apis/credentials)
+page, choose **Create credentials → API key**. Copy the key that appears.
 
 ### 5. Restrict the key (strongly recommended)
 
-The key's edit page offers **two separate** restriction groups, and only one of
-them is useful here — the same reasoning as the Pollen guide:
+**Use the [Google Maps Platform → Credentials](https://console.cloud.google.com/google/maps-apis/credentials)
+page**, not **APIs & Services → Credentials** — the API-restriction control for
+Maps Platform keys lives on the former. Click the key to open its edit page.
+
+One catch: **APIs that aren't enabled on the project don't appear in the
+"Select APIs" list at all.** If **Weather API** isn't offered, step 3 didn't
+take — which is also the failure mode that later makes a working key look
+rejected.
+
+The edit page offers **two separate** restriction groups, and only one of them
+is useful here — the same reasoning as the Pollen guide:
 
 - **Application restrictions** → choose **None**. *Websites (HTTP referrers)*
   only works for browser JavaScript (this server calls from Node, which sends

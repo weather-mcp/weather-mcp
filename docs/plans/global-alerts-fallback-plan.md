@@ -1,7 +1,9 @@
 # Global Alerts Fallback (Google Weather API) — Design Plan
 
-**Status:** ✅ SETTLED — authored 2026-08-18; reviewed and planned 2026-08-18
-(`docs/global-alerts-fallback-implementation-plan.md`).
+**Status:** ✅ IMPLEMENTED — shipped on `feat/global-alerts-fallback` for
+v1.23.0; live-verified against a real key 2026-08-18. See
+[Implementation notes](#implementation-notes) for what live verification
+changed.
 **Origin:** `docs/planning/GOOGLE_KEY_OPPORTUNITIES.md` #1 — "the killer feature
 for the key. If only one more Google integration ever ships, it should be this
 one."
@@ -432,3 +434,79 @@ its Australia case locks the keyless not-covered message. New
    D10 free-tier gate**, adjusting `mapPublicAlertsError` / types if live
    shapes differ.
 4. Grep all driver output and logs for the key string — must appear nowhere.
+
+
+## Implementation notes (T6, live-verified 2026-08-18)
+
+Executed via `docs/global-alerts-fallback-implementation-plan.md` (T0–T6).
+Keyless byte-identity confirmed against branch base `09cff0b` for all four
+routing paths (Sydney / US / Berlin / Toronto), identical md5, with Berlin
+returning real DWD warnings rather than a vacuous empty.
+
+### D10 free-tier gate — **PASSED**
+
+Google's published pricing list carries exactly **one** Weather API SKU:
+**"Weather Usage"**, SKU `9DB8-727A-ACFE`, **Essentials tier**, **10,000 free
+events/month**, then $0.12/1,000 to 100k. Because there is only one Weather
+SKU, `publicAlerts:lookup` necessarily bills under it — which resolves
+upstream (f)'s open question ("same SKU or a separate one?") as *there is no
+separate alerts SKU*. The standing key policy's "usable free tier" rule is
+satisfied with wide margin: the 5-minute per-location cache caps a single
+polled location at ~8,640 calls/month, and normal use is orders of magnitude
+below that.
+
+### Upstream (g) — resolved, with six real deviations
+
+The web-verified shapes were wrong in six load-bearing ways. All are fixed in
+`7dcf4a5`; each is locked by a regression test.
+
+| # | Documented / assumed | **Live reality** | Consequence had it shipped |
+|---|----------------------|------------------|----------------------------|
+| 1 | Array field `alerts` | **`weatherAlerts`** | `getPublicAlerts` returns `[]` for **every location on Earth** — the feature silently does nothing |
+| 2 | `severity` is "exactly NOAA's" (`Severe`) | **SCREAMING_CASE** (`"SEVERE"`) | Every alert ranks `Unknown` and renders ⚪; severity sort collapses |
+| 3 | `timezoneOffset` is `±HH:MM` | **seconds duration** (`"28800s"`) | Every time silently renders in UTC — a shifted expiry on safety data |
+| 4 | `safetyRecommendations: string[]` | **`{ directive, subtext }[]`** | Renders `- [object Object]` |
+| 5 | `dataSource.fullName` | **`{ publisher, name, authorityUri }`** — no `fullName` | Layer-2 attribution degrades (here it still fell back to `name`) |
+| 6 | Uncovered region → `regionCode`-only HTTP 200 | **HTTP 404 `NOT_FOUND`**, message "Information is not supported for this location" | Mapped to the generic-status branch and **threw** — under the contract posture an ocean point surfaces a hard error, and the no-re-probe cache never populates (the exact pollen-T6 deviation, repeating) |
+
+Other confirmations:
+
+- **`alertTitle` is an object** `{ text, languageCode }` — the loose union
+  written at T1 accepted it unchanged.
+- **`instruction` is `string[]`** (often empty), unlike its sibling.
+- **Rejected key: HTTP 400** with `API_KEY_INVALID` / `API key not valid` —
+  the marker set was correct. Verified live with a bogus key: the fixed
+  actionable message propagates as a tool error and logs carry only
+  `{ status: 400, code: 'ERR_BAD_REQUEST' }`.
+- **Field presence varies widely by publisher.** One sampled PAGASA alert
+  carried no `severity`, no times, and no `instruction` at all; another from
+  the same feed carried all three. The all-optional typing was correct, and
+  the CAP line is now omitted entirely rather than rendering
+  `Unknown | Unknown | Unknown`.
+- **`nextPageToken` exists** (empty string when exhausted) — the docs listed
+  no pagination. Not implemented; see follow-ups.
+- **Routing invariant holds live:** with a valid key set and `LOG_LEVEL=0`,
+  the US, Berlin, and Toronto requests produced **zero** Google log lines and
+  zero Google attribution in their output.
+- **Key hygiene verified:** the key string appears in no driver output, no
+  log, nowhere in the repo, and nowhere in git history.
+
+### Console corrections (setup doc, first field test)
+
+Provisioning found the setup doc's **API restrictions** path wrong: for Maps
+Platform keys it is the **Google Maps Platform → Credentials** page
+(`console.cloud.google.com/google/maps-apis/credentials`), not
+**APIs & Services → Credentials**. Corrected in
+`docs/GOOGLE_WEATHER_KEY_SETUP.md`, which is now stamped live-verified.
+
+### Follow-ups (not blocking, recorded rather than silently dropped)
+
+- **Pagination.** `nextPageToken` is real. Manila returned 2 alerts on one
+  page and the display caps are 10/25, so nothing was truncated in testing —
+  but a location with many concurrent warnings could under-report. Page size
+  is unmeasured. Worth its own small change if a heavily-warned location ever
+  shows a short list.
+- **Quarterly re-check routine (A7).** The scheduled key-doc routine lives
+  outside the repo and could not be located from the implementing session;
+  extending its scope to `docs/GOOGLE_WEATHER_KEY_SETUP.md` and Google's
+  Weather API pricing/coverage pages is an open TODO for the maintainer.
