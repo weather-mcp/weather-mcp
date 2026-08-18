@@ -89,3 +89,35 @@ export const GOOGLE_POLLEN_API_KEY = process.env.GOOGLE_POLLEN_API_KEY;
 export function isGooglePollenKeyAvailable(): boolean {
   return !!GOOGLE_POLLEN_API_KEY && GOOGLE_POLLEN_API_KEY.trim().length > 0;
 }
+
+/**
+ * Google Weather API key
+ *
+ * OPTIONAL: Create a key in the Google Cloud console
+ * (https://console.cloud.google.com/). Unlike the NCEI and FIRMS keys above,
+ * this one is **not a free registration**: it has a free usage tier, but
+ * **requires a Google Cloud billing account** (credit card on file).
+ * The **Weather API** must be enabled on the project.
+ *
+ * Benefits of providing a key:
+ * - Official weather alerts for ~45+ additional territories (Australia, Japan,
+ *   Brazil, Mexico, and others) via the Google Weather API
+ *
+ * If not provided:
+ * - US, Canadian, and European alerts continue to work keyless
+ * - Alerts outside these regions are unavailable
+ * - No setup required
+ *
+ * Rate limits with key:
+ * - Per Google's Weather API free tier
+ *
+ * Setup guide: docs/GOOGLE_WEATHER_KEY_SETUP.md
+ */
+export const GOOGLE_WEATHER_API_KEY = process.env.GOOGLE_WEATHER_API_KEY;
+
+/**
+ * Check if Google Weather API key is available (key configured)
+ */
+export function isGoogleWeatherKeyAvailable(): boolean {
+  return !!GOOGLE_WEATHER_API_KEY && GOOGLE_WEATHER_API_KEY.trim().length > 0;
+}
