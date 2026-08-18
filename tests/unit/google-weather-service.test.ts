@@ -126,7 +126,7 @@ describe('GoogleWeatherService', () => {
 
       const result = await service.getPublicAlerts(-33.8688, 151.2093);
 
-      expect(result).toEqual(SAMPLE_ALERTS_RESPONSE.weatherAlerts);
+      expect(result).toEqual({ alerts: SAMPLE_ALERTS_RESPONSE.weatherAlerts, covered: true });
     });
   });
 
@@ -141,39 +141,39 @@ describe('GoogleWeatherService', () => {
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
-    it('regionCode-only body resolves to [] and is cached', async () => {
+    it('regionCode-only body resolves to a covered-but-empty result and is cached', async () => {
       mockGet.mockImplementation(() => jsonResponse({ regionCode: 'AU' }));
       const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
 
       const first = await service.getPublicAlerts(0, -160);
       const second = await service.getPublicAlerts(0, -160);
 
-      expect(first).toEqual([]);
-      expect(second).toEqual([]);
+      expect(first).toEqual({ alerts: [], covered: true });
+      expect(second).toEqual({ alerts: [], covered: true });
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
-    it('caches an absent weatherAlerts field (empty body) as [] and does not re-probe', async () => {
+    it('caches an absent weatherAlerts field (empty body) as covered-empty and does not re-probe', async () => {
       mockGet.mockImplementation(() => jsonResponse({}));
       const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
 
       const first = await service.getPublicAlerts(10, 10);
       const second = await service.getPublicAlerts(10, 10);
 
-      expect(first).toEqual([]);
-      expect(second).toEqual([]);
+      expect(first).toEqual({ alerts: [], covered: true });
+      expect(second).toEqual({ alerts: [], covered: true });
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
-    it('caches an empty weatherAlerts array as [] and does not re-probe', async () => {
+    it('caches an empty weatherAlerts array as covered-empty and does not re-probe', async () => {
       mockGet.mockImplementation(() => jsonResponse({ weatherAlerts: [], regionCode: 'AU' }));
       const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
 
       const first = await service.getPublicAlerts(10, 10);
       const second = await service.getPublicAlerts(10, 10);
 
-      expect(first).toEqual([]);
-      expect(second).toEqual([]);
+      expect(first).toEqual({ alerts: [], covered: true });
+      expect(second).toEqual({ alerts: [], covered: true });
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
   });
@@ -193,10 +193,10 @@ describe('GoogleWeatherService', () => {
 
       const result = await service.getPublicAlerts(14.6, 121.0);
 
-      expect(result).toEqual([{ alertId: 'right-field' }]);
+      expect(result).toEqual({ alerts: [{ alertId: 'right-field' }], covered: true });
     });
 
-    it('treats the 404 uncovered-region answer as no data, and caches it', async () => {
+    it('reports the 404 uncovered-region answer as covered: false, and caches it', async () => {
       mockGet.mockImplementation(() =>
         Promise.reject(
           axiosError({
@@ -216,8 +216,10 @@ describe('GoogleWeatherService', () => {
       const first = await service.getPublicAlerts(-30, -140);
       const second = await service.getPublicAlerts(-30, -140);
 
-      expect(first).toEqual([]);
-      expect(second).toEqual([]);
+      // The distinction the renderer depends on: no alerts, but *not* an
+      // all-clear — Google never checked this location.
+      expect(first).toEqual({ alerts: [], covered: false });
+      expect(second).toEqual({ alerts: [], covered: false });
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
 

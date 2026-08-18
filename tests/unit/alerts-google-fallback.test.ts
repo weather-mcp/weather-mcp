@@ -73,18 +73,24 @@ function makeNominatimFake(country: string | null): NominatimService {
 interface GoogleFakeOptions {
   keyAvailable?: boolean;
   alerts?: GoogleWeatherAlert[];
+  /**
+   * Whether Google serves this location at all. `false` models the HTTP 404
+   * `NOT_FOUND` answer, which returns no alerts for a completely different
+   * reason than a quiet covered region. Defaults to covered.
+   */
+  covered?: boolean;
   error?: Error;
 }
 
 function makeGoogleFake(options: GoogleFakeOptions = {}): GoogleWeatherService {
-  const { keyAvailable = true, alerts = [], error } = options;
+  const { keyAvailable = true, alerts = [], covered = true, error } = options;
   return {
     isKeyAvailable: vi.fn(() => keyAvailable),
     getPublicAlerts: vi.fn(async () => {
       if (error) {
         throw error;
       }
-      return alerts;
+      return { alerts, covered };
     })
   } as unknown as GoogleWeatherService;
 }
@@ -537,6 +543,43 @@ describe('get_alerts — Google Weather failure posture (D6)', () => {
     expect(text).toContain('No active weather alerts found for this location via the Google Weather API');
     expect(text).toContain('rather than a guarantee that this location is covered');
     expect(text).toContain(MANDATORY_ATTRIBUTION);
+  });
+
+  it('an uncovered region is not rendered as an all-clear', async () => {
+    // The two empty answers mean opposite things. Live testing found Google
+    // 404s for India, Kenya, Hong Kong and the open ocean while answering 200
+    // for Australia and Japan — so an uncovered point must never borrow the
+    // covered point's ✅.
+    const result = await callSydney(makeGoogleFake({ alerts: [], covered: false }));
+    const text = result.content[0].text;
+
+    expect(text).toContain('No alert coverage for this location');
+    expect(text).toContain('this is not an all-clear');
+    expect(text).not.toContain('✅');
+    expect(text).not.toContain('No active weather alerts found');
+  });
+
+  it('an uncovered region swaps in the uncovered caveat, not the covered one', async () => {
+    const result = await callSydney(makeGoogleFake({ alerts: [], covered: false }));
+    const text = result.content[0].text;
+
+    expect(text).toContain('falls outside that aggregation');
+    // The covered caveat's closing clause describes a search that happened;
+    // here nothing was searched, so it must not appear.
+    expect(text).not.toContain('rather than a guarantee that this location is covered');
+    // Attribution is still mandatory — Google was contacted either way.
+    expect(text).toContain(MANDATORY_ATTRIBUTION);
+  });
+
+  it('a covered-but-quiet region keeps the all-clear untouched', async () => {
+    // Guards the other direction: the fix must not have made every empty
+    // result read as uncovered.
+    const covered = (await callSydney(makeGoogleFake({ alerts: [], covered: true }))).content[0].text;
+
+    expect(covered).toContain('✅');
+    expect(covered).toContain('No active weather alerts found for this location via the Google Weather API');
+    expect(covered).not.toContain('No alert coverage for this location');
+    expect(covered).not.toContain('falls outside that aggregation');
   });
 
   it('a rejected key propagates with its fixed sanitized message — no silent degrade', async () => {

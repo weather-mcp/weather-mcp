@@ -617,6 +617,17 @@ const GOOGLE_COVERAGE_CAVEAT =
   `found rather than a guarantee that this location is covered.*\n\n`;
 
 /**
+ * Coverage caveat for the uncovered-region answer (HTTP 404). The shared
+ * caveat above is written for a location Google *does* serve, and its closing
+ * clause ("an empty result means no alerts were found") would be actively
+ * misleading here — nothing was searched at all.
+ */
+const GOOGLE_UNCOVERED_CAVEAT =
+  `*Coverage note: Google aggregates official national alert feeds across ~45+ territories, ` +
+  `and this location falls outside that aggregation. Alerts for this area may still be ` +
+  `published directly by the responsible national weather service.*\n\n`;
+
+/**
  * Google Weather API footer. The final sentence is the **exact mandatory
  * attribution string** required by the Weather API policies — do not reword it
  * (layer 1 of the two-layer attribution; layer 2 is the per-alert `dataSource`
@@ -757,7 +768,10 @@ async function handleGoogleAlerts(
   detail: Detail,
   reverseLookupFailed: boolean
 ): Promise<HandlerResult> {
-  const alerts = await googleWeatherService.getPublicAlerts(resolved.latitude, resolved.longitude);
+  const { alerts, covered } = await googleWeatherService.getPublicAlerts(
+    resolved.latitude,
+    resolved.longitude
+  );
 
   const regionName = countryCode ? regionDisplayName(countryCode) : null;
 
@@ -772,10 +786,20 @@ async function handleGoogleAlerts(
     output += `*Note: historical alerts are not available for this region — showing current alerts only.*\n\n`;
   }
 
-  if (alerts.length === 0) {
-    // Honest empty (D6): Google does not distinguish "no active alerts" from
-    // "region not covered", so the message never claims an all-clear beyond
-    // what was actually asked — the FIRMS empty-result framing.
+  if (alerts.length === 0 && !covered) {
+    // Google answered "I do not cover this place" (HTTP 404). Nothing was
+    // checked, so there is nothing to be reassured by: no ✅, and the text
+    // says out loud that this is not an all-clear. The premise behind the
+    // original single message — that Google returns the same shape for
+    // "quiet" and "uncovered" — was falsified by live testing.
+    output += `ℹ️ **No alert coverage for this location.**\n\n`;
+    output += `The Google Weather API does not cover this area, so **this is not an all-clear** — `;
+    output += `no check for active weather could be made here. A national or local weather service `;
+    output += `may still be issuing warnings.\n\n`;
+  } else if (alerts.length === 0) {
+    // Honest empty (D6): a covered region with nothing active. The message
+    // still credits the source rather than claiming a bare all-clear — the
+    // FIRMS empty-result framing.
     output += `✅ **No active weather alerts found for this location via the Google Weather API.**\n\n`;
   } else {
     output += `⚠️ **${alerts.length} active alert${alerts.length > 1 ? 's' : ''} found**\n\n`;
@@ -911,7 +935,7 @@ async function handleGoogleAlerts(
     }
   }
 
-  output += GOOGLE_COVERAGE_CAVEAT;
+  output += covered ? GOOGLE_COVERAGE_CAVEAT : GOOGLE_UNCOVERED_CAVEAT;
   output += GOOGLE_FOOTER;
 
   return prependLocationLine({

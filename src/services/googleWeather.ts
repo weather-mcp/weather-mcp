@@ -59,6 +59,27 @@ export interface GoogleWeatherServiceConfig {
   apiKey?: string;
 }
 
+/**
+ * The result of a public-alerts lookup.
+ *
+ * `alerts` alone cannot answer the caller's question, because an empty array
+ * has **two live-verified causes that mean opposite things**: a covered region
+ * with nothing active (HTTP 200) and a region Google does not cover at all
+ * (HTTP 404 `NOT_FOUND`). Collapsing both into `[]` forced the renderer to
+ * print one message for both, so an uncovered location read as a green
+ * all-clear — a reassurance nobody had actually established, on safety data.
+ * `covered` carries the distinction the transport already knows.
+ */
+export interface PublicAlertsResult {
+  /** Active alerts. Empty when none are active *or* the region is uncovered. */
+  alerts: GoogleWeatherAlert[];
+  /**
+   * `false` only for the uncovered-region 404. An empty `alerts` with
+   * `covered: false` means **unknown**, not "all clear".
+   */
+  covered: boolean;
+}
+
 const PUBLIC_ALERTS_URL = 'https://weather.googleapis.com/v1/publicAlerts:lookup';
 
 // **Live-verified 2026-08-18** (T6): a rejected key returns HTTP 400 with a
@@ -72,7 +93,8 @@ const KEY_REJECTION_MARKERS = ['API_KEY_INVALID', 'API key not valid', 'PERMISSI
 // ocean, and by extension the excluded countries) answers **HTTP 404
 // `NOT_FOUND`** with this message — *not* the `regionCode`-only HTTP 200 the
 // documentation implied. That is a "no data here" answer rather than a fault,
-// so it resolves to `[]` and is cached; otherwise an uncovered location would
+// so it resolves to an uncovered result (`covered: false`) and is cached rather
+// than thrown; otherwise an uncovered location would
 // re-query Google on every call, burning the quota the TTL exists to protect,
 // and — because alerts are contract, not garnish — would surface a hard error
 // to a caller whose only mistake was asking about the middle of the Pacific.
@@ -87,7 +109,7 @@ const LOCATION_UNSUPPORTED_MARKER = 'Information is not supported for this locat
 
 export class GoogleWeatherService {
   private client: AxiosInstance;
-  private cache: Cache<GoogleWeatherAlert[]>;
+  private cache: Cache<PublicAlertsResult>;
   private readonly apiKey: string | undefined;
 
   constructor(config: GoogleWeatherServiceConfig = {}) {
@@ -131,17 +153,20 @@ export class GoogleWeatherService {
   /**
    * Active public weather alerts for a location.
    *
-   * Two distinct no-data answers both resolve to `[]`, and `[]` is cached so
-   * neither is re-probed for the TTL (**live-verified 2026-08-18**):
-   *   - a covered region with nothing active → HTTP 200, `weatherAlerts: []`;
+   * Two distinct no-data answers both resolve to an empty `alerts` array, and
+   * both are cached so neither is re-probed for the TTL (**live-verified
+   * 2026-08-18**) — but they are told apart by `covered`:
+   *   - a covered region with nothing active → HTTP 200, `weatherAlerts: []`
+   *     → `{ alerts: [], covered: true }`;
    *   - a region Google does not cover → HTTP 404 `NOT_FOUND` (not the
-   *     `regionCode`-only 200 the documentation implied).
+   *     `regionCode`-only 200 the documentation implied)
+   *     → `{ alerts: [], covered: false }`.
    * **No retries.**
    *
    * @throws {GoogleWeatherKeyRejectedError} the configured key was rejected
    * @throws {Error} no key configured, invalid coordinates, or any other failure
    */
-  async getPublicAlerts(latitude: number, longitude: number): Promise<GoogleWeatherAlert[]> {
+  async getPublicAlerts(latitude: number, longitude: number): Promise<PublicAlertsResult> {
     validateLatitude(latitude);
     validateLongitude(longitude);
 
@@ -162,16 +187,16 @@ export class GoogleWeatherService {
       }
     }
 
-    const alerts = await this.fetchPublicAlerts(latitude, longitude);
+    const result = await this.fetchPublicAlerts(latitude, longitude);
 
     if (CacheConfig.enabled) {
-      this.cache.set(cacheKey, alerts, CacheConfig.ttl.alerts);
+      this.cache.set(cacheKey, result, CacheConfig.ttl.alerts);
     }
 
-    return alerts;
+    return result;
   }
 
-  private async fetchPublicAlerts(latitude: number, longitude: number): Promise<GoogleWeatherAlert[]> {
+  private async fetchPublicAlerts(latitude: number, longitude: number): Promise<PublicAlertsResult> {
     // The key rides in the request params, not the logged metadata below —
     // never log or throw this value (see module doc comment).
     const key = this.apiKey as string; // isKeyAvailable() already checked by the caller
@@ -194,11 +219,13 @@ export class GoogleWeatherService {
       // documented name returned an empty array for every location on Earth.
       const alerts = response.data?.weatherAlerts;
       if (!alerts || alerts.length === 0) {
+        // A 200 means Google served this location — it simply has nothing
+        // active. That is a real all-clear, unlike the 404 below.
         logger.info('Google Weather API returned no active alerts for this location');
-        return [];
+        return { alerts: [], covered: true };
       }
 
-      return alerts;
+      return { alerts, covered: true };
     } catch (error) {
       // Deliberately do not pass the raw axios error object to the logger —
       // it carries the request config (including the key in `params`). Only
@@ -210,7 +237,7 @@ export class GoogleWeatherService {
       // so the caller caches it and stops re-probing.
       if (isLocationUnsupported(error)) {
         logger.info('Google Weather has no alert coverage for this location', { status });
-        return [];
+        return { alerts: [], covered: false };
       }
 
       logger.error('Google Weather API request failed', undefined, { status, code });

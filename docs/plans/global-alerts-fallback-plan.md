@@ -277,12 +277,21 @@ historical-not-available note as MeteoAlarm/GeoMet.
 
 ### D6. No-alerts vs failure — an honest empty, loud errors
 
-- **`regionCode`-only response** (no active alerts, or an uncovered region —
-  Google does not distinguish) → `✅ No active weather alerts found for this
-  location via the Google Weather API.` **plus** the coverage caveat: Google
-  aggregates ~45+ territories and matches by provider polygon, so an empty
-  answer is *"no alerts found"*, not a guarantee of coverage — the FIRMS
-  empty-result framing.
+- **No active alerts in a region Google *does* serve** (HTTP 200 with an
+  empty or absent `weatherAlerts`) → `✅ No active weather alerts found for
+  this location via the Google Weather API.` **plus** the coverage caveat:
+  Google aggregates ~45+ territories and matches by provider polygon, so an
+  empty answer is *"no alerts found"*, not a guarantee of coverage — the
+  FIRMS empty-result framing.
+- **An uncovered region** (HTTP 404 `NOT_FOUND`) → a *different* message:
+  `ℹ️ No alert coverage for this location.` stating plainly that **this is
+  not an all-clear**, with its own caveat replacing the clause about an
+  empty search. **Amended post-T6** — this design originally assumed the two
+  cases were indistinguishable ("Google does not distinguish") and gave them
+  one message. Live testing falsified that: covered-but-quiet answers 200
+  and uncovered answers 404, so the ✅ was being printed over a question
+  nobody had asked Google to answer. The service now carries the
+  distinction to the renderer as `PublicAlertsResult.covered`.
 - **Key rejected** → `GoogleWeatherKeyRejectedError` propagates with its
   fixed, actionable message (env var named; suggests checking that the
   Weather API is enabled and the key is unrestricted or Weather-restricted —
@@ -498,6 +507,32 @@ Platform keys it is the **Google Maps Platform → Credentials** page
 (`console.cloud.google.com/google/maps-apis/credentials`), not
 **APIs & Services → Credentials**. Corrected in
 `docs/GOOGLE_WEATHER_KEY_SETUP.md`, which is now stamped live-verified.
+
+### Post-verification amendment — uncovered ≠ all-clear (2026-08-18)
+
+Found while reviewing live output for the pre-PR test pass, not by a failing
+test. D6 originally rendered one message for both empty answers on the stated
+premise that Google returns the same shape for "nothing active" and "not
+covered". T6 itself disproved the premise — it recorded the uncovered answer as
+HTTP 404 `NOT_FOUND` — but the renderer was never revisited, so an uncovered
+point still printed `✅ No active weather alerts found`. Live sampling showed
+this was not a corner case: **India, Kenya, Hong Kong and the open ocean all
+404**, while Australia, Japan, Taiwan, Mexico, Brazil and New Zealand answer
+200. A user asking about Mumbai during monsoon season was getting a green check
+mark for a question that was never asked.
+
+`getPublicAlerts` now returns `PublicAlertsResult` (`{ alerts, covered }`)
+rather than a bare array, `covered` being false only for the marker-matched
+404. The uncovered branch renders `ℹ️ No alert coverage for this location`,
+says explicitly that it is not an all-clear, and swaps in a caveat that does
+not describe a search which never happened. Attribution and the footer are
+unchanged — Google was still contacted.
+
+Both covered paths are **byte-identical to the pre-fix build**, verified by
+diffing live `get_alerts` output for Sydney (covered, quiet) and Manila
+(covered, two live PAGASA alerts). The keyless and NOAA/GeoMet/MeteoAlarm
+paths are untouched by construction: the change lives entirely inside
+`handleGoogleAlerts` and the service.
 
 ### Follow-ups (not blocking, recorded rather than silently dropped)
 
