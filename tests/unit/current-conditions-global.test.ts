@@ -845,3 +845,213 @@ describe('handleGetCurrentConditions — auto-mode NOAA -> Open-Meteo fallback (
     expect(fakes.noaa.getStations).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 8. Thermal stress — frostbite / WBGT (Open-Meteo path) (T3)
+//
+// See docs/heat-cold-stress-plan.md D4 (which wind chill drives the band),
+// D5 (rendering), D6 (gates). On this path the computed wind chill is always
+// echoed in the frostbite line (there is no "Feels Like (Wind Chill)" line
+// on this formatter to avoid duplicating). Bands are computed on the
+// *rounded* effective wind chill / WBGT so the number shown and the band
+// naming it never disagree at an edge. All fixtures below are hand-computed
+// against the formulas in src/utils/thermalStress.ts (see the doc comments
+// there for the NWS wind chill and ABM WBGT formulas).
+// ---------------------------------------------------------------------------
+
+describe('handleGetCurrentConditions — thermal stress (Open-Meteo path)', () => {
+  it('renders the frostbite line, echoing form, for a cold + windy fixture', async () => {
+    // -21°F @ 25 mph -> NA WCI = -52.17°F -> rounds -52°F, "Very High" band.
+    const response = buildOpenMeteoCurrentResponse({
+      temperature_2m: -21,
+      apparent_temperature: -21,
+      relative_humidity_2m: 50,
+      wind_speed_10m: 25,
+    });
+    const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+    const text = textOf(result);
+
+    expect(text).toContain('🥶 **Frostbite risk (Very High):** wind chill -52°F — exposed skin can freeze in 5–10 minutes. Cover all skin and limit time outdoors.');
+  });
+
+  it('calm-air carve-out: wind below 3 mph with air temp <= -18°F still renders the line, using air temp as the effective value', async () => {
+    // 2 mph is below the formula's validity floor, so calculateWindChillF
+    // returns null and the handler substitutes the air temperature itself.
+    const response = buildOpenMeteoCurrentResponse({
+      temperature_2m: -25,
+      apparent_temperature: -25,
+      relative_humidity_2m: 50,
+      wind_speed_10m: 2,
+    });
+    const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+    const text = textOf(result);
+
+    expect(text).toContain('🥶 **Frostbite risk (High):** air temperature -25°F in calm air — exposed skin can freeze in 10–30 minutes. Cover all skin and limit time outdoors.');
+  });
+
+  it('distinguishes wind never reported from measured calm air', async () => {
+    // No wind_speed_10m at all: the substituted air temperature must not be
+    // described as "calm air", and the line flags that wind would shorten it.
+    const response = buildOpenMeteoCurrentResponse({
+      temperature_2m: -25,
+      apparent_temperature: -25,
+      relative_humidity_2m: 50,
+      wind_speed_10m: null,
+    });
+    const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+    const text = textOf(result);
+
+    expect(text).toContain('🥶 **Frostbite risk (High):** air temperature -25°F, wind not reported — exposed skin can freeze in 10–30 minutes, sooner if it is windy. Cover all skin and limit time outdoors.');
+    expect(text).not.toContain('in calm air');
+  });
+
+  it('renders no frostbite line when the effective wind chill is above -18°F', async () => {
+    // 0°F @ 10 mph -> NA WCI = -15.93°F -> rounds -16°F, above the -18°F gate.
+    const response = buildOpenMeteoCurrentResponse({
+      temperature_2m: 0,
+      apparent_temperature: 0,
+      relative_humidity_2m: 50,
+      wind_speed_10m: 10,
+    });
+    const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+    const text = textOf(result);
+
+    expect(text).not.toContain('🥶');
+  });
+
+  it('renders the WBGT heat line, including the italic derivation caveat, for a hot-humid fixture', async () => {
+    // 90°F @ 70% RH -> WBGT = 95.74°F -> rounds 96°F, "Extreme" band.
+    const response = buildOpenMeteoCurrentResponse({
+      temperature_2m: 90,
+      apparent_temperature: 90,
+      relative_humidity_2m: 70,
+      wind_speed_10m: 5,
+    });
+    const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+    const text = textOf(result);
+
+    expect(text).toContain(
+      '🥵 **Heat stress (Extreme):** estimated WBGT 96°F — outdoor exertion is dangerous; rest often, hydrate, and seek shade. *Estimated from temperature and humidity assuming full sun; thresholds vary with acclimatization.*'
+    );
+  });
+
+  it('renders no heat line for a hot-dry fixture whose WBGT rounds below 80', async () => {
+    // 90°F @ 10% RH -> WBGT = 75.37°F -> rounds 75°F, below the 80°F gate.
+    const response = buildOpenMeteoCurrentResponse({
+      temperature_2m: 90,
+      apparent_temperature: 90,
+      relative_humidity_2m: 10,
+      wind_speed_10m: 5,
+    });
+    const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+    const text = textOf(result);
+
+    expect(text).not.toContain('🥵');
+  });
+
+  it('renders no heat line and no warning note when RH is missing on a hot fixture (garnish, not contract)', async () => {
+    const response = buildOpenMeteoCurrentResponse({
+      temperature_2m: 90,
+      apparent_temperature: 90,
+      relative_humidity_2m: null,
+      wind_speed_10m: 5,
+    });
+    const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+    const text = textOf(result);
+
+    expect(text).not.toContain('🥵');
+    expect(text).not.toContain('⚠️');
+  });
+
+  it('produces the same frostbite band from metric prefs as from the imperial equivalent, displayed in °C', async () => {
+    // Same weather as the first test (-21°F / 25 mph), expressed in the units
+    // Open-Meteo would return for metric preferences (-29.44°C / 40.23 km/h).
+    // The band is computed on fixed °F, so it must match; only the displayed
+    // number changes unit.
+    const imperial = await callCurrentConditions(
+      { ...LONDON, units: 'imperial' },
+      buildFakes(buildOpenMeteoCurrentResponse({
+        temperature_2m: -21,
+        apparent_temperature: -21,
+        relative_humidity_2m: 50,
+        wind_speed_10m: 25,
+      }))
+    );
+    const metric = await callCurrentConditions(
+      { ...LONDON, units: 'metric' },
+      buildFakes(buildOpenMeteoCurrentResponse({
+        temperature_2m: -29.44,
+        apparent_temperature: -29.44,
+        relative_humidity_2m: 50,
+        wind_speed_10m: 40.23,
+      }))
+    );
+
+    const imperialText = textOf(imperial);
+    const metricText = textOf(metric);
+
+    expect(imperialText).toContain('🥶 **Frostbite risk (Very High):** wind chill -52°F');
+    expect(metricText).toContain('🥶 **Frostbite risk (Very High):** wind chill -47°C');
+    expect(metricText).toContain('exposed skin can freeze in 5–10 minutes. Cover all skin and limit time outdoors.');
+  });
+
+  describe('frostbite gate boundary (-18°F)', () => {
+    it('renders the line when the effective wind chill rounds to exactly -18°F', async () => {
+      // -10°F @ 3 mph -> NA WCI = -18.19°F -> rounds -18°F (at the gate).
+      const response = buildOpenMeteoCurrentResponse({
+        temperature_2m: -10,
+        apparent_temperature: -10,
+        relative_humidity_2m: 50,
+        wind_speed_10m: 3,
+      });
+      const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+      const text = textOf(result);
+
+      expect(text).toContain('🥶 **Frostbite risk (High):** wind chill -18°F — exposed skin can freeze in 10–30 minutes. Cover all skin and limit time outdoors.');
+    });
+
+    it('renders no line when the effective wind chill rounds to -17°F, just above the gate', async () => {
+      // -9°F @ 3 mph -> NA WCI = -17.06°F -> rounds -17°F (one above the gate).
+      const response = buildOpenMeteoCurrentResponse({
+        temperature_2m: -9,
+        apparent_temperature: -9,
+        relative_humidity_2m: 50,
+        wind_speed_10m: 3,
+      });
+      const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+      const text = textOf(result);
+
+      expect(text).not.toContain('🥶');
+    });
+  });
+
+  describe('WBGT gate boundary (80°F)', () => {
+    it('renders the line when WBGT rounds to exactly 80°F', async () => {
+      // 80°F @ 55% RH -> WBGT = 79.87°F -> rounds 80°F (at the gate).
+      const response = buildOpenMeteoCurrentResponse({
+        temperature_2m: 80,
+        apparent_temperature: 80,
+        relative_humidity_2m: 55,
+        wind_speed_10m: 5,
+      });
+      const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+      const text = textOf(result);
+
+      expect(text).toContain('🥵 **Heat stress (Elevated):** estimated WBGT 80°F — use caution during prolonged outdoor exertion; take breaks and hydrate. *Estimated from temperature and humidity assuming full sun; thresholds vary with acclimatization.*');
+    });
+
+    it('renders no line when WBGT rounds to 79°F, just below the gate', async () => {
+      // 80°F @ 50% RH -> WBGT = 78.64°F -> rounds 79°F (one below the gate).
+      const response = buildOpenMeteoCurrentResponse({
+        temperature_2m: 80,
+        apparent_temperature: 80,
+        relative_humidity_2m: 50,
+        wind_speed_10m: 5,
+      });
+      const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+      const text = textOf(result);
+
+      expect(text).not.toContain('🥵');
+    });
+  });
+});

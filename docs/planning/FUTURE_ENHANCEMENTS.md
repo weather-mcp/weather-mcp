@@ -407,6 +407,34 @@ pros/cons for each idea. Sections for ideas that have since shipped are marked
 ---
 
 #### 6.2 Heat Index & Cold Stress Enhancements
+
+> **✅ RESOLVED (shipped subset) — the "diminishing returns" con below was
+> wrong.** The two safety-relevant halves of this item shipped on the
+> **v1.24.0 line**: **frostbite time-to-onset** (a computed North American Wind
+> Chill Index banded into Environment-Canada-adapted exposure times) and
+> **WBGT heat stress** (the Australian Bureau of Meteorology's simplified
+> estimate banded into flag-condition exertion categories). Both render
+> automatically on `get_current_conditions` — **no new tool and no new
+> parameter** — on the NOAA *and* Open-Meteo paths, gated so moderate-weather
+> output stays byte-identical. The con was right that heat index and wind chill
+> already existed, but wrong about what that bought: those numbers say how it
+> *feels*, never what it *means for the body*, and −40 °F rendered identically
+> in form to −5 °F. As the pros predicted, it needed **no new API** — every
+> input was already fetched on every path, so the whole feature was one pure
+> module plus rendering. See
+> [`docs/plans/heat-cold-stress-plan.md`](../plans/heat-cold-stress-plan.md).
+>
+> **Still open from this item:** "apparent temperature" as listed here is
+> already shipped (NOAA heat index / wind chill; Open-Meteo apparent
+> temperature), so nothing remains there. Descoped deliberately and tracked as
+> 💡 rows in [README.md](./README.md): thermal stress on the **METAR** path
+> (one render path per release — the standing Fosberg-on-METAR precedent) and
+> **forecast-path** per-day WBGT/frostbite on `get_forecast`. The full
+> **Liljegren WBGT** — the occupational gold standard, needing solar radiation
+> and an iterative solve — remains out of scope absent demand for
+> occupational-grade numbers; what ships is the disclosed simplified estimate.
+> The notes below are kept as written for historical context.
+
 **Description:** Enhanced heat/cold stress indices (WBGT, apparent temperature, frostbite risk).
 
 **Use Cases:**

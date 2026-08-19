@@ -44,10 +44,17 @@ import {
   windDirectionFromDegrees,
   relativeHumidityFromDewpoint,
   celsiusToFahrenheit,
+  fahrenheitToCelsius,
   kphToMph,
   mpsToMph,
   knotsToMph
 } from '../utils/units.js';
+import {
+  calculateWindChillF,
+  getFrostbiteRisk,
+  calculateSimplifiedWbgtF,
+  getWbgtCategory
+} from '../utils/thermalStress.js';
 import { milesToKm } from '../utils/distance.js';
 import { DataNotFoundError, InvalidLocationError, ServiceUnavailableError } from '../errors/ApiError.js';
 import { logger } from '../utils/logger.js';
@@ -233,6 +240,119 @@ export async function handleGetCurrentConditions(
 }
 
 /**
+ * What the frostbite line names as the value it was computed from (D4/D5).
+ *
+ * - `'shown'` — a `Feels Like (Wind Chill)` line above already displays it
+ * - `'windChill'` — a real wind chill the line must echo itself
+ * - `'airTempCalm'` — measured wind below the formula's 3 mph floor, so the
+ *   carve-out substituted the air temperature; named as an air temperature
+ *   rather than dressed up as a wind chill it is not
+ * - `'airTempNoWind'` — wind was never reported. Distinct from `'airTempCalm'`
+ *   because claiming "calm air" from a missing measurement asserts a fact
+ *   nobody observed, and the substituted air temperature understates the risk
+ *   whenever it is in fact windy — so the line says wind is unknown and that
+ *   the time could be shorter.
+ */
+type FrostbiteBasis = 'shown' | 'windChill' | 'airTempCalm' | 'airTempNoWind';
+
+/**
+ * Render a fixed-°F value in the caller's preferred temperature unit.
+ *
+ * The thermal-stress indices are computed on fixed °F (so the band is
+ * identical regardless of unit preferences), but any value echoed into the
+ * output has to be shown in the caller's unit like every other temperature.
+ */
+function formatFahrenheitInPrefs(valueF: number, prefs: UnitPreferences): string {
+  const shown = prefs.temperature === 'C' ? fahrenheitToCelsius(valueF) : valueF;
+  return `${Math.round(shown)}${temperatureLabel(prefs)}`;
+}
+
+/**
+ * Render the thermal-stress safety lines shared by both current-conditions
+ * paths (design D4/D5): frostbite time-to-onset on the cold side, an
+ * estimated WBGT exertion band on the hot side.
+ *
+ * Both bands are computed from the **rounded** display value, so the number
+ * shown and the band naming it can never disagree at an edge (the v1.20.0
+ * fire-weather lesson). The two gates are mutually exclusive by construction
+ * — the cold line needs an effective wind chill at or below -18 °F, the hot
+ * line an air temperature at or above 80 °F.
+ *
+ * These lines are garnish, not contract: a missing input, an out-of-domain
+ * value, or a `null` from any pure helper omits the line silently. There is
+ * never a `⚠️ unavailable` note, and NaN never reaches the output.
+ *
+ * @param effectiveWindChillF Wind chill driving the frostbite band — the
+ *   station-published value where there is one, otherwise the computed NA
+ *   Wind Chill Index, otherwise (calm air, D4 carve-out) the air temperature
+ * @param tempF Air temperature in °F, gating the WBGT computation
+ * @param relativeHumidity Relative humidity in percent, or `null`
+ * @param basis How the frostbite line states what it was computed from:
+ *   `'shown'` when a `Feels Like (Wind Chill)` line above already displays it,
+ *   `'windChill'` when the line must echo a real wind chill, `'airTempCalm'`
+ *   when the calm-air carve-out substituted the air temperature — which is
+ *   named as such rather than as a "wind chill", because it is not one
+ */
+function formatThermalStress(
+  effectiveWindChillF: number | null,
+  tempF: number,
+  relativeHumidity: number | null,
+  prefs: UnitPreferences,
+  basis: FrostbiteBasis
+): string {
+  let output = '';
+
+  // Cold side: frostbite time-to-onset for exposed skin.
+  if (effectiveWindChillF !== null) {
+    const roundedWindChillF = Math.round(effectiveWindChillF);
+    if (roundedWindChillF <= DisplayThresholds.thermalStress.showFrostbiteAtWindChillF) {
+      const risk = getFrostbiteRisk(roundedWindChillF);
+      if (risk) {
+        const shown = formatFahrenheitInPrefs(roundedWindChillF, prefs);
+        let lead = '';
+        let trail = '';
+        switch (basis) {
+          case 'shown':
+            trail = ' at this wind chill';
+            break;
+          case 'windChill':
+            lead = `wind chill ${shown} — `;
+            break;
+          case 'airTempCalm':
+            lead = `air temperature ${shown} in calm air — `;
+            break;
+          case 'airTempNoWind':
+            lead = `air temperature ${shown}, wind not reported — `;
+            trail = ', sooner if it is windy';
+            break;
+        }
+        output += `🥶 **Frostbite risk (${risk.level}):** ${lead}exposed skin can freeze in ${risk.timeToFrostbite}${trail}. Cover all skin and limit time outdoors.\n`;
+      }
+    }
+  }
+
+  // Heat side: estimated WBGT exertion band. Gated on air temperature first
+  // so no work happens on the cold side of the year (D6).
+  if (tempF >= DisplayThresholds.temperature.showHeatIndex && relativeHumidity !== null) {
+    const wbgtF = calculateSimplifiedWbgtF(tempF, relativeHumidity);
+    if (wbgtF !== null) {
+      const roundedWbgtF = Math.round(wbgtF);
+      if (roundedWbgtF >= DisplayThresholds.thermalStress.showWbgtF) {
+        const category = getWbgtCategory(roundedWbgtF);
+        if (category) {
+          // The band descriptions are written as standalone sentences; here
+          // the clause follows a dash mid-sentence.
+          const action = category.description.charAt(0).toLowerCase() + category.description.slice(1);
+          output += `🥵 **Heat stress (${category.level}):** estimated WBGT ${formatFahrenheitInPrefs(roundedWbgtF, prefs)} — ${action} *Estimated from temperature and humidity assuming full sun; thresholds vary with acclimatization.*\n`;
+        }
+      }
+    }
+  }
+
+  return output;
+}
+
+/**
  * Format current conditions from NOAA station observations (US locations).
  */
 async function formatNOAACurrentConditions(
@@ -366,13 +486,53 @@ async function formatNOAACurrentConditions(
       }
     }
 
-    // Show wind chill when temperature is low and wind chill is available
+    // Show wind chill when temperature is low and wind chill is available.
+    // The station-published value, when there is one, is also what drives the
+    // frostbite band below (D4) — the risk statement and the displayed
+    // "feels like" number must never be computed from different inputs.
+    let effectiveWindChillF: number | null = null;
+    let windChillLineShown = false;
     if (props.windChill) {
       const windChillF = convertToFahrenheit(props.windChill.value, props.windChill.unitCode);
-      if (windChillF !== null && tempF < DisplayThresholds.temperature.showWindChill && windChillF < tempF) {
-        output += `**Feels Like (Wind Chill):** ${formatTemperatureQV(props.windChill, prefs)}\n`;
+      if (windChillF !== null) {
+        effectiveWindChillF = windChillF;
+        if (tempF < DisplayThresholds.temperature.showWindChill && windChillF < tempF) {
+          output += `**Feels Like (Wind Chill):** ${formatTemperatureQV(props.windChill, prefs)}\n`;
+          windChillLineShown = true;
+        }
       }
     }
+
+    // No published wind chill: compute the NA Wind Chill Index from the
+    // station's temperature and sustained wind, converted inline the same way
+    // the wind section below converts it. Below the formula's 3 mph floor (or
+    // with no wind reported at all) the air temperature itself is the
+    // effective value — calm -50 °F air freezes exposed skin regardless of
+    // wind, so suppressing the warning there would fail exactly when it
+    // matters (D4 carve-out; the pure helper stays faithful to the published
+    // domain and returns null).
+    let basis: FrostbiteBasis = windChillLineShown ? 'shown' : 'windChill';
+    if (effectiveWindChillF === null) {
+      const windMph = props.windSpeed && props.windSpeed.value !== null
+        ? (props.windSpeed.unitCode.includes('km_h')
+            ? props.windSpeed.value * 0.621371
+            : props.windSpeed.value * 2.23694)
+        : null;
+      const computed = windMph !== null ? calculateWindChillF(tempF, windMph) : null;
+      effectiveWindChillF = computed ?? tempF;
+      basis =
+        computed !== null ? 'windChill' : windMph !== null ? 'airTempCalm' : 'airTempNoWind';
+    }
+
+    // Safety context sits adjacent to the number it qualifies (D5). The band's
+    // basis is echoed unless the Feels Like (Wind Chill) line above shows it.
+    output += formatThermalStress(
+      effectiveWindChillF,
+      tempF,
+      props.relativeHumidity.value,
+      prefs,
+      basis
+    );
   }
 
   // 24-hour temperature range
@@ -792,6 +952,29 @@ async function formatOpenMeteoCurrentConditions(
         output += `**Feels Like:** ${Math.round(current.apparent_temperature)}${tempU}\n`;
       }
     }
+
+    // Thermal-stress safety context (D4/D5). The frostbite band is computed
+    // from a real wind chill, never from `apparent_temperature` — that is a
+    // Steadman apparent temperature, a different model making a different
+    // claim. Because the Feels Like line above therefore does not show this
+    // band's basis, the frostbite line always echoes its own value.
+    const thermalTempF = prefsTempToFahrenheit(current.temperature_2m, prefs);
+    const thermalWindMph = current.wind_speed_10m != null
+      ? prefsWindToMph(current.wind_speed_10m, prefs)
+      : null;
+    const computedWindChillF =
+      thermalWindMph !== null ? calculateWindChillF(thermalTempF, thermalWindMph) : null;
+    output += formatThermalStress(
+      computedWindChillF ?? thermalTempF,
+      thermalTempF,
+      current.relative_humidity_2m ?? null,
+      prefs,
+      computedWindChillF !== null
+        ? 'windChill'
+        : thermalWindMph !== null
+          ? 'airTempCalm'
+          : 'airTempNoWind'
+    );
   }
 
   // Today's range from the single-day daily block
