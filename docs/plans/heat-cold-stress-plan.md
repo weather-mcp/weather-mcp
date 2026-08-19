@@ -378,7 +378,8 @@ Not acted on, recorded instead:
   the mitigation, but both paths hold inputs that could bound it
   (`cloud_cover`, wind, the observation timestamp and station timezone).
   Deliberately left as a design question rather than changed days before a
-  tag — a candidate follow-up.
+  tag, and confirmed as such at release time — recorded as the 💡 row
+  "Qualify the WBGT band by sun/cloud/time of day" in the planning index.
 - Three copies of the °F→caller-unit rounding helper now exist in the
   handler's neighbourhood (`formatFahrenheitInPrefs`, a local `toPref`, and
   `normals.ts`'s `normalTempToPref`); consolidating touches paths with their
