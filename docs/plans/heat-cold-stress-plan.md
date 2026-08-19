@@ -1,6 +1,6 @@
 # Heat/Cold Stress Indices (WBGT + Frostbite Time-to-Onset) — Design Plan
 
-**Status:** DESIGN SETTLED (2026-08-18) — ready for `/impl-plan`
+**Status:** IMPLEMENTED (2026-08-18) — shipped on `feat/heat-cold-stress` for the v1.24.0 line
 **Parent:** `docs/planning/FUTURE_ENHANCEMENTS.md` §6.2; planning-index row "Heat/cold stress extras (WBGT, frostbite time-to-onset)"
 **Target release:** next minor (v1.24.0 line; version settled at release time)
 **Branch (for /impl-plan):** `feat/heat-cold-stress` off `main`
@@ -303,3 +303,96 @@ Three disclosed truths, all in-output (D5) or in doc comments (D2):
 - [ ] README.md, CHANGELOG.md, CLAUDE.md, `docs/TOOLS.md`
 - [ ] `docs/planning/README.md` + FE §6.2 — status flips and descoped-idea rows
 - [ ] Move this doc to `docs/plans/` at completion (project convention)
+
+
+---
+
+## Implementation notes (filled at completion, 2026-08-18)
+
+Executed via `docs/plans/heat-cold-stress-implementation-plan.md` (T1–T5) on
+`feat/heat-cold-stress`, branched off `main` @ `8e5af48` (v1.23.0).
+
+### What shipped, against the checklist
+
+Every box in the checklist above is satisfied. Final gate: `npm run build`
+0 errors, `npm test` **2,330 passing** (95 files, up from 2,274), `npm audit`
+0 vulnerabilities.
+
+- `src/utils/thermalStress.ts` — the four D2 functions, pure with zero imports,
+  `null` sentinel throughout (deliberately *not* Fosberg's `NaN`).
+- `src/config/displayThresholds.ts` — the two D6 gates.
+- `src/utils/units.ts` — `fahrenheitToCelsius`, the mechanical inverse the
+  caller's-unit display needed (the `knotsToMph` precedent).
+- `src/handlers/currentConditionsHandler.ts` — one shared `formatThermalStress`
+  renderer used by both paths, so wording cannot drift between them.
+- `src/index.ts` — the D8 half-sentence; **no inputSchema change**.
+
+### Deviation from D5: the calm-air carve-out names its own quantity
+
+D5 specified the echoing form as `wind chill −47°F — …`. Under the D4 calm-air
+carve-out the echoed value is *not* a wind chill — it is the air temperature,
+substituted because calm −50 °F air freezes skin anyway — and rendering it as
+"wind chill −25°F" mislabels the quantity in a safety line, contradicting D7's
+honest-framing mandate. The basis is therefore a three-way discriminator
+(`'shown' | 'windChill' | 'airTempCalm'`) and the carve-out renders
+`air temperature −25°F in calm air — …`. The design settled *which value* to
+use; it never mandated what to call it. Found by reading rendered output, not
+by a failing test — the compare_models/pollen lesson repeating.
+
+A second, smaller tightening: rather than hardcoding "NOAA published-`windChill`
+⇒ no echo", the handler tracks whether the `Feels Like (Wind Chill)` line
+actually rendered and echoes whenever it did not. This satisfies D4's "the
+band's basis is always visible" in the edge case where a published wind chill
+exists but the existing display gate does not fire.
+
+### Live verification sweep (2026-08-18, against the built dist)
+
+Byte-identity probes were run **back-to-back** against a `8e5af48` worktree
+build (the feed-drift lesson), driver with `process.exit(0)`, no parallel live
+drivers:
+
+| Probe | Result |
+|-------|--------|
+| San Francisco `source: "noaa"`, imperial **and** metric (59 °F / 15 °C) | **byte-identical** to base |
+| Milan `source: "openmeteo"`, imperial **and** metric (72 °F / 22 °C) | **byte-identical** to base |
+| San Francisco `source: "metar"` | **byte-identical** to base (out-of-scope path) |
+
+All five in one diff: **identical md5** (`37b6d3db05a0033587d87cb8a708228d`).
+
+Extreme-condition probes:
+
+| Probe | Rendered |
+|-------|----------|
+| Vostok, `openmeteo`, imperial (−70 °F, 19 mph) | `🥶 Frostbite risk (Extreme): wind chill -113°F — … under 2 minutes` |
+| Vostok, metric | same band, `-81°C` — metric/imperial band invariance confirmed |
+| New Orleans, `noaa` (90 °F, 71 % RH) | `🥵 Heat stress (Extreme): estimated WBGT 95°F` + italic caveat, directly under `Feels Like (Heat Index): 105°F` |
+| New Orleans, metric | same band, `35°C` |
+| Kuwait City, `openmeteo` (97 °F, 26 % RH) | `🥵 Heat stress (High): estimated WBGT 87°F` + caveat |
+| Phoenix, `noaa` (109 °F, 15 % RH) | `Heat stress (Extreme)`, WBGT 92 °F — the hot-*dry* case still scoring high, which is the ABM full-sun bias the mandatory caveat exists to disclose |
+
+The Vostok probe reproduced the design header's upstream figure (≈ −114 °F;
+−113/−114 across runs as the feed refreshed). It also demonstrated *why* D4
+forbids banding off `apparent_temperature`: `Feels Like` read −86 °F while the
+wind chill driving the band was −113 °F, a 27° gap that would otherwise have
+been invisible to the reader.
+
+**Not live-verifiable this release:** the NOAA *cold* path. It is northern
+August and no US station sat anywhere near a −18 °F wind chill, so that path
+(published-`windChill` band, computed-WCI band, and the NOAA calm-air
+carve-out) rests on the unit fixtures in `tests/unit/thermal-stress-handler.test.ts`
+rather than on live output. The Open-Meteo cold path *was* live-verified.
+Likewise the calm-air carve-out itself: every extreme-cold point probed was
+windy, so it is unit-tested only.
+
+### Test lock
+
+`tests/unit/thermal-stress-handler.test.ts` is new (NOAA path, fake services);
+`tests/unit/current-conditions-global.test.ts` was **appended to only** (194
+insertions, zero deletions). Passing unedited throughout, as designed:
+`metar-handler.test.ts`, `noaa-staleness.test.ts`, `openmeteo-current.test.ts`,
+`fireWeather.test.ts`, `fireWeatherContext.test.ts`, and every pre-existing case
+in `current-conditions-global.test.ts`.
+
+Standing caveat observed: `tests/unit/bounds-checking.test.ts` carries a
+machine-timing perf assertion (10 ms bound) that flakes under load and passes
+in isolation. It flaked once on the baseline run and never again.

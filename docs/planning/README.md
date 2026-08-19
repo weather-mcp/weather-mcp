@@ -84,7 +84,9 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Better precipitation-type parsing (rain/snow/freezing rain) | 💡 | FE §3.2 |
 | Aviation weather tool (METAR/TAF) | 💡 | FE §4 — **observation half closed:** shipped as `source: 'metar'` on `get_current_conditions` in v1.17.0 ([`docs/plans/metar-plan.md`](../plans/metar-plan.md)), and the raw METAR text is in the output. What remains open is the pilot-facing product: TAF forecasts (the `/api/data/taf` endpoint is verified working) and a dedicated aviation tool, both explicitly out of scope for v1.17.0 (metar-plan D7) |
 | Drought indices (US Drought Monitor) | 💡 | FE §5.2 |
-| Heat/cold stress extras (WBGT, frostbite time-to-onset) | 📝 | FE §6.2; design settled 2026-08-18 — [`docs/heat-cold-stress-plan.md`](../heat-cold-stress-plan.md). Automatic gated lines on `get_current_conditions` (no new parameter): computed NA wind-chill → Environment-Canada-banded frostbite time-to-onset, and ABM simplified WBGT → exertion-risk bands. Zero new API variables — pure computation from already-fetched inputs (the Fosberg pattern). METAR path and forecast path explicitly descoped |
+| Thermal stress on the METAR path (frostbite/WBGT via `source: 'metar'`) | 💡 | A METAR carries temperature, dewpoint, and wind — enough for both indices — but the project ships one render path per release. Natural companion to the deferred METAR-path Fosberg above; a single "computed indices on METAR" release would close both ([`docs/plans/heat-cold-stress-plan.md`](../plans/heat-cold-stress-plan.md) Scope) |
+| Forecast-path thermal stress (per-day WBGT / frostbite on `get_forecast`) | 💡 | Current conditions only, exactly like fire weather. Answers "will it be safe to work outside Thursday?" rather than "is it safe now?" ([`docs/plans/heat-cold-stress-plan.md`](../plans/heat-cold-stress-plan.md) Scope) |
+| Heat/cold stress extras (WBGT, frostbite time-to-onset) | ✅ | Shipped on `feat/heat-cold-stress` targeting the v1.24.0 line — [`docs/plans/heat-cold-stress-plan.md`](../plans/heat-cold-stress-plan.md). Automatic gated lines on `get_current_conditions` (no new parameter, no schema change), both the NOAA and Open-Meteo paths: computed NA wind chill → Environment-Canada-banded frostbite time-to-onset, and ABM simplified WBGT → exertion-risk bands. Zero new API variables — pure computation from already-fetched inputs (the Fosberg pattern); moderate-weather output byte-identical. METAR path and forecast path descoped, tracked as 💡 rows below |
 | Smoke forecasts (NOAA HRRR-Smoke) | 💡 | FE §7.2 |
 | Storm reports (NOAA SPC, post-storm verification) | 💡 | FE §8.2 |
 | Seasonal outlooks + ENSO status (NOAA CPC) | 💡 | FE §9 |
@@ -155,6 +157,7 @@ One line per idea that graduated; see [CHANGELOG.md](../../CHANGELOG.md) for rel
 | Global fire weather — computed Fosberg FFWI + dryness context (ICR Phase 5) | ✅ v1.20.0 |
 | Multi-model forecast comparison (`compare_models`), climate-normals hardening | ✅ v1.21.0 |
 | Single-model ensemble spread (`ensemble_spread`, ECMWF ENS) — closes FE §13.1 | ✅ v1.21.0 |
+| Heat/cold stress context — frostbite time-to-onset + WBGT on `get_current_conditions` (closes FE §6.2's safety halves) | ✅ v1.24.0 line |
 
 ---
 

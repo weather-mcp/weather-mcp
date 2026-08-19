@@ -230,7 +230,8 @@ least 10" is a floor, not a measurement of exactly 10.
 
 Limits on this source: `include_normals` works as usual, but
 `include_fire_weather` renders a one-line note instead of indices — Haines
-and transport wind need NOAA gridpoint data a METAR does not carry. TAF
+and transport wind need NOAA gridpoint data a METAR does not carry — and the
+thermal-stress lines do not render on this source. TAF
 (aerodrome forecasts) and a dedicated aviation tool are out of scope;
 `get_weather_summary` does not pass this source through.
 
@@ -249,6 +250,7 @@ What's the weather right now in Tokyo?
 - Snow depth on ground (when available)
 - Climate normals comparison (when `include_normals=true`), plus the US record high/low for today's date with attribution "Records: NOAA Regional Climate Centers (ACIS)"
 - Fire weather indices (when `include_fire_weather=true`) — Haines Index, Grassland Fire Danger, Red Flag Threat, mixing height, transport winds, as published by NOAA
+- Thermal-stress context in extreme conditions (automatic, see below)
 - All timestamps in local timezone
 
 **Returns (international, via Open-Meteo):**
@@ -261,6 +263,7 @@ What's the weather right now in Tokyo?
   Index computed by this server** from the current temperature, humidity, and
   sustained wind, with its category, plus a dryness-context block (vapour-pressure
   deficit, topsoil moisture) when the model reports those values
+- Thermal-stress context in extreme conditions (automatic, see below)
 - All timestamps in the location's local timezone
 
 Visibility, snow depth, and cloud layer detail are not available on the
@@ -271,6 +274,53 @@ API, and no equivalent exists globally. The Fosberg index shown instead is
 the output says so and defers to national fire authorities, and its category
 bands are a project heuristic rather than an agency scale. It renders anywhere
 the model path runs, including US locations queried with `source="openmeteo"`.
+
+**Thermal stress (automatic, both the US and international paths):**
+
+Two safety lines render directly after the temperature/feels-like block, with
+no parameter to enable them and nothing shown in moderate weather. They are
+mutually exclusive by construction.
+
+- 🥶 **Frostbite risk** — gate: effective wind chill at or below **−18 °F**.
+  Bands a wind chill into a time-to-onset for *exposed* skin: High (10–30 min)
+  at −18 °F, Very High (5–10 min) at −40 °F, Severe (2–5 min) at −54 °F,
+  Extreme (under 2 min) at −67 °F.
+- 🥵 **Heat stress** — gate: air temperature at or above **80 °F** *and* rounded
+  WBGT at or above **80 °F**. Bands an estimated wet-bulb globe temperature
+  into exertion risk: Elevated (80–84), High (85–87), Very High (88–89),
+  Extreme (90+).
+
+**Provenance.** The wind chill is the **North American Wind Chill Index**, the
+joint NWS/Environment Canada 2001 model (Osczevski & Bluestein), valid for
+temperatures at or below 50 °F and winds at or above 3 mph. The frostbite time
+bands are **adapted from Environment Canada's wind chill program** (published in
+°C; the °F banding here is a project heuristic adaptation) and describe the most
+cold-susceptible fraction of the population — the conservative direction is
+intentional for a safety line. The WBGT is the **Australian Bureau of
+Meteorology's simplified estimate** from temperature and humidity alone, whose
+own published assumption is *moderately high radiation with light wind* — a
+full-sun outdoor estimate that can overestimate in shade, overcast, or strong
+wind. The exertion bands follow the widely used flag-condition categories and
+are likewise a project heuristic, since acclimatization genuinely shifts them.
+Both numbers are **computed by this server**, not observed or agency-published,
+and the heat line carries that caveat inline.
+
+**Which value drives the band.** On the US path a station-published wind chill
+drives both the band and the display, so the risk statement always matches the
+`Feels Like (Wind Chill)` number above it; absent one, the index is computed
+from temperature and sustained wind. On the international path it is always
+computed and **never taken from `apparent_temperature`**, which is a Steadman
+model making a different claim — so that line echoes its own basis. Below the
+3 mph validity floor the air temperature itself becomes the effective value
+(calm −50 °F air freezes skin regardless of wind), and is named as an air
+temperature rather than as a wind chill. Bands are computed on the rounded
+displayed value, so the number shown and the band naming it never disagree.
+Values display in the caller's preferred unit while the computation is always
+on fixed °F, so the band is identical in metric and imperial.
+
+Missing inputs simply omit the line — there is no "unavailable" note, since
+absence of a bonus line needs no announcement. Not available on the METAR
+source.
 
 **Returns (worldwide, via `source="metar"`):**
 - Station name, ICAO identifier, distance and bearing from the requested

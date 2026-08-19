@@ -2,7 +2,7 @@
 
 **Status:** READY (2026-08-18)
 
-Execution plan for `docs/heat-cold-stress-plan.md` (the WHAT/WHY); rules live in
+Execution plan for `docs/plans/heat-cold-stress-plan.md` (the WHAT/WHY); rules live in
 `docs/orchestration-playbook.md`.
 
 ## Kickoff
@@ -10,10 +10,10 @@ Execution plan for `docs/heat-cold-stress-plan.md` (the WHAT/WHY); rules live in
 A fresh Opus session should run this with:
 
 ```
-/run-plan docs/heat-cold-stress-implementation-plan.md
+/run-plan docs/plans/heat-cold-stress-implementation-plan.md
 ```
 
-Or, equivalently: read `docs/heat-cold-stress-plan.md` (design),
+Or, equivalently: read `docs/plans/heat-cold-stress-plan.md` (design),
 `docs/orchestration-playbook.md` (rules of engagement), and this file, then
 execute the task graph below — green baseline, one subagent per task, review
 the diff, run the gate yourself, commit, tick the tracker, push.
@@ -48,7 +48,7 @@ v1.23.0). Target release: next minor (v1.24.0 line; version settled at
 release time).
 
 **Working-tree note:** the settled design plan
-(`docs/heat-cold-stress-plan.md`, untracked) and its planning-index row
+(`docs/plans/heat-cold-stress-plan.md`, untracked) and its planning-index row
 (`docs/planning/README.md`, modified) are uncommitted as of plan-writing.
 The branch's first commit — before T1 — is
 `docs: Add heat/cold stress design and implementation plans`, capturing the
@@ -301,7 +301,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 
 - Files: `CHANGELOG.md`, `README.md`, `docs/TOOLS.md`, `CLAUDE.md`,
   `docs/planning/README.md`, `docs/planning/FUTURE_ENHANCEMENTS.md`,
-  `docs/heat-cold-stress-plan.md` (implementation notes, status, move),
+  `docs/plans/heat-cold-stress-plan.md` (implementation notes, status, move),
   this file (move)
 - **Sweep against the built dist**, run by the orchestrator personally
   (branch base `8e5af48`; dist drivers need `process.exit(0)`; no parallel
@@ -381,7 +381,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 - [x] T2 — Display gates + `fahrenheitToCelsius` (`haiku`) — `893e112`
 - [x] T3 — Frostbite + WBGT lines on both current-conditions paths (`opus`) — `d1a78e0`
 - [x] T4 — Tool-description half-sentence (`haiku`) — `bd3175a`
-- [ ] T5 — Byte-identical sweep + documentation checklist (`opus`)
+- [x] T5 — Byte-identical sweep + documentation checklist (`opus`) — this commit
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T5 sweep is
@@ -392,5 +392,5 @@ caveat on both paths, metric/imperial band invariance, METAR unchanged), the
 locked test files (`metar-handler.test.ts`, `noaa-staleness.test.ts`,
 `openmeteo-current.test.ts`, `fireWeather*.test.ts`, and every pre-existing
 case in `current-conditions-global.test.ts`) pass unedited, and
-`docs/heat-cold-stress-plan.md` is marked `IMPLEMENTED` with the plan set
+`docs/plans/heat-cold-stress-plan.md` is marked `IMPLEMENTED` with the plan set
 moved to `docs/plans/`. Opening the PR is the human's call.
