@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   celsiusToFahrenheit,
+  fahrenheitToCelsius,
   metersToFeet,
   kphToMph,
   knotsToMph,
@@ -43,6 +44,20 @@ describe('Unit Conversions', () => {
 
       it('should handle negative values', () => {
         expect(celsiusToFahrenheit(-10)).toBe(14);
+      });
+    });
+
+    describe('fahrenheitToCelsius', () => {
+      it('should convert 32°F to 0°C', () => {
+        expect(fahrenheitToCelsius(32)).toBe(0);
+      });
+
+      it('should perform round-trip conversion accurately', () => {
+        expect(fahrenheitToCelsius(celsiusToFahrenheit(21))).toBeCloseTo(21, 10);
+      });
+
+      it('should convert -40°F to -40°C', () => {
+        expect(fahrenheitToCelsius(-40)).toBe(-40);
       });
     });
   });

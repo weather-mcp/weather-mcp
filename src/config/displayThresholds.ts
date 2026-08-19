@@ -96,6 +96,16 @@ export const DisplayThresholds = {
       mm: 0.05,
     },
   },
+
+  /**
+   * Thermal stress thresholds
+   */
+  thermalStress: {
+    /** Render the frostbite line when effective wind chill (°F) is at or below this */
+    showFrostbiteAtWindChillF: -18,
+    /** Compute/render WBGT only when air temp (°F) is at or above showHeatIndex and rounded WBGT (°F) is at or above this */
+    showWbgtF: 80,
+  },
 } as const;
 
 /**

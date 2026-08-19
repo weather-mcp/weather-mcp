@@ -22,6 +22,13 @@ export function celsiusToFahrenheit(celsius: number): number {
 }
 
 /**
+ * Convert Fahrenheit to Celsius
+ */
+export function fahrenheitToCelsius(fahrenheit: number): number {
+  return (fahrenheit - 32) * 5 / 9;
+}
+
+/**
  * Convert meters per second to miles per hour
  */
 export function mpsToMph(mps: number): number {
