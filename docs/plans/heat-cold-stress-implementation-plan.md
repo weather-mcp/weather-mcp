@@ -381,7 +381,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 - [x] T2 — Display gates + `fahrenheitToCelsius` (`haiku`) — `893e112`
 - [x] T3 — Frostbite + WBGT lines on both current-conditions paths (`opus`) — `d1a78e0`
 - [x] T4 — Tool-description half-sentence (`haiku`) — `bd3175a`
-- [x] T5 — Byte-identical sweep + documentation checklist (`opus`) — this commit
+- [x] T5 — Byte-identical sweep + documentation checklist (`opus`) — `f7d1604`
 
 **Done when:** every box is ticked with its commit SHA, the full gate
 (`npm run build`, `npm test`, `npm audit`) is green, the T5 sweep is
