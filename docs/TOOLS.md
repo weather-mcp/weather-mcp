@@ -313,7 +313,11 @@ computed and **never taken from `apparent_temperature`**, which is a Steadman
 model making a different claim — so that line echoes its own basis. Below the
 3 mph validity floor the air temperature itself becomes the effective value
 (calm −50 °F air freezes skin regardless of wind), and is named as an air
-temperature rather than as a wind chill. Bands are computed on the rounded
+temperature rather than as a wind chill. Wind that was *never reported* is
+kept distinct from measured calm air: claiming "calm" from a missing
+measurement would assert something nobody observed, and the air-temperature
+band understates the risk if it is in fact windy — so that case says wind is
+unknown and that the time could be shorter. Bands are computed on the rounded
 displayed value, so the number shown and the band naming it never disagree.
 Values display in the caller's preferred unit while the computation is always
 on fixed °F, so the band is identical in metric and imperial.

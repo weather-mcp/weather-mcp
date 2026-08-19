@@ -101,6 +101,13 @@ export const DisplayThresholds = {
    * Thermal stress thresholds
    */
   thermalStress: {
+    /**
+     * Display gates only. The band boundaries themselves live in
+     * `src/utils/thermalStress.ts` (where Fosberg's live), and those functions
+     * return null below their own lowest band — so *raising* a gate here
+     * suppresses lines as expected, while *lowering* one past the pure
+     * module's floor has no effect until that floor moves too.
+     */
     /** Render the frostbite line when effective wind chill (°F) is at or below this */
     showFrostbiteAtWindChillF: -18,
     /** Compute/render WBGT only when air temp (°F) is at or above showHeatIndex and rounded WBGT (°F) is at or above this */

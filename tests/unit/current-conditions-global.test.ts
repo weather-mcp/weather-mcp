@@ -889,6 +889,22 @@ describe('handleGetCurrentConditions — thermal stress (Open-Meteo path)', () =
     expect(text).toContain('🥶 **Frostbite risk (High):** air temperature -25°F in calm air — exposed skin can freeze in 10–30 minutes. Cover all skin and limit time outdoors.');
   });
 
+  it('distinguishes wind never reported from measured calm air', async () => {
+    // No wind_speed_10m at all: the substituted air temperature must not be
+    // described as "calm air", and the line flags that wind would shorten it.
+    const response = buildOpenMeteoCurrentResponse({
+      temperature_2m: -25,
+      apparent_temperature: -25,
+      relative_humidity_2m: 50,
+      wind_speed_10m: null,
+    });
+    const result = await callCurrentConditions({ ...LONDON, units: 'imperial' }, buildFakes(response));
+    const text = textOf(result);
+
+    expect(text).toContain('🥶 **Frostbite risk (High):** air temperature -25°F, wind not reported — exposed skin can freeze in 10–30 minutes, sooner if it is windy. Cover all skin and limit time outdoors.');
+    expect(text).not.toContain('in calm air');
+  });
+
   it('renders no frostbite line when the effective wind chill is above -18°F', async () => {
     // 0°F @ 10 mph -> NA WCI = -15.93°F -> rounds -16°F, above the -18°F gate.
     const response = buildOpenMeteoCurrentResponse({

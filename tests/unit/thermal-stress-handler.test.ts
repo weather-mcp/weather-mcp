@@ -178,6 +178,24 @@ describe('handleGetCurrentConditions — thermal stress (NOAA path)', () => {
     );
   });
 
+  it('distinguishes wind never reported from measured calm air, and warns the time could be shorter', async () => {
+    // Same -25°F air, but the station reports no wind at all (a failed or
+    // absent anemometer). Claiming "calm air" here would assert a fact nobody
+    // measured, and the air-temperature band understates the risk whenever it
+    // is in fact windy — so the line says wind is unknown.
+    const obs = buildObservation({
+      temperature: { unitCode: 'wmoUnit:degF', value: -25 },
+      windSpeed: { unitCode: 'wmoUnit:km_h-1', value: null },
+      relativeHumidity: { unitCode: 'wmoUnit:percent', value: 50 },
+    });
+    const text = textOf(await callHandler(obs));
+
+    expect(text).toContain(
+      '🥶 **Frostbite risk (High):** air temperature -25°F, wind not reported — exposed skin can freeze in 10–30 minutes, sooner if it is windy. Cover all skin and limit time outdoors.'
+    );
+    expect(text).not.toContain('in calm air');
+  });
+
   it('renders the WBGT heat line for a hot-humid fixture', async () => {
     // 90°F, 70% RH -> WBGT = 95.74°F -> rounds 96°F, "Extreme" band.
     const obs = buildObservation({

@@ -315,7 +315,7 @@ Executed via `docs/plans/heat-cold-stress-implementation-plan.md` (T1–T5) on
 ### What shipped, against the checklist
 
 Every box in the checklist above is satisfied. Final gate: `npm run build`
-0 errors, `npm test` **2,330 passing** (95 files, up from 2,274), `npm audit`
+0 errors, `npm test` **2,332 passing** (95 files, up from 2,274), `npm audit`
 0 vulnerabilities.
 
 - `src/utils/thermalStress.ts` — the four D2 functions, pure with zero imports,
@@ -344,6 +344,47 @@ A second, smaller tightening: rather than hardcoding "NOAA published-`windChill`
 actually rendered and echoes whenever it did not. This satisfies D4's "the
 band's basis is always visible" in the edge case where a published wind chill
 exists but the existing display gate does not fire.
+
+### Pre-tag code review (2026-08-18)
+
+A review of `main...feat/heat-cold-stress` before tagging, per the release
+checklist's step 1 (the v1.20.0 release-review-hardening precedent). One
+finding was acted on, and it was a consequence of the D5 deviation above:
+
+**Missing wind was being reported as "calm air."** When a station reports no
+wind at all (failed or absent anemometer), the carve-out substituted the air
+temperature *and* the new wording announced "in calm air" — asserting a fact
+nobody measured, while the air-temperature band understates the risk whenever
+it is in fact windy. A −25 °F observation during a 30 mph blizzard rendered
+High (10–30 min) instead of the true wind chill's Severe (2–5 min). The basis
+enum gained a fourth case, `'airTempNoWind'`, rendering
+`air temperature −25°F, wind not reported — … 10–30 minutes, sooner if it is
+windy`. Measured-calm (`'airTempCalm'`) is unchanged. Note this hazard existed
+before the deviation too — D5's original copy would have called the same value
+a "wind chill" — but the explicit "calm air" wording made the false claim
+louder, which is how the review caught it.
+
+Also fixed: an orphaned JSDoc left pointing at the new type instead of
+`formatNOAACurrentConditions`, and a config comment now records that the
+`DisplayThresholds.thermalStress` gates are *upper* bounds only — the pure
+module's own band floors mean lowering a gate past them is a no-op.
+
+Not acted on, recorded instead:
+
+- **The WBGT band renders its full-sun estimate at night.** The New Orleans
+  probe below was taken at ~22:45 local and rendered `Heat stress (Extreme)`
+  from a model whose published assumption is moderately high radiation. The
+  mandatory caveat discloses the assumption, which is what D5/D7 settled as
+  the mitigation, but both paths hold inputs that could bound it
+  (`cloud_cover`, wind, the observation timestamp and station timezone).
+  Deliberately left as a design question rather than changed days before a
+  tag — a candidate follow-up.
+- Three copies of the °F→caller-unit rounding helper now exist in the
+  handler's neighbourhood (`formatFahrenheitInPrefs`, a local `toPref`, and
+  `normals.ts`'s `normalTempToPref`); consolidating touches paths with their
+  own byte-identity locks, so it was not attempted pre-tag.
+- `getFrostbiteRisk(...).description` is unused — the handler composes its own
+  sentence from D5's copy. Kept because D2 specifies the shape.
 
 ### Live verification sweep (2026-08-18, against the built dist)
 

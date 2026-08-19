@@ -240,15 +240,20 @@ export async function handleGetCurrentConditions(
 }
 
 /**
- * Format current conditions from NOAA station observations (US locations).
+ * What the frostbite line names as the value it was computed from (D4/D5).
+ *
+ * - `'shown'` — a `Feels Like (Wind Chill)` line above already displays it
+ * - `'windChill'` — a real wind chill the line must echo itself
+ * - `'airTempCalm'` — measured wind below the formula's 3 mph floor, so the
+ *   carve-out substituted the air temperature; named as an air temperature
+ *   rather than dressed up as a wind chill it is not
+ * - `'airTempNoWind'` — wind was never reported. Distinct from `'airTempCalm'`
+ *   because claiming "calm air" from a missing measurement asserts a fact
+ *   nobody observed, and the substituted air temperature understates the risk
+ *   whenever it is in fact windy — so the line says wind is unknown and that
+ *   the time could be shorter.
  */
-/**
- * What the frostbite line names as the value it was computed from (D4/D5):
- * a `Feels Like (Wind Chill)` line already on screen, a wind chill the line
- * must echo itself, or — under the calm-air carve-out — the air temperature,
- * which is named honestly rather than dressed up as a wind chill it is not.
- */
-type FrostbiteBasis = 'shown' | 'windChill' | 'airTempCalm';
+type FrostbiteBasis = 'shown' | 'windChill' | 'airTempCalm' | 'airTempNoWind';
 
 /**
  * Render a fixed-°F value in the caller's preferred temperature unit.
@@ -304,13 +309,23 @@ function formatThermalStress(
       const risk = getFrostbiteRisk(roundedWindChillF);
       if (risk) {
         const shown = formatFahrenheitInPrefs(roundedWindChillF, prefs);
-        const lead =
-          basis === 'shown'
-            ? ''
-            : basis === 'windChill'
-              ? `wind chill ${shown} — `
-              : `air temperature ${shown} in calm air — `;
-        const trail = basis === 'shown' ? ' at this wind chill' : '';
+        let lead = '';
+        let trail = '';
+        switch (basis) {
+          case 'shown':
+            trail = ' at this wind chill';
+            break;
+          case 'windChill':
+            lead = `wind chill ${shown} — `;
+            break;
+          case 'airTempCalm':
+            lead = `air temperature ${shown} in calm air — `;
+            break;
+          case 'airTempNoWind':
+            lead = `air temperature ${shown}, wind not reported — `;
+            trail = ', sooner if it is windy';
+            break;
+        }
         output += `🥶 **Frostbite risk (${risk.level}):** ${lead}exposed skin can freeze in ${risk.timeToFrostbite}${trail}. Cover all skin and limit time outdoors.\n`;
       }
     }
@@ -337,6 +352,9 @@ function formatThermalStress(
   return output;
 }
 
+/**
+ * Format current conditions from NOAA station observations (US locations).
+ */
 async function formatNOAACurrentConditions(
   noaaService: NOAAService,
   openMeteoService: OpenMeteoService,
@@ -502,7 +520,8 @@ async function formatNOAACurrentConditions(
         : null;
       const computed = windMph !== null ? calculateWindChillF(tempF, windMph) : null;
       effectiveWindChillF = computed ?? tempF;
-      basis = computed !== null ? 'windChill' : 'airTempCalm';
+      basis =
+        computed !== null ? 'windChill' : windMph !== null ? 'airTempCalm' : 'airTempNoWind';
     }
 
     // Safety context sits adjacent to the number it qualifies (D5). The band's
@@ -950,7 +969,11 @@ async function formatOpenMeteoCurrentConditions(
       thermalTempF,
       current.relative_humidity_2m ?? null,
       prefs,
-      computedWindChillF !== null ? 'windChill' : 'airTempCalm'
+      computedWindChillF !== null
+        ? 'windChill'
+        : thermalWindMph !== null
+          ? 'airTempCalm'
+          : 'airTempNoWind'
     );
   }
 
