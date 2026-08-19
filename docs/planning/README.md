@@ -84,7 +84,7 @@ Detail for all of these lives in [FUTURE_ENHANCEMENTS.md](./FUTURE_ENHANCEMENTS.
 | Better precipitation-type parsing (rain/snow/freezing rain) | 💡 | FE §3.2 |
 | Aviation weather tool (METAR/TAF) | 💡 | FE §4 — **observation half closed:** shipped as `source: 'metar'` on `get_current_conditions` in v1.17.0 ([`docs/plans/metar-plan.md`](../plans/metar-plan.md)), and the raw METAR text is in the output. What remains open is the pilot-facing product: TAF forecasts (the `/api/data/taf` endpoint is verified working) and a dedicated aviation tool, both explicitly out of scope for v1.17.0 (metar-plan D7) |
 | Drought indices (US Drought Monitor) | 💡 | FE §5.2 |
-| Heat/cold stress extras (WBGT, frostbite time-to-onset) | 💡 | FE §6.2 |
+| Heat/cold stress extras (WBGT, frostbite time-to-onset) | 📝 | FE §6.2; design settled 2026-08-18 — [`docs/heat-cold-stress-plan.md`](../heat-cold-stress-plan.md). Automatic gated lines on `get_current_conditions` (no new parameter): computed NA wind-chill → Environment-Canada-banded frostbite time-to-onset, and ABM simplified WBGT → exertion-risk bands. Zero new API variables — pure computation from already-fetched inputs (the Fosberg pattern). METAR path and forecast path explicitly descoped |
 | Smoke forecasts (NOAA HRRR-Smoke) | 💡 | FE §7.2 |
 | Storm reports (NOAA SPC, post-storm verification) | 💡 | FE §8.2 |
 | Seasonal outlooks + ENSO status (NOAA CPC) | 💡 | FE §9 |
