@@ -377,8 +377,8 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 
 ## Progress Tracker
 
-- [ ] T1 — Thermal-stress pure module (`sonnet`)
-- [ ] T2 — Display gates + `fahrenheitToCelsius` (`haiku`)
+- [x] T1 — Thermal-stress pure module (`sonnet`) — `4dcef5b`
+- [x] T2 — Display gates + `fahrenheitToCelsius` (`haiku`) — `893e112`
 - [ ] T3 — Frostbite + WBGT lines on both current-conditions paths (`opus`)
 - [ ] T4 — Tool-description half-sentence (`haiku`)
 - [ ] T5 — Byte-identical sweep + documentation checklist (`opus`)
