@@ -380,7 +380,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 - [x] T1 — Thermal-stress pure module (`sonnet`) — `4dcef5b`
 - [x] T2 — Display gates + `fahrenheitToCelsius` (`haiku`) — `893e112`
 - [x] T3 — Frostbite + WBGT lines on both current-conditions paths (`opus`) — `d1a78e0`
-- [ ] T4 — Tool-description half-sentence (`haiku`)
+- [x] T4 — Tool-description half-sentence (`haiku`) — `bd3175a`
 - [ ] T5 — Byte-identical sweep + documentation checklist (`opus`)
 
 **Done when:** every box is ticked with its commit SHA, the full gate
