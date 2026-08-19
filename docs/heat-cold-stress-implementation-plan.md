@@ -379,7 +379,7 @@ Spot-checks against the code (2026-08-18), reconciled into the tasks below:
 
 - [x] T1 — Thermal-stress pure module (`sonnet`) — `4dcef5b`
 - [x] T2 — Display gates + `fahrenheitToCelsius` (`haiku`) — `893e112`
-- [ ] T3 — Frostbite + WBGT lines on both current-conditions paths (`opus`)
+- [x] T3 — Frostbite + WBGT lines on both current-conditions paths (`opus`) — `d1a78e0`
 - [ ] T4 — Tool-description half-sentence (`haiku`)
 - [ ] T5 — Byte-identical sweep + documentation checklist (`opus`)
 
