@@ -1,18 +1,21 @@
 /**
  * Handler for get_alerts tool.
  *
- * Routed by country (see docs/plans/international-alerts-plan.md D1):
+ * Routed by country (see .devdocs/archive/completed/international-alerts-plan.md D1):
  *   US → NOAA (the original path, byte-identical output),
  *   Canada → MSC GeoMet (Environment and Climate Change Canada),
  *   MeteoAlarm member countries → the country's MeteoAlarm feed,
+ *   India / Philippines / Indonesia → their national CAP feeds (NDMA SACHET,
+ *     PAGASA, BMKG), matched to the requested point by alert polygon
+ *     (see .devdocs/archive/completed/plan-national-cap-alerts.md D1),
  *   elsewhere → the optional keyed Google Weather API fallback when a
  *     `GOOGLE_WEATHER_API_KEY` is configured, else a clean not-covered
- *     message (see docs/global-alerts-fallback-plan.md D1).
+ *     message (see .devdocs/archive/completed/global-alerts-fallback-plan.md D1).
  *
- * The branch order is the invariant: a US, Canadian, or MeteoAlarm-country
- * request never contacts Google, key or no key — those are jurisdictional
- * authorities and stay first-choice. Without a key the elsewhere branch is
- * byte-identical to before the fallback existed.
+ * The branch order is the invariant: a US, Canadian, MeteoAlarm-country, or
+ * national-CAP-country request never contacts Google, key or no key — those
+ * are jurisdictional authorities and stay first-choice. Without a key the
+ * elsewhere branch is byte-identical to before the fallback existed.
  *
  * Country resolution order: a `country_code` already carried by the resolved
  * location (saved location or geocoded city_name), else a cached
@@ -34,7 +37,14 @@ import {
 import { GeoMetService } from '../services/geomet.js';
 import { NominatimService } from '../services/nominatim.js';
 import { GoogleWeatherService } from '../services/googleWeather.js';
+import {
+  NationalCapService,
+  NATIONAL_CAP_FEEDS,
+  isNationalCapCountry
+} from '../services/nationalCap.js';
 import type { GoogleWeatherAlert } from '../types/googleWeather.js';
+import type { NationalCapWarning } from '../types/cap.js';
+import { pointInAnyRing } from '../utils/pointInPolygon.js';
 import {
   resolveLocationAsync,
   prependLocationLine,
@@ -70,7 +80,8 @@ export async function handleGetAlerts(
   meteoAlarmService?: MeteoAlarmService,
   geoMetService?: GeoMetService,
   nominatimService?: NominatimService,
-  googleWeatherService?: GoogleWeatherService
+  googleWeatherService?: GoogleWeatherService,
+  nationalCapService?: NationalCapService
 ): Promise<HandlerResult> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as AlertsArgs, locationStore, geocodingService);
@@ -122,6 +133,14 @@ export async function handleGetAlerts(
 
   if (!countryCode && isInUS(latitude, longitude)) {
     return handleNoaaAlerts(resolved, noaaService, active_only, detail);
+  }
+
+  // 3b. National CAP feeds (India, the Philippines, Indonesia): keyless
+  //     jurisdictional authorities, so they sit ahead of Google exactly as
+  //     NOAA/ECCC/MeteoAlarm do. Unlike Europe these carry polygon geometry,
+  //     so warnings are matched to the requested point.
+  if (countryCode && isNationalCapCountry(countryCode) && nationalCapService) {
+    return handleNationalCapAlerts(resolved, nationalCapService, countryCode, active_only, detail);
   }
 
   // 4. Elsewhere (D1): the optional keyed Google Weather API fallback. No
@@ -467,6 +486,202 @@ async function handleMeteoAlarmAlerts(
   return prependLocationLine({
     content: [{ type: 'text', text: output }]
   }, resolved);
+}
+
+/**
+ * National CAP renderer (India, the Philippines, Indonesia) — the fifth
+ * CAP-shaped renderer, built from the same helpers as the MeteoAlarm and
+ * Google ones rather than forking them.
+ *
+ * What is different here: these feeds publish **polygon geometry**, so
+ * warnings are split into those whose rings contain the requested point and
+ * those with no usable geometry at all. A warning whose rings exclude the
+ * point is for somewhere else and is not shown; a warning with no rings is
+ * never dropped — it falls back to a country-level block carrying the same
+ * caveat Europe gets, because dropping it would be a fabricated all-clear.
+ *
+ * Failures propagate (contract, D9): `getWarnings` is deliberately not
+ * wrapped in a try/catch. A ✅ produced by a failed fetch is a dangerous lie
+ * on safety data.
+ */
+async function handleNationalCapAlerts(
+  resolved: ResolvedLocation,
+  nationalCapService: NationalCapService,
+  countryCode: string,
+  active_only: boolean,
+  detail: Detail
+): Promise<HandlerResult> {
+  const feed = NATIONAL_CAP_FEEDS[countryCode];
+  const countryName = feed?.name ?? regionDisplayName(countryCode);
+  const publisher = feed?.publisher ?? countryName;
+
+  const { warnings, unavailableCount, polygonUnavailableCount, indexTrimmed } =
+    await nationalCapService.getWarnings(countryCode);
+
+  // Split by geometry. A warning with rings that exclude the point is for
+  // somewhere else in the country and is deliberately not rendered.
+  const matched: NationalCapWarning[] = [];
+  const countryLevel: NationalCapWarning[] = [];
+  for (const warning of warnings) {
+    if (warning.polygons.length === 0) {
+      countryLevel.push(warning);
+    } else if (pointInAnyRing(resolved.latitude, resolved.longitude, warning.polygons)) {
+      matched.push(warning);
+    }
+  }
+
+  const bySeverityThenExpiry = (a: NationalCapWarning, b: NationalCapWarning): number => {
+    const bySeverity = capSeverityRank(a.severity) - capSeverityRank(b.severity);
+    if (bySeverity !== 0) {
+      return bySeverity;
+    }
+    const aExpires = a.expires ? new Date(a.expires).getTime() : Infinity;
+    const bExpires = b.expires ? new Date(b.expires).getTime() : Infinity;
+    return aExpires - bExpires;
+  };
+  matched.sort(bySeverityThenExpiry);
+  countryLevel.sort(bySeverityThenExpiry);
+
+  let output = `# Weather Alerts — ${countryName}\n\n`;
+  output += `**Location:** ${resolved.latitude.toFixed(4)}, ${resolved.longitude.toFixed(4)}\n\n`;
+
+  if (!active_only) {
+    output += `*Note: historical alerts are not available for this region — showing current warnings only.*\n\n`;
+  }
+
+  if (indexTrimmed) {
+    output += `*Note: the ${publisher} feed listed more than 200 alerts; only the first 200 were checked.*\n\n`;
+  }
+  if (unavailableCount > 0) {
+    output += `⚠️ *${unavailableCount} alert${unavailableCount > 1 ? 's' : ''} in the ${publisher} feed `;
+    output += `could not be loaded and ${unavailableCount > 1 ? 'are' : 'is'} not shown — this is not an all-clear for those alerts.*\n\n`;
+  }
+
+  if (warnings.length === 0 && unavailableCount > 0) {
+    // Nothing loaded at all. A ✅ here would be a green check contradicted by
+    // the caveat directly above it, so there is deliberately no ✅.
+    output += `ℹ️ **The ${publisher} alert list could not be loaded for your location.**\n\n`;
+  } else if (matched.length === 0 && countryLevel.length === 0) {
+    // Honest empty: the feed was read, nothing covers this point. The scope
+    // line says what was actually checked.
+    output += `✅ **No active weather alerts for your location in ${countryName}.**\n\n`;
+    output += warnings.length > 0
+      ? `*Checked against ${publisher}'s public CAP feed — ${warnings.length} active warning${warnings.length > 1 ? 's' : ''} elsewhere in ${countryName}, none covering this point.*\n\n`
+      : `*Checked against ${publisher}'s public CAP feed — no active warnings nationwide.*\n\n`;
+  } else {
+    if (matched.length > 0) {
+      output += `⚠️ **${matched.length} active warning${matched.length > 1 ? 's' : ''} matched to your location**\n\n`;
+    }
+
+    if (detail === 'summary') {
+      output += renderNationalCapCounts('Matched to your location', matched);
+      output += renderNationalCapCounts('Country-level (no usable geometry)', countryLevel);
+      output += `\n*Counts only at detail="summary". Use detail="standard" or detail="full" for the warnings themselves.*\n\n`;
+    } else {
+      // The display cap is combined across both blocks, so a long
+      // country-level list cannot push the matched warnings off the page.
+      const cap = detail === 'full' ? FULL_DISPLAY_CAP : STANDARD_DISPLAY_CAP;
+      const shownMatched = matched.slice(0, cap);
+      const countryLevelBudget = Math.max(0, cap - shownMatched.length);
+      const shownCountryLevel = countryLevel.slice(0, countryLevelBudget);
+      const remainder = [
+        ...matched.slice(shownMatched.length),
+        ...countryLevel.slice(shownCountryLevel.length)
+      ];
+
+      for (const warning of shownMatched) {
+        output += renderNationalCapWarning(warning, detail);
+      }
+
+      if (shownCountryLevel.length > 0) {
+        // The count here is computed from the block itself, never from the
+        // service's total, so this line can never disagree with the warnings
+        // printed beneath it.
+        const lostGeometry = shownCountryLevel.filter(warning => warning.polygonUnavailable).length;
+        if (polygonUnavailableCount > 0 && lostGeometry > 0) {
+          output += `*Area geometry for ${lostGeometry} alert${lostGeometry > 1 ? 's' : ''} could not be loaded or parsed, `;
+          output += `so ${lostGeometry > 1 ? 'they are' : 'it is'} listed at country level rather than matched to your point.*\n\n`;
+        }
+        output += `**Country-level warnings** — *matched at country level (no usable area geometry for these alerts) — they may not affect your exact location:*\n\n`;
+        for (const warning of shownCountryLevel) {
+          output += renderNationalCapWarning(warning, detail);
+        }
+      }
+
+      if (remainder.length > 0) {
+        output += remainderNote(remainder);
+      }
+      if (detail !== 'full') {
+        output += `*Showing standard detail. Use detail="full" for complete warning descriptions.*\n\n`;
+      }
+    }
+  }
+
+  output += `---\n`;
+  output += `*Data source: ${feed?.attribution ?? publisher}; alerts shown unmodified as issued, times as published.*\n`;
+
+  return prependLocationLine({
+    content: [{ type: 'text', text: output }]
+  }, resolved);
+}
+
+/** Severity counts for one national-CAP block at detail="summary". */
+function renderNationalCapCounts(label: string, warnings: NationalCapWarning[]): string {
+  if (warnings.length === 0) {
+    return '';
+  }
+  const bySeverity = new Map<string, number>();
+  for (const warning of warnings) {
+    const severity = warning.severity ?? 'Unknown';
+    bySeverity.set(severity, (bySeverity.get(severity) ?? 0) + 1);
+  }
+  return `**${label}:** ${[...bySeverity.entries()]
+    .map(([severity, count]) => `${severity}: ${count}`)
+    .join(' | ')}\n`;
+}
+
+/** One national-CAP warning block, shared by the matched and country-level lists. */
+function renderNationalCapWarning(warning: NationalCapWarning, detail: Detail): string {
+  let output = `${capSeverityEmoji(warning.severity)} **${warning.event ?? warning.headline ?? 'Weather warning'}**\n`;
+  output += `---\n`;
+
+  if (warning.headline && warning.headline !== warning.event) {
+    output += `**Headline:** ${warning.headline}\n`;
+  }
+  // Publishers that omit all three CAP fields would otherwise render
+  // "Unknown | Unknown | Unknown", which is noise (the Google precedent).
+  if (warning.severity || warning.urgency || warning.certainty) {
+    output += `**Severity:** ${warning.severity ?? 'Unknown'} | **Urgency:** ${warning.urgency ?? 'Unknown'} | **Certainty:** ${warning.certainty ?? 'Unknown'}\n`;
+  }
+  if (warning.areaDesc.length > 0) {
+    output += `**Area:** ${warning.areaDesc.join('; ')}\n`;
+  }
+  output += `**Issued:** ${formatPublishedTime(warning.sent) ?? 'not stated'}\n`;
+  if (warning.onset) {
+    output += `**Onset:** ${formatPublishedTime(warning.onset)}\n`;
+  }
+  if (warning.effective && warning.effective !== warning.onset) {
+    output += `**Effective:** ${formatPublishedTime(warning.effective)}\n`;
+  }
+  if (warning.expires) {
+    output += `**Expires:** ${formatPublishedTime(warning.expires)}\n`;
+  }
+
+  // CAP text renders verbatim: description at full only, instruction at
+  // standard and full — the NOAA detail contract.
+  if (detail === 'full' && warning.description) {
+    output += `\n**Description:**\n${warning.description}\n`;
+  }
+  if (warning.instruction) {
+    output += `\n**Instructions:**\n${warning.instruction}\n`;
+  }
+  if (detail === 'full' && warning.web) {
+    output += `\n**More info:** ${warning.web}\n`;
+  }
+  if (warning.senderName) {
+    output += `\n**Sender:** ${warning.senderName}\n`;
+  }
+  return output + `\n`;
 }
 
 /** GeoMet alert_type display rank: warning > watch > advisory > statement. */
@@ -960,8 +1175,10 @@ function notCoveredResult(
   output += `**Location:** ${resolved.latitude.toFixed(4)}, ${resolved.longitude.toFixed(4)}\n\n`;
   output += `Weather alerts are not yet available for ${region}.\n\n`;
   output += `Current alert coverage: the United States (NOAA National Weather Service), `;
-  output += `Canada (Environment and Climate Change Canada), and the European MeteoAlarm `;
-  output += `member countries (matched at country level).\n`;
+  output += `Canada (Environment and Climate Change Canada), the European MeteoAlarm `;
+  output += `member countries (matched at country level), and — via their national CAP feeds, `;
+  output += `matched by alert polygon — India (NDMA SACHET), the Philippines (PAGASA), and `;
+  output += `Indonesia (BMKG).\n`;
 
   if (reverseLookupFailed) {
     output += `\n*Note: the country lookup service was unavailable, so routing fell back to coordinate checks.*\n`;
