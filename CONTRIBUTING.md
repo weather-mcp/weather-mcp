@@ -105,10 +105,10 @@ weather-mcp/
 │   ├── test_noaa_api.ts   # NOAA API test script
 │   ├── test_openmeteo.ts  # Open-Meteo API test script
 │   └── test_historical_mcp.ts  # Historical weather MCP test
-├── docs/                  # Documentation
-│   ├── TOOLS.md
-│   ├── NOAA_API_RESEARCH.md
-│   └── planning/          # Feature-idea backlog (README.md = status index)
+├── docs/                  # User-facing documentation
+│   ├── TOOLS.md           # Per-tool reference
+│   ├── CLIENT_SETUP.md    # Setup for 8 MCP clients
+│   └── testing/           # TESTING_GUIDE.md, TEST_SUITE_README.md
 └── dist/                  # Compiled output (generated)
 ```
 
@@ -132,7 +132,7 @@ npx tsx tests/test_noaa_api.ts
 
 When adding new features:
 - Add test cases to `tests/test_noaa_api.ts` for new service methods
-- Update `docs/TESTING_GUIDE.md` with new manual test scenarios
+- Update `docs/testing/TESTING_GUIDE.md` with new manual test scenarios
 - Ensure all existing tests still pass
 
 ## Documentation
@@ -148,9 +148,9 @@ Update documentation when you:
 ### Which Files to Update
 
 - `README.md` - For user-facing changes
+- `docs/TOOLS.md` - For any change to a tool's parameters or output
 - `docs/testing/TESTING_GUIDE.md` - For new test scenarios
-- `docs/NOAA_API_RESEARCH.md` - For API discoveries
-- `docs/planning/README.md` - For feature-idea status (the status index)
+- `CHANGELOG.md` - Add an entry under `[Unreleased]`
 - Code comments - For implementation details
 
 ## Commit Messages

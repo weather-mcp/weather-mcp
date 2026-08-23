@@ -260,14 +260,14 @@ describe('Feature Name', () => {
 ## Documentation
 
 ### Detailed Reports
-- **Full Analysis:** `/home/dgahagan/work/personal/weather-mcp/weather-mcp/TEST_COVERAGE_ANALYSIS_2025.md`
-- **Recommendations:** `/home/dgahagan/work/personal/weather-mcp/weather-mcp/TEST_RECOMMENDATIONS.md`
-- **V1.0 Report:** `/home/dgahagan/work/personal/weather-mcp/weather-mcp/TEST_COVERAGE_REPORT_V1.0.md`
+- **Full Analysis:** `.devdocs/reports/TEST_COVERAGE_ANALYSIS_2025.md` (internal)
+- **Recommendations:** `.devdocs/reports/TEST_RECOMMENDATIONS.md` (internal)
+- **V1.0 Report:** `.devdocs/reports/TEST_COVERAGE_REPORT_V1.0.md` (internal)
 
 ### Code Documentation
-- **Development Guide:** `/home/dgahagan/work/personal/weather-mcp/weather-mcp/CLAUDE.md`
-- **Contributing:** `/home/dgahagan/work/personal/weather-mcp/weather-mcp/CONTRIBUTING.md`
-- **Security:** `/home/dgahagan/work/personal/weather-mcp/weather-mcp/SECURITY.md`
+- **Development Guide:** `CLAUDE.md`
+- **Contributing:** `CONTRIBUTING.md`
+- **Security:** `SECURITY.md`
 
 ---
 
@@ -316,6 +316,6 @@ describe('Feature Name', () => {
 **Node Version:** v18.0.0+
 
 **Quick Links:**
-- [Full Analysis Report](TEST_COVERAGE_ANALYSIS_2025.md)
-- [Recommendations & Action Plan](TEST_RECOMMENDATIONS.md)
-- [Development Guide](CLAUDE.md)
+- Full analysis report — `.devdocs/reports/TEST_COVERAGE_ANALYSIS_2025.md` (internal)
+- Recommendations & action plan — `.devdocs/reports/TEST_RECOMMENDATIONS.md` (internal)
+- [Development Guide](../../CLAUDE.md)

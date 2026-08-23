@@ -4,17 +4,20 @@
 
 set -e
 
-ARCHIVE_DIR="docs/archive"
+ARCHIVE_DIR=".devdocs/archive/reports"
 mkdir -p "$ARCHIVE_DIR"
 
 echo "📦 Archiving completed documentation..."
 echo ""
 
 # List candidate files for archiving
-echo "Conventions (see docs/development/DOCUMENTATION_MAINTENANCE.md):"
-echo "  - General/historical docs        -> docs/archive/"
-echo "  - Planning-era docs              -> docs/planning/archive/"
-echo "  - Shipped plan sets (docs/<name>-*.md) -> docs/plans/ (git mv, no version suffix)"
+echo "Conventions (see .devdocs/README.md):"
+echo "  - Superseded reports/status docs -> .devdocs/archive/reports/"
+echo "  - Shipped plan sets              -> .devdocs/archive/completed/"
+echo ""
+echo "NOTE: shipped plan sets are archived automatically by /run-plan as its"
+echo "      last step, by plan set and never file-by-file. Do not use this"
+echo "      script for them. This is for superseded reports only."
 echo ""
 echo "Typical candidates: stale status snapshots, superseded guides,"
 echo "old RELEASE_NOTES (older than 3 versions)."
@@ -45,5 +48,7 @@ echo "✅ Archived to: ${ARCHIVE_DIR}/${ARCHIVED_NAME}"
 echo ""
 echo "Don't forget to:"
 echo "  - Add a '> 📁 ARCHIVED <date>' banner pointing at the live equivalent"
-echo "  - Update docs/README.md to remove references"
-echo "  - Commit the change: git add . && git commit -m 'docs: archive ${BASENAME} (completed in v${VERSION})'"
+echo "  - Update any doc that linked to it"
+echo "  - Commit the change IN weather-mcp-internal (.devdocs is tracked there):"
+echo "      git -C ~/work/personal/weather-mcp-internal add -A && \\"
+echo "      git -C ~/work/personal/weather-mcp-internal commit -m 'docs: archive ${BASENAME} (completed in v${VERSION})'"
