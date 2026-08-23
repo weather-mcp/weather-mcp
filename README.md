@@ -349,7 +349,7 @@ Project structure, patterns, and contribution guidance:
 - Error messages sanitized — no internal details leak to output
 - Zero secrets by design: no keys means nothing to steal or misconfigure
 - Automated dependency scanning (npm audit + Dependabot), minimal dependency footprint
-- Independent security audit: see [docs/development/SECURITY_AUDIT.md](./docs/development/SECURITY_AUDIT.md)
+- Security policy and supported versions: see [SECURITY.md](./SECURITY.md)
 
 To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 

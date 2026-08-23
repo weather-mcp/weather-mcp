@@ -140,10 +140,32 @@ SUMMARY_TEXT=${SUMMARY:-"See CHANGELOG.md"}
 # Escape sed-replacement metacharacters (/ & \) so summaries can contain paths
 SUMMARY_SED=$(printf '%s' "$SUMMARY_TEXT" | sed -e 's/[\/&\\]/\\&/g')
 
+# CLAUDE.md keeps a short "Recent releases" list — one line per release, capped
+# at CLAUDE_RELEASE_LINES. Release narrative belongs in CHANGELOG.md and the
+# plan docs, not here (the file was trimmed from 70 KB on 2026-08-22 for exactly
+# this reason), so the cap is enforced by the script rather than by hand.
+CLAUDE_RELEASE_LINES=3
+
+# The prepend below anchors on the first existing "New in" line. If someone
+# removes the last one, the sed would silently do nothing and the release
+# would ship without its line — so refuse instead.
+if ! grep -qE '^- \*\*New in v[0-9]' CLAUDE.md; then
+  echo "❌ CLAUDE.md has no '- **New in vX.Y.Z:**' line to anchor on."
+  echo "   Add one under '## Project Status' → 'Recent releases' and re-run."
+  exit 1
+fi
+
 # Insert a new "New in" history line above the first existing one (first match
 # only — an unanchored substitution here would rewrite every older release's
 # line to the new summary, which is exactly what happened on v1.14.0 prep).
 sed -i "0,/^- \*\*New in v[0-9]/s//- **New in v${NEW_VERSION}:** ${SUMMARY_SED}\n&/" CLAUDE.md
+
+# Prune: keep only the newest CLAUDE_RELEASE_LINES "New in" lines. They are
+# contiguous, so this drops the tail of the list and touches nothing else.
+awk -v keep="$CLAUDE_RELEASE_LINES" '
+  /^- \*\*New in v[0-9]/ { n++; if (n > keep) next }
+  { print }
+' CLAUDE.md > CLAUDE.md.tmp && mv CLAUDE.md.tmp CLAUDE.md
 
 sed -i -E \
   -e "s/\*\*Version:\*\* [0-9]+\.[0-9]+\.[0-9]+/**Version:** ${NEW_VERSION}/g" \

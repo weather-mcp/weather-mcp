@@ -42,7 +42,7 @@ Before you begin:
 - [ ] CHANGELOG.md is updated with release notes
 - [ ] All changes committed to main branch
 - [ ] **Run code-reviewer and security-auditor agents in parallel** → Generate reports
-- [ ] **Review generated reports** → `docs/development/CODE_REVIEW.md` and `SECURITY_AUDIT.md`
+- [ ] **Review generated reports** → `.devdocs/reports/CODE_REVIEW.md` and `SECURITY_AUDIT.md`
 - [ ] **Fix all CRITICAL/HIGH issues** → Address findings from both reports
 - [ ] **Commit fixes** → `git commit -m "fix/security: Address findings for vX.X.X"`
 - [ ] **Run test-automator agent** → Enhance test coverage based on fixes
@@ -115,13 +115,13 @@ Please run the code-reviewer and security-auditor agents in parallel to assess t
 - In Claude Code, type: "Run the code-reviewer agent"
 - Or: Use Task tool with `subagent_type="code-reviewer"`
 
-**Output:** `docs/development/CODE_REVIEW.md` (will be completely replaced)
+**Output:** `.devdocs/reports/CODE_REVIEW.md` (will be completely replaced)
 
 **What the agent does:**
-1. Deletes existing `docs/development/CODE_REVIEW.md` if present
+1. Deletes existing `.devdocs/reports/CODE_REVIEW.md` if present
 2. Performs comprehensive code quality review of current codebase
 3. Generates fresh report with findings specific to this version
-4. Saves new report to `docs/development/CODE_REVIEW.md`
+4. Saves new report to `.devdocs/reports/CODE_REVIEW.md`
 
 **What you do:**
 1. Review the generated report for code quality issues
@@ -138,13 +138,13 @@ Please run the code-reviewer and security-auditor agents in parallel to assess t
 - In Claude Code, type: "Run the security-auditor agent"
 - Or: Use Task tool with `subagent_type="security-auditor"`
 
-**Output:** `docs/development/SECURITY_AUDIT.md` (will be completely replaced)
+**Output:** `.devdocs/reports/SECURITY_AUDIT.md` (will be completely replaced)
 
 **What the agent does:**
-1. Deletes existing `docs/development/SECURITY_AUDIT.md` if present
+1. Deletes existing `.devdocs/reports/SECURITY_AUDIT.md` if present
 2. Performs comprehensive security audit of current codebase
 3. Generates fresh report with findings specific to this version
-4. Saves new report to `docs/development/SECURITY_AUDIT.md`
+4. Saves new report to `.devdocs/reports/SECURITY_AUDIT.md`
 
 **What you do:**
 1. Review security findings in the report
@@ -162,8 +162,8 @@ Please run the code-reviewer and security-auditor agents in parallel to assess t
 #### Step-by-Step Fix Process
 
 1. **Open Both Reports:**
-   - `docs/development/CODE_REVIEW.md`
-   - `docs/development/SECURITY_AUDIT.md`
+   - `.devdocs/reports/CODE_REVIEW.md`
+   - `.devdocs/reports/SECURITY_AUDIT.md`
 
 2. **Prioritize Fixes:**
    - **CRITICAL/HIGH:** Fix ALL of these (mandatory for release)
@@ -190,7 +190,7 @@ Please run the code-reviewer and security-auditor agents in parallel to assess t
    - Fixed issue #2 (HIGH): Description
    - Fixed issue #3 (HIGH): Description
 
-   See docs/development/CODE_REVIEW.md for details."
+   See .devdocs/reports/CODE_REVIEW.md for details."
 
    # After fixing critical/high security issues
    git add .
@@ -199,7 +199,7 @@ Please run the code-reviewer and security-auditor agents in parallel to assess t
    - Fixed vulnerability #1 (CRITICAL): Description
    - Fixed vulnerability #2 (HIGH): Description
 
-   See docs/development/SECURITY_AUDIT.md for details."
+   See .devdocs/reports/SECURITY_AUDIT.md for details."
    ```
 
 6. **Verify All Fixes:**
@@ -281,7 +281,7 @@ You may skip this workflow if:
 ### Common Issues
 
 **Problem:** Agent outputs are outdated
-- **Solution:** Delete old reports in `docs/development/` and re-run agents
+- **Solution:** Delete old reports in `.devdocs/reports/` and re-run agents
 
 **Problem:** Too many findings to address
 - **Solution:** Focus on CRITICAL/HIGH severity issues first. Create GitHub issues for MEDIUM/LOW items to address post-release.
@@ -313,7 +313,7 @@ This project uses a comprehensive documentation maintenance system with:
 - **Pre-written Claude Code prompts** for AI-assisted updates
 - **Detailed checklists** for manual updates
 
-**Full Documentation:** See [docs/development/DOCUMENTATION_MAINTENANCE.md](../development/DOCUMENTATION_MAINTENANCE.md) for complete guide.
+**Full Documentation:** See [.devdocs/reference/DOCUMENTATION_MAINTENANCE.md](../../.devdocs/reference/DOCUMENTATION_MAINTENANCE.md) for complete guide.
 
 ### Quick Documentation Update Workflow
 
@@ -323,7 +323,7 @@ Use Claude Code to automate most documentation updates:
 
 **Prompt for Claude Code:**
 ```
-I'm preparing to release version X.Y.Z of the Weather MCP Server. Please help me update all documentation according to the Version Update Checklist in docs/development/DOCUMENTATION_MAINTENANCE.md.
+I'm preparing to release version X.Y.Z of the Weather MCP Server. Please help me update all documentation according to the Version Update Checklist in .devdocs/reference/DOCUMENTATION_MAINTENANCE.md.
 
 Current state:
 - package.json version: [current version]
@@ -445,7 +445,7 @@ git commit -m "docs: update documentation for vX.Y.Z release
 - Update SECURITY.md supported versions
 - Update CODE_REVIEW.md and SECURITY_AUDIT.md (if applicable)
 
-See docs/development/DOCUMENTATION_MAINTENANCE.md for full checklist."
+See .devdocs/reference/DOCUMENTATION_MAINTENANCE.md for full checklist."
 
 git push origin main
 ```
@@ -475,7 +475,7 @@ You may skip full documentation workflow if:
 
 ### Reference Documentation
 
-- **Complete Guide:** [docs/development/DOCUMENTATION_MAINTENANCE.md](../development/DOCUMENTATION_MAINTENANCE.md)
+- **Complete Guide:** [.devdocs/reference/DOCUMENTATION_MAINTENANCE.md](../../.devdocs/reference/DOCUMENTATION_MAINTENANCE.md)
 - **Automation Scripts:** `scripts/check-doc-versions.sh`, `scripts/update-docs-for-release.sh`
 
 ---
@@ -1160,7 +1160,7 @@ See section 5.6 "Common Issues" above for detailed solutions.
 - **GitHub CLI**: https://cli.github.com/manual/
 
 **Documentation:**
-- **Full Maintenance Guide**: [docs/development/DOCUMENTATION_MAINTENANCE.md](../development/DOCUMENTATION_MAINTENANCE.md)
+- **Full Maintenance Guide**: [.devdocs/reference/DOCUMENTATION_MAINTENANCE.md](../../.devdocs/reference/DOCUMENTATION_MAINTENANCE.md)
 - **Version Check Script**: `./scripts/check-doc-versions.sh`
 - **Release Update Script**: `./scripts/update-docs-for-release.sh`
 
@@ -1187,7 +1187,7 @@ The complete publishing workflow:
 - Patch release: ~20-30 minutes (if minimal documentation changes needed)
 
 **Documentation Resources:**
-- **Full Guide:** [docs/development/DOCUMENTATION_MAINTENANCE.md](../development/DOCUMENTATION_MAINTENANCE.md)
+- **Full Guide:** [.devdocs/reference/DOCUMENTATION_MAINTENANCE.md](../../.devdocs/reference/DOCUMENTATION_MAINTENANCE.md)
 - **Scripts:** `./scripts/check-doc-versions.sh`, `./scripts/update-docs-for-release.sh`
 
 Happy publishing! 🚀
