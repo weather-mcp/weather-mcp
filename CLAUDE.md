@@ -213,7 +213,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 - **Read real output, not just passing tests.** Several shipped-quality bugs were found only by reading rendered text (a percentage contradicting the words it labelled; a quantity mislabelled in a safety line; `**X** (X)` suffix duplication). Run the built dist against live points before tagging.
 - Design → plan → run: `/design-plan` drafts `.devdocs/backlog/plan-<name>.md`; promoting it to the `.devdocs/` root (SETTLED) makes it valid input to `/impl-plan` → `/plan-review` → `/run-plan`, whose last step moves the whole plan set to `.devdocs/archive/completed/`. Update `.devdocs/ROADMAP.md` whenever an idea changes state.
-- `scripts/update-docs-for-release.sh` rewrites this file's version, tool count, test count, `Last Updated`, and prepends one "New in" line — keep those anchors; **do not add per-release narrative here** (it belongs in `CHANGELOG.md` and the plan doc).
+- `scripts/update-docs-for-release.sh` rewrites this file's version, tool count, test count, `Last Updated`, and prepends one "New in" line (auto-pruned to the newest three; it refuses to run if no "New in" anchor line exists) — keep those anchors; **do not add per-release narrative here** (it belongs in `CHANGELOG.md` and the plan doc).
 
 ## Testing
 
@@ -576,7 +576,7 @@ npm audit             # No critical vulnerabilities
 - **Test Coverage:** 2,332 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
-Recent releases (one line each; the release script prepends here — prune lines older than the last three releases, and keep the detail in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
+Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
 - **New in v1.23.0:** Global alerts fallback (Google Weather API) behind optional `GOOGLE_WEATHER_API_KEY`
 - **New in v1.22.0:** Global pollen fallback on `get_air_quality` behind optional `GOOGLE_POLLEN_API_KEY`
