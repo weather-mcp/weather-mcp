@@ -104,7 +104,8 @@ export function isGooglePollenKeyAvailable(): boolean {
  *   Brazil, Mexico, and others) via the Google Weather API
  *
  * If not provided:
- * - US, Canadian, and European alerts continue to work keyless
+ * - US, Canadian, European, Indian, Philippine, and Indonesian alerts
+ *   continue to work keyless
  * - Alerts outside these regions are unavailable
  * - No setup required
  *

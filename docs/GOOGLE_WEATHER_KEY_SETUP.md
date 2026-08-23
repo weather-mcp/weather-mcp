@@ -18,18 +18,18 @@ below walked in the console, then exercised against the live API)
 
 This key is **entirely optional**. Without it `get_alerts` still returns
 official warnings for the United States (NOAA), Canada (Environment and
-Climate Change Canada), and the 38 European MeteoAlarm member countries —
-all keyless — and every other tool works exactly as before. The key adds
-official alerts for roughly 45 more territories, including Australia, Japan,
-Brazil, and Mexico. See
+Climate Change Canada), the 38 European MeteoAlarm member countries, India
+(NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG) — all keyless —
+and every other tool works exactly as before. The key adds official alerts for
+roughly 45 more territories, including Australia, Japan, Brazil, and Mexico. See
 [Google's coverage page](https://developers.google.com/maps/documentation/weather/coverage)
 for the current list; any list in this project's docs is representative, not
 exhaustive.
 
-**The US, Canada, and Europe never contact Google, key or no key.** Those are
-jurisdictional authorities and stay first choice; the Google fallback fires
-only on the branch that would otherwise return "alerts are not yet available
-for this region".
+**The US, Canada, Europe, India, the Philippines, and Indonesia never contact
+Google, key or no key.** Those are jurisdictional authorities and stay first
+choice; the Google fallback fires only on the branch that would otherwise
+return "alerts are not yet available for this region".
 
 ## Before you start — the honest caveat
 
@@ -48,7 +48,8 @@ same caveat as the Pollen key, and the same billing account serves both.
   normal personal use stays far inside the free tier.
 
 If you'd rather not put a card on file, simply don't set the key. Nothing
-breaks — the elsewhere branch keeps today's not-covered message, byte for byte.
+breaks — the elsewhere branch keeps today's not-covered message, whose coverage
+sentence now also names India, the Philippines, and Indonesia as keyless.
 
 ## Already have the Pollen key? Read this first
 
@@ -154,7 +155,8 @@ variables:
 
 ## Verifying it works
 
-Ask for alerts somewhere outside the US, Canada, and Europe — for example
+Ask for alerts somewhere outside the keyless authorities (the US, Canada,
+Europe, India, the Philippines, and Indonesia) — for example
 *"Any weather warnings in Sydney?"* — and `get_alerts` should return a
 `# Weather Alerts — Australia` section ending with the line
 `Source: Includes weather data from Google` (Google's attribution terms require
@@ -181,9 +183,10 @@ fetch would be a dangerous lie about safety data.
 **A note on what you'll actually see.** Google aggregates official national
 feeds and matches them by **provider polygon**, so — in Google's own words —
 "country and region coverage alignment may not be exact". A location Google
-does not cover and a location with genuinely no active alerts return the same
-answer, so the output always says "no alerts found" rather than claiming an
-all-clear, and repeats the coverage caveat on both empty and non-empty results.
+does not cover answers HTTP 404 and renders an explicit no-coverage note saying
+that **this is not an all-clear**; a covered location with genuinely no active
+alerts renders a ✅ none-found result instead. The two are deliberately
+distinguishable, and the coverage caveat is repeated either way.
 Alert text is shown in the publisher's source language; only the title is
 translated, which is a provider restriction rather than a choice.
 
@@ -198,5 +201,5 @@ key appears in no thrown message and no log argument.
 Responses are cached **in memory only**, for 5 minutes per location, and
 nothing is written to disk — Google Maps Platform terms generally prohibit
 persisting API content. Five minutes is the same TTL the server already uses
-for NOAA, ECCC, and MeteoAlarm alerts: alert volatility is alert volatility
-regardless of source.
+for NOAA, ECCC, MeteoAlarm, and the national CAP feeds: alert volatility is
+alert volatility regardless of source.
