@@ -26,6 +26,7 @@ import { NIFCService } from './services/nifc.js';
 import { FIRMSService } from './services/firms.js';
 import { GooglePollenService } from './services/googlePollen.js';
 import { GoogleWeatherService } from './services/googleWeather.js';
+import { NationalCapService } from './services/nationalCap.js';
 import { GeocodingService } from './services/geocoding.js';
 import { LocationStore } from './services/locationStore.js';
 import { blitzortungService } from './services/blitzortung.js';
@@ -186,10 +187,19 @@ const firmsService = new FIRMSService();
 const googlePollenService = new GooglePollenService();
 
 /**
+ * Initialize the national CAP alert services for India (NDMA SACHET), the
+ * Philippines (PAGASA), and Indonesia (BMKG). Keyless jurisdictional
+ * authorities, so they sit ahead of the Google branch in get_alerts routing
+ * exactly as NOAA/ECCC/MeteoAlarm do; no API key required.
+ */
+const nationalCapService = new NationalCapService();
+
+/**
  * Initialize the Google Weather API service for global alerts fallback.
  * Optional keyed alerts fallback for the "elsewhere" branch of get_alerts; without
- * GOOGLE_WEATHER_API_KEY the keyless authorities (NOAA / ECCC / MeteoAlarm) are
- * entirely unaffected and the elsewhere branch returns the not-covered message unchanged.
+ * GOOGLE_WEATHER_API_KEY the keyless authorities (NOAA / ECCC / MeteoAlarm / national
+ * CAP feeds) are entirely unaffected and the elsewhere branch returns the not-covered
+ * message unchanged.
  */
 const googleWeatherService = new GoogleWeatherService();
 
@@ -404,7 +414,7 @@ const TOOL_DEFINITIONS = {
 
   get_alerts: {
     name: 'get_alerts' as const,
-    description: 'Get active weather alerts, watches, warnings, and advisories for a location. Coverage: the United States (NOAA), Canada (Environment and Climate Change Canada), and European MeteoAlarm member countries (official national warnings, matched at country level — regional filtering within a European country is not yet available). With an optional `GOOGLE_WEATHER_API_KEY`, official alerts are also available for ~45+ more territories (Australia, Japan, Brazil, Mexico, and others) via the Google Weather API. Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas where the source provides them. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get active weather alerts, watches, warnings, and advisories for a location. Coverage: the United States (NOAA), Canada (Environment and Climate Change Canada), European MeteoAlarm member countries (official national warnings, matched at country level — regional filtering within a European country is not yet available), and India (NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG) via their official national CAP feeds, matched to your exact point by alert polygon. With an optional `GOOGLE_WEATHER_API_KEY`, official alerts are also available for ~45+ more territories (Australia, Japan, Brazil, Mexico, and others) via the Google Weather API. Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas where the source provides them. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -817,7 +827,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_alerts':
         return await withAnalytics('get_alerts', async () =>
-          handleGetAlerts(args, noaaService, locationStore, geocodingService, meteoAlarmService, geoMetService, nominatimService, googleWeatherService)
+          handleGetAlerts(args, noaaService, locationStore, geocodingService, meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService)
         );
 
       case 'get_historical_weather':
@@ -829,7 +839,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await withAnalytics('get_weather_summary', async () =>
           handleGetWeatherSummary(
             args, noaaService, openMeteoService, nceiService, locationStore, geocodingService,
-            meteoAlarmService, geoMetService, nominatimService, googleWeatherService
+            meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService
           )
         );
 
