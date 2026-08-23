@@ -4,12 +4,13 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 
 ## Project Overview
 
-**Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA and Open-Meteo APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, and severe weather alerts.
+**Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
 - **Version:** 1.23.0 (Production Ready)
 - **License:** MIT
-- **MCP SDK:** @modelcontextprotocol/sdk v1.21.0
+- **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
+- **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
 
 ## Architecture
 
@@ -17,68 +18,65 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 
 ```
 src/
-├── index.ts                 # MCP server entry point, tool registry
-├── handlers/                # Tool request handlers (one per MCP tool)
-│   ├── forecastHandler.ts
-│   ├── currentConditionsHandler.ts
-│   ├── alertsHandler.ts
+├── index.ts                 # MCP server entry point, TOOL_DEFINITIONS registry, dispatch
+├── handlers/                # One handler per MCP tool (saved locations share one file)
+│   ├── forecastHandler.ts           # get_forecast (+ compare_models, ensemble_spread, normals, astronomy)
+│   ├── currentConditionsHandler.ts  # get_current_conditions (NOAA / Open-Meteo / METAR; fire weather, thermal stress)
+│   ├── alertsHandler.ts             # get_alerts — routed by country (NOAA / GeoMet / MeteoAlarm / Google fallback)
 │   ├── historicalWeatherHandler.ts
+│   ├── weatherSummaryHandler.ts     # get_weather_summary — composite, fans out to the others
 │   ├── statusHandler.ts
-│   ├── locationHandler.ts
-│   ├── airQualityHandler.ts
+│   ├── locationHandler.ts           # search_location
+│   ├── airQualityHandler.ts         # get_air_quality (+ CAMS pollen, Google pollen fallback)
 │   ├── marineConditionsHandler.ts
-│   ├── riverConditionsHandler.ts
-│   ├── wildfireHandler.ts
-│   └── savedLocationsHandler.ts  # Saved locations management (v1.7.0)
-├── services/                # External API clients
-│   ├── noaa.ts             # NOAA Weather API client
-│   ├── openmeteo.ts        # Open-Meteo API client
-│   ├── nominatim.ts        # Nominatim/OSM geocoding client (v1.7.0); country-level reverseCountry lookup (v1.19.0)
-│   ├── meteoalarm.ts       # EUMETNET MeteoAlarm country warning feeds — European alerts (v1.19.0)
-│   ├── geomet.ts           # MSC GeoMet weather-alerts client — Canadian alerts (v1.19.0)
-│   ├── locationStore.ts    # Saved locations storage service (v1.7.0)
-│   ├── basemap.ts          # NASA GIBS base-map tile fetch + stitch (composited radar)
-│   ├── nifc.ts             # NIFC wildfire API client (US incidents)
-│   ├── firms.ts            # NASA FIRMS satellite fire detections — global wildfire (v1.20.0)
-│   ├── googlePollen.ts     # Google Pollen API — optional keyed global pollen fallback (v1.22.0)
-│   ├── googleWeather.ts    # Google Weather API publicAlerts — optional keyed global alerts fallback (v1.23.0)
-│   ├── acis.ts             # RCC ACIS client — US daily temperature records (v1.16.0)
-│   ├── aviationWeather.ts  # aviationweather.gov METAR client — worldwide station obs (v1.17.0)
-│   └── usgs.ts             # USGS water services client
-├── types/                   # TypeScript type definitions
-│   ├── noaa.ts
-│   ├── openmeteo.ts
-│   ├── aviationWeather.ts  # METAR observation shape (v1.17.0)
-│   ├── nominatim.ts        # Nominatim API types (v1.7.0)
-│   ├── firms.ts            # FIRMS detection/cluster/region shapes (v1.20.0)
-│   ├── googlePollen.ts     # Google Pollen response subset — all fields optional (v1.22.0)
-│   ├── googleWeather.ts    # Google Weather publicAlerts response subset — all fields optional (v1.23.0)
-│   └── savedLocations.ts   # Saved locations types (v1.7.0)
-├── utils/                   # Shared utilities
-│   ├── cache.ts            # LRU cache with TTL
-│   ├── validation.ts       # Input validation
-│   ├── units.ts            # Unit conversions
-│   ├── logger.ts           # Structured logging
-│   ├── locationResolver.ts # Location name/coordinate resolution (v1.7.0)
-│   ├── astronomy.ts        # Moon phase, rise/set, twilight — pure local math (v1.16.0)
-│   ├── firmsHotspots.ts    # FIRMS CSV parsing, region picker, clustering — pure, no I/O (v1.20.0)
-│   ├── modelComparison.ts  # Multi-model agreement stats, bands, buckets — pure, zero imports (v1.21.0)
-│   ├── ensembleSpread.ts   # Single-model member spread: percentiles, wet fractions, confidence — pure, imports only modelComparison (v1.21.0)
-│   ├── normals.ts          # Climate-normals table compute + NCEI/Open-Meteo orchestration + shared renderer (v1.21.0)
-│   ├── records.ts          # US record high/low line orchestration (v1.16.0)
-│   ├── metarStation.ts     # METAR station picker + field parsers — pure, no I/O (v1.17.0)
-│   ├── composite.ts        # PNG stitch/blend/marker/encode — pure, no I/O
-│   ├── airQuality.ts       # AQI calculations
-│   ├── marine.ts           # Wave/ocean utilities
-│   ├── fireWeather.ts      # NOAA index interpretation + computed Fosberg FFWI (v1.20.0)
-│   ├── thermalStress.ts    # NA wind chill, EC-banded frostbite onset, ABM simplified WBGT — pure, zero imports (v1.24.0 line)
-│   ├── distance.ts         # Haversine distance calculations
-│   └── geohash.ts          # Geohash encoding/decoding
-├── config/                  # Configuration
-│   ├── cache.ts            # Cache TTL settings
+│   ├── weatherImageryHandler.ts     # get_weather_imagery (+ composite radar maps)
+│   ├── lightningHandler.ts
+│   ├── riverConditionsHandler.ts    # NOAA NWPS (US) / Open-Meteo Flood (elsewhere)
+│   ├── wildfireHandler.ts           # NIFC (US, PR, VI, GU) / NASA FIRMS (elsewhere)
+│   └── savedLocationsHandler.ts     # save/list/get/remove_saved_location
+├── services/                # External API clients (one per upstream)
+│   ├── noaa.ts              # NOAA Weather API (forecast, observations, alerts, NWPS rivers)
+│   ├── openmeteo.ts         # Open-Meteo (forecast, archive, AQ, marine, flood, model comparison, ensemble)
+│   ├── nominatim.ts         # Nominatim/OSM geocoding + country-level reverseCountry
+│   ├── geocoding.ts         # Multi-provider geocoding with automatic fallback
+│   ├── meteoalarm.ts        # EUMETNET MeteoAlarm — European national warnings
+│   ├── geomet.ts            # MSC GeoMet — Canadian alerts
+│   ├── googleWeather.ts     # Google Weather publicAlerts — optional keyed global alerts fallback
+│   ├── googlePollen.ts      # Google Pollen API — optional keyed global pollen fallback
+│   ├── nifc.ts              # NIFC wildfire incidents (US)
+│   ├── firms.ts             # NASA FIRMS satellite fire detections (global)
+│   ├── acis.ts              # RCC ACIS — US daily temperature records
+│   ├── ncei.ts              # NCEI climate normals (optional token, US)
+│   ├── aviationWeather.ts   # aviationweather.gov METAR — worldwide station obs
+│   ├── blitzortung.ts       # Blitzortung MQTT lightning
+│   ├── rainviewer.ts        # RainViewer radar tiles
+│   ├── gibs.ts / basemap.ts # NASA GIBS tiles; base-map fetch + stitch for composites
+│   └── locationStore.ts     # Saved locations persistence (~/.weather-mcp/locations.json)
+├── types/                   # One file per upstream response shape (all optional fields for 3rd-party JSON)
+├── utils/                   # Shared utilities — prefer pure, I/O-free modules here
+│   ├── cache.ts             # LRU cache with TTL
+│   ├── validation.ts        # Input validation (all user inputs go through here)
+│   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
+│   ├── logger.ts            # Structured logging to stderr
+│   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates
+│   ├── geography.ts         # isInUS and region helpers
+│   ├── timezone.ts          # Local-time formatting, formatObservationAge
+│   ├── normals.ts / records.ts / astronomy.ts        # Climate normals, US records, almanac
+│   ├── modelComparison.ts / ensembleSpread.ts        # Forecast agreement + member spread (pure)
+│   ├── fireWeather.ts / thermalStress.ts             # Fire indices incl. Fosberg; wind chill, frostbite, WBGT (pure)
+│   ├── firmsHotspots.ts / metarStation.ts / riverDischarge.ts  # FIRMS parse+cluster; METAR picker; GloFAS cell snap (pure)
+│   ├── composite.ts         # PNG stitch/blend/marker/encode (pure)
+│   ├── airQuality.ts / marine.ts / snow.ts / distance.ts / geohash.ts
+│   └── version.ts
+├── config/
+│   ├── cache.ts             # Cache TTLs + CACHE_*/API_TIMEOUT_MS/LOG_LEVEL parsing
+│   ├── units.ts             # WEATHER_UNITS and per-unit overrides
+│   ├── tools.ts             # ENABLED_TOOLS presets (basic/standard/full) and tool names
+│   ├── defaultLocation.ts   # WEATHER_DEFAULT_LOCATION
+│   ├── api.ts               # Optional API keys (NCEI, FIRMS, Google)
 │   └── displayThresholds.ts # Display logic constants
-└── errors/                  # Custom error classes
-    └── ApiError.ts
+└── errors/
+    └── ApiError.ts          # Custom error hierarchy; ApiServiceName is a closed union
 ```
 
 ### Design Patterns
@@ -88,29 +86,29 @@ src/
 3. **Validation First:** All user inputs validated before processing (see `src/utils/validation.ts`)
 4. **Caching Strategy:** LRU cache with TTL based on data volatility (see `src/config/cache.ts`)
 5. **Error Hierarchy:** Custom error classes for different failure scenarios
+6. **Three-layer split for computed features:** service fetches → pure zero-I/O util computes → handler renders. The pure module owns constants; the service imports them from the util, never the reverse (e.g. `COMPARISON_MODELS`, `ENSEMBLE_MODEL`)
+7. **Route by country, not by bounding box, for jurisdictional data** (alerts, wildfire): `NominatimService.reverseCountry` resolves the country once; saved/geocoded locations carry `country_code` through `ResolvedLocation` and skip the lookup
 
 ## Key Features (17 MCP Tools)
 
 All location-based tools accept coordinates, a saved `location_name`, or a
 free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
+Full per-tool parameter reference: `docs/TOOLS.md`.
 
-1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); `detail` output control; `compare_models: true` returns a five-model agreement comparison instead of a single forecast (v1.21.0); `ensemble_spread: true` returns one model's own member spread — ECMWF ENS, 50 members — instead of a single forecast (v1.21.0). The two flags are mutually exclusive
-2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere, or worldwide METAR airport observations via `source="metar"`; auto-select via `source`); `include_fire_weather` gives NOAA's published indices in the US and a server-computed Fosberg index with dryness context on the Open-Meteo path (v1.20.0) — not available on the METAR source. Automatically adds **thermal-stress context** in extreme conditions on both the NOAA and Open-Meteo paths (v1.24.0 line): a frostbite time-to-onset line from a computed NA Wind Chill Index, or a heat-stress line from an estimated ABM simplified WBGT — no parameter, gated so moderate output is byte-identical
-3. **get_alerts** - Weather alerts/warnings, routed by country: NOAA (US), MSC GeoMet/ECCC (Canada), EUMETNET MeteoAlarm national warnings (38 European countries, matched at country level); elsewhere the optional keyed Google Weather API fallback (~45+ territories) when `GOOGLE_WEATHER_API_KEY` is set, else a clean not-covered message (v1.23.0); `detail` output control
-4. **get_historical_weather** - Historical data 1940-present (Open-Meteo, global)
-5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning) (NEW in v1.11.0)
+1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only
+2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere, or worldwide METAR airport observations via `source="metar"`); `include_fire_weather` gives NOAA's published indices in the US and a server-computed Fosberg index on the Open-Meteo path (not on METAR); automatically adds a frostbite-risk or heat-stress (WBGT) line in extreme conditions — no parameter, gated so moderate output is unchanged
+3. **get_alerts** - Weather alerts/warnings routed by country: NOAA (US), MSC GeoMet/ECCC (Canada), EUMETNET MeteoAlarm (38 European countries); elsewhere the optional keyed Google Weather fallback (`GOOGLE_WEATHER_API_KEY`) or a clean not-covered message; `detail` output control
+4. **get_historical_weather** - Historical data 1940-present (Open-Meteo archive, global; NOAA for recent US dates)
+5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning)
 6. **check_service_status** - API health check (all services)
-7. **search_location** - Location search/geocoding (Nominatim/OSM, better small town coverage)
-8. **get_air_quality** - Air quality index + pollutants (Open-Meteo, global); pollen is Europe-only keyless (CAMS grains/m³), and worldwide as a Universal Pollen Index when the optional `GOOGLE_POLLEN_API_KEY` is set (v1.22.0)
+7. **search_location** - Location search/geocoding (Nominatim/OSM)
+8. **get_air_quality** - AQI + pollutants (Open-Meteo, global); pollen keyless in Europe (CAMS grains/m³), worldwide as a Universal Pollen Index with the optional `GOOGLE_POLLEN_API_KEY`
 9. **get_marine_conditions** - Wave height, swell, currents (Open-Meteo, global)
-10. **get_weather_imagery** - Weather radar/precipitation imagery (RainViewer, global); `detail` controls URL vs embedded images; `composite: true` returns a finished radar map over a NASA GIBS base map as an MCP image content block (radar/precipitation only, latest frame only)
+10. **get_weather_imagery** - Radar/precipitation imagery (RainViewer, global); `composite: true` returns a finished radar map over a NASA GIBS base map as an MCP image block
 11. **get_lightning_activity** - Real-time lightning detection (Blitzortung.org, global)
-12. **get_river_conditions** - River levels and flood monitoring (NOAA NWPS gauges in the US, Open-Meteo Flood/GloFAS modeled discharge elsewhere; auto-select via `source`)
-13. **get_wildfire_info** - Active wildfire tracking, routed by country: NIFC named incidents in the US, NASA FIRMS satellite heat detections elsewhere (v1.20.0); `source` override, no cross-fallback
-14. **save_location** - Save frequently used locations with aliases (NEW in v1.7.0)
-15. **list_saved_locations** - View all saved locations (NEW in v1.7.0)
-16. **get_saved_location** - Get details for a saved location (NEW in v1.7.0)
-17. **remove_saved_location** - Delete a saved location (NEW in v1.7.0)
+12. **get_river_conditions** - NOAA NWPS gauges in the US, Open-Meteo Flood/GloFAS modeled discharge elsewhere; `source` override, no cross-fallback
+13. **get_wildfire_info** - NIFC named incidents in the US, NASA FIRMS satellite heat detections elsewhere; `source` override, no cross-fallback
+14. **save_location** / 15. **list_saved_locations** / 16. **get_saved_location** / 17. **remove_saved_location** - Saved-location management
 
 ## Development Guidelines
 
@@ -123,13 +121,13 @@ free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#
 
 ### Adding New Features
 
-1. **Types First:** Define TypeScript interfaces in `src/types/`
+1. **Types First:** Define TypeScript interfaces in `src/types/` — every field of a third-party response optional
 2. **Validation:** Add validators to `src/utils/validation.ts`
-3. **Handler:** Create handler in `src/handlers/` following existing patterns
-4. **Service (if needed):** Add API methods to `src/services/noaa.ts` or `openmeteo.ts`
-5. **Tool Registration:** Register in `src/index.ts` (ListToolsRequestSchema and CallToolRequestSchema)
+3. **Handler:** Create or extend a handler in `src/handlers/` following existing patterns
+4. **Service (if needed):** Add API methods to an existing service or create a new one in `src/services/`
+5. **Tool Registration:** Register in `src/index.ts` (`TOOL_DEFINITIONS` and the `CallToolRequestSchema` dispatch)
 6. **Tests:** Write comprehensive tests (see Testing section below)
-7. **Documentation:** Update README.md, CHANGELOG.md
+7. **Documentation:** `CHANGELOG.md` `[Unreleased]`, `docs/TOOLS.md`, `README.md` feature list, `.devdocs/ROADMAP.md` status row; this file only if architecture or a convention changed
 
 ### Error Handling
 
@@ -146,6 +144,8 @@ throw new InvalidLocationError('NOAA', 'Coordinates outside US coverage');
 ```
 
 **Security:** All errors are sanitized via `formatErrorForUser()` before returning to users.
+
+`ApiServiceName` is a **closed union**. Newer, peripheral services (FIRMS, Google Pollen, Google Weather, ACIS, NIFC, GeoMet, MeteoAlarm) deliberately stay outside it and throw plain `Error`s with fixed, pre-written messages — see the conventions below for when that is right.
 
 ### Logging
 
@@ -167,36 +167,72 @@ logger.error('API request failed', { error: err.message });
 
 **Important:** All logs go to `stderr` (MCP protocol requirement). Never log to `stdout`.
 
+## Project Conventions (hard-won rules)
+
+These are the cross-cutting rules that recur across releases. Each was learned the hard way; the per-feature reasoning lives in `.devdocs/archive/completed/<feature>-plan.md` (D-numbered decisions) and `CHANGELOG.md`.
+
+### Scope and output stability
+
+- **Automatic enhancement over parameter proliferation.** If a new piece of context needs no new upstream input, gate it on conditions rather than adding a parameter (thermal stress, stale-observation notes).
+- **Existing output must stay byte-identical when a new flag/key is absent.** Add new service parameters **optional and trailing**, so `undefined` ⇒ the old path *by construction*. New request variables get a new cache key; no-flag request URLs must not change.
+- **Verify byte-identity by diffing built-dist output against the branch base** (md5 of the rendered text for a US point, a non-US point, imperial and metric), and treat the existing fixture tests for that path as the lock — they should pass **unedited**. Live feeds drift, so run keyed/keyless or before/after spawns back-to-back.
+- **One render path per release.** A new computed feature ships on one path (NOAA or Open-Meteo or METAR) and the others get an honest "not available on this source" note; don't spread a half-verified computation across paths.
+- **Nothing the caller can't use the regression of:** the `source` parameter (`auto`/`noaa`/`openmeteo`/`metar`/`nifc`/`firms`) never cross-falls-back between authorities that answer *different questions* (gauge vs model, station vs model, incident vs hotspot). An out-of-coverage forced source gets a coverage disclosure, not a fabricated all-clear.
+
+### Garnish vs contract
+
+- **Garnish** (records, normals, composited images, pollen, fire-weather dryness lines): wrapped in one try/catch, degrades silently to "no section" or a one-line note; **no retries** (must not add latency on failure); plain `Error`s. The only garnish failure that *must* surface is a **rejected API key** — silence would hide a misconfiguration from someone who deliberately configured one.
+- **Contract** (alerts, model comparison, ensemble spread, river/wildfire routing): failures **propagate** with the service's fixed sanitized message. A fabricated "✅ no alerts" from a failed fetch is a dangerous lie on safety data. Incompatible flag combinations are **validation errors thrown before any request**, never a silent downgrade to a different answer.
+- **Distinguish "empty" from "not covered."** HTTP 200 with all-null arrays, HTTP 404 for an uncovered region, and a real empty result mean different things; render them differently (honest-empty with a coverage caveat vs "no coverage here — not an all-clear") and cache the not-covered answer (typed null sentinel) so it isn't re-probed.
+
+### Upstream data hygiene
+
+- **Never trust the HTTP 200 alone.** Open-Meteo and others return 200 with all-null series for uncovered points (pollen outside Europe, flood at sea, ensemble probability). Guard with `!= null`, not `!== undefined` — JSON `null` survives `!== undefined` and then coerces to 0 in arithmetic/conversion (the v1.20.0 F1 and normals-averaging bugs).
+- **Parse CSV/JSON by field name, never by position.** Two live shapes of the same feed have differed in column order and count.
+- **Verify documented shapes live before building on them.** Documented field names, enum casing, duration formats, and error codes have all been wrong upstream (Google Weather: six divergences; FIRMS Area API counts calendar UTC days while flat files are rolling 24 h). Record the verified shape in the plan doc.
+- **Bands and categories are computed from the rounded display value**, so the displayed number and its category can never disagree.
+- **When a station publishes a value, band off the published value** (NOAA `windChill`) so the risk line never contradicts the "Feels Like" line above it; when computing, say what basis was used.
+- **Heuristic bands are disclosed as project heuristics** (Fosberg categories, model-agreement bands, frostbite times, WBGT) — never presented as official ratings; mandatory inline caveats where the model's assumptions bite (WBGT full-sun).
+
+### Keys, secrets, attribution
+
+- **Key-in-URL services** (FIRMS, Google Pollen, Google Weather): never log or throw URLs or raw axios errors; every thrown error is a fixed pre-written string; logs carry only `{ status, code }`; unit tests assert the key appears in no thrown message and no logger argument.
+- **Env vars are permanent and per-feature** — a new Google-backed feature gets its own var (key restrictions make a shared var break silently).
+- **Standing key policy:** no tool ever *requires* a key; a keyed feature needs a usable free tier; say plainly when a "free tier" still needs a billing account.
+- **Attribution strings that a licence mandates are exact** (`Source: Includes weather data from Google`, `Source: Includes pollen data from Google`) — do not reword. Licensed alert text renders verbatim with issue times as published.
+- Persist nothing from Google APIs beyond the in-memory cache (ToS).
+
+### Caching and concurrency
+
+- TTLs live in `CacheConfig.ttl.*` (`src/config/cache.ts`); reuse an existing entry when the data's volatility matches rather than adding one (Google alerts reuse `alerts`), and add a named entry when you'd otherwise hardcode `Infinity`.
+- Cache the *table*, not the per-date slice, for anything derived from a bulk pull (normals).
+- Dedupe concurrent same-key pulls with a `Map<string, Promise<T>>` deleted in `finally`, so a rejected pull is never cached nor left behind.
+- Bound every upstream array (`securityEvent` warn + caveat when the cap trims): 5,000 FIRMS rows, 64 ensemble members, gridpoint series lengths.
+
+### Process
+
+- **Read real output, not just passing tests.** Several shipped-quality bugs were found only by reading rendered text (a percentage contradicting the words it labelled; a quantity mislabelled in a safety line; `**X** (X)` suffix duplication). Run the built dist against live points before tagging.
+- Design → plan → run: `/design-plan` drafts `.devdocs/backlog/plan-<name>.md`; promoting it to the `.devdocs/` root (SETTLED) makes it valid input to `/impl-plan` → `/plan-review` → `/run-plan`, whose last step moves the whole plan set to `.devdocs/archive/completed/`. Update `.devdocs/ROADMAP.md` whenever an idea changes state.
+- `scripts/update-docs-for-release.sh` rewrites this file's version, tool count, test count, `Last Updated`, and prepends one "New in" line — keep those anchors; **do not add per-release narrative here** (it belongs in `CHANGELOG.md` and the plan doc).
+
 ## Testing
 
 ### Test Structure
 
 ```
 tests/
-├── unit/                    # Unit tests (fast, no I/O)
-│   ├── cache.test.ts       # Cache functionality
-│   ├── validation.test.ts  # Input validation
-│   ├── units.test.ts       # Unit conversions
-│   ├── errors.test.ts      # Error classes
-│   ├── config.test.ts      # Configuration
-│   ├── retry-logic.test.ts # Backoff algorithms
-│   ├── security.test.ts    # Security validation
-│   ├── bounds-checking.test.ts  # Array bounds
-│   ├── alert-sorting.test.ts    # Performance optimizations
-│   ├── distance.test.ts    # Haversine distance calculations
-│   ├── security-v1.6.test.ts    # v1.6.0 security boundaries
-│   └── geohash-neighbors.test.ts # Geohash neighbor API
-└── integration/             # Integration tests (with API calls)
-    ├── error-recovery.test.ts
-    └── safety-hazards.test.ts   # River and wildfire features
+├── unit/          # ~80 files; fast, no I/O. Fixture-based handler/service tests plus pure-module tests
+└── integration/   # ~13 files; some make live network calls and can flake — re-run before blaming a diff
 ```
+
+Named by subject (`<feature>-handler.test.ts`, `<util>.test.ts`, `<feature>-routing.test.ts`). When a change must leave an existing path untouched, the existing test file for that path is the **lock** — it should pass unedited; if you have to edit it, the path changed.
 
 ### Testing Requirements
 
 - **Framework:** Vitest (configured in `package.json`)
 - **Coverage Target:** 100% on critical utilities (cache, validation, units, errors)
-- **Performance:** All tests must complete in < 2 seconds
-- **No Flakiness:** Tests must be deterministic
+- **Performance:** Unit tests are fast; the full suite currently takes ~1 minute. Keep new unit tests I/O-free
+- **No Flakiness:** Unit tests must be deterministic (pin percentile methods, clustering order, time zones)
 
 ### Running Tests
 
@@ -204,6 +240,7 @@ tests/
 npm test                    # Run all tests
 npm run test:watch         # Watch mode
 npm run test:coverage      # With coverage report
+npx vitest run tests/unit/cache.test.ts   # One file
 ```
 
 ### Writing Tests
@@ -279,8 +316,7 @@ if (series.values.length > maxEntries) {
 
 ### No Hardcoded Secrets
 
-- No API keys required (all APIs are public)
-- Use environment variables for configuration
+- No API keys required (all default APIs are public); optional keys come only from environment variables
 - Never commit `.env` files
 
 ## Configuration
@@ -295,13 +331,20 @@ CACHE_MAX_SIZE=1000            # Max cache entries (100-10000, default: 1000)
 # API Configuration
 API_TIMEOUT_MS=30000           # API timeout in milliseconds (5000-120000, default: 30000)
 
+# Tool selection
+ENABLED_TOOLS=basic            # Preset (basic | standard | full | all) and/or names,
+                               # e.g. basic,+air_quality  or  all,-marine  (src/config/tools.ts)
+
+# Default location (used when a tool is called with no location at all)
+WEATHER_DEFAULT_LOCATION=home  # saved alias | "lat,lon" | free-text place name
+
 # Lightning
 WEATHER_LIGHTNING_PREWARM=true # Subscribe saved locations at startup so lightning
                                # coverage accumulates before the first query (default: true).
                                # Set false to skip the startup MQTT connection. No effect
                                # when get_lightning_activity is disabled.
 
-# Units / Localization (v1.10.0)
+# Units / Localization
 WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
 # Optional per-unit overrides (follow WEATHER_UNITS if unset):
 #   WEATHER_TEMPERATURE_UNIT (F|C), WEATHER_WIND_SPEED_UNIT (mph|kmh|ms|kn),
@@ -325,8 +368,9 @@ LOG_LEVEL=1                    # 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR (default: 1)
 ```
 
 Cache/API/logging variables are validated in `src/config/cache.ts`; unit variables
-are parsed and validated in `src/config/units.ts`. Per-call unit parameters are
-resolved by `src/utils/unitPreferences.ts` and formatted via `src/utils/unitFormat.ts`.
+are parsed and validated in `src/config/units.ts`; optional keys in `src/config/api.ts`.
+Per-call unit parameters are resolved by `src/utils/unitPreferences.ts` and formatted
+via `src/utils/unitFormat.ts`.
 
 ## Caching Strategy
 
@@ -339,6 +383,7 @@ resolved by `src/utils/unitPreferences.ts` and formatted via `src/utils/unitForm
 - **Alerts:** 5 minutes (can change rapidly)
 - **Historical data (>1 day old):** Infinity (finalized)
 - **Recent historical (<1 day):** 1 hour (may be corrected)
+- Newer entries (normals, Google pollen, FIRMS, tiles, composites) are documented inline in `CacheConfig`
 
 ### Cache Implementation
 
@@ -362,29 +407,11 @@ chore: Tooling, dependencies, etc.
 security: Security improvements
 ```
 
-### Commit Message Format
+Body: a short description, then `**Changes:**` / `**Benefits:**` bullets when the
+change warrants it, and `Addresses <issue/plan reference>.` when there is one.
+**No `Co-Authored-By` or generated-with trailers.**
 
-```
-<type>: <short description>
-
-<detailed description>
-
-**Changes:**
-- Bullet point list of changes
-- Implementation details
-
-**Benefits:**
-- Why this change was made
-- What problems it solves
-
-Addresses <issue/doc reference>.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-```
-
-## Saved Locations Feature (v1.7.0)
+## Saved Locations Feature
 
 ### Overview
 
@@ -404,61 +431,33 @@ The saved locations feature allows users to save frequently used locations with 
 
 ### Using Location Names in Tools
 
-To add `location_name` support to a weather tool:
+Every location-based tool already accepts `location_name` / `city_name` / `latitude`+`longitude`
+via the shared `resolveLocationAsync` helper and the `LOCATION_SCHEMA_PROPERTIES` schema
+fragment in `src/index.ts`. A new tool follows the same pattern:
 
 ```typescript
-// 1. Add location_name to Args interface
+// 1. Args interface
 interface YourToolArgs {
   latitude?: number;
   longitude?: number;
-  location_name?: string;  // Add this
+  location_name?: string;
+  city_name?: string;
   // ... other parameters
 }
 
-// 2. Import dependencies
-import { LocationStore } from '../services/locationStore.js';
-import { resolveLocation } from '../utils/locationResolver.js';
+// 2. Resolve once at the top of the handler
+import { resolveLocationAsync } from '../utils/locationResolver.js';
+const resolved = await resolveLocationAsync(args as YourToolArgs, locationStore, geocodingService);
+const { latitude, longitude } = resolved;
 
-// 3. Update function signature
-export async function handleYourTool(
-  args: unknown,
-  // ... other services
-  locationStore: LocationStore  // Add this
-): Promise<...> {
-  // 4. Resolve location
-  const { latitude, longitude } = resolveLocation(args as YourToolArgs, locationStore);
-
-  // 5. Use coordinates as normal
-  // ... rest of handler logic
-}
-
-// 6. Update tool registration in index.ts
-case 'your_tool':
-  return await withAnalytics('your_tool', async () =>
-    handleYourTool(args, otherServices, locationStore)  // Pass locationStore
-  );
-
-// 7. Update tool schema in index.ts
-your_tool: {
-  inputSchema: {
-    properties: {
-      latitude: {
-        description: 'Latitude. Not required if location_name provided.',
-        // ... other props
-      },
-      longitude: {
-        description: 'Longitude. Not required if location_name provided.',
-        // ... other props
-      },
-      location_name: {
-        type: 'string',
-        description: 'Name of saved location (e.g., "home"). Use instead of coordinates.'
-      }
-    },
-    required: []  // Change from ['latitude', 'longitude']
-  }
-}
+// 3. Spread LOCATION_SCHEMA_PROPERTIES into the tool's inputSchema.properties in src/index.ts
+//    and leave `required: []`.
 ```
+
+Name-based lookups echo the resolved place in a `**Location:**` header
+(`formatLocationLine`/`prependLocationLine` in `src/utils/locationResolver.ts`).
+`ResolvedLocation` also carries `country_code` when known, which country-routed
+tools use to skip the reverse-geocode lookup.
 
 ### Storage Format
 
@@ -497,26 +496,13 @@ your_tool: {
 - **Geocoding**: Uses Nominatim service (rate-limited to 1 req/sec)
 - **Error handling**: Helpful messages if location not found or invalid
 - **Thread-safe**: LocationStore uses synchronous file I/O with cache invalidation
-- **Activities (optional)**:
-  - Array of activity strings (e.g., ["boating", "fishing", "hiking"])
-  - Normalized to lowercase and trimmed
-  - Max 50 characters per activity
-  - Helps AI provide contextually relevant weather information
-  - Empty/whitespace-only activities are filtered out
-- **Smart Updates**:
-  - If alias exists AND no location details provided, only update specified fields
-  - Allows updating name/activities without re-specifying coordinates
-  - Example: `save_location(alias="cabin", activities=["boating", "fishing"])` updates activities while preserving all location data
-  - New locations still require location_query or lat/long
+- **Activities (optional)**: array of strings, lowercased/trimmed, ≤ 50 chars each, empties dropped; helps the AI tailor weather context
+- **Smart Updates**: if the alias exists and no location details are provided, only the specified fields change (`description`/`alternateNames`/`notes` preserved when omitted, cleared when explicitly `""`/`[]`); new locations still need `location_query` or lat/long
 
 ### Currently Supported Tools
 
-As of v1.11.0, **every location-based weather tool** accepts `location_name`
-(saved) and `city_name` (geocoded on demand) in addition to `latitude`/`longitude`,
-via the shared `resolveLocationAsync` helper and the `LOCATION_SCHEMA_PROPERTIES`
-schema fragment in `src/index.ts`. Name-based lookups echo the resolved place in a
-`**Location:**` header (see `formatLocationLine`/`prependLocationLine` in
-`src/utils/locationResolver.ts`):
+**Every location-based weather tool** accepts `location_name` (saved) and `city_name`
+(geocoded on demand) in addition to `latitude`/`longitude`:
 
 - ✅ `get_forecast`, `get_current_conditions`, `get_alerts`, `get_historical_weather`
 - ✅ `get_air_quality`, `get_marine_conditions`, `get_weather_imagery`
@@ -528,22 +514,20 @@ schema fragment in `src/index.ts`. Name-based lookups echo the resolved place in
 ### Adding a New MCP Tool
 
 1. Create handler: `src/handlers/newFeatureHandler.ts`
-2. Define types: `src/types/noaa.ts` or `openmeteo.ts`
+2. Define types: `src/types/<upstream>.ts`
 3. Add service method if needed: `src/services/`
-4. Register tool in `src/index.ts`:
-   - Add to `ListToolsRequestSchema` handler
-   - Add case to `CallToolRequestSchema` handler
+4. Register tool in `src/index.ts` (`TOOL_DEFINITIONS` + dispatch) and in `src/config/tools.ts` (`ToolName`, presets)
 5. Write tests: `tests/unit/` and `tests/integration/`
-6. Update documentation: README.md, CHANGELOG.md
+6. Update documentation: `docs/TOOLS.md`, `README.md`, `CHANGELOG.md`
 
 ### Adding External API Integration
 
-1. Create type definitions in `src/types/`
+1. Create type definitions in `src/types/` (all fields optional)
 2. Add client methods to existing service or create new service class
-3. Implement retry logic with exponential backoff
-4. Add error handling using custom error classes
-5. Add caching with appropriate TTL
-6. Write integration tests with mocked responses
+3. Decide garnish vs contract (see conventions) — that decides retries, error class, and failure rendering
+4. Add caching with an appropriate `CacheConfig.ttl` entry
+5. Verify the live response shape before writing the parser; record what you saw in the plan doc
+6. Write unit tests with fixture responses; never let a unit test hit the network
 
 ### Debugging
 
@@ -561,6 +545,8 @@ npx vitest run tests/unit/cache.test.ts
 npm run build
 ```
 
+Note: MCP clients spawn `dist/index.js` at session start — a rebuild alone is invisible to an already-running client; restart the session to pick it up.
+
 ## Code Quality Standards
 
 ### Must Pass Before Commit
@@ -575,47 +561,26 @@ npm audit             # No critical vulnerabilities
 
 - [ ] TypeScript strict mode compliance
 - [ ] Input validation on all user-facing functions
-- [ ] Error handling with custom error classes
+- [ ] Error handling with custom error classes (or fixed-message plain `Error` for garnish/keyed services)
 - [ ] Security event logging where appropriate
-- [ ] Tests for new functionality (unit + integration)
-- [ ] Documentation updated (inline comments + README)
+- [ ] Tests for new functionality (unit + integration); existing lock tests pass unedited
+- [ ] Documentation updated (inline comments + README + docs/TOOLS.md + CHANGELOG)
 - [ ] No console.log (use logger instead)
 - [ ] No hardcoded values (use config/)
+- [ ] Rendered output read against live points, not just tests
 
 ## Project Status
 
-- **Version:** 1.23.0 — global alerts fallback (optional `GOOGLE_WEATHER_API_KEY`). Previously 1.22.0 — global pollen fallback on `get_air_quality` (optional `GOOGLE_POLLEN_API_KEY`, Universal Pollen Index beyond Europe). (The ensemble-spread work below was developed against an internal v1.22.0 target and first shipped in the v1.21.0 consolidated release; likewise the v1.15–v1.17 content further below first shipped in v1.18.0.)
-- **Unreleased (v1.24.0 line):** Heat/cold stress context on `get_current_conditions` — automatic gated frostbite-risk and heat-stress (WBGT) lines, per `.devdocs/archive/completed/heat-cold-stress-plan.md` (D1–D8). The Fosberg pattern in its purest form: **zero service changes, zero new request variables, zero cache-key changes** — every input was already fetched on every path, so the diff is one new pure zero-import module (`src/utils/thermalStress.ts`), handler rendering on **both** the NOAA and Open-Meteo paths (and therefore `get_weather_summary`'s current section), two config gates, and docs. **No new parameter and no schema change** (principle 1: automatic enhancement over parameter proliferation). **Moderate output is byte-identical** — verified by diffing built-dist output for San Francisco (NOAA) and Milan (Open-Meteo) in imperial *and* metric plus the METAR source against branch base `8e5af48`, identical md5 across all five; every existing fixture sits at moderate temperatures, so `metar-handler.test.ts`, `noaa-staleness.test.ts`, `openmeteo-current.test.ts`, `fireWeather*.test.ts` and every pre-existing `current-conditions-global.test.ts` case pass unedited — that *is* the lock. **The load-bearing decision is which number drives the band:** a NOAA station-published `windChill` drives band and display together so the risk statement can never contradict the `Feels Like (Wind Chill)` line above it; the Open-Meteo path always computes and **never bands off `apparent_temperature`** (Steadman — a different claim), which is why that line echoes its own basis. Live at Vostok the gap was 27°: `Feels Like` −86 °F against a −113 °F wind chill. Both bands are computed from the **rounded** display value (the v1.20.0 fire-weather lesson). The **calm-air carve-out** lives in the handler, not the pure function — below the 3 mph published floor `calculateWindChillF` returns `null` and the handler substitutes air temperature, since −50 °F calm air freezes skin anyway. **Deviation from the plan's D5 copy, found by reading real output rather than a failing test:** that carve-out rendered the substituted air temperature as `wind chill -25°F`, mislabeling the quantity in a safety line against D7's honest-framing mandate; the basis is now a three-way discriminator and renders `air temperature -25°F in calm air` — and a **pre-tag code review** then caught that this same wording asserted "calm" when wind was merely *never reported* (dead anemometer), understating a blizzard's band, so a fourth `airTempNoWind` basis now says wind is unknown and that skin could freeze sooner. Sentinel convention here is **`null`, not Fosberg's `NaN`**. Bands are disclosed heuristics (EC-adapted frostbite times; flag-condition WBGT categories) and the heat line carries a mandatory inline caveat — the ABM model's full-sun assumption is real and visible: Phoenix at 109 °F / 15 % RH scores WBGT 92 Extreme. The NOAA cold path could not be live-verified (northern August) and rests on unit fixtures. Descoped: METAR-path thermal stress (one render path per release, the Fosberg-on-METAR precedent), forecast-path per-day thermal stress, full Liljegren WBGT.
-- **Status:** Production Ready ✅
-- **New in v1.23.0:** Global alerts fallback (Google Weather API)
-- **New in v1.23.0 (global alerts fallback):** `get_alerts` goes worldwide behind an **optional** `GOOGLE_WEATHER_API_KEY` — the **elsewhere branch only** (`src/handlers/alertsHandler.ts`) calls Google's Weather API `publicAlerts:lookup` and renders official national warnings for ~45+ territories, per `.devdocs/archive/completed/global-alerts-fallback-plan.md` (D1–D10). **The US, Canada, and the 38 MeteoAlarm countries never contact Google, key or no key** — they are jurisdictional authorities and the branch order alone enforces it, so reaching the Google branch already proves the point is none of them. **No client-side country allowlist ships** (D1/D9): Google's coverage is provider polygons whose "alignment may not be exact", so a hardcoded list would drift and mis-gate borders; Google answers coverage per request and an uncovered answer caches. **Unlike pollen, this is contract, not garnish** (D6): alerts *are* the tool's whole answer, so `handleGoogleAlerts` catches nothing — a rejected key, 429, timeout, or network failure propagates with the service's fixed sanitized message, exactly as a GeoMet or MeteoAlarm failure does, because a fabricated "✅ no alerts" from a failed fetch would be a dangerous lie on safety data. **The two empty answers are rendered distinctly**, since live testing showed they are distinguishable and mean opposite things: HTTP 200 with nothing active renders **honest-empty** ("no alerts found" + the standing coverage caveat, FIRMS framing), while the uncovered-region HTTP 404 renders `ℹ️ No alert coverage for this location` stating explicitly that it is **not** an all-clear, with its own caveat. `getPublicAlerts` returns `PublicAlertsResult` (`{ alerts, covered }`) rather than a bare array so the renderer can tell them apart; D6's original one-message design assumed the shapes were identical and was amended after live output review (India/Kenya/Hong Kong/open ocean 404; Australia/Japan/Taiwan/Mexico/Brazil 200). Both covered paths stayed byte-identical across that fix. The renderer is a fourth CAP-shaped one deliberately close to MeteoAlarm's, reusing `capSeverityRank`/`capSeverityEmoji`/`STANDARD_DISPLAY_CAP`/`FULL_DISPLAY_CAP`; `remainderNote` was generalized to `Array<{ severity?: string }>` with a `noun` defaulting to the MeteoAlarm wording, so that output is unchanged. Times render in the alert's **own `timezoneOffset`** (times-as-issued; all arithmetic in UTC so the string never depends on the server's timezone). **Attribution is mandatory in two layers** (upstream (d)): the **exact** footer string `Source: Includes weather data from Google` — do not reword — plus a per-alert `**Source:**` publisher line with its authority URI. **Key hygiene is the FIRMS threat model** (key in URL): `src/services/googleWeather.ts` never logs/throws URLs or raw axios errors, every thrown error is a fixed pre-written string, logs carry only `{ status, code }`, and `GoogleWeatherKeyRejectedError extends Error`, **not** `ApiError` (closed union). Cache is **in-memory only**, reusing `CacheConfig.ttl.alerts` (5 min — no new TTL entry, so `config.test.ts` is untouched by construction); **no retries**. The new `googleWeatherService` parameter is **optional and trailing (8th on `handleGetAlerts`, 10th on `handleGetWeatherSummary`)**, so `undefined` ⇒ the old path *by construction*: keyless output is byte-identical, verified by diffing built-dist `get_alerts` output for Sydney / a US point / Berlin / Toronto against branch base `09cff0b` (identical md5, with Berlin returning real DWD warnings rather than a vacuous empty), with `alerts-routing.test.ts`, `alerts-detail.test.ts`, and `alert-sorting.test.ts` passing unedited. **Rendering gotcha found by reading real output, not a failing test** (the compare_models lesson repeating): the event-type suffix rendered `**Severe Thunderstorm Warning** (Severe Thunderstorm)` — publishers routinely put the event in the title — so the suffix now renders only when it says something the title does not. **Live-verified 2026-08-18**, which passed the D10 free-tier gate (one Essentials SKU, 10,000 free events/month) and corrected **six** documented shapes — the array field is **`weatherAlerts`** not `alerts` (the documented name returned empty for every location on Earth); CAP enums are **SCREAMING_CASE** (normalized once by `capEnumValue` before reaching `capSeverityRank`/`capSeverityEmoji`); `timezoneOffset` is a **seconds duration** (`"28800s"`); `safetyRecommendations` holds **objects** while `instruction` holds strings; `dataSource` is `{publisher,name,authorityUri}` with no `fullName`; and an **uncovered region answers HTTP 404** `NOT_FOUND`, not a `regionCode`-only 200 — the pollen-T6 deviation repeating, and under the contract posture it *threw* until fixed to resolve-and-cache. Publisher field presence varies widely (one live alert carried no severity, times, or instructions), so the CAP line is omitted rather than rendering `Unknown | Unknown | Unknown`. `nextPageToken` exists (docs listed no pagination) — recorded as a follow-up, not implemented. Descoped: every other Google Weather endpoint, polygon rendering/filtering, `languageCode` as a parameter, `statusHandler` key reporting, persistent caching, retries, and any change to the NOAA/GeoMet/MeteoAlarm paths.
-- **New in v1.22.0:** Global pollen fallback — an optional `GOOGLE_POLLEN_API_KEY` extends `get_air_quality` pollen beyond Europe (Universal Pollen Index, 65+ countries incl. the US); keyless output byte-identical
-- **New in v1.21.0:** Multi-model forecast comparison and single-model ensemble spread on get_forecast, plus global climate-normals hardening
-- **New in v1.21.0 (global normals hardening):** `include_normals` has been **global since v1.2.0** — the planning index and ICR rows claiming "NCEI, US stations only" were stale (the FE §1.1 "no moon API" pattern). `getClimateNormals` (`src/utils/normals.ts`) tries NCEI only with a token *and* a US point, and otherwise computes 1991–2020 normals from the Open-Meteo archive anywhere; since the project ships keyless, **that fallback is the path virtually every caller is already on, US included**. So this was a hardening pass on the hot path, not a coverage feature, per `.devdocs/archive/completed/global-normals-hardening-plan.md` (D1–D7). **D1:** the per-date fetch becomes one full-year (`1991-01-01`…`2020-12-31`) pull per location — live-verified at **+2.5 % bytes over what a single date cost**, because the old "month ±1 optimization" spanned a contiguous range and the API returned every interior day of all 30 years anyway (its comment misled; deleted with `getLastDayOfMonth`, its only caller). `computeNormalsTable` computes all 366 `"MM-DD"` slots in one pass; the **table** is cached under a new `CacheConfig.ttl.normals` (the Infinity was hardcoded at two call sites), so an eviction costs one pull rather than up to 366. The private `getNormalsTable` seam keeps the public signature and `ClimateNormals` shape exactly — the service-boundary fakes in `metar-handler.test.ts`/`almanac-handler.test.ts` lock it and passed unedited throughout. **D2 fixed a real averaging bug:** the old filters tested `!== undefined`, so Open-Meteo's JSON `null`s reached `reduce` where `sum + null` coerces to `+ 0` and dragged means down; means now skip nulls, a slot needs ≥ 15 of 30 samples, and **Feb 29 carves out at 6** (8 leap days exist) — live-verified as a real leap-day mean (55.67 °F) distinct from Feb 28 (47.79 °F), not a fallback. An all-null response caches an all-unavailable table so ocean points never refetch per date. **D3:** a per-service `Map<string, Promise<NormalsTable>>` dedupes concurrent same-location pulls (entry deleted in `finally`, so a rejected pull is never cached nor left behind) plus one bounded 429 retry (2 s + jitter); **the 429 is real and was hit live during T8 verification**, with the retry firing exactly as designed. Failure contract unchanged — everything still ends at the call sites' catch and the unavailable note. **Corrected premise:** the design justified dedupe by `get_weather_summary` racing forecast + current, but that handler's `for` loop **awaits each section sequentially** — the dedupe is defensive for genuinely concurrent callers (verified directly: two concurrent calls → 1 pull), not that scenario. **D4:** `isLocationInUS` (contiguous-only) deleted; the NCEI gate uses the shared `isInUS`, so AK/HI/PR token holders now reach NCEI. **D5:** unrounded float storage with render-time rounding (`normalPrecipToPref`'s inch branch gained 2-decimal rounding — a no-op before, load-bearing after). Imperial is **byte-identical** (Kansas City diffed against the branch base); **metric can differ by 1° as displayed** — the old path double-rounded °C→°F→int→°C (Paris live: 24 → 25 °C, 1 → 0.9 mm). **D6:** five duplicated render blocks collapse into `renderNormalsSection`, fixing a drift where success rendered `## 📊 Climate Context` and every failure rendered `## Climate Normals`; one constant now serves both. **D7:** the non-US test accepted *either* a rendered section *or* the unavailable note — it now asserts the render. Live-falsified design premise worth remembering: **ERA5 covers open ocean**, so an ocean point returns real normals rather than the unavailable note; that path is locked by unit fixtures instead. Descoped: removing NCEI, international records, persistent disk cache, more tools.
-- **New in v1.21.0 (single-model ensemble spread, developed as the internal v1.22.0 milestone):** `ensemble_spread: true` on `get_forecast` returns a **member-spread confidence view** instead of a single forecast, per `.devdocs/archive/completed/ensemble-spread-plan.md` (D1–D10). It answers the sibling question to `compare_models`: not "do the models agree?" but "how confident is the model itself?" One fixed model — **`ecmwf_ifs025`** (ECMWF ENS 0.25°, 50 perturbed members + control) — from Open-Meteo's **own subdomain** `ensemble-api.open-meteo.com/v1/ensemble`, so the service gets its own axios client rather than riding `forecastURL`. Same three-layer split as the comparison, and the same corrected constant direction: `ENSEMBLE_MODEL` lives in the pure `src/utils/ensembleSpread.ts` and the **service imports it from the util**, never the reverse. The module is pure and **logger-free**, importing exactly three symbols from `modelComparison.ts` (`classifyTempSpread`, `weatherCodeBucket`, `precipThreshold` — the last needed only the `export` keyword added, no behavior change), so the band/bucket/threshold heuristics are shared rather than duplicated; the 64-member defensive ceiling surfaces as a returned meta flag and the *handler* emits the `securityEvent` warn (A6). **The control run is excluded from every statistic by construction, not by filtering** — it lives in the *unsuffixed* series and is extracted by a separate function that never merges into the member arrays (D6, mirror of `best_match`), so the exclusion cannot be forgotten in a later edit. **`precipitation_probability_max` is never requested:** on the ensemble endpoint it is an HTTP 200 with unit `"undefined"` and all-null control *and* member arrays, because probability is *derived from* ensembles rather than published by them — the wet-member fraction IS that product. Percentile method pinned for determinism (sort ascending, `rank = q*(n-1)`, linear interpolation — numpy default) and locked by tests. **Bands classify the p25–p75 interquartile range, not min–max**, because the IQR is what gets rendered: with 50 members the extremes are single outlying runs, and `detail: "full"` adds the envelope as its own line. Spread is **contract, not garnish** (D7) — no degraded fallback; the two flags are **mutually exclusive**, and `granularity: "hourly"`/`source: "noaa"` are validation errors thrown before any request. Distinct cache namespace `openmeteo-ensemble` with `CacheConfig.ttl.forecast`; `getForecast` and `getModelComparison` are byte-untouched — the `openmeteo.ts` diff is **197 insertions, 0 deletions** — and the no-flag paths were verified byte-identical against branch base `5995b80` across six cases (US, non-US, normals, astronomy, hourly, `compare_models`), with all six lock test files passing unedited. **Rendering gotcha found by reading real output, not by a failing test — the compare_models lesson repeating:** `detail: "summary"` paired the *control run's* description with the *members' modal-bucket* percentage, so a day whose control forecast rain while 37 of 50 members were cloudy rendered `Slight rain (74% of members)`, the figure contradicting the words it labelled; the control's wording is now borrowed only when the control falls in the modal bucket. Live sweep confirmed the design's horizon fact: `days: 16` renders **14** days and trims 2. Descoped: caller-selectable ensemble model (`gfs_seamless` would give a ~33-day horizon), hourly member spread, combining with `compare_models`, and any probability calibration or skill claim.
-- **New in v1.21.0 (multi-model comparison):** `compare_models: true` on `get_forecast` returns a **model-agreement view** instead of a single forecast, per `.devdocs/archive/completed/multi-model-comparison-plan.md` (D1–D10). Five global models — `gfs_seamless`, `ecmwf_ifs025`, `icon_seamless`, `gem_seamless`, `ukmo_seamless` — plus `best_match` as a reference, fetched in **one** request via Open-Meteo's `models=` parameter. Three-layer split: `src/services/openmeteo.ts` `getModelComparison` fetches (six daily variables only — extending `buildForecastParams`'s 19 across six models would sextuple the payload for variables never rendered), the **zero-import** pure module `src/utils/modelComparison.ts` computes, and `formatModelComparisonForecast` renders. **`best_match` is excluded from every statistic, band, participation count, and trimming decision (D6)** — it is Open-Meteo's blend of largely these same models, so counting it double-counts and artificially tightens every spread; it renders as a reference line only. **The constant lives in the pure module, not the service** (assumption A1): D3's prose put `COMPARISON_MODELS` "on the service", but D4 forbids the pure module importing services — the service imports it from the util, the normal direction (cf. `openMeteoUnitParams`). Three live-verified null modes are handled *distinctly*, since a model can return HTTP 200 with all-null arrays (Flood-API/pollen precedent): all-null models dropped and disclosed by name; per-variable participation (UKMO publishes no `precipitation_probability_max` at all, so that count is legitimately short and the output says so); per-day counts anchored on `temperature_2m_max` with trailing days below 2 models trimmed, interior gaps retained. Comparison is **contract, not garnish** (D7) — no retry-without-models, no degraded fallback to a plain forecast; `granularity: "hourly"` and `source: "noaa"` are validation errors thrown before any service call, because silently returning a single forecast to someone asking whether models agree would be dishonest. `include_normals`/`include_astronomy` are silently ignored (they already are on hourly). US points route to the comparison too, with a footer disclosure that the NWS point forecast is not among the compared models; NOAA is never contacted. `get_weather_summary` strips the flag (D9). Distinct cache namespace `openmeteo-model-comparison` with `CacheConfig.ttl.forecast`; `getForecast` is byte-untouched — params, key, and its hardcoded TTL — verified by diffing built-dist output for a US and a non-US point against the v1.20.0 base, with five lock test files passing unedited. Bands, the precipitation threshold, and the weather-code buckets are disclosed as project heuristics (Fosberg precedent). **Rendering gotcha found by reading real output, not by a failing test:** precipitation amount ranges must cover only the *wet* models — including dry ones pinned every minimum to `0.00`, so a confident 0.05–0.31 in forecast read as "anywhere from nothing". Descoped: caller-selectable models (regional models break the anywhere-on-Earth contract), hourly comparison, single-model ensemble spread.
-- **New in v1.22.0 (global pollen fallback):** Pollen goes worldwide behind an **optional** `GOOGLE_POLLEN_API_KEY` — `get_air_quality` renders a grass/tree/weed **Universal Pollen Index** (0–5) from Google's Pollen API when a key is configured **and** all six CAMS species come back null, per `.devdocs/archive/completed/global-pollen-fallback-plan.md` (D1–D10). Pollen rides the CAMS *European* model on the endpoint the tool already calls, so it was Europe-only by construction since v1.18.0; **Europe is untouched and never contacts Google** (quota + privacy), keeping its richer per-species grains/m³. The trigger is the all-six-null gate — *partial* European coverage stays keyless, since one real species is coverage — and the trigger and the CAMS render block now read one extracted `finiteCamsPollen` helper so they cannot drift. **The Google data is garnish, not contract** (ACIS/records precedent): the whole fetch sits in one try/catch and the air-quality call never fails because of it; quota/timeout/network/uncovered-country/empty all degrade silently to no section, with a **rejected key** the sole exception (one note, wildfire-F3 disclosure precedent — silence would hide a misconfiguration from someone who deliberately configured a key). Out-of-season types omit `indexInfo` entirely upstream and so are dropped, while a *present* zero renders as meaningful "none detected" (the CAMS olive-0 rule). The footer carries the **mandatory exact** string `Source: Includes pollen data from Google` — Pollen API policy, do not reword. **Key hygiene is the FIRMS threat model** since the key rides the URL query string: `src/services/googlePollen.ts` never logs/throws URLs or raw axios errors, every thrown error is a fixed pre-written string, logs carry only `{ status, code }`, and unit tests assert the key appears in no thrown message and no logger argument. `GooglePollenKeyRejectedError extends Error`, **not** `ApiError` (`ApiServiceName` is a closed union; FIRMS deliberately stayed outside it). Cache is **in-memory only**, `CacheConfig.ttl.googlePollen: 6 * HOUR`, per Google ToS on persisting API content; an uncovered region caches a **null sentinel** (the cache is typed `Cache<GooglePollenDailyInfo | null>` so a cached "no data" is distinguishable from a miss) and isn't re-probed. **No retries** — garnish must not add latency on failure. The new `googlePollenService` parameter is **optional and trailing (5th)**, so `undefined` ⇒ the old path *by construction*: keyless output is byte-identical, verified by diffing built-dist `get_air_quality` output for Kansas City and Berlin against branch base `f895761` (identical md5), with `air-quality-pollen.test.ts` and `air-quality-forecast.test.ts` passing unedited. Also lands the README **"Optional API keys"** section consolidating all three keys with the standing key policy (usable free tier required; no tool ever *requires* a key; paid-key features out of scope absent demand) — and states plainly that this key, unlike NCEI/FIRMS, is **not a free registration**: Google requires a billing account even for the free 5,000 lookups/month tier (`docs/GOOGLE_POLLEN_KEY_SETUP.md`). Per D10 the env var is **permanent and per-feature** — a future Google-backed feature gets its own var, because the setup doc's recommended Pollen-API key restriction means a shared var would invite silent `PERMISSION_DENIED` breakage. Descoped: multi-day Google forecast, health-recommendation strings, per-plant detail, `statusHandler` key reporting, persistent caching, any change to the CAMS path.
-- **New in v1.20.0 (global fire weather):** Global **fire weather** — `include_fire_weather` on `get_current_conditions` computes a **Fosberg Fire Weather Index** on the Open-Meteo path (non-US via `auto`, anywhere via `source: "openmeteo"`), per `.devdocs/archive/completed/global-fire-weather-plan.md` (D1–D7). **Corrected premise:** `src/utils/fireWeather.ts` had no formulas to reuse — it *interprets* five series NOAA pre-computes on the gridpoint API — so the global path computes the index in-house from current temperature/RH/sustained wind, the three inputs verified non-null worldwide. D2 appends four pure functions to that zero-import module (`calculateFosbergIndex` — three-branch EMC piecewise, η damping clamped ≥ 0, clamped 0–100, `NaN` on any non-finite input; `getFosbergCategory`; `describeVpd`; `describeTopsoilMoisture`), with the bands disclosed as project heuristics. D3 gives `OpenMeteoService.getCurrentConditions` an **optional trailing** `includeFireWeather` flag that appends `soil_moisture_0_to_1cm,vapour_pressure_deficit` to the `current=` list and keys the cache, so a no-flag request URL is byte-identical to before. **D4 is the verified gotcha:** the response carries the *caller's* units (`openMeteoUnitParams`), so temperature/wind normalize back to fixed °F/mph in the handler (`knotsToMph` added to `units.ts`) — no second fetch, and the index is identical in metric and imperial (live-verified in Milan). D5/D6 render the section — emoji/level line mirroring the NOAA block, computed-from sentence, optional `**Dryness context:**` lines, and the derivation disclosure ("*not an official fire-danger rating*") — and **never call `getFireWeatherContext`**, whose US geography boxes and northern-hemisphere seasonality would be wrong outside the US; the index is hemisphere-proof by construction. Null dryness drops its line (open ocean: HTTP 200 with nulls, Flood-API precedent), a missing core input renders `⚠️ Fire weather inputs unavailable…`, and NaN never reaches output. The US NOAA path is byte-for-byte unchanged (locked by `tests/unit/fireWeatherContext.test.ts` unedited, verified against the branch base with and without the flag). The METAR note's *leading clause* is unchanged — and is all `metar-handler.test.ts` asserted, so that file was extended additively — but its advice clause was corrected in the review-hardening pass to name both index routes (see below). Descoped: global Haines via pressure levels, METAR-path Fosberg.
-- **New in v1.20.0 (global wildfire):** Global `get_wildfire_info` — routed by country like alerts (`src/handlers/wildfireHandler.ts`): US → NIFC byte-identical (locked by `tests/unit/wildfire-handler.test.ts` unedited), elsewhere → **NASA FIRMS** VIIRS satellite heat detections, per `.devdocs/archive/completed/global-wildfire-plan.md` (D1–D8). **Keyless-first**: with no key the tool fetches FIRMS' keyless 24 h regional flat CSVs (conservative inset region picker in `src/utils/firmsHotspots.ts` — the US–Canada border band and Middle East gap deliberately fall to the ~10 MB `Global` file; parsed rows cached per region, 30 min); the optional free `FIRMS_MAP_KEY` (`src/config/api.ts`, NCEI shape) upgrades to Area-API bbox queries with `day_range` 1–5. **The Area API counts calendar UTC days while the flat files are rolling 24 h** (live-verified — a midday day-1 query missed yesterday evening's fires), so the keyed path requests one extra day (capped at the API max of 5) and filters to the true rolling window. A rejected key (`FIRMSKeyRejectedError`, fixed sanitized message) falls back keyless with a note; the key lives in the URL, so `src/services/firms.ts` never logs/throws URLs and every error is a fixed pre-written string (key-hygiene unit-tested). FIRMS returns *hotspots, not incidents* — no names/acreage/containment — so D5 clusters them (greedy FRP-descending, 2 km, deterministic; pure module, no I/O) and frames honestly: header disclosure (industrial heat/gas flares/agricultural burns), per-cluster count/distance/bearing/peak-FRP/age/day-night/confidence/satellite, not-all-clear caveat on empty results, NIFC distance tiers on the nearest cluster with **no containment logic**. `source` (`auto`/`nifc`/`firms`) with no cross-fallback (rivers doctrine); `firms` works in the US (pre-WFIGS signal). Both live CSV shapes (Area 14-col `l/n/h`/unpadded, flat 13-col spelled-out/zero-padded) parsed by header name, never position. 5,000-row cap with `securityEvent` warn + caveat. Wildfire was the last US-only safety tool.
-- **New in v1.19.0 (composited imagery):** `composite: true` on `get_weather_imagery` returns a finished picture — the RainViewer overlay rendered onto a NASA GIBS base map with a location crosshair — as an MCP image content block alongside the text (`[text, image]`), per `.devdocs/archive/completed/composited-imagery-plan.md` (D1–D7 settled and upstream-verified). Two new modules: `src/utils/composite.ts` (pure stitch/blend/marker/encode, ported from `scripts/capture-examples.mjs`) and `src/services/basemap.ts` (GIBS fetch + stitch). **GIBS tile matrix sets are layer-specific** — `OSM_Land_Water_Map` needs `GoogleMapsCompatible_Level9` and `Reference_Features_15m` needs `Level13`; the GeoColor `Level7` constant in `gibs.ts` returns HTTP 400 for them, so each layer carries its own. Composites are **centered on the requested coordinates**, not tile-aligned (live testing found a location landing 36px from its own map's edge). Everything works in one shared global pixel space — RainViewer's 512px tiles at zoom z and the GIBS 256px tiles at zoom z+1 are the same grid, `512 * 2^z` px across — so `latLonToGlobalPixel` → `centeredWindowOrigin` → `planTileWindow` picks the covering tiles (2×2–3×3 per base layer, 1–4 radar), `assembleTiles` stitches them and `cropTo` cuts the window. Columns wrap at the antimeridian; rows clamp at the poles (marker goes off-center there, correctly). `assembleTiles` **preserves alpha** because the features layer is transparent — opacity-forcing is the separate `flattenOpaque`, base layer only. `pngjs` is now a runtime dependency (pure JS, zero transitive deps; `@types/pngjs` supplies the declarations it ships without). Scope limits: radar/precipitation only (satellite gets a note — GeoColor is already a full picture), latest *observed* frame only (nowcast frames are forecasts), no in-image attribution text (would need a font rasterizer). **The composite is garnish, not contract** (ACIS/NIFC precedent): plain `Error`s throughout, and the handler catches everything to return the normal URL-based text with a one-line note — a request without `composite` is byte-for-byte unchanged (verified against `main`, and locked by `tests/unit/imagery-handler.test.ts` passing unedited). Tile cache 24 h, composite cache 10 min. Live-measured payloads 30–97 KB PNG / 40–129 KB base64, against a 1 MB defensive cap.
-- **New in v1.19.0 (international alerts):** `get_alerts` routes by **country** (`src/handlers/alertsHandler.ts`): US → NOAA byte-identical (locked by `tests/unit/alerts-detail.test.ts`/`alert-sorting.test.ts` unedited), Canada → MSC GeoMet (`src/services/geomet.ts`, ±0.25° bbox, `status_en: "ended"` + expiry filtered at read time), 38 MeteoAlarm member countries → the country's keyless CAP JSON feed (`src/services/meteoalarm.ts`; every slug live-verified 2026-08-13 — `mk` is `republic-of-north-macedonia`), elsewhere → a not-covered message naming the region. Coordinate-only requests resolve their country via `NominatimService.reverseCountry` (`zoom=3`, permanent cache on 2-decimal rounding, `null` = open ocean cached too); saved/geocoded locations carry `country_code` through `ResolvedLocation` and skip the lookup. The reverse answer **wins over `isInUS`** (Toronto/Vancouver → ECCC), while a no-country answer falls back to `isInUS` to preserve NOAA marine alerts offshore; a *failed* lookup adds a one-line note, an *absent* `nominatimService` (test harnesses — the three new handler parameters are optional and trailing) falls back silently. MeteoAlarm warnings select the `en`-prefixed `info` variant (fallback: first), and `filterActiveWarnings` applies status/Cancel → expiry → `Update`-references supersession **on every read** — a 4-minute-old cache entry never serves a warning that expired 3 minutes ago (feeds are 2.76 MB worst case, parsed once, cached 5 min). Renderers honour licence terms: verbatim text, issue times always shown as published (both new paths skip the NOAA `getStations` timezone side-call), EUMETNET/national-service and ECCC attribution footers, country-level coverage note, 10/25/summary display caps, `active_only: false` → a "historical alerts not available" note. `get_weather_summary` dropped its US-only short-circuit — alerts dispatch everywhere. Rest-of-world (WMO SWIC) verified not production-usable; no `source` override (authorities don't overlap); both new services throw plain sanitized `Error`s (ACIS/NIFC precedent).
-- **New in v1.20.0 (pre-release review hardening):** Six findings (F1–F6) from the pre-tag code review of `main...feat/global-fire-weather`, per `.devdocs/archive/completed/release-review-hardening-plan.md`. **F1** — `formatOpenMeteoFireWeather` guarded its three Fosberg inputs with `!== undefined`, which misses the `null` Open-Meteo actually returns; under *metric* the null survived conversion (`celsiusToFahrenheit(null)` → 32) and rendered a fabricated `2 (Low)` index, while imperial correctly rendered the unavailable note — a safety number that depended on the caller's unit preference. The three fields are now typed `?: number | null` and guarded with `!= null`, which compile-forced the same fix at the main formatter's temperature/humidity/wind display lines (a null omits its line instead of showing a converted zero). **F2** — country routing tested `countryCode !== 'us'`, sending US territories to FIRMS; it now checks a module-level `NIFC_COVERED_COUNTRIES` allowlist, **evidence-gated against WFIGS rather than political status**: the all-years ArcGIS layers publish `US-GU` (90), `US-VI` (5), `US-PR` (4) and **zero** rows for `US-AS`/`US-MP`, so the shipped set is `us, pr, vi, gu` and American Samoa / the Marianas keep routing to FIRMS. **F3** — a forced `source: "nifc"` outside coverage printed `✅ **No active wildfires found…**`; the forced branch now resolves the country too (via an extracted `resolveCountryCode` helper) and, on an *empty* result only, replaces the all-clear with a coverage disclosure suggesting `source: "firms"` — still no cross-fallback. **F4** — the METAR fire-weather note's advice now names both routes (`source: "noaa"` in the US, or omitting `source` for the computed index elsewhere) instead of only `noaa`, which rejects the non-US callers most likely to read it. **F5** — the two fire variables mutate the *primary* request's `current=` list, so an Open-Meteo 400 on either would have failed the whole call; `getCurrentConditions` now retries once without them on the 400-mapped `InvalidLocationError` (garnish precedent), caching the degraded response under the flagged key, with no happy-path change. **F6** — the keyed FIRMS bbox clamped longitude instead of wrapping it, dropping detections across the antimeridian that the keyless path found; it now issues two disjoint slices meeting at ±180 and merges before clustering (latitude clamps stay). F7 (clustering without a spatial index, 426 ms at the 5,000-row cap) was **deferred** — bounded by the existing cap, and an algorithm change days before a tag buys risk. `fireWeatherContext.test.ts` and `wildfire-handler.test.ts` stayed unedited throughout; one `wildfire-routing.test.ts` case that asserted the old F3 all-clear was updated by design.
-- **New in v1.20.0:** Global wildfire detection (NASA FIRMS) and global fire weather (computed Fosberg FFWI) — the last two US-only pieces of the fire-safety story
-- **New in v1.19.0:** International weather alerts (MeteoAlarm + MSC GeoMet) and composited radar maps
-- **New in v1.18.0 (hardening + pollen):** Live-test hardening — five pre-existing findings plus a re-test follow-up from the 2026-08-13 full-suite live test (see `.devdocs/archive/completed/live-test-hardening-plan.md`). `save_location` updates now preserve `description`/`alternateNames`/`notes` (omitted keeps, explicit `""`/`[]` clears). The NOAA current-conditions path always renders the observation's age, retries up to `maxStationAttempts` (3) gridpoint stations when the nearest observation exceeds `staleAcceptanceMinutes` (6 h, with a substitution note), and warns past `staleWarningMinutes` (2 h) — thresholds in `DisplayThresholds.currentConditions`, age strings via the shared `formatObservationAge` helper (`src/utils/timezone.ts`, extracted from the METAR path plus a ≥ 48 h days band); the handler drives `getStations`/`getLatestObservation` directly and the `noaa.ts` `getCurrentConditions` wrapper is no longer handler-called. NOAA recent historical appends an early-end note when observations stop more than the stale threshold before the requested end. The wildfire assessment tier comes from the nearest wildfire with containment < 100% (contained fires disclosed, all-contained renders AWARENESS). NOAA marine output always discloses the reported water body; `get_historical_weather` documents its UTC date interpretation. Also rides this release: **current pollen levels on `get_air_quality`** for European locations (six CAMS species in grains/m³ on the endpoint the tool already calls, current block only; non-European points return all-null and render no section — never trust the HTTP 200 alone).
-- **New in v1.17.0 (internal milestone, first published in v1.18.0):** Worldwide station observations — `source: 'metar'` on `get_current_conditions` returns real airport instrument readings anywhere on earth, from NOAA's keyless Aviation Weather Center METAR feed (`src/services/aviationWeather.ts`). This closes the server's largest data-quality gap: outside the US the tool previously returned only model-interpolated values. **`auto` is byte-for-byte unchanged** (verified by diffing built-dist output against `main` for a US and a non-US point) — a METAR measures conditions *at an airport* while Open-Meteo estimates them *at the caller's coordinates*, so the two answer different questions and the choice stays explicit, mirroring the global-rivers no-cross-fallback precedent. Station selection is an isolated pure module (`src/utils/metarStation.ts`): freshness gates first (≤90 min preferred, ≤6 h accepted with a `stale` flag), then nearest wins, with banding at 100 km (`far` caveat) and 250 km (no usable station). The handler drives the ±0.5°/±2.0°/±5.0° bbox tier ladder the module exports, keeping the picker I/O-free. Output always states station, distance, 16-point bearing, elevation, and observation age, since those are what make the reading interpretable; absent fields are omitted (gusts appear in 14% of reports, present-weather in 8%) and `visib: "10+"` keeps its qualifier. Units convert from METAR-native knots/hPa/statute miles. `include_normals` is supported; `include_fire_weather` renders an unavailable note (Haines needs NOAA gridpoint inputs). TAF, a dedicated aviation tool, and `get_weather_summary` pass-through are out of scope. Attribution: "NOAA Aviation Weather Center (aviationweather.gov) — METAR station observation".
-- **New in v1.16.0 (internal milestone, first published in v1.18.0):** Almanac — `include_astronomy` on `get_forecast` adds per-day moon phase/illumination/moonrise/moonset and civil/nautical/astronomical twilight, plus one next-full/new-moon line per response; computed locally by `src/utils/astronomy.ts` on top of `astronomy-engine` (the project's **first computational runtime dependency** — MIT, zero transitive deps, ±1 arcminute; it is not a data source, so the zero-cost/zero-key data model is preserved). Works on both provider paths (NOAA: one block per calendar date, "Tonight"-first safe; Open-Meteo: after the Sunset line); polar cases render "none (polar day)"/"none (polar night)"; daily-only like `include_normals`. US records — for US locations, `include_normals` on `get_forecast` (day 1) and `get_current_conditions` also appends `**Records for <date>:** High/Low (year) — records since <year>` from the keyless RCC ACIS API (`src/services/acis.ts`: bbox station search widened once on empty, longest period-of-record preferring threaded `…thr` ids; one POST fetches the full 366-slot leap-calendar table; cached 7d/30d). Records are garnish — any ACIS failure warns and omits the line, independent of the normals fetch (either can render without the other); non-US makes no ACIS request. Attribution: "Records: NOAA Regional Climate Centers (ACIS)".
-- **New in v1.15.0 (internal milestone, first published in v1.18.0):** Global `get_river_conditions` — NOAA NWPS gauges in the US (unchanged), Open-Meteo Flood API (GloFAS v4) modeled discharge elsewhere, auto-selected by `isInUS` and overridable with `source` (`auto`/`noaa`/`openmeteo`); no cross-fallback, since gauge observations and model discharge are different claims. Because GloFAS discharge is per ~0.05° cell and an off-channel cell reports runoff rather than the river (Memphis: 0.63 vs 11,640 m³/s one cell apart), each request probes a 3×3 neighborhood in one multi-coordinate call and snaps to the highest past-31-day mean, disclosing the move when the winner is not the requested point (`src/utils/riverDischarge.ts`). Model output is framed against its own history and ensemble rather than flood categories (GloFAS publishes none): trend, 31-day-mean ratio, and a median/p25–p75 forecast, with `forecast_days` (1-210, default 7) and `detail="full"` for the min/max envelope and full range. `radius` stays NOAA-only. (Alerts went international in v1.19.0, wildfire in v1.20.0.)
-- **New in v1.14.0:** Configurable default location (WEATHER_DEFAULT_LOCATION) with server-default disclosure, CI workflow for PRs, US timezone fallback band fix
-- **New in v1.13.0:** Max-range expansion — `get_air_quality` and `get_marine_conditions` gain `forecast_days` (1-7 and 1-16 respectively, day-grouped/null-trimmed full-range output), the historical hourly `limit` ceiling rises to 744 (the full 31-day hourly window; hourly-only semantics documented), `get_weather_imagery` `detail="full"` lists every animation frame, and RainViewer nowcast frames are appended defensively when the feed provides them. Output completeness — AQI forecast day headers add peak UV (hourly fetch trimmed to 3 variables); `detail="full"` on river/wildfire/lightning lifts display caps to 25 with disclosed remainders; wildfire surfaces the ArcGIS truncation caveat; river gauges show an observed rise/fall trend (NWPS stageflow, rate-limit tolerant) plus a multi-point forecast series at `full`; NWPS placeholder observed statuses are suppressed; river footer credits NWPS alone
-- **New in v1.12.0:** Global `get_current_conditions` — NOAA station observations in the US (unchanged), Open-Meteo model data elsewhere, auto-selected by the shared `isInUS` helper and overridable with a `source` parameter (`auto`/`noaa`/`openmeteo`). When NOAA rejects an auto-routed point (the US routing boxes overrun the border — Toronto, Vancouver), `get_current_conditions`, `get_forecast`, and `get_historical_weather` fall back to Open-Meteo with a note instead of erroring. `get_historical_weather` also routes recent dates (last 7 days) to NOAA only for US coordinates — international recent dates use the Open-Meteo archive directly. Fixes the `current` section of `get_weather_summary` outside the US. At the time, fire weather, `get_alerts`, rivers, and wildfire were all still US-only (rivers went global in v1.18.0, alerts in v1.19.0, wildfire and fire weather in v1.20.0).
-- **New in v1.11.1:** Geocoding fix — `city_name`/`search_location` lookups no longer fail at low result limits (RFC 3986 `%20` encoding + result floor); river forecast no longer prints NWPS `-999`/year-0001 placeholder sentinels; lightning monitoring is pre-warmed for saved locations at startup (`WEATHER_LIGHTNING_PREWARM`)
-- **New in v1.11.0:** Universal location resolution (`location_name`/`city_name` on every location-based tool), `get_weather_summary` composite tool, `detail` output control (forecast/alerts/imagery), and a "summary-first" 6-tool default `basic` preset led by `get_weather_summary` (history, air quality, saved-location CRUD, and specialized tools live in `standard`/`full`)
-- **New in v1.10.0:** Unit localization — imperial/metric (plus per-unit overrides and 12h/24h) via `WEATHER_UNITS` env or a per-call `units` parameter on forecast/current/historical tools
-- **New in v1.9.0:** `city_name` parameter for `get_forecast` — request a forecast by free-text place name (geocoded on demand, with caching)
-- **Security Rating:** A- (Excellent, 93/100)
+- **Version:** 1.23.0 — Production Ready ✅
+- **Unreleased on `main`:** heat/cold stress context on `get_current_conditions` (#68) — will ship as v1.24.0
 - **Test Coverage:** 2,332 tests, 100% pass rate
-- **Code Quality:** A+ (Excellent, 97.5/100)
+- **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
+
+Recent releases (one line each; the release script prepends here — prune lines older than the last three releases, and keep the detail in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
+
+- **New in v1.23.0:** Global alerts fallback (Google Weather API) behind optional `GOOGLE_WEATHER_API_KEY`
+- **New in v1.22.0:** Global pollen fallback on `get_air_quality` behind optional `GOOGLE_POLLEN_API_KEY`
+- **New in v1.21.0:** Multi-model forecast comparison, ECMWF ensemble spread, global climate-normals hardening
 
 ## Useful References
 
@@ -624,11 +589,11 @@ npm audit             # No critical vulnerabilities
 - **Open-Meteo Docs:** https://open-meteo.com/en/docs
 - **Project Docs:**
   - `README.md` - User-facing documentation
-  - `CHANGELOG.md` - Version history
+  - `docs/TOOLS.md` - Per-tool parameter reference
+  - `CHANGELOG.md` - Version history (the single source for what shipped when)
   - `.devdocs/ROADMAP.md` - Planning status index — single source of truth for feature-idea status (idea/planned/shipped/rejected); update it whenever an idea changes state
-  - `.devdocs/reports/CODE_REVIEW.md` - Code quality assessment
-  - `.devdocs/reports/SECURITY_AUDIT.md` - Security analysis
-  - `.devdocs/reports/TEST_COVERAGE_REPORT_V1.0.md` - Test coverage details
+  - `.devdocs/archive/completed/` - Shipped design + implementation plans: the *why* behind each feature (D-numbered decisions, live-verification notes)
+  - `.devdocs/reports/` - Code review, security audit, test coverage reports
 
 ## Getting Help
 
@@ -638,6 +603,6 @@ npm audit             # No critical vulnerabilities
 
 ---
 
-**Last Updated:** 2026-08-18 (v1.23.0; unreleased heat/cold stress work on `feat/heat-cold-stress`)
+**Last Updated:** 2026-08-22 (v1.23.0; trimmed release narrative into CHANGELOG/.devdocs, added Project Conventions)
 
-This document should be updated whenever major architectural changes are made or new patterns are introduced.
+This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
