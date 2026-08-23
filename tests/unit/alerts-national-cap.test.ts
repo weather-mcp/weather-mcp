@@ -413,6 +413,27 @@ describe('national CAP empty and partial states', () => {
     expect(text).toContain('no active warnings nationwide');
   });
 
+  it('gives the country name its definite article in prose but not in the header', async () => {
+    const { text } = await callAlerts(MANILA, { country: 'ph' });
+
+    expect(text).toContain('# Weather Alerts — Philippines');
+    expect(text).toContain('No active weather alerts for your location in the Philippines.');
+    expect(text).not.toContain('in Philippines.');
+  });
+
+  it('uses the article in the elsewhere scope line too', async () => {
+    const { text } = await callAlerts(MANILA, {
+      country: 'ph',
+      national: makeNationalFake({
+        warnings: [
+          warningFixture({ countryCode: 'ph', polygons: [RING_ELSEWHERE] })
+        ]
+      })
+    });
+
+    expect(text).toContain('1 active warning elsewhere in the Philippines, none covering this point');
+  });
+
   it('renders ℹ️ and never ✅ when nothing could be loaded', async () => {
     const { text } = await callAlerts(NEW_DELHI, {
       country: 'in',

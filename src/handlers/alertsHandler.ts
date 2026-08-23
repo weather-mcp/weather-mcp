@@ -513,6 +513,8 @@ async function handleNationalCapAlerts(
 ): Promise<HandlerResult> {
   const feed = NATIONAL_CAP_FEEDS[countryCode];
   const countryName = feed?.name ?? regionDisplayName(countryCode);
+  // Prose needs the article ("in the Philippines"); the header does not.
+  const countryPhrase = withArticle(countryName);
   const publisher = feed?.publisher ?? countryName;
 
   const { warnings, unavailableCount, polygonUnavailableCount, indexTrimmed } =
@@ -564,9 +566,9 @@ async function handleNationalCapAlerts(
   } else if (matched.length === 0 && countryLevel.length === 0) {
     // Honest empty: the feed was read, nothing covers this point. The scope
     // line says what was actually checked.
-    output += `✅ **No active weather alerts for your location in ${countryName}.**\n\n`;
+    output += `✅ **No active weather alerts for your location in ${countryPhrase}.**\n\n`;
     output += warnings.length > 0
-      ? `*Checked against ${publisher}'s public CAP feed — ${warnings.length} active warning${warnings.length > 1 ? 's' : ''} elsewhere in ${countryName}, none covering this point.*\n\n`
+      ? `*Checked against ${publisher}'s public CAP feed — ${warnings.length} active warning${warnings.length > 1 ? 's' : ''} elsewhere in ${countryPhrase}, none covering this point.*\n\n`
       : `*Checked against ${publisher}'s public CAP feed — no active warnings nationwide.*\n\n`;
   } else {
     if (matched.length > 0) {
@@ -623,6 +625,23 @@ async function handleNationalCapAlerts(
   return prependLocationLine({
     content: [{ type: 'text', text: output }]
   }, resolved);
+}
+
+/**
+ * Country names that read naturally only with a definite article, so prose
+ * says "in the Philippines" rather than "in Philippines". The block headers
+ * keep the bare name, which is correct in title position.
+ */
+const COUNTRY_NAMES_NEEDING_ARTICLE = new Set([
+  'Philippines',
+  'Netherlands',
+  'United States',
+  'United Kingdom',
+  'Czech Republic'
+]);
+
+function withArticle(countryName: string): string {
+  return COUNTRY_NAMES_NEEDING_ARTICLE.has(countryName) ? `the ${countryName}` : countryName;
 }
 
 /** Severity counts for one national-CAP block at detail="summary". */
