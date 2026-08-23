@@ -638,6 +638,7 @@ export class NationalCapService {
     if (CacheConfig.enabled) {
       const cached = this.cache.get(key) as NationalCapWarning | undefined;
       if (cached) {
+        this.noteInlineGeometryTrim(cached, countryCode);
         return freshCopy(cached);
       }
     }
@@ -674,7 +675,26 @@ export class NationalCapService {
     if (CacheConfig.enabled) {
       this.cache.set(key, record, CacheConfig.ttl.capDocument);
     }
+    this.noteInlineGeometryTrim(record, countryCode);
     return freshCopy(record);
+  }
+
+  /**
+   * Surface an inline ring-cap trim as a bounded-array security event.
+   *
+   * The flattener detects the trim but cannot log it — `capParse.ts` is a
+   * pure zero-I/O module — so the service reports it here, matching what
+   * `applyRings` does for the linked-polygon path. Without this, an inline
+   * feed's over-cap geometry would be dropped silently.
+   */
+  private noteInlineGeometryTrim(record: NationalCapWarning, countryCode: string): void {
+    if (record.geometryTrimmed) {
+      logger.warn('National CAP geometry exceeded the ring cap', {
+        country: countryCode,
+        reason: 'rings-trimmed',
+        securityEvent: true
+      });
+    }
   }
 
   /** Fetch and attach a linked polygon document, caching only a successful parse. */
