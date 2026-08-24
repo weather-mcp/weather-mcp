@@ -369,6 +369,38 @@ this entry shrink to one line.
 
 ---
 
+## G13 — A uniform-value fixture cannot test a "pick the most common" computation
+
+**Trigger:** writing fixtures for code that selects a mode, majority, or maximum
+— `mostly <severity>`, a top-N, a winning category.
+
+**Rule:** the fixture must carry **at least two distinct values, and a
+deliberate tie**. A fixture where every item shares a value exercises the
+selection with a single candidate, so the comparison, the tie-break, and the
+ordering are all unobservable — the test reads as coverage and is not.
+
+**Why:** `remainderNote`'s severity mix was "covered" by four fixtures that were
+uniformly `Moderate`. Flipping its tie-break from first-wins to last-wins
+(`count > topCount` → `>=`) passed **all 2,508 tests**, while a real 3-vs-3 tie
+flips the rendered line from `mostly Moderate` to `mostly Minor`. Uniform
+fixtures are the easy default precisely because they make the *other* assertions
+(counts, pluralisation) simplest to write.
+
+**Verify:** mutate the comparison in the selection loop
+(`src/handlers/alertsHandler.ts`, `remainderNote`'s `count > topCount`) to `>=`
+and confirm at least one test goes red.
+
+**Evidence:** 2026-08-24 — found by mutation testing during the
+remainder-note-detail diff review; closed by `74b69ab`, which added a
+clear-majority case and an exact-tie case. Both new cases also fail when the
+loop is mutated to take the last severity seen rather than the most common.
+
+**Status:** active. Sharper instance of [G11] — every assertion passes and the
+output is still wrong. Not lintable: only a human can tell that a fixture is
+degenerate with respect to the thing it claims to test.
+
+---
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
