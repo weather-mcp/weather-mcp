@@ -313,11 +313,13 @@ never run two live drivers in parallel).
 
 ## G11 — Read the rendered output, not just the assertions
 
-**Trigger:** finishing any feature that renders user-facing text.
+**Trigger:** finishing any feature that renders text a human will read — a
+tool's output, and equally a script's own progress or summary line.
 
 **Rule:** run the built dist against real coordinates and **read** the output
 before tagging. Cover both unit systems and every provider path the change
-touches.
+touches. For a script, read what it actually printed and what it actually
+wrote to disk; the exit code is not the acceptance.
 
 **Why:** a whole class of defects is invisible to assertions because every
 assertion passes: text that is internally contradictory, a count that disagrees
@@ -333,39 +335,52 @@ is wrong in a prepositional phrase and no test could see it. Same rule caught
 the v1.20.0 `**X** (X)` suffix duplication and a percentage contradicting its
 own label.
 
+Generalised 2026-08-24 (`eee2612`, changelog-link-refs T1): the new link-block
+check printed `✅ … [Unreleased] → v1.24.0` built from the newest **tag** rather
+than the base it had just parsed, so mid-release-prep it would have asserted the
+block pointed at the old version while it pointed at the new one. Every case
+passed and the exit code was 0; only reading the line caught it.
+
 **Status:** active. This is the highest-yield entry in the file.
 
 ---
 
-## G12 — `check-doc-versions.sh` does not check the README test-count badge
+## G12 — `check-doc-versions.sh` validates three of the four test-count sites
 
 **Trigger:** any change that moves the test count — i.e. every commit that adds
 or removes a test.
 
-**Rule:** when the count moves, update **four** places and read the badge back by
-eye: `README.md` the shields badge (line ~6), `README.md` the "N tests" body
-line, `README.md` the `npm test` comment, and `CLAUDE.md`'s **Test Coverage**
-line. A green `./scripts/check-doc-versions.sh` does **not** mean the badge is
-right.
+**Rule:** when the count moves, **four** places change: `README.md`'s shields
+badge (line ~6), `README.md`'s "N tests" body line (~61), `README.md`'s
+`npm test` comment (~346), and `CLAUDE.md`'s **Test Coverage** line (~578).
+`update-docs-for-release.sh` rewrites all four; the checker validates only
+three. **The `npm test` comment is the unvalidated one** — read it back by eye
+after any hand-edit, and never infer it from a green checker.
 
-**Why:** the script's test-count check greps `[0-9,]+ (automated )?tests` and
-takes `head -1`. The badge writes the number *after* the word — and
-URL-encoded: `tests-2%2C508%20passing`, where `%2C` is the comma. It therefore
-matches nothing, the grep falls through to the body line, and the badge is never
-validated. The failure is silent and reads as success: the script prints
-`✅ README.md test count` while the badge on the front page of a public repo is
-stale.
+**Why:** the checker's README test-count grep (`[0-9,]+ (automated )?tests`)
+takes `head -1`, which lands on the body line at ~61 and never reaches the
+`Run all N tests` comment 285 lines further down. The failure is silent and
+reads as success: `✅ README.md test count` while that line is stale.
 
-**Verify:** set the badge to a deliberately wrong number and run
-`./scripts/check-doc-versions.sh` — it still reports all checks passed.
+**Verify:** set `Run all N tests` in `README.md` to a deliberately wrong number
+and run `./scripts/check-doc-versions.sh` — it still reports all checks passed.
+(The same experiment on the **badge** now correctly fails; do not use the badge
+to test this entry.)
 
-**Evidence:** 2026-08-24 (`338c2b0`, remainder-note-detail T2) — count moved
-2,500 → 2,508; confirmed by the deliberate-wrong-badge experiment above, which
-passed with the badge reading 9,999.
+**Evidence:** first recorded 2026-08-24 (`338c2b0`) as "the badge is never
+validated". Re-running that Verify line on 2026-08-24 during the
+changelog-link-refs run **falsified the badge half**: `tests-9%2C999%20passing`
+extracts `9999` and reports `❌`, because `31ce822` (2026-07-07) had already
+added the encoded-badge check this entry's own Status line had proposed as its
+lint candidate — the entry was written against a stale reading of the script.
+The `head -1` gap at `README.md:346` is real and survives, confirmed by the same
+deliberate-wrong-value experiment: `9,999` there still reports `✅`.
 
-**Status:** active. Lint candidate — extending the script to match the encoded
-badge form (`tests-([0-9]|%2C)+%20passing`) would close it mechanically and let
-this entry shrink to one line.
+**Status:** active, **narrowed** 2026-08-24. Lint candidate — anchoring a third
+check on `Run all [0-9,]+ tests` specifically would close it mechanically and
+let this entry retire. Standing lesson beyond the specific gap: an entry
+asserting that a checker *misses* something has a shelf life, so run its Verify
+line before relying on it.
 
 ---
 
@@ -398,6 +413,37 @@ loop is mutated to take the last severity seen rather than the most common.
 **Status:** active. Sharper instance of [G11] — every assertion passes and the
 output is still wrong. Not lintable: only a human can tell that a fixture is
 degenerate with respect to the thing it claims to test.
+
+---
+
+## G14 — Both release scripts run the full Vitest suite internally
+
+**Trigger:** editing `scripts/check-doc-versions.sh` or
+`scripts/update-docs-for-release.sh`.
+
+**Rule:** never iterate by re-running the whole script. Extract the block you
+are changing into a scratch harness — `awk` it out of the real file by its
+sentinel comment so the two cannot diverge — and exercise every case there.
+Run the real script only to confirm the pass and one deliberate failure.
+
+**Why:** `check-doc-versions.sh` shells out to `npm test` to get the count it
+validates against (`:91`), so every invocation costs ~65 s. `update-docs-for-release.sh`
+runs the suite itself (`:139`) **and** then invokes the checker (`:257`), which
+runs it again — so a release dry run is ~2.5 minutes, and neither cost is
+visible from reading the script's top. A five-case truth table iterated against
+the real checker is half an hour that a harness does in under a second.
+
+**Verify:** `grep -n 'npm test' scripts/check-doc-versions.sh scripts/update-docs-for-release.sh`
+— any hit means the script is suite-bound and needs the harness treatment.
+
+**Evidence:** 2026-08-24 (`eee2612`, `1aca484`, changelog-link-refs T1/T2) — the
+implementation plan carried this as a written warning to the builder before the
+work started, and it held: the seven-case truth table for the new link-block
+rules (including the forced-empty tag set and the mid-release-prep exemption
+with its control) ran standalone, and the real checker was invoked twice.
+
+**Status:** active. Related: [G1] — the same "run the thing you are actually
+changing, and read what it says" discipline, one layer up.
 
 ---
 
