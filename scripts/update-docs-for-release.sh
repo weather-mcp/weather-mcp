@@ -90,6 +90,43 @@ text = text.replace(
   /## \[Unreleased\]\n[\s\S]*?(?=\n## \[)/,
   `## [Unreleased]\n\n## [${version}] - ${today}\n\n${body}\n`
 );
+
+// --- link-reference block at the foot of the file ----------------------------
+// The heading just promoted is a Markdown *reference* link: it renders as a diff
+// link only if a matching "[X.Y.Z]: <url>" definition exists in the block at the
+// foot of CHANGELOG.md. Promoting the heading without writing the definition is
+// how nineteen releases' worth of drift accumulated before being repaired by
+// hand in PR #75; scripts/check-doc-versions.sh now asserts the result at step 9.
+//
+// The compare base is the previous **tag**, not the previous heading. Several
+// early headings were never tagged, so e.g. [1.13.0] compares against v1.11.1 —
+// lastTag (git describe --tags) already holds exactly that value.
+const unreleasedDef = text.match(/^\[Unreleased\]: (\S+)$/m);
+if (!unreleasedDef) {
+  console.error('❌ No "[Unreleased]: <url>" link definition found at the foot of CHANGELOG.md');
+  console.error('   It is the anchor this script reads the repository URL from, and re-points.');
+  process.exit(1);
+}
+const baseMatch = unreleasedDef[1].match(/^(https?:\/\/.+?)\/(?:compare|releases)\//);
+if (!baseMatch) {
+  console.error('❌ Could not derive a repository URL from the [Unreleased] link definition:');
+  console.error(`   ${unreleasedDef[1]}`);
+  process.exit(1);
+}
+const base = baseMatch[1];
+// No previous tag means nothing to compare against — link the release itself.
+const newDef = lastTag
+  ? `[${version}]: ${base}/compare/${lastTag}...v${version}`
+  : `[${version}]: ${base}/releases/tag/v${version}`;
+
+// Both substitutions anchor on ^[Unreleased]: with the `m` flag and NO `g`. That
+// is load-bearing: an unanchored substitution here would rewrite every older
+// release's definition — the same failure the "New in" sed at the foot of this
+// script carries its own warning about, after it happened during v1.14.0 prep.
+text = text.replace(/^(\[Unreleased\]: \S+)$/m, `$1\n${newDef}`);
+text = text.replace(/^\[Unreleased\]: \S+$/m, `[Unreleased]: ${base}/compare/v${version}...HEAD`);
+console.log(`🔗 CHANGELOG: linked [${version}] against ${lastTag || 'its release tag'}`);
+
 fs.writeFileSync('CHANGELOG.md', text);
 EOF
 
