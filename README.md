@@ -42,6 +42,14 @@ Then just ask:
 
 📦 Listed in the [Official MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp) as `io.github.dgahagan/weather-mcp`.
 
+✅ **The official package is [`@dangahagan/weather-mcp`](https://www.npmjs.com/package/@dangahagan/weather-mcp)**, published from this repository via npm [trusted publishing](https://docs.npmjs.com/trusted-publishers). Every release carries a signed provenance attestation tying the tarball to the exact commit and workflow that built it — verify any version without installing it:
+
+```bash
+npm view @dangahagan/weather-mcp@latest dist.attestations
+```
+
+Republished copies of this server exist under other npm scopes. They are MIT-licensed forks, which the license permits, but they are not maintained here and are usually many versions behind. This issue tracker covers `@dangahagan/weather-mcp` only — for anything installed from another scope, please report it to that package's publisher.
+
 ## Why this server?
 
 There are excellent commercial weather MCPs backed by paid APIs and full-time teams. If you need SLA-backed data, minute-level nowcasting, or premium global station coverage, they're worth a look — this project won't pretend otherwise.
