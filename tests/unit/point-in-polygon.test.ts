@@ -77,6 +77,36 @@ describe('pointInRing', () => {
     expect(result).toBe(true);
   });
 
+  // The three cases below are the ones that actually discriminate. Even-odd
+  // ray casting returns true for the low edges and the origin vertex on its
+  // own, so a boundary suite built only from those passes with the explicit
+  // on-segment check deleted. The high edges and the far vertex do not:
+  // without `isOnSegment` they read as outside.
+
+  it('returns true for a point exactly on the top edge', () => {
+    // Arrange: (10, 5) is the midpoint of the top edge (lat=10, lon 0->10).
+    // Act
+    const result = pointInRing(10, 5, SQUARE);
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('returns true for a point exactly on the right edge', () => {
+    // Arrange: (5, 10) is the midpoint of the right edge (lon=10, lat 0->10).
+    // Act
+    const result = pointInRing(5, 10, SQUARE);
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('returns true for a point exactly on the vertex opposite the origin', () => {
+    // Arrange: (10, 10) is the ring vertex diagonally opposite (0, 0).
+    // Act
+    const result = pointInRing(10, 10, SQUARE);
+    // Assert
+    expect(result).toBe(true);
+  });
+
   it('returns false for a point in the notch of a concave ring', () => {
     // Arrange: (8, 5) sits inside the notch cavity (lat 6-10, lon 4-6):
     // within the ring's overall bounding box (lat 0-10, lon 0-10) but

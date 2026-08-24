@@ -576,7 +576,7 @@ npm audit             # No critical vulnerabilities
 
 - **Version:** 1.23.0 — Production Ready ✅
 - **Unreleased on `main`:** heat/cold stress context on `get_current_conditions` (#68) — will ship as v1.24.0
-- **Test Coverage:** 2,492 tests, 100% pass rate
+- **Test Coverage:** 2,500 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):

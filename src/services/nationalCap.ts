@@ -695,6 +695,13 @@ export class NationalCapService {
         securityEvent: true
       });
     }
+    if (record.ringsDropped) {
+      logger.warn('National CAP geometry partly unparseable', {
+        country: countryCode,
+        reason: 'rings-dropped',
+        securityEvent: true
+      });
+    }
   }
 
   /** Fetch and attach a linked polygon document, caching only a successful parse. */
@@ -777,6 +784,19 @@ export class NationalCapService {
       return;
     }
     warning.polygons = parsed.rings;
+    if (parsed.failed > 0) {
+      // Some siblings parsed and some did not. Keep the survivors — they can
+      // still match the point — but mark the set incomplete so a *non*-match
+      // falls through to the country-level block instead of dropping the
+      // warning. Same rule as the ring cap above, different door.
+      logger.warn('National CAP geometry partly unparseable', {
+        country: countryCode,
+        reason: 'rings-dropped',
+        securityEvent: true
+      });
+      warning.polygonUnavailable = true;
+      warning.ringsDropped = parsed.failed;
+    }
   }
 
   /** Get cache statistics. */
@@ -801,6 +821,7 @@ interface CachedList {
 interface PolygonCacheEntry {
   rings: Array<Array<[number, number]>>;
   trimmed: boolean;
+  failed: number;
 }
 
 function listKeyFor(countryCode: string): string {
@@ -817,6 +838,7 @@ function freshCopy(record: NationalCapWarning): NationalCapWarning {
     ...record,
     polygons: record.polygons.map(ring => [...ring]),
     polygonUnavailable: record.polygonUnavailable,
-    geometryTrimmed: record.geometryTrimmed
+    geometryTrimmed: record.geometryTrimmed,
+    ringsDropped: record.ringsDropped
   };
 }

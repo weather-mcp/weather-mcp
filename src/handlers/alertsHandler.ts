@@ -520,15 +520,26 @@ async function handleNationalCapAlerts(
   const { warnings, unavailableCount, polygonUnavailableCount, indexTrimmed } =
     await nationalCapService.getWarnings(countryCode);
 
-  // Split by geometry. A warning with rings that exclude the point is for
-  // somewhere else in the country and is deliberately not rendered.
+  // Split by geometry, in the one order that is safe on safety data:
+  //   1. inside a published ring        -> matched, however partial the set;
+  //   2. no usable/complete geometry    -> country-level, with the caveat;
+  //   3. outside a *complete* ring set  -> genuinely elsewhere, not shown.
+  //
+  // Only a ring set that parsed in full may answer "this does not cover you".
+  // `polygonUnavailable` marks a set that lost rings (unparseable siblings, a
+  // failed linked fetch, or the ring cap), and such a warning falls to the
+  // country-level block rather than being dropped — dropping it would be a
+  // fabricated all-clear for a point the publisher may well have drawn inside.
   const matched: NationalCapWarning[] = [];
   const countryLevel: NationalCapWarning[] = [];
   for (const warning of warnings) {
-    if (warning.polygons.length === 0) {
-      countryLevel.push(warning);
-    } else if (pointInAnyRing(resolved.latitude, resolved.longitude, warning.polygons)) {
+    if (
+      warning.polygons.length > 0 &&
+      pointInAnyRing(resolved.latitude, resolved.longitude, warning.polygons)
+    ) {
       matched.push(warning);
+    } else if (warning.polygonUnavailable || warning.polygons.length === 0) {
+      countryLevel.push(warning);
     }
   }
 
@@ -563,9 +574,17 @@ async function handleNationalCapAlerts(
     // Nothing loaded at all. A ✅ here would be a green check contradicted by
     // the caveat directly above it, so there is deliberately no ✅.
     output += `ℹ️ **The ${publisher} alert list could not be loaded for your location.**\n\n`;
+  } else if (matched.length === 0 && countryLevel.length === 0 && unavailableCount > 0) {
+    // A *partial* load with nothing covering this point. The alerts that
+    // could not be read have unknown areas, so a green check would claim an
+    // all-clear the feed never supported — the same contradiction the
+    // nothing-loaded branch above avoids, one threshold further along.
+    output += `ℹ️ **No alert covering your location among those that could be read.**\n\n`;
+    output += `*Checked against ${publisher}'s public CAP feed — ${warnings.length} active warning${warnings.length > 1 ? 's' : ''} elsewhere in ${countryPhrase}. `;
+    output += `The ${unavailableCount} alert${unavailableCount > 1 ? 's' : ''} above could not be read, so this is not a full all-clear.*\n\n`;
   } else if (matched.length === 0 && countryLevel.length === 0) {
-    // Honest empty: the feed was read, nothing covers this point. The scope
-    // line says what was actually checked.
+    // Honest empty: the whole feed was read, nothing covers this point. The
+    // scope line says what was actually checked.
     output += `✅ **No active weather alerts for your location in ${countryPhrase}.**\n\n`;
     output += warnings.length > 0
       ? `*Checked against ${publisher}'s public CAP feed — ${warnings.length} active warning${warnings.length > 1 ? 's' : ''} elsewhere in ${countryPhrase}, none covering this point.*\n\n`
@@ -607,6 +626,16 @@ async function handleNationalCapAlerts(
         output += `**Country-level warnings** — *matched at country level (no usable area geometry for these alerts) — they may not affect your exact location:*\n\n`;
         for (const warning of shownCountryLevel) {
           output += renderNationalCapWarning(warning, detail);
+        }
+      } else if (countryLevel.length > 0) {
+        // The matched block consumed the whole display cap, so the
+        // country-level block never renders. Its alerts are still counted in
+        // the remainder note below, but without this line the fact that they
+        // have no usable geometry would vanish silently.
+        const lostGeometry = countryLevel.filter(warning => warning.polygonUnavailable).length;
+        if (lostGeometry > 0) {
+          output += `*${lostGeometry} further alert${lostGeometry > 1 ? 's' : ''} had no usable area geometry `;
+          output += `and ${lostGeometry > 1 ? 'are' : 'is'} counted in the remainder below rather than matched to your point.*\n\n`;
         }
       }
 

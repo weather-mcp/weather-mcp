@@ -412,22 +412,36 @@ export function parseCapDocument(xml: string): CapAlertDocument {
   };
 }
 
-/** Run every ring text through `parseCapPolygon`, applying the ring cap. */
-function buildRings(polygonTexts: string[]): { rings: Array<Array<[number, number]>>; trimmed: boolean } {
+/**
+ * Run every ring text through `parseCapPolygon`, applying the ring cap and
+ * counting the rings that failed to parse.
+ *
+ * `failed > 0` means the published geometry is only partly usable. The caller
+ * must treat that set as **incomplete**: fine for a positive match, never
+ * usable to decide that a warning does *not* cover a point. This is the same
+ * rule the ring cap enforces below, reached through the other door — a
+ * malformed `<polygon>` sibling rather than a 257th valid one.
+ */
+function buildRings(
+  polygonTexts: string[]
+): { rings: Array<Array<[number, number]>>; trimmed: boolean; failed: number } {
   const rings: Array<Array<[number, number]>> = [];
+  let failed = 0;
   for (const text of polygonTexts) {
     const ring = parseCapPolygon(text);
     if (ring) {
       rings.push(ring);
+    } else {
+      failed += 1;
     }
   }
   // Ring-cap rule: a partial ring set must never be used for exclusion — a
   // point covered only by ring 257 must not read as "elsewhere". Keep none,
   // and say so, rather than silently truncating.
   if (rings.length > MAX_RINGS_PER_WARNING) {
-    return { rings: [], trimmed: true };
+    return { rings: [], trimmed: true, failed };
   }
-  return { rings, trimmed: false };
+  return { rings, trimmed: false, failed };
 }
 
 /**
@@ -438,7 +452,9 @@ function buildRings(polygonTexts: string[]): { rings: Array<Array<[number, numbe
  * geometry unavailable). More than `MAX_RINGS_PER_WARNING` valid rings
  * keeps none and reports `trimmed: true`.
  */
-export function parsePolygonDocument(xml: string): { rings: Array<Array<[number, number]>>; trimmed: boolean } {
+export function parsePolygonDocument(
+  xml: string
+): { rings: Array<Array<[number, number]>>; trimmed: boolean; failed: number } {
   const parsed = parseXml(xml);
   if (!isPlainObject(parsed) || !isPlainObject(parsed.alert)) {
     throw new Error('CAP document has an unexpected shape');
@@ -610,12 +626,20 @@ export function flattenCapAlert(
   }
 
   const polygonTexts = (info.area ?? []).flatMap(area => area.polygon ?? []);
-  const { rings, trimmed } = buildRings(polygonTexts);
+  const { rings, trimmed, failed } = buildRings(polygonTexts);
 
-  if (polygonTexts.length > 0 && rings.length === 0) {
+  // Three cases, all of which mean "do not exclude on this geometry":
+  // nothing parsed, the cap discarded the set, or *some* rings parsed and
+  // some did not. The last one is the dangerous one — the survivors look
+  // like a complete area, so a point inside a dropped ring would read as
+  // "elsewhere" and the warning would vanish from the output entirely.
+  if (polygonTexts.length > 0 && (rings.length === 0 || failed > 0)) {
     warning.polygonUnavailable = true;
     if (trimmed) {
       warning.geometryTrimmed = true;
+    }
+    if (failed > 0) {
+      warning.ringsDropped = failed;
     }
   }
   warning.polygons = rings;

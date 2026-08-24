@@ -456,6 +456,60 @@ describe('isAllowedFeedUrl', () => {
   });
 });
 
+describe('flattenCapAlert — an incomplete ring set may include but never exclude', () => {
+  /**
+   * Two `<polygon>` siblings, one valid and one unclosed. The unclosed ring
+   * is dropped by `parseCapPolygon`, leaving a survivor that *looks* like the
+   * alert's complete area. If that partial set were trusted for exclusion, a
+   * point inside the dropped ring would read as "elsewhere" and the warning
+   * would disappear from the output — a fabricated all-clear on safety data.
+   */
+  const PARTIALLY_PARSEABLE = `<alert>
+<identifier>ID-1</identifier>
+<status>Actual</status>
+<msgType>Alert</msgType>
+<info>
+  <language>en-US</language>
+  <event>Extreme Rainfall</event>
+  <severity>Severe</severity>
+  <area>
+    <areaDesc>Papua</areaDesc>
+    <polygon>-2.0,140.0 -2.0,141.0 -1.0,141.0 -1.0,140.0 -2.0,140.0</polygon>
+    <polygon>-7.0,106.0 -7.0,107.0 -5.0,107.0 -5.0,106.0</polygon>
+  </area>
+</info>
+</alert>`;
+
+  it('keeps the rings that parsed but marks the set unusable for exclusion', () => {
+    // Arrange
+    const doc = parseCapDocument(PARTIALLY_PARSEABLE);
+    // Act
+    const warning = flattenCapAlert(doc, { preferLanguage: 'en', polygonSource: 'inline' }, 'id');
+    // Assert
+    expect(warning?.polygons).toHaveLength(1);
+    expect(warning?.polygonUnavailable).toBe(true);
+    expect(warning?.ringsDropped).toBe(1);
+  });
+
+  it('leaves a fully-parseable ring set unflagged, so it can still exclude', () => {
+    // Arrange: same document with both rings closed.
+    const xml = PARTIALLY_PARSEABLE.replace(
+      '-7.0,106.0 -7.0,107.0 -5.0,107.0 -5.0,106.0',
+      '-7.0,106.0 -7.0,107.0 -5.0,107.0 -5.0,106.0 -7.0,106.0'
+    );
+    // Act
+    const warning = flattenCapAlert(
+      parseCapDocument(xml),
+      { preferLanguage: 'en', polygonSource: 'inline' },
+      'id'
+    );
+    // Assert
+    expect(warning?.polygons).toHaveLength(2);
+    expect(warning?.polygonUnavailable).toBeUndefined();
+    expect(warning?.ringsDropped).toBeUndefined();
+  });
+});
+
 describe('flattenCapAlert edge cases', () => {
   it('returns undefined for a document with no identifier and no info block', () => {
     const doc = parseCapDocument('<alert><status>Actual</status></alert>');
@@ -515,7 +569,7 @@ ${polygons}
 describe('parsePolygonDocument', () => {
   it('returns empty, untrimmed rings when there is no <polygon> element', () => {
     const result = parsePolygonDocument('<alert><identifier>x</identifier></alert>');
-    expect(result).toEqual({ rings: [], trimmed: false });
+    expect(result).toEqual({ rings: [], trimmed: false, failed: 0 });
   });
 
   it('parses SACHET-shaped sibling polygons under one <alert>', () => {

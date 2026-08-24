@@ -171,6 +171,13 @@ export interface NationalCapWarning {
   linkedPolygonUrl?: string;
   /** True if the polygon set was trimmed due to size limits. */
   geometryTrimmed?: boolean;
+  /**
+   * Count of `<polygon>` elements that were published but could not be
+   * parsed. Any value above zero means the ring set is **incomplete**, so it
+   * may be used to include a point but never to exclude one — see
+   * `polygonUnavailable`, which is always set alongside it.
+   */
+  ringsDropped?: number;
   /** Language code of this variant. */
   language?: string;
   /** ISO 3166-1 alpha-2 country code of the issuing authority. */

@@ -446,7 +446,10 @@ describe('national CAP empty and partial states', () => {
     expect(text).not.toContain('✅');
   });
 
-  it('renders ✅ with the caveat when some loaded but all were elsewhere', async () => {
+  it('never renders ✅ on a partial load, even when everything loaded was elsewhere', async () => {
+    // A green check needs the whole feed read. Alerts that could not be
+    // loaded have unknown areas, so "no alerts for your location" would be an
+    // all-clear the feed never supported.
     const { text } = await callAlerts(NEW_DELHI, {
       country: 'in',
       national: makeNationalFake({
@@ -456,7 +459,68 @@ describe('national CAP empty and partial states', () => {
     });
 
     expect(text).toContain('2 alerts in the NDMA SACHET feed could not be loaded');
+    expect(text).toContain('ℹ️ **No alert covering your location among those that could be read.**');
+    expect(text).toContain('this is not a full all-clear');
+    expect(text).not.toContain('✅');
+  });
+
+  it('renders ✅ only when the whole feed was read and nothing covers the point', async () => {
+    const { text } = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      national: makeNationalFake({
+        warnings: [warningFixture({ polygons: [RING_ELSEWHERE] })],
+        unavailableCount: 0
+      })
+    });
+
     expect(text).toContain('✅ **No active weather alerts for your location in India.**');
+    expect(text).toContain('1 active warning elsewhere in India, none covering this point');
+  });
+
+  it('lists a warning at country level when its ring set is incomplete and misses the point', async () => {
+    // The rings that survived parsing exclude New Delhi, but a ring was
+    // dropped — so the set cannot answer "this does not cover you". The
+    // warning must be listed, never silently treated as elsewhere.
+    const { text } = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      national: makeNationalFake({
+        warnings: [
+          warningFixture({
+            polygons: [RING_ELSEWHERE],
+            polygonUnavailable: true,
+            ringsDropped: 1
+          })
+        ],
+        // The real service derives this over the returned view, so a warning
+        // flagged polygonUnavailable always arrives with a non-zero count.
+        polygonUnavailableCount: 1
+      })
+    });
+
+    expect(text).not.toContain('✅');
+    expect(text).toContain('**Country-level warnings**');
+    expect(text).toContain('could not be loaded or parsed');
+    expect(text).toContain('Heavy Rainfall Warning');
+  });
+
+  it('still matches a warning whose incomplete ring set contains the point', async () => {
+    // Losing a ring must not cost precision in the safe direction: a point
+    // inside a surviving ring is still a match, not a country-level listing.
+    const { text } = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      national: makeNationalFake({
+        warnings: [
+          warningFixture({
+            polygons: [RING_AROUND_DELHI],
+            polygonUnavailable: true,
+            ringsDropped: 1
+          })
+        ]
+      })
+    });
+
+    expect(text).toContain('1 active warning matched to your location');
+    expect(text).not.toContain('**Country-level warnings**');
   });
 
   it('renders the index-trimmed caveat', async () => {
