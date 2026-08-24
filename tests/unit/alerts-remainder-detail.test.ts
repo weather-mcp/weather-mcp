@@ -16,9 +16,15 @@
  *   - at detail="full" the count (and severity mix, where present) still
  *     renders — the line was truncated after the hint, not mangled.
  *
- * All four fixtures use 26 items so every renderer's standard cap (10) and
- * full cap (25) are exercised together: standard leaves a 16-item remainder,
- * full a 1-item remainder (letting the pluralisation branch flip too).
+ * The four per-renderer fixtures use 26 uniform-severity items so every
+ * renderer's standard cap (10) and full cap (25) are exercised together:
+ * standard leaves a 16-item remainder, full a 1-item remainder (letting the
+ * pluralisation branch flip too).
+ *
+ * A uniform severity makes the `mostly <severity>` computation trivially
+ * satisfiable, so a final block gives the remainder a genuine severity mix —
+ * one clear majority and one exact tie — which is what makes the selection
+ * loop and its tie-break observable at all.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -84,6 +90,42 @@ function makeMeteoAlarmWarnings(count: number): MeteoAlarmWarning[] {
     event: `Warning ${i}`,
     severity: 'Moderate'
   }));
+}
+
+/**
+ * MeteoAlarm warnings with explicit per-item severities, for the severity-mix
+ * cases below. The renderer sorts by `capSeverityRank` (Extreme first) with a
+ * stable sort, so the caller controls exactly which severities land beyond the
+ * cap and in what order.
+ */
+function makeMeteoAlarmWarningsWithSeverities(severities: string[]): MeteoAlarmWarning[] {
+  return severities.map((severity, i) => ({
+    identifier: `de-${i}`,
+    references: [],
+    areaDesc: [],
+    event: `Warning ${i}`,
+    severity
+  }));
+}
+
+async function renderMeteoAlarmSeverities(
+  severities: string[],
+  detail: 'standard' | 'full'
+): Promise<string> {
+  const meteoAlarm = {
+    getWarnings: vi.fn(async () => makeMeteoAlarmWarningsWithSeverities(severities))
+  } as unknown as MeteoAlarmService;
+
+  const result = await handleGetAlerts(
+    { ...BERLIN, detail },
+    makeNoaaFake(),
+    emptyStore,
+    emptyGeocoding,
+    meteoAlarm,
+    undefined,
+    makeNominatimFake('de')
+  );
+  return result.content[0].text;
 }
 
 async function renderMeteoAlarm(detail: 'standard' | 'full'): Promise<string> {
@@ -257,6 +299,45 @@ describe('remainder note detail gating', () => {
       const text = await renderGoogle('full');
       expect(text).not.toContain('Use detail=');
       expect(text).toContain('*…and 1 more alert, mostly Moderate.*');
+    });
+  });
+
+  /**
+   * The fixtures above are deliberately uniform-severity, which exercises the
+   * `mostly <severity>` computation with a single candidate — so the comparison
+   * and its tie-break are unobservable there. These two cases give the remainder
+   * more than one severity, which is what makes that logic testable at all.
+   */
+  describe('severity mix in the remainder', () => {
+    it('names the true mode when one severity dominates the remainder', async () => {
+      // 15 Extreme + 2 Minor, cap 10 at standard. Sorted Extreme-first, the
+      // shown block takes 10 Extreme, leaving 5 Extreme + 2 Minor beyond it.
+      const text = await renderMeteoAlarmSeverities(
+        [...Array(15).fill('Extreme'), ...Array(2).fill('Minor')],
+        'standard'
+      );
+      expect(text).toContain(
+        '*…and 7 more warnings, mostly Extreme. Use detail="full" to see more.*'
+      );
+    });
+
+    it('resolves a tie deterministically, by first appearance in the remainder', async () => {
+      // 3 Extreme + 10 Moderate + 3 Minor, cap 10 at standard. The shown block
+      // takes 3 Extreme + 7 Moderate, leaving an exact 3-vs-3 tie between
+      // Moderate and Minor. Moderate appears first in the remainder and wins.
+      // This is the case that catches a first-wins/last-wins flip in the
+      // selection loop — a uniform-severity fixture cannot see that change.
+      const text = await renderMeteoAlarmSeverities(
+        [
+          ...Array(3).fill('Extreme'),
+          ...Array(10).fill('Moderate'),
+          ...Array(3).fill('Minor')
+        ],
+        'standard'
+      );
+      expect(text).toContain(
+        '*…and 6 more warnings, mostly Moderate. Use detail="full" to see more.*'
+      );
     });
   });
 
