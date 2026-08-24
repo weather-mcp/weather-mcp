@@ -50,7 +50,12 @@ fs.writeFileSync('server.json', JSON.stringify(s, null, 2) + '\n');
 echo "📝 server.json synced to ${NEW_VERSION}"
 
 # --- 3. CHANGELOG: promote [Unreleased] or seed from git log ------------------
-LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+# --match='v*' is load-bearing: bare `git describe --tags` returns the nearest
+# tag by ancestry of ANY shape, so a single checkpoint tag (say
+# backup-before-refactor) would become the compare base and ship a link that
+# resolves on GitHub while showing the wrong diff range. It must also agree with
+# check-doc-versions.sh's R3, which reads `git tag -l 'v*' --sort=-v:refname`.
+LAST_TAG=$(git describe --tags --abbrev=0 --match='v*' 2>/dev/null || echo "")
 REL_VERSION="$NEW_VERSION" REL_DATE="$TODAY" REL_LAST_TAG="$LAST_TAG" node <<'EOF'
 const fs = require('fs');
 const { execSync } = require('child_process');
@@ -100,7 +105,7 @@ text = text.replace(
 //
 // The compare base is the previous **tag**, not the previous heading. Several
 // early headings were never tagged, so e.g. [1.13.0] compares against v1.11.1 —
-// lastTag (git describe --tags) already holds exactly that value.
+// lastTag (git describe --tags --match='v*') already holds exactly that value.
 const unreleasedDef = text.match(/^\[Unreleased\]: (\S+)$/m);
 if (!unreleasedDef) {
   console.error('❌ No "[Unreleased]: <url>" link definition found at the foot of CHANGELOG.md');
