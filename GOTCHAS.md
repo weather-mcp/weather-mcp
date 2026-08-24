@@ -252,7 +252,7 @@ and confirm no `catch` block in that file contains `expect(`.
 
 ---
 
-## G10 — Byte-identity sweeps must run back-to-back, and the key must reach both sides
+## G10 — Byte-identity sweeps: run back-to-back, key both sides, and prove the hash is not vacuous
 
 **Trigger:** proving output is unchanged by diffing built-dist output against a
 base worktree.
@@ -264,19 +264,46 @@ line) is present in both outputs *before* comparing hashes. A diff of one line
 that is a feed's own timestamp is drift, not a regression — re-run tighter
 rather than "fixing" it.
 
-**Why:** two independent traps. Live feeds embed their own `Updated` stamps, so
+**And the inverse, which is the more dangerous half: an identical md5 proves
+nothing until you have confirmed the changed line was actually rendered on both
+sides.** Before trusting a match, grep both outputs for the construct under test
+and assert it is present. A feed that is failing renders a degraded block with
+the construct absent, so both sides hash the same and the sweep reports success
+without having exercised the change at all.
+
+**Why:** three independent traps. Live feeds embed their own `Updated` stamps, so
 a gap of even a few minutes between runs fabricates a diff. And `.env` is
 gitignored, so a base worktree has none — `dotenv` reads each process's own
 cwd, meaning the base silently runs *keyless* while the branch runs keyed, and
-the resulting mismatch gets blamed on the feature.
+the resulting mismatch gets blamed on the feature. Third: a *matching* hash is a
+false negative whenever the upstream is down, and nothing about the result says
+so — the sweep's own output looks exactly like a pass.
+
+Note the load asymmetry that makes the third trap easy to hit: `detail="full"`
+fetches 25 alert documents where `standard` fetches 10, so the heavier detail
+level rate-limits (SACHET 403s) on a path the lighter one sails through. The
+sweep at default detail can be green while the at-`full` read is silently empty.
 
 **Verify:** `.claude/scratch/national-cap-alerts/alerts-sweep.mjs` (gitignored
 scratch) and the md5 table in the archived plan set's implementation notes.
+Before trusting any match, `grep -c` both outputs for the construct under test
+and confirm the count is non-zero on **both** sides — an identical hash over two
+degraded blocks is the failure this check exists to catch.
 
 **Evidence:** 2026-08-23 (national CAP alerts T9) — the first sweep showed
 Kansas City differing; the diff was one line, NOAA's own `**Updated:**` stamp
 advancing 1:02 → 1:06 AM. A tighter re-run was byte-identical with no masking.
 The key-propagation half was raised as a major plan-review finding (codex-R10).
+The drift half recurred verbatim 2026-08-24 (`6c6a749`, remainder-note-detail
+T3): Kansas City again differed by exactly the `**Updated:**` stamp, and New
+Delhi by two alert blocks transposing as the feed churned.
+
+2026-08-24 (`6c6a749`) added the vacuous-identity half: the at-`full` India read
+returned md5-identical base vs branch and would have been recorded as a pass, but
+SACHET was 403-ing — the output carried `99 alerts … could not be loaded` and no
+remainder line at all, so the one line the change touches was absent from both
+sides. Six back-to-back retries all failed; a 4-minute backoff got a healthy pair
+on the second round, and the real diff was then exactly one line.
 
 **Status:** active. Related: the auto-memory note
 `live-verification-driver-hangs` (drivers need an explicit `process.exit(0)`;
@@ -307,6 +334,38 @@ the v1.20.0 `**X** (X)` suffix duplication and a percentage contradicting its
 own label.
 
 **Status:** active. This is the highest-yield entry in the file.
+
+---
+
+## G12 — `check-doc-versions.sh` does not check the README test-count badge
+
+**Trigger:** any change that moves the test count — i.e. every commit that adds
+or removes a test.
+
+**Rule:** when the count moves, update **four** places and read the badge back by
+eye: `README.md` the shields badge (line ~6), `README.md` the "N tests" body
+line, `README.md` the `npm test` comment, and `CLAUDE.md`'s **Test Coverage**
+line. A green `./scripts/check-doc-versions.sh` does **not** mean the badge is
+right.
+
+**Why:** the script's test-count check greps `[0-9,]+ (automated )?tests` and
+takes `head -1`. The badge writes the number *after* the word — and
+URL-encoded: `tests-2%2C508%20passing`, where `%2C` is the comma. It therefore
+matches nothing, the grep falls through to the body line, and the badge is never
+validated. The failure is silent and reads as success: the script prints
+`✅ README.md test count` while the badge on the front page of a public repo is
+stale.
+
+**Verify:** set the badge to a deliberately wrong number and run
+`./scripts/check-doc-versions.sh` — it still reports all checks passed.
+
+**Evidence:** 2026-08-24 (`338c2b0`, remainder-note-detail T2) — count moved
+2,500 → 2,508; confirmed by the deliberate-wrong-badge experiment above, which
+passed with the badge reading 9,999.
+
+**Status:** active. Lint candidate — extending the script to match the encoded
+badge form (`tests-([0-9]|%2C)+%20passing`) would close it mechanically and let
+this entry shrink to one line.
 
 ---
 
