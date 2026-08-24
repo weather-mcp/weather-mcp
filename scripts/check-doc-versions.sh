@@ -189,6 +189,85 @@ if [ $BROKEN_LINKS -eq 0 ]; then
   echo "✅ All documentation links valid"
 fi
 
+# --- CHANGELOG link-reference block (R1/R2/R3) --------------------------------
+# Every "## [X.Y.Z]" heading in CHANGELOG.md is a Markdown *reference* link: it
+# renders as a diff link only when a matching "[X.Y.Z]: <url>" definition exists
+# in the block at the foot of the file. Nineteen releases' worth of missing
+# definitions accumulated unnoticed and were repaired by hand in PR #75. Three
+# rules keep the block from drifting again:
+#
+#   R1  every heading that has a matching vX.Y.Z git tag has a definition
+#   R2  every definition names a tag that exists
+#   R3  [Unreleased]: exists and compares against the newest tag
+#
+# The invariant is keyed off **git tags, not headings** — deliberately. A number
+# of early sections were never tagged, so no compare URL can honestly be written
+# for them; one naming a tag that does not exist looks authoritative and 404s.
+# Keying off tags makes those sections legal by construction rather than by a
+# hardcoded exception list, which would drift the moment another one appeared —
+# which is why no version is named anywhere in this block. Bare sections are
+# bare on purpose; do not "fix" them by adding definitions.
+#
+# One exemption: the package.json version is exempt from R2 and R3's
+# tag-existence requirement. update-docs-for-release.sh writes both lines during
+# release prep (step 3) and then runs this script (step 9) *before* the human
+# cuts the tag at step 4 of its printed "Next steps" — so at that moment the new
+# version legitimately has a heading and a definition but no tag. Without the
+# exemption every release would fail its own verification step.
+echo ""
+echo "🔗 Checking CHANGELOG link-reference block..."
+
+CHANGELOG_HEADINGS=$(grep -oE '^## \[[0-9][^]]*\]' CHANGELOG.md | sed -E 's/^## \[//;s/\]$//' || true)
+CHANGELOG_DEFS=$(grep -oE '^\[[0-9][^]]*\]:' CHANGELOG.md | sed -E 's/^\[//;s/\]:$//' || true)
+# Deliberately one assignment: forcing this to "" is how the empty-tag-set path
+# below gets exercised, without contriving a tagless clone.
+GIT_TAG_VERSIONS=$(git tag -l 'v*' | sed -E 's/^v//' || true)
+
+if [ -z "$GIT_TAG_VERSIONS" ]; then
+  # A shallow or tagless checkout is a checkout artifact, not documentation
+  # drift. Say the block was NOT checked — never print a ✅ nobody earned.
+  echo "⚠️  ${YELLOW}CHANGELOG link block not checked${NC} — this checkout has no vX.Y.Z tags"
+else
+  LINK_ERRORS=0
+  NEWEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -1)
+
+  # Exact whole-line membership in a newline-separated list.
+  version_in_list() { printf '%s\n' "$2" | grep -qxF "$1"; }
+
+  # R1 — a tagged heading must have a definition.
+  for v in $CHANGELOG_HEADINGS; do
+    if version_in_list "$v" "$GIT_TAG_VERSIONS" && ! version_in_list "$v" "$CHANGELOG_DEFS"; then
+      echo "❌ CHANGELOG: heading ${RED}[${v}]${NC} is tagged (v${v}) but has no link definition"
+      LINK_ERRORS=$((LINK_ERRORS+1))
+    fi
+  done
+
+  # R2 — a definition must name a tag that exists (or the version being prepped).
+  for v in $CHANGELOG_DEFS; do
+    if ! version_in_list "$v" "$GIT_TAG_VERSIONS" && [ "$v" != "$PACKAGE_VERSION" ]; then
+      echo "❌ CHANGELOG: definition ${RED}[${v}]${NC} names tag v${v}, which does not exist"
+      LINK_ERRORS=$((LINK_ERRORS+1))
+    fi
+  done
+
+  # R3 — [Unreleased] must exist and compare against the newest tag.
+  UNRELEASED_BASE=$(grep -oE '^\[Unreleased\]: .*/compare/v[0-9][^ ]*\.\.\.HEAD' CHANGELOG.md |
+    head -1 | sed -E 's#^.*/compare/##;s#\.\.\.HEAD$##' || true)
+  if ! grep -qE '^\[Unreleased\]: ' CHANGELOG.md; then
+    echo "❌ CHANGELOG: ${RED}no [Unreleased]: link definition${NC}"
+    LINK_ERRORS=$((LINK_ERRORS+1))
+  elif [ "$UNRELEASED_BASE" != "$NEWEST_TAG" ] && [ "$UNRELEASED_BASE" != "v${PACKAGE_VERSION}" ]; then
+    echo "❌ CHANGELOG: [Unreleased] compares against ${RED}${UNRELEASED_BASE:-an unparseable base}${NC} (expected ${NEWEST_TAG})"
+    LINK_ERRORS=$((LINK_ERRORS+1))
+  fi
+
+  if [ $LINK_ERRORS -eq 0 ]; then
+    DEF_COUNT=$(printf '%s\n' "$CHANGELOG_DEFS" | grep -c . || true)
+    echo "✅ CHANGELOG link block: ${GREEN}${DEF_COUNT} definitions, [Unreleased] → ${UNRELEASED_BASE}${NC}"
+  fi
+  ERRORS=$((ERRORS+LINK_ERRORS))
+fi
+
 # Summary
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
