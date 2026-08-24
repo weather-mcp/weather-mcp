@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.23.0 (Production Ready)
+- **Version:** 1.24.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -574,16 +574,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.23.0 — Production Ready ✅
-- **Unreleased on `main`:** heat/cold stress context on `get_current_conditions` (#68) — will ship as v1.24.0
+- **Version:** 1.24.0 — Production Ready ✅
 - **Test Coverage:** 2,510 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.24.0:** Keyless national CAP alerts for India, the Philippines and Indonesia; heat/cold stress context on current conditions
 - **New in v1.23.0:** Global alerts fallback (Google Weather API) behind optional `GOOGLE_WEATHER_API_KEY`
 - **New in v1.22.0:** Global pollen fallback on `get_air_quality` behind optional `GOOGLE_POLLEN_API_KEY`
-- **New in v1.21.0:** Multi-model forecast comparison, ECMWF ensemble spread, global climate-normals hardening
 
 ## Useful References
 
@@ -606,6 +605,6 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-08-22 (v1.23.0; trimmed release narrative into CHANGELOG/.devdocs, added Project Conventions)
+**Last Updated:** 2026-08-24 (v1.24.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
