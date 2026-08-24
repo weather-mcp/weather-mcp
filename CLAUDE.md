@@ -215,7 +215,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 - **Read real output, not just passing tests.** Several shipped-quality bugs were found only by reading rendered text (a percentage contradicting the words it labelled; a quantity mislabelled in a safety line; `**X** (X)` suffix duplication). Run the built dist against live points before tagging.
 - Design → plan → run: `/design-plan` drafts `.devdocs/backlog/plan-<name>.md`; promoting it to the `.devdocs/` root (SETTLED) makes it valid input to `/impl-plan` → `/plan-review` → `/run-plan`, whose last step moves the whole plan set to `.devdocs/archive/completed/`. Update `.devdocs/ROADMAP.md` whenever an idea changes state.
-- `scripts/update-docs-for-release.sh` rewrites this file's version, tool count, test count, `Last Updated`, and prepends one "New in" line (auto-pruned to the newest three; it refuses to run if no "New in" anchor line exists) — keep those anchors; **do not add per-release narrative here** (it belongs in `CHANGELOG.md` and the plan doc).
+- `scripts/update-docs-for-release.sh` rewrites this file's version, tool count, test count, `Last Updated`, and prepends one "New in" line (auto-pruned to the newest three; it refuses to run if no "New in" anchor line exists) — keep those anchors; **do not add per-release narrative here** (it belongs in `CHANGELOG.md` and the plan doc). It also maintains `CHANGELOG.md`'s link-reference block: emitting the new version's compare-link definition and re-pointing `[Unreleased]:` at it.
 
 ## Testing
 

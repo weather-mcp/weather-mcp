@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Version headings in this changelog now link to their diff.** Every `## [X.Y.Z]` heading below is a reference-style Markdown link; the release script previously added the heading text without the matching link definition at the foot of the file, so each new version rendered as literal `[X.Y.Z]` bracket text with no way to click through to what changed. New releases now get a working compare link automatically, and `[Unreleased]` above always points at the diff since the newest tagged release.
+
 ## [1.24.0] - 2026-08-24
 
 ### Added
