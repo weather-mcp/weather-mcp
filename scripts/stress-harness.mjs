@@ -16,7 +16,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -99,7 +99,15 @@ async function main() {
     // tools/list sanity
     const tools = await client.listTools();
     const names = tools.tools.map((t) => t.name);
-    record('default(imperial)', 'tools/list exposes 16 tools', names.length === 16 ? 'PASS' : 'FAIL', `${names.length} tools`);
+    // Source of truth is TOOL_DEFINITIONS in src/index.ts, counted the same
+    // way scripts/check-doc-versions.sh counts it. Hardcoding the number here
+    // made this check go stale the moment a tool was added, and a permanently
+    // red sweep is worse than no check at all.
+    const expectedTools = (
+      readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+        .match(/name: '[a-z_]+' as const/g) ?? []
+    ).length;
+    record('default(imperial)', `tools/list exposes all ${expectedTools} defined tools`, names.length === expectedTools ? 'PASS' : 'FAIL', `${names.length} tools`);
     const fSchema = tools.tools.find((t) => t.name === 'get_forecast');
     const props = Object.keys(fSchema?.inputSchema?.properties || {});
     record('default(imperial)', 'get_forecast schema has units+city_name', props.includes('units') && props.includes('city_name') ? 'PASS' : 'FAIL', props.filter(p=>['units','city_name','wind_speed_unit','time_format'].includes(p)).join(','));
