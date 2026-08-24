@@ -346,10 +346,16 @@ function capitalize(value: string): string {
 
 /**
  * "…and N more warnings, mostly Minor" remainder line for capped lists.
- * Typed on the only field it reads so every CAP-shaped renderer can share it;
- * `noun` defaults to the MeteoAlarm wording, keeping that output unchanged.
+ * Typed on the only field it reads so every CAP-shaped renderer can share it.
+ * `detail` is required rather than defaulted so a renderer that forgets it is a
+ * compile error: at detail="full" the cap cannot be raised any further, so the
+ * "use detail=full" hint would tell the reader to do what they have already done.
  */
-function remainderNote(remainder: Array<{ severity?: string }>, noun = 'warning'): string {
+function remainderNote(
+  remainder: Array<{ severity?: string }>,
+  noun: string,
+  detail: Detail
+): string {
   const counts = new Map<string, number>();
   for (const warning of remainder) {
     const severity = warning.severity ?? 'Unknown';
@@ -364,7 +370,8 @@ function remainderNote(remainder: Array<{ severity?: string }>, noun = 'warning'
     }
   }
   const plural = remainder.length > 1 ? 's' : '';
-  return `*…and ${remainder.length} more ${noun}${plural}, mostly ${top}. Use detail="full" to see more.*\n\n`;
+  const hint = detail !== 'full' ? ` Use detail="full" to see more.` : '';
+  return `*…and ${remainder.length} more ${noun}${plural}, mostly ${top}.${hint}*\n\n`;
 }
 
 /**
@@ -471,7 +478,7 @@ async function handleMeteoAlarmAlerts(
       }
 
       if (remainder.length > 0) {
-        output += remainderNote(remainder);
+        output += remainderNote(remainder, 'warning', detail);
       }
       if (detail !== 'full') {
         output += `*Showing standard detail. Use detail="full" for complete warning descriptions.*\n\n`;
@@ -640,7 +647,7 @@ async function handleNationalCapAlerts(
       }
 
       if (remainder.length > 0) {
-        output += remainderNote(remainder);
+        output += remainderNote(remainder, 'warning', detail);
       }
       if (detail !== 'full') {
         output += `*Showing standard detail. Use detail="full" for complete warning descriptions.*\n\n`;
@@ -854,7 +861,8 @@ async function handleGeoMetAlerts(
       }
 
       if (remainder > 0) {
-        output += `*…and ${remainder} more alert${remainder > 1 ? 's' : ''}. Use detail="full" to see more.*\n\n`;
+        const hint = detail !== 'full' ? ` Use detail="full" to see more.` : '';
+        output += `*…and ${remainder} more alert${remainder > 1 ? 's' : ''}.${hint}*\n\n`;
       }
     }
   }
@@ -1189,7 +1197,8 @@ async function handleGoogleAlerts(
         // rather than echoing Google's raw "MINOR".
         output += remainderNote(
           remainder.map(alert => ({ severity: capEnumValue(alert.severity) })),
-          'alert'
+          'alert',
+          detail
         );
       }
       if (detail !== 'full') {
