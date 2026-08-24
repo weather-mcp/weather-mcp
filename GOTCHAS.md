@@ -447,6 +447,78 @@ changing, and read what it says" discipline, one layer up.
 
 ---
 
+## G15 — A tag-keyed invariant cannot check the release it is being run for
+
+**Trigger:** adding a verification rule keyed off git tags, release numbers, or
+any marker that is created *after* the check runs in the procedure.
+
+**Rule:** enumerate the moments the check actually executes and ask what the
+marker's state is at each one. If the artefact under test has no marker yet at
+the moment that matters, add a companion rule keyed off something that *does*
+exist then — `package.json`'s version, the branch, the file itself. Guard the
+companion on the marker being **absent**, so the two rules partition the cases
+instead of double-reporting the same defect.
+
+**Why:** `check-doc-versions.sh`'s R1 ("every tagged heading has a definition")
+runs at `update-docs-for-release.sh:257`, step 9 of release prep — before the
+human cuts the tag at step 4 of the printed "Next steps". The version being
+released therefore has no tag, so it was the single version R1 could not check,
+and the only one the run existed to verify. The exemption that lets the gate pass
+on its own first run cast a shadow exactly the width of the new release: a
+promoted heading with no definition reported `✅ CHANGELOG link block: 28
+definitions` and exited 0 — the very drift the block was written to prevent.
+
+**Verify:** per [G14], `awk` the link block out of the checker and run it against
+a `CHANGELOG.md` whose newest heading has no matching definition, with
+`PACKAGE_VERSION` set to that version and no tag for it. R4 must report
+`is being released but has no link definition`; deleting the R4 block makes the
+same case pass green, which is the shape of the original defect.
+
+**Evidence:** 2026-08-24 — found by the changelog-link-refs diff review
+(finding 1) by mutating the one case the gate could not see; closed by `1adc1cb`,
+which added R4 beside R1. Two regression cases keep it honest: no-double-report
+(tagged **and** missing → 1 error, not 2) and no-false-fail (version bumped with
+no heading yet → 0).
+
+**Status:** active. Related: [G12] — both are a checker reporting success over
+the thing it does not actually look at.
+
+---
+
+## G16 — `git describe --tags` is ancestry-nearest and matches any tag shape
+
+**Trigger:** deriving a release's previous version, or any compare base, from
+git tags.
+
+**Rule:** pass `--match='v*'` (or the project's release-tag glob). When another
+part of the system independently computes "the newest tag", make both sides use
+the same definition and say so in a comment — an ancestry-nearest emitter and a
+version-sorted checker agree right up until someone cuts an odd tag.
+
+**Why:** `git describe --tags --abbrev=0` returns the nearest reachable tag by
+**ancestry** and considers **all** tag names, so a single `backup-before-refactor`
+checkpoint makes it return that instead of `v1.24.0`. Release prep then writes
+`[1.25.0]: …/compare/backup-before-refactor...v1.25.0` — a link that *resolves*
+on GitHub and silently shows the wrong diff range, which no key-only check can
+see. It also disagreed with `check-doc-versions.sh`'s R3, which reads
+`git tag -l 'v*' --sort=-v:refname`.
+
+**Verify:** `git tag tmp-probe && git describe --tags --abbrev=0` returns
+`tmp-probe`, while `git describe --tags --abbrev=0 --match='v*'` still returns the
+newest release tag; then `git tag -d tmp-probe`. Confirm the glob is still in
+place with `grep -n 'describe --tags' scripts/update-docs-for-release.sh`.
+
+**Evidence:** 2026-08-24 — changelog-link-refs diff review (finding 2),
+reproduced in a throwaway clone; closed by `8adc053`. The glob also fixes a
+quieter case: when only non-release tags exist, `LAST_TAG` is now empty, so D4's
+`releases/tag/vX.Y.Z` fallback fires where the old code emitted a bogus compare
+URL. The checking side is covered independently by R5 (`6a88ce4`), which rejects
+a compare whose left side is not a release tag.
+
+**Status:** active.
+
+---
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
