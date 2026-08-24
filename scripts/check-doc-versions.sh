@@ -189,7 +189,7 @@ if [ $BROKEN_LINKS -eq 0 ]; then
   echo "✅ All documentation links valid"
 fi
 
-# --- CHANGELOG link-reference block (R1/R2/R3) --------------------------------
+# --- CHANGELOG link-reference block (R1-R4) -----------------------------------
 # Every "## [X.Y.Z]" heading in CHANGELOG.md is a Markdown *reference* link: it
 # renders as a diff link only when a matching "[X.Y.Z]: <url>" definition exists
 # in the block at the foot of the file. Nineteen releases' worth of missing
@@ -199,6 +199,7 @@ fi
 #   R1  every heading that has a matching vX.Y.Z git tag has a definition
 #   R2  every definition names a tag that exists
 #   R3  [Unreleased]: exists and compares against the newest tag
+#   R4  the version being prepped has a definition, tag or no tag
 #
 # The invariant is keyed off **git tags, not headings** — deliberately. A number
 # of early sections were never tagged, so no compare URL can honestly be written
@@ -214,6 +215,12 @@ fi
 # cuts the tag at step 4 of its printed "Next steps" — so at that moment the new
 # version legitimately has a heading and a definition but no tag. Without the
 # exemption every release would fail its own verification step.
+#
+# R4 is what keeps that exemption from casting a shadow. R1 is keyed off tags, so
+# it skips the untagged version being prepped — which is the one version a release
+# run exists to verify, and the one whose missing definition this whole block was
+# written to prevent. R4 checks exactly that version, exactly while it has no tag,
+# so the two rules partition the headings instead of leaving a gap between them.
 echo ""
 echo "🔗 Checking CHANGELOG link-reference block..."
 
@@ -258,6 +265,15 @@ else
     LINK_ERRORS=$((LINK_ERRORS+1))
   elif [ "$UNRELEASED_BASE" != "$NEWEST_TAG" ] && [ "$UNRELEASED_BASE" != "v${PACKAGE_VERSION}" ]; then
     echo "❌ CHANGELOG: [Unreleased] compares against ${RED}${UNRELEASED_BASE:-an unparseable base}${NC} (expected ${NEWEST_TAG})"
+    LINK_ERRORS=$((LINK_ERRORS+1))
+  fi
+
+  # R4 — the prepped version has no tag yet, so R1 skips it. Only fires while the
+  # tag is absent, so it complements R1 rather than double-reporting with it.
+  if ! version_in_list "$PACKAGE_VERSION" "$GIT_TAG_VERSIONS" &&
+     version_in_list "$PACKAGE_VERSION" "$CHANGELOG_HEADINGS" &&
+     ! version_in_list "$PACKAGE_VERSION" "$CHANGELOG_DEFS"; then
+    echo "❌ CHANGELOG: heading ${RED}[${PACKAGE_VERSION}]${NC} is being released but has no link definition"
     LINK_ERRORS=$((LINK_ERRORS+1))
   fi
 
