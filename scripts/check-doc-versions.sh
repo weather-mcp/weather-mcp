@@ -189,7 +189,7 @@ if [ $BROKEN_LINKS -eq 0 ]; then
   echo "✅ All documentation links valid"
 fi
 
-# --- CHANGELOG link-reference block (R1-R4) -----------------------------------
+# --- CHANGELOG link-reference block (R1-R5) -----------------------------------
 # Every "## [X.Y.Z]" heading in CHANGELOG.md is a Markdown *reference* link: it
 # renders as a diff link only when a matching "[X.Y.Z]: <url>" definition exists
 # in the block at the foot of the file. Nineteen releases' worth of missing
@@ -200,6 +200,7 @@ fi
 #   R2  every definition names a tag that exists
 #   R3  [Unreleased]: exists and compares against the newest tag
 #   R4  the version being prepped has a definition, tag or no tag
+#   R5  every definition's URL is the one the emitter would have written
 #
 # The invariant is keyed off **git tags, not headings** — deliberately. A number
 # of early sections were never tagged, so no compare URL can honestly be written
@@ -275,6 +276,51 @@ else
      ! version_in_list "$PACKAGE_VERSION" "$CHANGELOG_DEFS"; then
     echo "❌ CHANGELOG: heading ${RED}[${PACKAGE_VERSION}]${NC} is being released but has no link definition"
     LINK_ERRORS=$((LINK_ERRORS+1))
+  fi
+
+  # R5 — R2 checks a definition's *key*; this checks its *value*. Without it a
+  # definition can name a real tag and still point anywhere at all: a URL built
+  # from a checkpoint tag (compare/backup-before-refactor...v1.25.0) resolves on
+  # GitHub and quietly shows the wrong diff range. The legal forms are exactly the
+  # two the emitter writes — a compare ending in ...v<version> whose left side is
+  # a real tag, or the releases/tag form the earliest release uses. The base is
+  # read from [Unreleased] rather than hardcoded, the same way the emitter does it.
+  LINK_BASE=$(grep -oE '^\[Unreleased\]: \S+' CHANGELOG.md | head -1 |
+    sed -E 's/^\[Unreleased\]: //;s#/(compare|releases)/.*##')
+  if [ -n "$LINK_BASE" ]; then
+    while read -r key url; do
+      # Skip anything R2 already rejected, so one broken line gets one message.
+      if ! version_in_list "$key" "$GIT_TAG_VERSIONS" && [ "$key" != "$PACKAGE_VERSION" ]; then
+        continue
+      fi
+      case "$url" in
+        "$LINK_BASE"/*) ;;
+        *)
+          echo "❌ CHANGELOG: definition ${RED}[${key}]${NC} does not point at ${LINK_BASE}"
+          LINK_ERRORS=$((LINK_ERRORS+1))
+          continue
+          ;;
+      esac
+      rest=${url#"$LINK_BASE"/}
+      case "$rest" in
+        compare/*...*)
+          left=${rest#compare/}; left=${left%...*}
+          right=${rest##*...}
+          if [ "$right" != "v${key}" ]; then
+            echo "❌ CHANGELOG: definition ${RED}[${key}]${NC} compares to ${RED}${right}${NC}, not v${key}"
+            LINK_ERRORS=$((LINK_ERRORS+1))
+          elif ! version_in_list "${left#v}" "$GIT_TAG_VERSIONS"; then
+            echo "❌ CHANGELOG: definition ${RED}[${key}]${NC} compares from ${RED}${left}${NC}, which is not a vX.Y.Z tag"
+            LINK_ERRORS=$((LINK_ERRORS+1))
+          fi
+          ;;
+        releases/tag/v"${key}") ;;
+        *)
+          echo "❌ CHANGELOG: definition ${RED}[${key}]${NC} has an unrecognised URL form: ${RED}${rest}${NC}"
+          LINK_ERRORS=$((LINK_ERRORS+1))
+          ;;
+      esac
+    done < <(grep -oE '^\[[0-9][^]]*\]: \S+' CHANGELOG.md | sed -E 's/^\[([^]]*)\]: /\1 /')
   fi
 
   if [ $LINK_ERRORS -eq 0 ]; then
