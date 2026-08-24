@@ -77,6 +77,12 @@ This project has minimal runtime dependencies to reduce attack surface:
 - `@modelcontextprotocol/sdk` - Official MCP SDK from Anthropic
 - `axios` - Well-maintained HTTP client
 - `dotenv` - Simple environment variable loader
+- `fast-xml-parser` - The project's first XML dependency, added for the
+  national CAP alert feeds. Every document is refused before parsing if it
+  carries a `<!DOCTYPE` declaration (defence in depth against the
+  entity-expansion class; these feeds never use one), and well-formedness is
+  checked with `XMLValidator` rather than trusting the parser, which is
+  lenient by design and would otherwise accept malformed input silently.
 
 **Automated Scanning:**
 
@@ -140,6 +146,15 @@ This MCP server uses public weather APIs (NOAA and Open-Meteo) that do not requi
 - All external API calls use **HTTPS only**
 - Certificate validation is enabled by default (via axios)
 - No sensitive data is transmitted to external services
+- **URLs taken from a feed body are allowlisted before they are fetched.** The
+  national CAP feeds supply their own document and geometry URLs; each is
+  checked against that feed's exact HTTPS host list and path prefixes, with
+  userinfo and explicit ports rejected, before any request is made. Redirects
+  are **not followed** (`maxRedirects: 0`), so a 3xx cannot walk a request off
+  an allowlisted host, and response size is capped at the transport as well as
+  after reading. A refused URL is counted, logged as a security event, and
+  never fetched — and no log or error message ever contains the URL itself,
+  a response body, or alert geometry.
 
 ## Security Testing
 

@@ -4,10 +4,11 @@
  * "elsewhere" branch of `get_alerts`.
  *
  * `get_alerts` routes by country: US → NOAA, Canada → ECCC via MSC GeoMet,
- * 38 MeteoAlarm countries → MeteoAlarm. **This service is only ever reached
- * from the final "elsewhere" branch — the US, Canada, and MeteoAlarm
- * countries never contact Google, key or no key.** See
- * `docs/global-alerts-fallback-plan.md` D1/D2. Without a
+ * 38 MeteoAlarm countries → MeteoAlarm, and India / the Philippines /
+ * Indonesia → their national CAP feeds. **This service is only ever reached
+ * from the final "elsewhere" branch — none of those keyless authorities ever
+ * contacts Google, key or no key.** See
+ * `.devdocs/archive/completed/global-alerts-fallback-plan.md` D1/D2. Without a
  * `GOOGLE_WEATHER_API_KEY`, the elsewhere branch stays byte-identical to
  * today's not-covered message; this service never runs unkeyed.
  *

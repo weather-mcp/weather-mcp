@@ -169,6 +169,13 @@ export const CacheConfig = {
     // rows per region file (not per request), so repeated queries anywhere
     // in a region cost one fetch per half hour.
     firmsRegionalFile: 30 * MINUTE,
+
+    // National CAP documents and polygon documents, keyed on (index identifier,
+    // index published stamp). SACHET re-serves a thread's latest version under
+    // one GUID; the stamp (not the identifier) makes the key immutable. A named
+    // 24h entry rather than Infinity so a long-running server's LRU is not
+    // pinned with dead alerts.
+    capDocument: 24 * HOUR,
   },
 } as const;
 

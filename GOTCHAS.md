@@ -1,0 +1,316 @@
+# GOTCHAS
+
+Curated institutional memory: trigger-keyed traps that have actually bitten
+this codebase, each with the rule, why it exists, and the evidence. Entries
+carry stable `G<n>` ids and are never renumbered — a retired entry moves to the
+Graveyard with a reason rather than being deleted.
+
+This file is **committed**. `/impl-plan` cites matching entries per task,
+`/plan-review` checks coverage of them, and `/run-plan` pastes only the matching
+entries into a subagent's prompt. Subagents never write here; they report
+surprises and the orchestrator curates.
+
+The broader standing conventions live in `CLAUDE.md` ("Project Conventions").
+This file is for the sharper, more surprising traps — the ones where the
+obvious-looking code is wrong.
+
+---
+
+## G1 — A green `npm test` does not mean the build compiles
+
+**Trigger:** any change to `.ts` source, especially editing a long string
+literal in `src/index.ts`.
+
+**Rule:** run `npm run build` and read its output. Never infer build health
+from a passing test suite, and never commit on `npm test` alone.
+
+**Why:** Vitest transpiles each module itself and does not type-check, so
+`tsc` errors do not fail the suite. A syntax error in a tool description can
+sit behind 2,492 passing tests.
+
+**Verify:** introduce a deliberate `tsc` error, run `npm test`, and confirm it
+still passes.
+
+**Evidence:** 2026-08-23 (`e612a74`, national CAP alerts T10) — an apostrophe
+in `the alert's own polygon` terminated a single-quoted string in
+`src/index.ts`; `npm test` reported 101 files / 2,492 tests passing while
+`npm run build` emitted three TS1005/TS1128 errors.
+
+**Status:** active. Lint candidate — the gate already runs `build` before
+`test`; the trap is reading only the second result.
+
+---
+
+## G2 — Long tool descriptions in `src/index.ts` are single-quoted
+
+**Trigger:** editing any `description:` string in `TOOL_DEFINITIONS`.
+
+**Rule:** these are single-quoted TypeScript strings on one very long line.
+Never introduce a raw `'` — rewrite the phrase (`the alert polygon`, not
+`the alert's own polygon`) rather than escaping, so the line stays readable.
+
+**Why:** the strings are long enough that an apostrophe is invisible in review,
+and the resulting error points at a *different* line hundreds of lines away
+(the next string literal that gets mis-paired).
+
+**Verify:** `grep -n "description: '" src/index.ts` and confirm none of the
+matched strings contains an unescaped `'`.
+
+**Evidence:** 2026-08-23 (`e612a74`) — the reported errors were at
+`src/index.ts:783,785,789`, while the actual defect was at `:417`.
+
+**Status:** active. Related: [G1].
+
+---
+
+## G3 — `XMLValidator.validate` accepts several documents that are not one root
+
+**Trigger:** parsing XML from any upstream feed.
+
+**Rule:** validate with `XMLValidator` **before** parsing (the parser itself is
+lenient and will not throw), and then **also** check the parsed shape: exactly
+one root key that does not start with `?`, and that key's value must not be an
+array.
+
+**Why:** three separate gaps, all verified live against `fast-xml-parser`
+5.11.0. `XMLParser.parse('<a><b></a>')` returns `{"a":{"b":""}}` without
+throwing, so the parser can never be the well-formedness check. `XMLValidator`
+*accepts* two distinct self-closing roots (`<rss>…</rss><feed/>`). And it also
+accepts two self-closing roots sharing a tag name (`<alert/><alert/>`), which
+the parser then silently coalesces into a single key holding a 2-element array
+— which is why "exactly one non-PI root key" alone is insufficient. The `?xml`
+and `?xml-stylesheet` processing-instruction keys are why the check excludes
+`?`-prefixed keys rather than counting all keys.
+
+**Verify:** `src/utils/capParse.ts` `parseXml` guard 7, and the two-root cases
+in `tests/unit/cap-parse.test.ts`.
+
+**Evidence:** 2026-08-23 (`f1b757e`, national CAP alerts T3) — found in scratch
+against the installed parser version, not from documentation.
+
+**Status:** active.
+
+---
+
+## G4 — A right-root document with no usable envelope is not an empty feed
+
+**Trigger:** parsing any index/list response on safety-critical data.
+
+**Rule:** distinguish three outcomes explicitly — a valid envelope with no
+items (**honest empty**, return normally), a missing or unusable envelope
+(**throw**), and a transport failure (**throw**). Never return `[]` for a shape
+you did not recognise.
+
+**Why:** `<rss><error>maintenance</error></rss>` and `<rss><channel/></rss>`
+both have the expected root. Returning `[]` for them renders a ✅ "no active
+alerts" built from a maintenance page — a fabricated all-clear, which on alert
+data is the single worst failure this codebase can produce. Note
+`<rss><channel/></rss>` parses `channel` as the empty **string**, not an
+object, so the check must be `isPlainObject`, not truthiness.
+
+**Verify:** `parseCapIndex`'s envelope checks and the corresponding cases in
+`tests/unit/cap-parse.test.ts` / `tests/unit/national-cap-service.test.ts`.
+
+**Evidence:** 2026-08-23 (`f1b757e`) — raised as a blocker in the Codex plan
+review (codex-R2) before implementation.
+
+**Status:** active. Sharper instance of CLAUDE.md's "never trust the HTTP 200
+alone" and "distinguish empty from not-covered".
+
+---
+
+## G5 — `Cache.generateKey` joins with an unescaped `:`
+
+**Trigger:** building a cache key from two or more untrusted upstream strings.
+
+**Rule:** encode the tuple as **one injective token** —
+`JSON.stringify([a, b])` — and pass that as a single component. Never pass the
+untrusted parts as adjacent components.
+
+**Why:** `Cache.generateKey(...components)` joins with `:` and escapes nothing
+(`src/utils/cache.ts:175-189`). Upstream identifiers routinely contain colons
+(`urn:uuid:…`), as do ISO timestamps, so `('thread:2026-08-23T00', '00:00Z')`
+and `('thread', '2026-08-23T00:00:00Z')` collide — serving one alert's document
+under another alert's key.
+
+**Verify:** the key-injectivity test in
+`tests/unit/national-cap-service.test.ts`.
+
+**Evidence:** 2026-08-23 (`0918007`, national CAP alerts T4) — raised in the
+Codex plan review (codex-R4) with the concrete colliding pair.
+
+**Status:** active. Lint candidate — a rule flagging `generateKey` calls with
+more than one non-literal argument.
+
+---
+
+## G6 — Cache the unfiltered set; filter at read time
+
+**Trigger:** caching any list whose members expire, are superseded, or are
+otherwise time-filtered.
+
+**Rule:** cache the **complete, unfiltered** parsed list and run the filter on
+every return, cached or fresh. Never cache post-filter. Any count derived from
+the filtered view must be derived **at return**, never cached alongside the
+list.
+
+**Why:** two distinct bugs. Caching post-filter stops an original alert
+reappearing when the Update that superseded it expires first (supersession is
+deliberately evaluated after expiry, so an expired Update's references are
+inert), and it re-fetches every expired document on each refresh. Separately, a
+count computed at refresh time and cached will be rendered over a
+*re-filtered* list later — so a disclosure line can name a number that
+contradicts the block printed beneath it.
+
+**Verify:** `MeteoAlarmService.getWarnings` (`src/services/meteoalarm.ts:238-270`)
+and `NationalCapService.readView`; the resurrection and derived-count tests in
+`tests/unit/national-cap-service.test.ts`.
+
+**Evidence:** established by MeteoAlarm; re-confirmed 2026-08-23 (`0918007`,
+`17b403b`) where the count half was raised as a major plan-review finding (R2)
+before implementation.
+
+**Status:** active.
+
+---
+
+## G7 — Never freeze per-refresh state into a long-TTL cache entry
+
+**Trigger:** enriching a cached record with data fetched separately (geometry,
+a secondary lookup) after reading it from cache.
+
+**Rule:** cache the record **without** the enrichment state, build a fresh copy
+each refresh, and write the enrichment only into the copy. Cache the
+enrichment itself only on **success**, so a failure is retried next time.
+
+**Why:** the document cache has a 24-hour TTL; the enrichment can fail
+transiently. Writing the failure flag into the cached object makes one timeout
+render that alert degraded for a full day, long after the upstream recovered.
+
+**Verify:** `freshCopy` in `src/services/nationalCap.ts`, and the
+fail-then-succeed-across-refreshes test in
+`tests/unit/national-cap-service.test.ts`.
+
+**Evidence:** 2026-08-23 (`0918007`) — raised as a major plan-review finding
+(R1) before implementation.
+
+**Status:** active.
+
+---
+
+## G8 — A bounded array that trims must never be used for exclusion
+
+**Trigger:** applying a cap to any upstream array whose members are then tested
+for membership/containment.
+
+**Rule:** when a cap trims a set used to decide "does this apply to the user?",
+discard the set **entirely** and disclose it. Never keep the partial set.
+
+**Why:** with polygon rings, keeping the first 256 of 257 means a point covered
+only by ring 257 reads as *elsewhere* and the warning is dropped — a fabricated
+all-clear produced by a defensive limit. Degrading the whole warning to the
+disclosed country-level path is the safe direction.
+
+**Verify:** `buildRings` in `src/utils/capParse.ts`, `applyRings` in
+`src/services/nationalCap.ts`, and the 257-ring tests in both suites.
+
+**Evidence:** 2026-08-23 (`f1b757e`, `0918007`) — raised as a major plan-review
+finding (codex-R5).
+
+**Status:** active. Note the companion trap: a pure zero-I/O util *detects* the
+trim but cannot log it, so the **service** must emit the `securityEvent`
+(found at `17b403b` when the inline path was trimming silently).
+
+---
+
+## G9 — Live smoke tests must rethrow anything that is not a transport failure
+
+**Trigger:** writing or editing a test under `tests/integration/` that hits a
+live API.
+
+**Rule:** classify the caught error. Skip (log and pass) **only** on the
+service's own fixed transport strings; **rethrow** everything else. Put every
+`expect` **after** the `try/catch`, guarded on the result being defined. Declare
+an empty upstream explicitly rather than letting an all-items loop pass
+vacuously.
+
+**Why:** `vitest.config.ts` has no `include`, so `tests/integration/` runs on
+every `npm test`. A catch-all that swallows assertion and shape errors turns a
+real upstream contract regression into a logged "network flake" that nobody
+investigates — and a vacuous loop over an empty feed makes a broken parser look
+healthy.
+
+**Verify:** `grep -n 'isTransportFailure\|throw' tests/integration/national-cap-alerts.test.ts`,
+and confirm no `catch` block in that file contains `expect(`.
+
+**Evidence:** 2026-08-23 (`2d564ef`) — the shape being avoided is
+`tests/integration/international-alerts.test.ts:299-325`, which puts its
+`expect`s inside the tolerant catch; raised as a major plan-review finding
+(codex-R7).
+
+**Status:** active.
+
+---
+
+## G10 — Byte-identity sweeps must run back-to-back, and the key must reach both sides
+
+**Trigger:** proving output is unchanged by diffing built-dist output against a
+base worktree.
+
+**Rule:** build both trees first, then run the two probes **back-to-back**.
+When a probe needs an API key, load it once and pass it **explicitly into both
+child environments**. Assert the keyed marker (e.g. the provider's attribution
+line) is present in both outputs *before* comparing hashes. A diff of one line
+that is a feed's own timestamp is drift, not a regression — re-run tighter
+rather than "fixing" it.
+
+**Why:** two independent traps. Live feeds embed their own `Updated` stamps, so
+a gap of even a few minutes between runs fabricates a diff. And `.env` is
+gitignored, so a base worktree has none — `dotenv` reads each process's own
+cwd, meaning the base silently runs *keyless* while the branch runs keyed, and
+the resulting mismatch gets blamed on the feature.
+
+**Verify:** `.claude/scratch/national-cap-alerts/alerts-sweep.mjs` (gitignored
+scratch) and the md5 table in the archived plan set's implementation notes.
+
+**Evidence:** 2026-08-23 (national CAP alerts T9) — the first sweep showed
+Kansas City differing; the diff was one line, NOAA's own `**Updated:**` stamp
+advancing 1:02 → 1:06 AM. A tighter re-run was byte-identical with no masking.
+The key-propagation half was raised as a major plan-review finding (codex-R10).
+
+**Status:** active. Related: the auto-memory note
+`live-verification-driver-hangs` (drivers need an explicit `process.exit(0)`;
+never run two live drivers in parallel).
+
+---
+
+## G11 — Read the rendered output, not just the assertions
+
+**Trigger:** finishing any feature that renders user-facing text.
+
+**Rule:** run the built dist against real coordinates and **read** the output
+before tagging. Cover both unit systems and every provider path the change
+touches.
+
+**Why:** a whole class of defects is invisible to assertions because every
+assertion passes: text that is internally contradictory, a count that disagrees
+with the list beneath it, a quantity mislabelled in a safety line, duplicated
+suffixes, and plain grammatical wrongness in generated prose.
+
+**Verify:** each shipped feature's implementation notes in
+`.devdocs/archive/completed/` record what was probed and what it showed.
+
+**Evidence:** 2026-08-23 (`1997659`) — live output read
+`No active weather alerts for your location in Philippines`; the bare feed name
+is wrong in a prepositional phrase and no test could see it. Same rule caught
+the v1.20.0 `**X** (X)` suffix duplication and a percentage contradicting its
+own label.
+
+**Status:** active. This is the highest-yield entry in the file.
+
+---
+
+## Graveyard
+
+*(No retired entries yet. When an entry's trap is refactored away, move it here
+with the reason and the commit that removed it — never delete, never renumber.)*

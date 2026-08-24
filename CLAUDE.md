@@ -22,7 +22,7 @@ src/
 ├── handlers/                # One handler per MCP tool (saved locations share one file)
 │   ├── forecastHandler.ts           # get_forecast (+ compare_models, ensemble_spread, normals, astronomy)
 │   ├── currentConditionsHandler.ts  # get_current_conditions (NOAA / Open-Meteo / METAR; fire weather, thermal stress)
-│   ├── alertsHandler.ts             # get_alerts — routed by country (NOAA / GeoMet / MeteoAlarm / Google fallback)
+│   ├── alertsHandler.ts             # get_alerts — routed by country (NOAA / GeoMet / MeteoAlarm / national CAP IN-PH-ID / Google fallback)
 │   ├── historicalWeatherHandler.ts
 │   ├── weatherSummaryHandler.ts     # get_weather_summary — composite, fans out to the others
 │   ├── statusHandler.ts
@@ -41,6 +41,7 @@ src/
 │   ├── geocoding.ts         # Multi-provider geocoding with automatic fallback
 │   ├── meteoalarm.ts        # EUMETNET MeteoAlarm — European national warnings
 │   ├── geomet.ts            # MSC GeoMet — Canadian alerts
+│   ├── nationalCap.ts       # National CAP feeds — NDMA SACHET (IN), PAGASA (PH), BMKG (ID); first XML upstream
 │   ├── googleWeather.ts     # Google Weather publicAlerts — optional keyed global alerts fallback
 │   ├── googlePollen.ts      # Google Pollen API — optional keyed global pollen fallback
 │   ├── nifc.ts              # NIFC wildfire incidents (US)
@@ -65,6 +66,7 @@ src/
 │   ├── modelComparison.ts / ensembleSpread.ts        # Forecast agreement + member spread (pure)
 │   ├── fireWeather.ts / thermalStress.ts             # Fire indices incl. Fosberg; wind chill, frostbite, WBGT (pure)
 │   ├── firmsHotspots.ts / metarStation.ts / riverDischarge.ts  # FIRMS parse+cluster; METAR picker; GloFAS cell snap (pure)
+│   ├── capParse.ts / pointInPolygon.ts  # CAP 1.2 XML → records, active filter, feed-URL allowlist; ray-casting point-in-ring (pure)
 │   ├── composite.ts         # PNG stitch/blend/marker/encode (pure)
 │   ├── airQuality.ts / marine.ts / snow.ts / distance.ts / geohash.ts
 │   └── version.ts
@@ -87,7 +89,7 @@ src/
 4. **Caching Strategy:** LRU cache with TTL based on data volatility (see `src/config/cache.ts`)
 5. **Error Hierarchy:** Custom error classes for different failure scenarios
 6. **Three-layer split for computed features:** service fetches → pure zero-I/O util computes → handler renders. The pure module owns constants; the service imports them from the util, never the reverse (e.g. `COMPARISON_MODELS`, `ENSEMBLE_MODEL`)
-7. **Route by country, not by bounding box, for jurisdictional data** (alerts, wildfire): `NominatimService.reverseCountry` resolves the country once; saved/geocoded locations carry `country_code` through `ResolvedLocation` and skip the lookup
+7. **Route by country, not by bounding box, for jurisdictional data** (alerts, wildfire): `NominatimService.reverseCountry` resolves the country once; saved/geocoded locations carry `country_code` through `ResolvedLocation` and skip the lookup (alerts also route to the national CAP feeds ahead of Google)
 
 ## Key Features (17 MCP Tools)
 
@@ -97,7 +99,7 @@ Full per-tool parameter reference: `docs/TOOLS.md`.
 
 1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only
 2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere, or worldwide METAR airport observations via `source="metar"`); `include_fire_weather` gives NOAA's published indices in the US and a server-computed Fosberg index on the Open-Meteo path (not on METAR); automatically adds a frostbite-risk or heat-stress (WBGT) line in extreme conditions — no parameter, gated so moderate output is unchanged
-3. **get_alerts** - Weather alerts/warnings routed by country: NOAA (US), MSC GeoMet/ECCC (Canada), EUMETNET MeteoAlarm (38 European countries); elsewhere the optional keyed Google Weather fallback (`GOOGLE_WEATHER_API_KEY`) or a clean not-covered message; `detail` output control
+3. **get_alerts** - Weather alerts/warnings routed by country: NOAA (US), MSC GeoMet/ECCC (Canada), EUMETNET MeteoAlarm (38 European countries), and the national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG) — matched by alert polygon where the feed publishes geometry inline (PH/ID), country-level with an explicit note otherwise (IN, whose geometry endpoint is not server-reachable); elsewhere the optional keyed Google Weather fallback (`GOOGLE_WEATHER_API_KEY`) or a clean not-covered message; `detail` output control
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo archive, global; NOAA for recent US dates)
 5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning)
 6. **check_service_status** - API health check (all services)
@@ -360,7 +362,8 @@ WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
                                # outside Europe. docs/GOOGLE_POLLEN_KEY_SETUP.md
 # GOOGLE_WEATHER_API_KEY=...   # Also NOT a free registration (same billing requirement,
                                # separate key — a Pollen-restricted key will not work).
-                               # Adds official alerts beyond US/Canada/Europe.
+                               # Adds official alerts beyond US/Canada/Europe/India/
+                               # Philippines/Indonesia.
                                # docs/GOOGLE_WEATHER_KEY_SETUP.md
 
 # Logging
@@ -573,7 +576,7 @@ npm audit             # No critical vulnerabilities
 
 - **Version:** 1.23.0 — Production Ready ✅
 - **Unreleased on `main`:** heat/cold stress context on `get_current_conditions` (#68) — will ship as v1.24.0
-- **Test Coverage:** 2,332 tests, 100% pass rate
+- **Test Coverage:** 2,500 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
