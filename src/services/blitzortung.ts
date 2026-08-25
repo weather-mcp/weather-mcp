@@ -185,7 +185,7 @@ export class BlitzortungService {
   /**
    * Connect to MQTT broker if not already connected
    */
-  private async ensureConnected(): Promise<void> {
+  private async ensureConnected(mqtt: MqttModule): Promise<void> {
     if (this.isConnected && this.client) {
       return;
     }
@@ -202,21 +202,19 @@ export class BlitzortungService {
       });
     }
 
-    // Resolve the optional package BEFORE touching connection state.
+    // NOTHING may await between the `isConnecting` check above and the
+    // assignment below. That flag is the only guard against concurrent callers
+    // each opening their own broker connection, and it works precisely because
+    // it is set in the same synchronous run as the check that reads it.
     //
-    // Placement is load-bearing. `isConnecting` is cleared only by the catch at
-    // the foot of the try below, and the early-return above treats
-    // `isConnecting === true` as "someone else is connecting" and polls a
-    // setInterval that resolves only when `isConnected` flips or `isConnecting`
-    // clears. A throw after the flag is set but outside that catch's reach would
-    // strand the flag, turning every later lightning call into a promise that
-    // never settles — an endless poll with no error and no timeout, so the MCP
-    // client hangs instead of being told the package is missing.
+    // This is why the resolved `mqtt` module arrives as a parameter rather than
+    // being awaited here: `subscribeToLocation` resolves it before calling this
+    // method. An `await loadMqtt()` in this window let all three startup
+    // prewarms past the guard and opened three connections, orphaning two
+    // clients that stayed connected with live message handlers.
     //
     // Invariant: `isConnecting` is false on every path out of this method that
-    // did not connect.
-    const mqtt = await loadMqtt();
-
+    // did not connect — the catch at the foot of the try restores it.
     this.isConnecting = true;
 
     try {
@@ -375,7 +373,12 @@ export class BlitzortungService {
     longitude: number,
     radiusKm: number
   ): Promise<void> {
-    await this.ensureConnected();
+    // Resolved here, outside `ensureConnected`, so that method contains no
+    // await before it sets `isConnecting` (see the comment there). An absent
+    // package therefore throws before any connection state is touched, and
+    // concurrent callers all reject from the one shared import promise.
+    const mqtt = await loadMqtt();
+    await this.ensureConnected(mqtt);
 
     if (!this.client) {
       throw new Error('MQTT client not connected');

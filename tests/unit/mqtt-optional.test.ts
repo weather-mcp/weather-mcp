@@ -352,6 +352,37 @@ describe('optional mqtt dependency resolution (blitzortung.ts)', () => {
     }
   });
 
+  it('contract 8: concurrent callers open exactly ONE broker connection when mqtt is present', async () => {
+    // REGRESSION LOCK, not a feature test.
+    //
+    // `ensureConnected` guards against concurrent connection attempts with a
+    // plain `isConnecting` boolean, and that guard is only sound because the
+    // flag is assigned in the same synchronous run as the check that reads it.
+    // Any `await` introduced between those two statements lets every concurrent
+    // caller past the guard: each sets the flag, each calls `connect()`, and
+    // every client but the last is orphaned while still connected and still
+    // holding a `message` handler.
+    //
+    // This shipped briefly. Resolving the optional module with
+    // `await loadMqtt()` inside `ensureConnected` put an await in exactly that
+    // window, and startup — which fires `void prewarmLocation(...)` per saved
+    // location without awaiting (src/index.ts) — opened three connections for
+    // three saved locations. The whole suite stayed green throughout; nothing
+    // existing could see it. The module is now resolved in
+    // `subscribeToLocation` and passed in, so `ensureConnected` awaits nothing
+    // before setting the flag.
+    const { esModule: presentModule, connect } = createPresentMqttModule();
+    vi.doMock('mqtt', () => presentModule);
+    const { blitzortungService } = await importFreshBlitzortung();
+
+    // Started without awaiting the first, mirroring the startup prewarm loop.
+    const first = blitzortungService.prewarmLocation(40.0, -74.0, 100);
+    const second = blitzortungService.prewarmLocation(41.0, -75.0, 100);
+    await Promise.all([first, second]);
+
+    expect(connect).toHaveBeenCalledTimes(1);
+  });
+
   // Contract 7 (the composite summary degrades and never fabricates calm) is
   // exercised in tests/unit/weather-summary-handler.test.ts, which already
   // mocks the lightning handler and is the right place to assert on the
