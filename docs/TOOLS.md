@@ -713,6 +713,8 @@ Provides real-time lightning strike detection from the Blitzortung.org global li
 
 **Note:** Data provided by Blitzortung.org, a free community-operated lightning detection network. May have regional coverage variations.
 
+**Requires the optional `mqtt` package.** It is installed by default; if the server was installed with `--omit=optional` this tool returns an error naming the package and how to reinstall it, never a "no strikes" result. The same message appears in `get_weather_summary`'s `lightning` section. See [Optional dependency](../README.md#optional-dependency).
+
 ### 12. get_river_conditions
 Monitor river levels and flood status worldwide — NOAA gauge observations in the US, GloFAS modeled discharge elsewhere.
 

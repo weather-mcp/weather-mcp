@@ -31,6 +31,7 @@ vi.mock('../../src/handlers/lightningHandler.js', () => ({
 }));
 
 import { handleGetWeatherSummary } from '../../src/handlers/weatherSummaryHandler.js';
+import { MqttUnavailableError, MQTT_UNAVAILABLE_MESSAGE } from '../../src/errors/ApiError.js';
 
 function textResult(text: string) {
   return { content: [{ type: 'text', text }] };
@@ -183,6 +184,37 @@ describe('handleGetWeatherSummary', () => {
     expect(currentMock).toHaveBeenCalledTimes(1);
     expect(forecastMock).toHaveBeenCalledTimes(1);
     expect(alertsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('degrades lightning to an honest unavailable note on MqttUnavailableError, never a fabricated all-clear', async () => {
+    // The optional `mqtt` package can be absent (see src/services/blitzortung.ts,
+    // T1/T3 of the optional-mqtt-dependency plan). That must never surface here as
+    // "no lightning strikes" or any other calm-sounding result — lightning is
+    // safety data, so an absent dependency degrades the same way any other
+    // section failure does: an honest "(unavailable)" note with the real reason,
+    // via the generic per-section catch in weatherSummaryHandler.ts.
+    lightningMock.mockRejectedValue(new MqttUnavailableError());
+
+    const result = await callSummary({
+      latitude: 47.6,
+      longitude: -122.3,
+      include: ['lightning'],
+    });
+    const text = result.content[0].text;
+
+    expect((result as { isError?: boolean }).isError).not.toBe(true);
+    expect(text).toContain('## lightning (unavailable)');
+    // Assert against the exported constant, never a hand-copied literal, so a
+    // reword of the message can't silently desync this test. It names the
+    // package and states the remedy.
+    expect(text).toContain(MQTT_UNAVAILABLE_MESSAGE);
+    expect(text).toContain('mqtt');
+    expect(text).toContain('Reinstall without --omit=optional');
+
+    const lower = text.toLowerCase();
+    expect(lower).not.toMatch(/no lightning strikes/);
+    expect(lower).not.toMatch(/all[- ]clear/);
+    expect(lower).not.toMatch(/\bsafe\b/);
   });
 });
 

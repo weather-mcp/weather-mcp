@@ -127,6 +127,57 @@ Check:
 - Service status: https://open-meteo.com/en/docs/model-updates
 ```
 
+### Optional Dependency Errors
+
+Unlike everything above, this is a **configuration** state, not an upstream outage. No weather
+service is down — the server was installed without an optional package, and the tool that needs it
+says so rather than guessing.
+
+#### Lightning package missing
+
+```
+This server was installed without the optional "mqtt" package, which lightning
+detection requires. Reinstall without --omit=optional
+(e.g. npm install -g @dangahagan/weather-mcp) to enable it.
+```
+
+Returned by `get_lightning_activity` as an error result. The same text appears inside
+`get_weather_summary` when `lightning` is requested, under a `## lightning (unavailable)` heading —
+there the summary still succeeds and its other sections are unaffected.
+
+Check:
+- Whether the server was installed with `--omit=optional` (`npm ls mqtt` in the install prefix
+  resolves nothing if so)
+- Reinstall without the flag to restore lightning: `npm install -g @dangahagan/weather-mcp`
+
+This error is deliberately **not** a silent degradation. Reporting "no strikes" because a package
+is missing would be a confidently wrong answer on safety data, so the absence is surfaced instead.
+
+#### Lightning package present but unloadable
+
+```
+The optional "mqtt" package is installed but could not be loaded, so lightning
+detection is unavailable. This usually means a damaged or partial install;
+reinstalling the server (e.g. npm install -g @dangahagan/weather-mcp) repairs it.
+```
+
+A different state from the one above, with a different remedy: the package **is** installed, so
+reinstalling without `--omit=optional` would not help. It usually means a damaged or partially
+extracted `node_modules` — a package whose own dependencies are missing reports this, as does one
+whose files were truncated.
+
+Check:
+- `node -e "import('mqtt').then(() => console.log('ok'), e => console.log(e.code, e.message))"`
+  from the install prefix — it names what actually failed
+- Reinstall the server, or clear the npm cache (`npm cache clean --force`) and reinstall
+
+Like the case above, this reaches both surfaces and is never a silent degradation.
+
+**Restart the server after repairing the install.** The server does not cache this failure — the
+next lightning query genuinely re-attempts the load — but Node caches the failed module itself, so
+within one process every retry replays the same error even once the files on disk are fixed. MCP
+clients spawn the server per session, so reconnecting is usually enough.
+
 ## Service Status Tool
 
 ### Usage

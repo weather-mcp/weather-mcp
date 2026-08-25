@@ -24,6 +24,20 @@ Or install globally:
 npm install -g @dangahagan/weather-mcp
 ```
 
+**Smaller install (optional):** `mqtt` is an optional dependency used only by
+`get_lightning_activity`. Declining it drops 42 packages (163 → 121):
+
+```bash
+npm install -g @dangahagan/weather-mcp --omit=optional
+```
+
+Lightning then reports that the package is missing — both from
+`get_lightning_activity` and in `get_weather_summary`'s optional `lightning`
+section — and every other tool is unaffected. Reinstall without the flag to get
+it back. Source builds still use a plain `npm install`: TypeScript needs
+`mqtt`'s bundled declarations at build time even though the emitted server loads
+the package only when lightning is requested.
+
 ### Option 2: From Source
 
 Clone and build from source:
