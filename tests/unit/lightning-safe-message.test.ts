@@ -74,24 +74,31 @@ describe('Lightning safe-message coherence (T1-T3 lock)', () => {
     mockGetCoverageStart.mockReset();
   });
 
-  it('state B (strikes + partial coverage, nearest > 50 km): message names the distance, no false all-clear, and strikes are actually listed', async () => {
-    mockGetLightningStrikes.mockResolvedValue(buildFarStrikes());
-    mockGetCoverageStart.mockReturnValue(partialCoverageStart());
+  // Swept across every detail level, not just the default: `detail` today only changes the
+  // strike-list cap, but nothing structural stops a future change from moving the safety block
+  // or the ⚠️ caveat behind that gate, and this contract must hold at all three.
+  it.each(['summary', 'standard', 'full'] as const)(
+    'state B (strikes + partial coverage, nearest > 50 km) at detail=%s: message names the distance, no false all-clear, and strikes are actually listed',
+    async detail => {
+      mockGetLightningStrikes.mockResolvedValue(buildFarStrikes());
+      mockGetCoverageStart.mockReturnValue(partialCoverageStart());
 
-    const result = await getLightningActivity({ latitude: LAT, longitude: LON, timeWindow: 60 });
-    expect(result.safety.level).toBe('safe');
-    expect(result.coverage.isComplete).toBe(false);
+      const result = await getLightningActivity({ latitude: LAT, longitude: LON, timeWindow: 60 });
+      expect(result.safety.level).toBe('safe');
+      expect(result.coverage.isComplete).toBe(false);
 
-    const formatted = formatLightningActivityResponse(result);
+      const formatted = formatLightningActivityResponse(result, detail);
 
-    expect(formatted).toContain('Nearest lightning 203.2 km away');
-    expect(formatted).not.toContain('No lightning strikes observed');
-    expect(formatted).not.toContain('No significant lightning');
+      expect(formatted).toContain('Nearest lightning 203.2 km away');
+      expect(formatted).not.toContain('No lightning strikes observed');
+      expect(formatted).not.toContain('No significant lightning');
+      expect(formatted).toContain('The nearest-strike distance below is therefore a floor');
 
-    const totalMatch = formatted.match(/\*\*Total Strikes:\*\* (\d+)/);
-    expect(totalMatch).not.toBeNull();
-    expect(Number(totalMatch![1])).toBeGreaterThan(0);
-  });
+      const totalMatch = formatted.match(/\*\*Total Strikes:\*\* (\d+)/);
+      expect(totalMatch).not.toBeNull();
+      expect(Number(totalMatch![1])).toBe(20);
+    }
+  );
 
   it('state C (strikes + complete coverage, nearest > 50 km): message names the distance, no false all-clear, and strikes are actually listed', async () => {
     mockGetLightningStrikes.mockResolvedValue(buildFarStrikes());
@@ -203,6 +210,32 @@ describe('Lightning safe-message coherence (T1-T3 lock)', () => {
     expect(formattedD).not.toContain(
       'An absence of strikes in this report does not confirm an absence of lightning'
     );
+  });
+
+  // Diff-review MINOR-2. `assessSafety` bands on the nearest-strike distance, while the coverage
+  // substitution and the ⚠️ caveat used to key on `strikes.length` — three predicates for one
+  // concept. They diverge for a strike carrying no distance, which `LightningStrike` permits
+  // (`distance?: number`): length is 1 and the distance is null at once, so one report could take
+  // the no-strikes branch for its message and the strikes-present branch for its caveat. Not
+  // reachable through `filterStrikes`, which always computes a distance — this pins the invariant
+  // rather than a live bug.
+  it('never lets the message and the ⚠️ caveat disagree about the same report', async () => {
+    const distanceless = { ...makeStrike(1), distance: undefined } as LightningStrike;
+    mockGetLightningStrikes.mockResolvedValue([distanceless]);
+    mockGetCoverageStart.mockReturnValue(partialCoverageStart());
+
+    const result = await getLightningActivity({ latitude: LAT, longitude: LON, timeWindow: 60 });
+    expect(result.safety.nearestStrikeDistance).toBeNull();
+
+    const formatted = formatLightningActivityResponse(result);
+    const claimsAbsence = formatted.includes('No lightning strikes observed') ||
+                          formatted.includes('No significant lightning');
+    const claimsFloor = formatted.includes('The nearest-strike distance below is therefore a floor');
+
+    // Exactly one of the two framings, never both — they contradict each other.
+    expect(claimsAbsence && claimsFloor).toBe(false);
+    // And with no distance to report, the caveat must not promise one.
+    expect(claimsFloor).toBe(false);
   });
 
   describe('nearest-strike distance seam (T1 lock: `??` not `||`)', () => {

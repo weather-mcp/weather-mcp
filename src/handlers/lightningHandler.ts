@@ -270,12 +270,15 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
   };
 
   if (!coverage.isComplete && safety.level === 'safe') {
-    // Only the *message* is gated on the strike count: with strikes present this wording would
-    // deny the very list printed beneath it. The coverage recommendation below is unconditional
-    // with respect to the strike count — partial coverage makes the result inconclusive either
-    // way — but it stays inside the `safe` gate, because "treat this as inconclusive" above an
-    // EXTREME DANGER warning would degrade a life-safety message.
-    if (strikes.length === 0) {
+    // Only the *message* is gated on whether there is a nearest-strike distance at all: with one
+    // present this wording would deny the very list printed beneath it. Key on the same value
+    // `assessSafety` banded on rather than on `strikes.length`, so the two can never disagree
+    // about one report — a strike carrying no distance has `length === 1` and a null distance at
+    // once. The coverage recommendation below is unconditional with respect to the strike count —
+    // partial coverage makes the result inconclusive either way — but it stays inside the `safe`
+    // gate, because "treat this as inconclusive" above an EXTREME DANGER warning would degrade a
+    // life-safety message.
+    if (safety.nearestStrikeDistance === null) {
       safety.message =
         'No lightning strikes observed during the limited monitoring period. ' +
         'This does NOT confirm the absence of lightning activity.';
@@ -339,12 +342,13 @@ export function formatLightningActivityResponse(
     const since = response.coverage.monitoringSince
       ? ` (since ${response.coverage.monitoringSince.toISOString()})`
       : '';
-    // What partial coverage under-informs depends on what was found. With an empty list the
-    // caveat is about the absence; with strikes present the absence is not in doubt — the
-    // under-informed number is the nearest-strike distance, which is what the verdict rests on.
-    // The distance itself is deliberately not repeated here: it is rendered below, and a second
-    // copy is a second rounding site that could disagree with it.
-    const coverageCaveat = response.strikes.length === 0
+    // What partial coverage under-informs depends on what was found. With no nearest-strike
+    // distance the caveat is about the absence; with one present the absence is not in doubt —
+    // the under-informed number is that distance, which is what the verdict rests on. Key on the
+    // same value the verdict was banded on, not on `strikes.length`, so the sentence can never
+    // contradict the message above it. The distance itself is deliberately not repeated here: it
+    // is rendered below, and a second copy is a second rounding site that could disagree with it.
+    const coverageCaveat = response.safety.nearestStrikeDistance === null
       ? `An absence of strikes in this report does not confirm an absence of lightning. `
       : `The nearest-strike distance below is therefore a floor — a closer strike could have ` +
         `occurred during the minutes that were not monitored. `;
