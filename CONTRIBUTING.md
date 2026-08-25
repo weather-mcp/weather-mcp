@@ -188,12 +188,31 @@ fixed stuff
 
 (For maintainers)
 
-1. Update version in `package.json`
-2. Update `docs/releases/CHANGELOG.md` with changes
-3. Create a git tag: `git tag v1.0.0`
-4. Push tag: `git push origin v1.0.0`
-5. Create GitHub release with notes
-6. (Optional) Publish to npm: `npm publish`
+Most of this is scripted. `./scripts/update-docs-for-release.sh <patch|minor|major|X.Y.Z>`
+does steps 1-2: it bumps `package.json` **and** `server.json` (which carries the version
+twice), promotes the `[Unreleased]` section of the root `CHANGELOG.md` into a dated
+`## [X.Y.Z]` section, writes that heading's `[X.Y.Z]:` compare-link definition, re-points
+`[Unreleased]:` at the new tag, and updates the version, tool-count and test-count
+references across the docs. Then `./scripts/check-doc-versions.sh` verifies the result.
+
+1. Run `./scripts/update-docs-for-release.sh <bump> ["one-line summary"]`, then review the
+   diff — especially the `CHANGELOG.md` wording, which is written for users of the server,
+   not for someone reading the commits.
+2. Commit: `git commit -m "chore: Release vX.Y.Z"`
+3. Push `main`: `git push origin main`
+4. Tag and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+5. Create the GitHub release, with notes taken from the new `CHANGELOG.md` section
+6. Publish to the MCP registry: `./mcp-publisher login github && ./mcp-publisher publish`
+
+**Do not run `npm publish` by hand.** Pushing the `vX.Y.Z` tag is what publishes the
+package: it triggers `.github/workflows/publish.yml`, which re-checks that the tag and both
+version fields agree, builds, tests, and publishes to npm with a provenance attestation via
+trusted publishing (OIDC — there is no npm token to hold). A hand-published tarball would
+carry no provenance and could silently disagree with the tag.
+
+Note that `docs/releases/CHANGELOG.md` is a frozen historical copy ending at 1.6.0. The
+canonical changelog is `CHANGELOG.md` at the repository root; add entries there, under
+`[Unreleased]`.
 
 ## Questions?
 
