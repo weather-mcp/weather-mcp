@@ -339,10 +339,19 @@ export function formatLightningActivityResponse(
     const since = response.coverage.monitoringSince
       ? ` (since ${response.coverage.monitoringSince.toISOString()})`
       : '';
+    // What partial coverage under-informs depends on what was found. With an empty list the
+    // caveat is about the absence; with strikes present the absence is not in doubt — the
+    // under-informed number is the nearest-strike distance, which is what the verdict rests on.
+    // The distance itself is deliberately not repeated here: it is rendered below, and a second
+    // copy is a second rounding site that could disagree with it.
+    const coverageCaveat = response.strikes.length === 0
+      ? `An absence of strikes in this report does not confirm an absence of lightning. `
+      : `The nearest-strike distance below is therefore a floor — a closer strike could have ` +
+        `occurred during the minutes that were not monitored. `;
     lines.push(
       `⚠️ **Limited monitoring coverage:** Live strike collection for this area spans ` +
       `${response.coverage.coverageMinutes.toFixed(1)} of the requested ${response.timeWindow} minutes${since}. ` +
-      `An absence of strikes in this report does not confirm an absence of lightning. ` +
+      coverageCaveat +
       `Re-check in a few minutes or consult official weather services before making safety decisions.`
     );
     lines.push('');
