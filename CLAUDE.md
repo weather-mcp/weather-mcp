@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.25.0 (Production Ready)
+- **Version:** 1.25.1 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -575,15 +575,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.25.0 — Production Ready ✅
+- **Version:** 1.25.1 — Production Ready ✅
 - **Test Coverage:** 2,541 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.25.1:** Lightning no longer claims no strikes were observed in a report listing strikes
 - **New in v1.25.0:** Optional `mqtt` dependency — lightning reports unavailable rather than an all-clear when it is absent
 - **New in v1.24.0:** Keyless national CAP alerts for India, the Philippines and Indonesia; heat/cold stress context on current conditions
-- **New in v1.23.0:** Global alerts fallback (Google Weather API) behind optional `GOOGLE_WEATHER_API_KEY`
 
 ## Useful References
 
@@ -606,6 +606,6 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-08-25 (v1.25.0)
+**Last Updated:** 2026-08-25 (v1.25.1)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
