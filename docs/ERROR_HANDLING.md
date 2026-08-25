@@ -127,6 +127,32 @@ Check:
 - Service status: https://open-meteo.com/en/docs/model-updates
 ```
 
+### Optional Dependency Errors
+
+Unlike everything above, this is a **configuration** state, not an upstream outage. No weather
+service is down — the server was installed without an optional package, and the tool that needs it
+says so rather than guessing.
+
+#### Lightning package missing
+
+```
+This server was installed without the optional "mqtt" package, which lightning
+detection requires. Reinstall without --omit=optional
+(e.g. npm install -g @dangahagan/weather-mcp) to enable it.
+```
+
+Returned by `get_lightning_activity` as an error result. The same text appears inside
+`get_weather_summary` when `lightning` is requested, under a `## lightning (unavailable)` heading —
+there the summary still succeeds and its other sections are unaffected.
+
+Check:
+- Whether the server was installed with `--omit=optional` (`npm ls mqtt` in the install prefix
+  resolves nothing if so)
+- Reinstall without the flag to restore lightning: `npm install -g @dangahagan/weather-mcp`
+
+This error is deliberately **not** a silent degradation. Reporting "no strikes" because a package
+is missing would be a confidently wrong answer on safety data, so the absence is surfaced instead.
+
 ## Service Status Tool
 
 ### Usage

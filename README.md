@@ -177,7 +177,7 @@ npm run build
 
 Then point your MCP client at `node /absolute/path/to/weather-mcp/dist/index.js`.
 
-Requires Node.js 18+. No API keys, tokens, or accounts needed — see [Optional API keys](#optional-api-keys) for the three that add optional extras.
+Requires Node.js 18+. No API keys, tokens, or accounts needed — see [Optional API keys](#optional-api-keys) for the three that add optional extras, and [Optional dependency](#optional-dependency) if you want a smaller install.
 
 ### Works with
 
@@ -307,6 +307,41 @@ three rules:
    if that path is "this data isn't available for your region".
 3. **Features that would require a *paid* key are out of scope** unless there's
    significant user demand for that specific service.
+
+## Optional dependency
+
+Everything above installs by default and nothing here needs configuring — this section only
+matters if you want a smaller install.
+
+One dependency, `mqtt`, exists for a single tool: `get_lightning_activity` streams live strikes
+from Blitzortung.org over MQTT, and nothing else in the server uses that transport. It is declared
+as an `optionalDependency`, so a normal install still includes it and lightning works exactly as
+described above. You can decline it:
+
+```bash
+npm install -g @dangahagan/weather-mcp --omit=optional
+```
+
+That installs **121 packages instead of 163** — 42 fewer, `mqtt` and its transitive tree.
+
+**What you give up**, on both paths that reach lightning:
+
+- `get_lightning_activity` returns an error naming the package and how to get it back, rather than
+  a result. It never reports "no strikes" — a missing dependency rendering as an all-clear on
+  lightning is precisely the kind of confidently wrong safety answer this project treats as its
+  worst failure.
+- `get_weather_summary` still works, but its optional `lightning` section renders as
+  `## lightning (unavailable)` with the same message. Every other section is unaffected.
+
+Nothing else changes: all 16 remaining tools behave identically, and `get_lightning_activity` still
+appears in `tools/list`.
+
+To get lightning back, reinstall without the flag.
+
+> **Source builds still use a plain `npm install`.** TypeScript needs `mqtt`'s bundled type
+> declarations at build time even though the emitted server loads the package only when lightning
+> is actually requested, so `--omit=optional` belongs to the published package, not to a build from
+> a clone.
 
 ## Coverage & Limitations
 
