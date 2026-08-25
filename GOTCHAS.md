@@ -737,6 +737,112 @@ forward.
 
 ---
 
+## G23 — `ERR_MODULE_NOT_FOUND` and `MODULE_NOT_FOUND` are different codes from different loaders
+
+**Trigger:** classifying a failed dynamic `import()` by `error.code` to decide
+whether a package is absent.
+
+**Rule:** `ERR_MODULE_NOT_FOUND` is the **ESM** loader failing to resolve a bare
+specifier — that, and only that, is the `--omit=optional` case. A CommonJS
+package (no `"type": "module"`, a `"main"` entry) that resolves but then fails to
+require one of *its own* dependencies throws `MODULE_NOT_FOUND` instead, from
+inside the CJS loader. Checking only the first is correct for "did the installer
+skip this package?" and silently wrong for "is this package usable?". Decide
+which question you are asking, and never let the second one fall through to a
+caller that returns an empty result.
+
+**Why:** `mqtt` is CommonJS. The optional-dependency work classified absence on
+`ERR_MODULE_NOT_FOUND` and rethrew everything else raw, where
+`getLightningStrikes`'s pre-existing `catch` turned it into `return []` — which
+renders as `## 🟢 Safety Status: SAFE (LIMITED DATA)`, `Total Strikes: 0`. A
+green safety verdict assembled from a module that never loaded, on the one tool
+whose whole point is a hazard. The two codes look interchangeable and are not,
+and the difference only appears with a *damaged* install rather than an absent
+one — a state no test had reason to construct.
+
+**Verify:** `mv node_modules/<pkg>/node_modules/<dep> ...hidden`, or overwrite
+the package's `main` file with a syntax error, then read `error.code` from a
+dynamic import. It is `MODULE_NOT_FOUND`, not `ERR_MODULE_NOT_FOUND`.
+
+**Evidence:** 2026-08-25 (`f523adb`, found by `/diff-review` on
+`feat/issue-73-optional-mqtt`) — reproduced both ways against the built dist
+installed from a packed tarball. Fixed by giving the load failure its own
+`MqttLoadFailedError` with its own remedy, since telling someone to reinstall
+without `--omit=optional` when they never omitted it points at the wrong fix.
+
+**Status:** active. Related: [G4] — a module that fails to load is not an empty
+feed; [G24].
+
+---
+
+## G24 — Making a dependency optional converts a boot failure into a runtime result
+
+**Trigger:** moving any runtime dependency behind a lazy `import()`, for any
+reason.
+
+**Rule:** a static top-level import fails **loudly at startup** for every reason
+the module might be unusable — absent, corrupt, half-installed, incompatible. A
+lazy import narrows that to whichever reason you explicitly classify, and routes
+every other reason into whatever the call site's `catch` already does. Before
+landing the change, enumerate the states the static import used to catch and
+check each one against the new call path. On safety data the question to ask is
+"which of these now renders as a normal result?"
+
+**Why:** this is the trap underneath [G23], and it generalises past `mqtt`. The
+optional-dependency plan reasoned carefully about *absence* — it is in the
+design's `## Verification`, it has four test contracts — and never asked what
+else the static import had been catching. Before the change a corrupt `mqtt`
+meant the server did not start and `tools/list` never answered; after it, the
+server booted cleanly and answered a lightning query with a green banner. The
+change that made the failure survivable is what made it silent.
+
+**Verify:** with the package installed but deliberately corrupted, call the tool
+and **read the rendered output** — not the exit code, not the logs.
+
+**Evidence:** 2026-08-25 (`f523adb`) — the diff review's only major finding. The
+whole gate stayed green throughout: `tsc` clean, 2,519 tests passing, `npm
+audit` clean, and no unit test could observe it, because the suite mocks the
+package.
+
+**Status:** active. Related: [G23], [G20], [G11].
+
+---
+
+## G25 — A re-invoked mock proves your memo retried, not that a retry can succeed
+
+**Trigger:** asserting that a failed dynamic `import()` is "retried, not cached",
+using a mocked module factory.
+
+**Rule:** Node caches a module that failed to load, so re-importing the same
+specifier in the same process replays the same rejection no matter what your own
+memo does. A `vi.doMock` factory is re-invoked on every import and hides that
+entirely, so a green "it retried and then succeeded" assertion can coexist with a
+process that can never recover. Keep the **memo** claim ("we do not cache the
+absence") separate from the **outcome** claim ("a repaired install heals without
+a restart"), and never publish the second on the strength of a test that only
+establishes the first.
+
+**Why:** the optional-`mqtt` loader deliberately leaves its memo `undefined`
+after a load failure so the next caller retries, and test contract 4 proves it
+by watching an `attempts` counter go 1 → 2 and then succeed. On that evidence
+"repairing the install takes effect without restarting the server" was written
+into `docs/ERROR_HANDLING.md` and `CHANGELOG.md`. It is false: a server started
+against a corrupted `mqtt`, with the package repaired underneath it while
+running, still returned the load-failure error on the next query. Our code did
+retry; Node returned the cached rejection. The mock was more forgiving than the
+runtime, and the assertion that passed was not the claim that shipped.
+
+**Verify:** run the built dist against a genuinely broken package, repair it on
+disk while the process is still running, and call the tool again.
+
+**Evidence:** 2026-08-25 — caught during `/diff-review` by probing a claim
+written minutes earlier; all three copies corrected to say a restart is needed.
+
+**Status:** active. Related: [G21] (the same file's mock/runtime divergences),
+[G11], [G23].
+
+---
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
