@@ -147,7 +147,9 @@ function calculateStatistics(strikes: LightningStrike[], radiusKm: number, timeW
  */
 function assessSafety(strikes: LightningStrike[], statistics: LightningStatistics): LightningSafetyAssessment {
   const nearestStrike = strikes[0] || null;
-  const nearestDistance = nearestStrike?.distance || null;
+  // `??`, never `||`: a strike at exactly 0 km is falsy, and `|| null` would send it down the
+  // `nearestDistance === null` arm below and render a green SAFE all-clear for a strike overhead.
+  const nearestDistance = nearestStrike?.distance ?? null;
   const nearestTime = nearestStrike?.timestamp || null;
 
   // Determine if there's active thunderstorm activity
