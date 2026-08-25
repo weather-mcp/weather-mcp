@@ -251,6 +251,49 @@ export class MqttUnavailableError extends Error {
 }
 
 /**
+ * The user-facing text shown when the optional `mqtt` package is installed but
+ * cannot be loaded.
+ *
+ * A different state from `MQTT_UNAVAILABLE_MESSAGE`, and deliberately a
+ * different message: telling someone to reinstall without `--omit=optional`
+ * when they never omitted it sends them after the wrong fix. Reaches the same
+ * two surfaces (`get_lightning_activity`, `get_weather_summary`).
+ *
+ * Fixed text with no path and no stack — the underlying failure can carry a
+ * `Require stack:` of absolute paths, and none of that belongs in a tool result.
+ */
+export const MQTT_LOAD_FAILED_MESSAGE =
+  'The optional "mqtt" package is installed but could not be loaded, so lightning ' +
+  'detection is unavailable. This usually means a damaged or partial install; ' +
+  'reinstalling the server (e.g. npm install -g @dangahagan/weather-mcp) repairs it.';
+
+/**
+ * The optional `mqtt` package resolved but failed to load.
+ *
+ * Distinct from {@link MqttUnavailableError} so the two remedies stay distinct,
+ * but the same **contract** posture: lightning is safety data, and a module that
+ * failed to load is not an empty feed. Without this, the loader's "real fault"
+ * rethrow fell through `getLightningStrikes`'s generic catch to `return []` and
+ * rendered a green safety verdict built from a broken dependency — verified
+ * against the built dist with a corrupted `mqtt` and with one of its transitive
+ * dependencies removed.
+ *
+ * Note that a corrupt CommonJS package reports `MODULE_NOT_FOUND`, not
+ * `ERR_MODULE_NOT_FOUND`, so it never reaches the absence branch — see
+ * `loadMqtt` in `src/services/blitzortung.ts`.
+ */
+export class MqttLoadFailedError extends Error {
+  constructor(message: string = MQTT_LOAD_FAILED_MESSAGE) {
+    super(message);
+    this.name = 'MqttLoadFailedError';
+
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+}
+
+/**
  * Check if an error is retryable
  */
 export function isRetryableError(error: Error): boolean {

@@ -11,7 +11,7 @@ import type { MqttClient } from 'mqtt';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { LightningStrike } from '../types/lightning.js';
 import { calculateGeohashSubscriptions } from '../utils/geohash.js';
-import { MqttUnavailableError } from '../errors/ApiError.js';
+import { MqttLoadFailedError, MqttUnavailableError } from '../errors/ApiError.js';
 
 /**
  * The `mqtt` package is an **optional** dependency: it is the only dependency
@@ -54,10 +54,18 @@ let mqttLoadPromise: Promise<MqttModule> | undefined;
 /**
  * Resolve the optional `mqtt` package, at most once per process.
  *
- * Throws `MqttUnavailableError` when the package is genuinely absent. Any other
- * import failure is a real fault and propagates unchanged **without** being
- * memoised, so a transient problem is retried rather than cached as an absence
- * for the life of the process.
+ * Throws `MqttUnavailableError` when the package is genuinely absent, and
+ * `MqttLoadFailedError` when it resolved but failed to load. Both are contract
+ * failures; only the first is memoised. A load failure leaves the memo
+ * `undefined` so it is retried rather than cached as an absence for the life of
+ * the process.
+ *
+ * That retry is worth having for a transient failure, but note it cannot heal a
+ * genuinely broken package: Node caches the failed module, so re-importing the
+ * same specifier in the same process replays the same rejection even after the
+ * files on disk are repaired. Verified against the built dist — repairing
+ * `mqtt` under a running server still errors until it is restarted. The unit
+ * mock is more forgiving than Node here, so the suite cannot show this.
  */
 async function loadMqtt(): Promise<MqttModule> {
   // Explicit three-state discrimination: `null` and `undefined` mean different
@@ -96,9 +104,27 @@ async function loadMqtt(): Promise<MqttModule> {
         throw new MqttUnavailableError();
       }
 
-      // Leave the memo `undefined` — this is a real fault, not an absence, and
-      // reporting it as "not installed" would send the user after the wrong fix.
-      throw error;
+      // A real fault, not an absence. The memo stays `undefined` so the next
+      // caller retries, and the message stays distinct from the absent one —
+      // telling someone to reinstall without --omit=optional when they never
+      // omitted it sends them after the wrong fix.
+      //
+      // It is still a **contract** failure. Letting the raw error propagate put
+      // it through `getLightningStrikes`'s generic catch to `return []`, which
+      // renders a green safety verdict built from a module that never loaded.
+      // Note a corrupt CommonJS package reports `MODULE_NOT_FOUND`, not
+      // `ERR_MODULE_NOT_FOUND`, so it lands here and not in the branch above.
+      const failure = error as NodeJS.ErrnoException | undefined;
+      // The `Error` slot is deliberately left empty — the logger would serialise
+      // its message and stack, and the underlying failure can carry a
+      // `Require stack:` of absolute paths. Only its name and code are kept.
+      logger.error('Lightning detection unavailable: the optional mqtt package failed to load', undefined, {
+        package: 'mqtt',
+        tool: 'get_lightning_activity',
+        name: failure?.name,
+        code: failure?.code
+      });
+      throw new MqttLoadFailedError();
     }
   );
 
@@ -593,13 +619,14 @@ export class BlitzortungService {
 
       return strikes;
     } catch (error) {
-      // An absent optional package is a contract failure, not an empty feed.
-      // Falling through to `return []` would render "no strikes" — a fabricated
-      // all-clear on safety data, built from a packaging state rather than from
-      // anything the detection network said. Rethrown before the generic
-      // logger.error below so an absent module does not log a line per query;
-      // the loader already said it once for the whole process.
-      if (error instanceof MqttUnavailableError) {
+      // An unusable optional package is a contract failure, not an empty feed —
+      // whether it is absent or merely broken. Falling through to `return []`
+      // would render "no strikes" and a green safety verdict, a fabricated
+      // all-clear built from a packaging state rather than from anything the
+      // detection network said. Rethrown before the generic logger.error below
+      // so an unusable module does not log a line per query; the loader already
+      // said it for this resolution.
+      if (error instanceof MqttUnavailableError || error instanceof MqttLoadFailedError) {
         throw error;
       }
       logger.error('Failed to fetch lightning data', error as Error);
@@ -630,10 +657,11 @@ export class BlitzortungService {
         radiusKm
       });
     } catch (error) {
-      // The loader's single line is the whole of "say it once". This catch runs
+      // The loader's own line is the whole of "say it once". This catch runs
       // once per saved location, so repeating it here would produce exactly the
-      // per-location spam the memo exists to prevent.
-      if (error instanceof MqttUnavailableError) {
+      // per-location spam the memo and the single-flight promise exist to
+      // prevent — for a broken package as much as for an absent one.
+      if (error instanceof MqttUnavailableError || error instanceof MqttLoadFailedError) {
         return;
       }
       logger.warn('Failed to pre-warm lightning monitoring for location', {

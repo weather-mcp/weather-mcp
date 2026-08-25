@@ -145,7 +145,9 @@ async function importFreshBlitzortung() {
       ...blitzortungModule,
       logger: loggerModule.logger,
       MqttUnavailableError: errorsModule.MqttUnavailableError,
+      MqttLoadFailedError: errorsModule.MqttLoadFailedError,
       MQTT_UNAVAILABLE_MESSAGE: errorsModule.MQTT_UNAVAILABLE_MESSAGE,
+      MQTT_LOAD_FAILED_MESSAGE: errorsModule.MQTT_LOAD_FAILED_MESSAGE,
     };
   } finally {
     vi.useRealTimers();
@@ -257,7 +259,7 @@ describe('optional mqtt dependency resolution (blitzortung.ts)', () => {
     }
   });
 
-  it('contract 4: a non-ERR_MODULE_NOT_FOUND import failure propagates unchanged, is not reported as "not installed", and is not memoised (retried on the next call)', async () => {
+  it('contract 4: a non-ERR_MODULE_NOT_FOUND import failure is not reported as "not installed" and is not memoised (retried on the next call)', async () => {
     // Deliberately NO error-code bridge here: this case wants the opposite
     // classification outcome from contracts 1-3/6, and a plain Error with no
     // `.code` already produces that (bridged or not — the bridge only ever
@@ -276,24 +278,24 @@ describe('optional mqtt dependency resolution (blitzortung.ts)', () => {
     vi.doMock('mqtt', factory);
     const { blitzortungService, logger } = await importFreshBlitzortung();
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
 
-    // First call: a generic failure is not an "absence" — prewarmLocation's
-    // catch swallows every non-MqttUnavailableError into a warn (pre-existing
-    // behaviour, unrelated to the optional-mqtt feature). Note: Vitest wraps
-    // whatever the mock factory throws (see file header, wrinkle 2), so the
-    // message actually logged is Vitest's wrapper text, not
-    // genericError.message verbatim — this assertion is deliberately scoped
-    // to what we CAN verify without that wrapping getting in the way: the
-    // loader's fixed "not installed" classification line never fired, and a
-    // message was logged at all.
+    // First call: a generic failure is a load failure, not an "absence".
+    // prewarmLocation swallows it exactly as it swallows an absence, so startup
+    // is never blocked and nothing is said per saved location — the loader's
+    // single line is the whole of it. Note: Vitest wraps whatever the mock
+    // factory throws (see file header, wrinkle 2), which is why nothing here
+    // asserts on genericError.message verbatim.
     await expect(blitzortungService.prewarmLocation(1, 1, 100)).resolves.toBeUndefined();
     expect(attempts).toBe(1);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][0]).toBe('Failed to pre-warm lightning monitoring for location');
-    expect(typeof warnSpy.mock.calls[0][1]?.error).toBe('string');
+
+    // The distinguishing assertion: the loader's fixed "not installed"
+    // classification line never fired, because this failure is not an absence.
     expect(
-      warnSpy.mock.calls.some((call) => String(call[0]).includes('Lightning detection unavailable'))
+      warnSpy.mock.calls.some((call) => String(call[0]).includes('is not installed'))
     ).toBe(false);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0][0]).toContain('failed to load');
 
     // Second call: because a non-ERR_MODULE_NOT_FOUND failure leaves the memo
     // `undefined` (never set to `null`), this retries the import rather than
@@ -381,6 +383,60 @@ describe('optional mqtt dependency resolution (blitzortung.ts)', () => {
     await Promise.all([first, second]);
 
     expect(connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('contract 9: a load failure reaching getLightningStrikes rejects and never resolves to []', async () => {
+    // THE GAP CONTRACT 4 LEAVES OPEN, and the one that shipped a green safety
+    // verdict.
+    //
+    // Contract 4 drives a generic (non-ERR_MODULE_NOT_FOUND) failure through
+    // `prewarmLocation`, whose catch swallows everything — so it can prove the
+    // classification and the retry, but it can never observe what a *query*
+    // does with the same failure. Through `getLightningStrikes` the answer used
+    // to be `return []`, which `lightningHandler` renders as
+    // "## 🟢 Safety Status: SAFE (LIMITED DATA)" with "Total Strikes: 0" —
+    // an all-clear on safety data assembled from a module that never loaded.
+    // Reproduced against the built dist twice: with mqtt's entry point
+    // corrupted, and with mqtt intact but its `mqtt-packet` dependency removed.
+    //
+    // Note the second case reports `MODULE_NOT_FOUND`, not
+    // `ERR_MODULE_NOT_FOUND` — mqtt resolves through the CommonJS loader, so a
+    // failure *inside* it never reaches the absence branch. No error-code
+    // bridge here, deliberately: a plain Error with no `.code` already lands in
+    // exactly the branch under test.
+    const genericError = new Error('unexpected parse failure while loading mqtt');
+    const factory = vi.fn(() => {
+      throw genericError;
+    });
+    vi.doMock('mqtt', factory);
+    const { blitzortungService, MqttLoadFailedError, MQTT_LOAD_FAILED_MESSAGE, logger } =
+      await importFreshBlitzortung();
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const outcome = await blitzortungService
+      .getLightningStrikes(40.0, -74.0, 100, 60)
+      .then((strikes) => ({ kind: 'resolved' as const, strikes }))
+      .catch((error: unknown) => ({ kind: 'rejected' as const, error }));
+
+    // Stated as an explicit resolve/reject discrimination rather than
+    // `.rejects`, so a regression reports "it resolved to []" instead of a bare
+    // assertion failure.
+    expect(outcome.kind).toBe('rejected');
+    expect(outcome.kind === 'rejected' && outcome.error).toBeInstanceOf(MqttLoadFailedError);
+
+    // The remedy must not be the absent one: this user did not use
+    // --omit=optional, and sending them to reinstall without it is the wrong fix.
+    const message = (outcome.kind === 'rejected' ? (outcome.error as Error).message : '');
+    expect(message).toBe(MQTT_LOAD_FAILED_MESSAGE);
+    expect(message).not.toContain('--omit=optional');
+    expect(message).toContain('mqtt');
+
+    // The underlying failure can carry a `Require stack:` of absolute paths.
+    // Only its name and code are logged, and the Error slot is left empty.
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0][1]).toBeUndefined();
+    expect(errorSpy.mock.calls[0][2]).toMatchObject({ package: 'mqtt' });
+    expect(JSON.stringify(errorSpy.mock.calls[0])).not.toContain('unexpected parse failure');
   });
 
   // Contract 7 (the composite summary degrades and never fabricates calm) is
