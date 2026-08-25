@@ -36,8 +36,10 @@ in `the alert's own polygon` terminated a single-quoted string in
 `src/index.ts`; `npm test` reported 101 files / 2,492 tests passing while
 `npm run build` emitted three TS1005/TS1128 errors.
 
-**Status:** active. Lint candidate — the gate already runs `build` before
-`test`; the trap is reading only the second result.
+**Status:** active. **Re-verified 2026-08-24** (optional-mqtt curation): two
+deliberate `TS2322`/`TS6133` errors in `src/utils/version.ts` still left
+`npm test` reporting 103 files / 2,519 tests passing. Lint candidate — the gate
+already runs `build` before `test`; the trap is reading only the second result.
 
 ---
 
@@ -376,8 +378,12 @@ lint candidate — the entry was written against a stale reading of the script.
 The `head -1` gap at `README.md:346` is real and survives, confirmed by the same
 deliberate-wrong-value experiment: `9,999` there still reports `✅`.
 
-**Status:** active, **narrowed** 2026-08-24. Lint candidate — anchoring a third
-check on `Run all [0-9,]+ tests` specifically would close it mechanically and
+**Status:** active, **narrowed** 2026-08-24, **re-verified 2026-08-24**
+(optional-mqtt curation): `Run all 9,999 tests` in `README.md` still produced
+`✅ All documentation checks passed!`. Note the line has since moved to
+`README.md:381` — a new section was inserted above it — so match it by content,
+never by line number. Lint candidate — anchoring a third check on
+`Run all [0-9,]+ tests` specifically would close it mechanically and
 let this entry retire. Standing lesson beyond the specific gap: an entry
 asserting that a checker *misses* something has a shelf life, so run its Verify
 line before relying on it.
@@ -516,6 +522,218 @@ URL. The checking side is covered independently by R5 (`6a88ce4`), which rejects
 a compare whose left side is not a release tag.
 
 **Status:** active.
+
+---
+
+## G17 — A lazy optional import must memoise the in-flight promise, not just the value
+
+**Trigger:** loading an optional module with a dynamic `import()` from anywhere
+two or more callers can start concurrently — especially a fire-and-forget
+startup loop.
+
+**Rule:** assign the import **promise** synchronously, before the first `await`,
+and return that same promise to every concurrent caller. Do the absence
+classification and the one-time logging inside its shared rejection handler. A
+loaded/`null`/`undefined` value memo handles *later* calls but does not coalesce
+callers already in flight.
+
+**Why:** every concurrent caller observes the value as `undefined`, starts its
+own import, and runs its own rejection handler — so the "once per process"
+warning fires once per caller. `src/index.ts` starts every saved-location
+prewarm with `void blitzortungService.prewarmLocation(...)` and never awaits the
+previous one, so any user with two saved locations exercises this on every
+startup.
+
+**Verify:** hold a mocked import behind a deferred rejection, start two callers,
+release it, and assert the import factory and the warning were each observed
+exactly once — `tests/unit/mqtt-optional.test.ts` contract 3.
+
+**Evidence:** 2026-08-24 (`7101a5f`, optional-mqtt T1) — raised as a major
+finding in the Codex plan review (R1) before implementation, and the live run
+confirmed the shape: three saved locations, one warning.
+
+**Status:** active. Related: [G20], which is the same file's other concurrency
+trap and the one that actually shipped.
+
+---
+
+## G18 — `import type` erases at runtime but still requires the package at build time
+
+**Trigger:** moving a TypeScript runtime dependency to `optionalDependencies`
+while still importing anything from its bundled declarations.
+
+**Rule:** distinguish the **published package** from a **source build**. The
+emitted JavaScript can boot without the package; `tsc` cannot compile without
+it. Document the opt-out only for the published package, and verify it by
+installing a packed tarball with `--omit=optional` — never by building from a
+source tree that still has the package present.
+
+**Why:** `import type { X } from 'pkg'` emits no runtime import, which makes it
+look as though the dependency is fully optional. It is not: TypeScript must
+still resolve the declarations, and an isolated strict Node16 probe with the
+package absent fails `TS2307: Cannot find module 'pkg' or its corresponding type
+declarations`. A `README` that says `npm install --omit=optional` without
+qualification therefore hands source-installers a red build rather than a
+working server with one tool disabled.
+
+**Verify:** `npm pack`, install the tarball into a fresh prefix with
+`--omit=optional`, confirm `npm ls <pkg>` resolves nothing there, and run the
+installed `dist/index.js`. Then confirm the opposite: `npm run build` from a
+source tree without the package fails `TS2307`.
+
+**Evidence:** 2026-08-24 (`6bfbbdb` / `ef97915`, optional-mqtt) — raised as a
+major finding in the Codex plan review (R2) and independently reproduced. Every
+documented command in `README.md` and `docs/CLIENT_SETUP.md` is consequently the
+`npm install -g @dangahagan/weather-mcp --omit=optional` form, each carrying an
+explicit source-build caveat.
+
+**Status:** active. Directly relevant to the pending micro-dependency vendoring
+work, which touches the same dependency block.
+
+---
+
+## G19 — A specialized tool has a second public path through `get_weather_summary`
+
+**Trigger:** changing a handler, service, dependency, or error contract behind
+any section `get_weather_summary` can render — `current`, `forecast`, `alerts`,
+`air_quality`, `lightning`.
+
+**Rule:** grep **both** the tool dispatch in `src/index.ts` and the summary's
+own `switch` in `weatherSummaryHandler.ts`. Exercise the change through both
+tools, and document both user-visible consequences.
+
+**Why:** preset membership differs between the two. `get_lightning_activity` is
+absent from the default `basic` preset while `get_weather_summary` — which calls
+the same handler through its `include` array — **is** in it. So a change to a
+"tool that is off by default" can still be the thing a default install actually
+experiences, and reasoning about the specialized tool alone gets the blast
+radius wrong. The summary also catches per-section failures into a
+`## <section> (unavailable)` block, so a thrown error surfaces very differently
+there than it does from the tool.
+
+**Verify:** search `SummarySection` and the summary switch, then drive the
+changed section through both MCP tools against the built dist.
+
+**Evidence:** 2026-08-24 (optional-mqtt) — raised as a minor finding in the
+Codex plan review (R3). It corrected the design plan's framing (which called
+lightning "a tool that is switched off"), added a test contract, and added a
+built-dist probe that would otherwise have been missed entirely.
+
+**Status:** active.
+
+---
+
+## G20 — Never introduce an `await` between a synchronous guard flag and the check that reads it
+
+**Trigger:** adding any `await` inside a method that guards concurrent entry
+with a plain boolean — `if (this.isBusy) { wait } ... this.isBusy = true`.
+
+**Rule:** the assignment must remain in the **same synchronous run** as the
+check. Before inserting an await above it, move the awaited work to the caller
+and pass the result in. If you cannot, the boolean is no longer a guard and the
+method needs a real single-flight promise instead.
+
+**Why:** such a guard is sound only because no other caller can interleave
+between the check and the assignment. One `await` in that window lets every
+concurrent caller past: each sets the flag and each performs the guarded work.
+Here that meant three MQTT broker connections instead of one, with two clients
+orphaned — still connected, still holding `message` handlers — because each
+attempt overwrote `this.client`. **Nothing in the test suite could see it**: all
+2,511 pre-existing tests plus the seven new ones passed while the branch was
+opening three connections. It was found only by counting
+`Connecting to Blitzortung MQTT broker` lines in live stderr.
+
+**Verify:** stub the connection factory, start two concurrent callers, and
+assert `connect()` was called exactly once —
+`tests/unit/mqtt-optional.test.ts` contract 8. Reinstating the bad placement
+fails that test and **only** that test.
+
+**Evidence:** 2026-08-24. Introduced by `7101a5f` (resolving the optional module
+inside `ensureConnected`), shipped green, caught by reading live output during
+T4, fixed in `30ad5cf` by resolving in `subscribeToLocation` and passing the
+module in.
+
+**Status:** active. Related: [G17] (the same file's other concurrency trap) and
+[G11] — this is the sharpest instance yet of the exit code not being the
+acceptance.
+
+---
+
+## G21 — Re-importing under `vi.resetModules()` is not the module you imported at the top
+
+**Trigger:** writing a test that uses `vi.resetModules()` plus a dynamic
+re-import to reset module-level state, or `vi.doMock` with a factory that
+throws.
+
+**Rule:** three things, all learned the hard way:
+
+1. **Class identity is per-epoch, transitively.** A class imported at the top of
+   the test file will never satisfy `instanceof` against an error thrown by a
+   freshly re-imported module, because that import re-resolves *its* imports
+   into new class objects too. Re-import the error module (and `logger.js`, for
+   spies to observe the same singleton) **inside** the same reset epoch and use
+   those references.
+2. **A `vi.doMock` factory cannot deliver a coded error.** Vitest's mocker wraps
+   whatever the factory throws in a *new* `Error` — the stock "top level
+   variables" hoisting warning, which fires even when nothing is hoisted — and
+   moves the original to `.cause` **without copying custom properties**. So
+   `err.code` is `undefined` at the code under test, and any
+   `code === 'ERR_MODULE_NOT_FOUND'` branch is unreachable through that route.
+3. **Re-importing re-runs module bodies, including singleton construction.** If
+   a module ends in `export const x = new Thing()` and that constructor starts
+   an un-`unref`'d `setInterval`, every case leaks a live timer. Wrap only
+   `resetModules()` + the `import()` in `vi.useFakeTimers()` and switch back
+   immediately — the timers land on the fake clock and are abandoned, and the
+   test body still gets real timers for genuine timeout races.
+
+**Why:** each of these produces a confusing failure that looks like a bug in the
+code under test — `expected MqttUnavailableError to be an instance of
+MqttUnavailableError`, a classification branch that "does not work", or a suite
+that reports green and then hangs.
+
+**Verify:** `tests/unit/mqtt-optional.test.ts` — its file header documents all
+three and its helpers implement the workarounds.
+`tests/unit/tool-config.test.ts:31-34` is the simple precedent that hits none of
+them, which is why it is a misleading model on its own.
+
+**Evidence:** 2026-08-24 (`dbcefd8`, optional-mqtt T3), **Vitest 4.1.11**.
+Points 1 and 3 cost real debugging time; point 2 required a scoped
+`Error.prototype.code` getter bridging to `.cause` to make the branch reachable
+at all.
+
+**Status:** active, **version-stamped**. Point 2 in particular is tied to
+`@vitest/mocker` internals — re-run the Verify line after any Vitest major
+upgrade, and retire that clause if the wrapper stops discarding `.code`.
+
+---
+
+## G22 — Re-measure a published number at the scope you publish it
+
+**Trigger:** putting a measured quantity — package counts, sizes, timings — into
+`README.md`, `CHANGELOG.md`, or an issue.
+
+**Rule:** measure it again, in the form the reader will reproduce, before
+writing it down. Prefer the number the tool itself reports over one you derive.
+A figure inherited from a design document is an assumption, not a measurement.
+
+**Why:** the same quantity legitimately differs by scope, and the discrepancy is
+silent. The optional-`mqtt` design plan measured `110 → 72 packages, 38 removed`
+and that figure did not reproduce anywhere: a dev tree gave `158 → 117` (41 by
+name, 42 by tree path, because `find` over hoisted directories misses nested
+copies), while a fresh install of the packed tarball — the thing a user actually
+runs — gave **`163 → 121`, 42 removed**. Three methods, three answers, and `38`
+was about to ship in the changelog and the README.
+
+**Verify:** for package counts, install the packed tarball into a fresh prefix
+both ways and quote npm's own `added N packages` line, which is what the user
+sees in their terminal.
+
+**Evidence:** 2026-08-24 (`9b61494` / `ef97915`, optional-mqtt T4) — caught as
+amendment A8 during `/run-plan` when the declaration finally existed to measure
+against; the design plan's `## Context` was corrected rather than copied
+forward.
+
+**Status:** active. Sharper, numeric instance of [G11].
 
 ---
 
