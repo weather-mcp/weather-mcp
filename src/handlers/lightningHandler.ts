@@ -167,7 +167,13 @@ function assessSafety(strikes: LightningStrike[], statistics: LightningStatistic
   // Safety assessment based on nearest strike distance
   if (nearestDistance === null || nearestDistance > 50) {
     level = 'safe';
-    message = 'No significant lightning activity detected in the area.';
+    // `safe` covers two different facts, and they must not share a sentence: no strikes were
+    // found at all, or strikes were found and the nearest is beyond the 50 km threshold. The
+    // second must state the fact and claim only what the band means — never assert an absence
+    // above a report that goes on to list the strikes.
+    message = nearestDistance === null
+      ? 'No significant lightning activity detected in the area.'
+      : `Nearest lightning ${nearestDistance.toFixed(1)} km away — no immediate lightning threat at this location.`;
     recommendations.push('Continue to monitor weather conditions.');
     recommendations.push('Lightning can strike from distant storms, so stay alert to changing conditions.');
   } else if (nearestDistance > 16) {
@@ -264,9 +270,16 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
   };
 
   if (!coverage.isComplete && safety.level === 'safe') {
-    safety.message =
-      'No lightning strikes observed during the limited monitoring period. ' +
-      'This does NOT confirm the absence of lightning activity.';
+    // Only the *message* is gated on the strike count: with strikes present this wording would
+    // deny the very list printed beneath it. The coverage recommendation below is unconditional
+    // with respect to the strike count — partial coverage makes the result inconclusive either
+    // way — but it stays inside the `safe` gate, because "treat this as inconclusive" above an
+    // EXTREME DANGER warning would degrade a life-safety message.
+    if (strikes.length === 0) {
+      safety.message =
+        'No lightning strikes observed during the limited monitoring period. ' +
+        'This does NOT confirm the absence of lightning activity.';
+    }
     safety.recommendations.unshift(
       `Live monitoring of this area covers only ${coverageMinutes.toFixed(1)} of the requested ` +
       `${timeWindow} minutes — treat this result as inconclusive and re-check shortly.`
