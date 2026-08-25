@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-08-25
+
 ### Changed
 - **`mqtt` is now an optional dependency, so you can install without it.** Nothing changes for anyone who does nothing: optional dependencies are installed by default, so a plain `npm install` or `npx` still gets `mqtt` and lightning works exactly as before. What is new is that you can now decline it — `npm install -g @dangahagan/weather-mcp --omit=optional` installs **121 packages instead of 163**, dropping 42. `mqtt` is the only dependency in the tree that serves a single tool, and that tool (`get_lightning_activity`) is not in the default `basic` preset, so until now every install carried it for a feature most installs never expose. **What you give up, on both surfaces it reaches:** `get_lightning_activity` returns an error naming the package and how to get it back, and `get_weather_summary`'s optional `lightning` section renders as `## lightning (unavailable)` carrying the same message — the summary itself still succeeds and its other sections are unaffected. Neither ever reports "no strikes": a missing package rendering as an all-clear on lightning is exactly the fabricated-safe-answer this project treats as its worst failure mode, so the absence is a contract failure that propagates, not a silent degradation. The same holds for a package that is present but **unloadable** — a damaged or partial install — which reports its own distinct message and remedy rather than borrowing the "reinstall without --omit=optional" advice, since that install never omitted anything. The server does not cache that state, though Node caches the failed module itself, so a repaired install needs a restart to take effect. **The opt-out applies to the published package, not to a source build** — `import type` erases from the emitted JavaScript, but TypeScript still needs `mqtt`'s bundled declarations to compile, so building from a clone continues to use a plain `npm install`. Internally the package is no longer imported at load time at all: it is resolved by a memoised dynamic `import()` at its single call site, behind a single-flight promise so that concurrent callers share one resolution and one log line. That was not merely an optimisation — the service module is imported unconditionally at startup, above the tool gate, so before this change a missing `mqtt` did not disable one tool, it prevented the server from starting at all and `tools/list` never answered. Verified against the built dist with the package absent: the server starts, non-lightning tools return normal results, the two lightning surfaces report unavailable, startup logs the reason exactly once regardless of how many saved locations are pre-warmed, and with the default `basic` preset nothing about `mqtt` is logged at all. (`src/services/blitzortung.ts`, `src/errors/ApiError.ts`, `package.json`)
 
@@ -1273,7 +1275,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.24.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.0...HEAD
+[1.25.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.24.0...v1.25.0
 [1.24.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.23.0...v1.24.0
 [1.23.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.22.0...v1.23.0
 [1.22.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.21.0...v1.22.0
