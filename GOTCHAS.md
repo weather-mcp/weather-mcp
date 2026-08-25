@@ -906,6 +906,68 @@ spawns from a clean temp cwd would close it mechanically.
 
 ---
 
+## G27 — Restore a mutation with a file copy, never `git checkout --`, while the fix under test is uncommitted
+
+**Trigger:** mutation-testing a change that is not yet committed — proving a new
+test is real by breaking its subject and watching it go red.
+
+**Rule:** back the file up (`cp`) before mutating and restore from that copy.
+`git checkout -- <file>` restores to **HEAD**, which silently discards every
+uncommitted change in that file, including the fix you were validating. If the
+mutation loop is scripted, make each step's anchor assertion fail loudly rather
+than pass silently, so a lost edit surfaces on the next iteration instead of
+being reported as a passing mutation.
+
+**Why:** the failure is invisible in the moment — the mutation *does* go red, the
+restore *does* succeed, and the tree looks clean. What is gone is the change under
+test, so every subsequent mutation runs against the unfixed code and its results
+mean something different from what the table records.
+
+**Verify:** edit a tracked file without committing, run
+`git checkout -- <that file>`, and confirm the edit is gone with no warning.
+
+**Evidence:** 2026-08-25 (v1.25.1, lightning-safe-message-coherence diff review) —
+a four-mutation loop restored with `git checkout --` after each step. The first
+restore discarded the uncommitted predicate fix; the second mutation's Python
+anchor assertion then failed to match, which is the only reason it was caught.
+The mutation evidence survived, but only by luck: the accidental clean-tree run
+happened to be a valid proof of the un-fixed case.
+
+**Status:** active. Lint candidate — a mutation helper that snapshots and restores
+by copy would close it mechanically.
+
+---
+
+## G28 — A probe that fails validation reports as a clean negative, not as an error
+
+**Trigger:** writing a live probe or QA driver that parses a rendered report and
+branches on what it finds.
+
+**Rule:** when a parse returns null/empty, print the raw response before
+concluding anything. A tool call rejected by input validation returns an error
+string, not a report — and a parser looking for `**Total Strikes:** (\d+)` finds
+nothing in it and yields the same `null` it would yield for a genuinely quiet
+sky. Assert the *shape* you expected, not merely the absence of what you were
+counting.
+
+**Why:** the two outcomes are opposite in meaning and identical in the driver's
+output. "No convection anywhere in four regions" is a plausible-looking result
+that ends a QA pass early with a false negative recorded as an observation.
+
+**Verify:** call `get_lightning_activity` with `radius: 800` (the validated range
+is 1–500) and confirm the response contains no `**Total Strikes:**` line at all.
+
+**Evidence:** 2026-08-25 (v1.25.1 QA pass) — a storm-locating driver passed
+`radius: 800`; all four seed regions returned validation errors, the parser
+reported `total=null` for each, and the driver concluded "NO CONVECTION FOUND".
+Florida was in fact producing 62 strikes within 500 km at that moment.
+
+**Status:** active. Same family as [G10]'s vacuous-hash half — a failed
+measurement that renders as a clean result. Not lintable: only the probe's author
+knows what shape the response should have had.
+
+---
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
