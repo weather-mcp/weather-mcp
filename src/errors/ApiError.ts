@@ -209,6 +209,48 @@ export class ValidationError extends Error {
 }
 
 /**
+ * The user-facing text shown when the optional `mqtt` package is absent.
+ *
+ * This single string reaches the user through three surfaces, so it is defined
+ * once and never reworded per-surface:
+ *   1. `get_lightning_activity` — as `Error: <this>` via `formatErrorForUser`
+ *   2. `get_weather_summary` — inline in its `## lightning (unavailable)` section
+ *   3. `docs/ERROR_HANDLING.md` — quoted verbatim
+ *
+ * It names the package, states plainly that it is not installed, and gives the
+ * remedy. It carries no file path and no stack: the reader needs the fix, not
+ * our node_modules layout.
+ */
+export const MQTT_UNAVAILABLE_MESSAGE =
+  'This server was installed without the optional "mqtt" package, which lightning ' +
+  'detection requires. Reinstall without --omit=optional ' +
+  '(e.g. npm install -g @dangahagan/weather-mcp) to enable it.';
+
+/**
+ * The optional `mqtt` package could not be resolved.
+ *
+ * Deliberately a plain `Error` and **not** an `ApiError`: `ApiServiceName` is a
+ * closed union that does not include Blitzortung, and this is a local packaging
+ * state rather than an upstream service failure. `formatErrorForUser` has no
+ * branch for it, so it falls through to the generic sanitiser and the user sees
+ * `Error: <message>`.
+ *
+ * This is a **contract** failure, not garnish. Lightning is safety data, so an
+ * absent module must never degrade into an empty strike list — that would render
+ * as an all-clear built from a missing dependency.
+ */
+export class MqttUnavailableError extends Error {
+  constructor(message: string = MQTT_UNAVAILABLE_MESSAGE) {
+    super(message);
+    this.name = 'MqttUnavailableError';
+
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+}
+
+/**
  * Check if an error is retryable
  */
 export function isRetryableError(error: Error): boolean {

@@ -7,10 +7,103 @@
  * @see https://www.blitzortung.org/
  */
 
-import mqtt, { MqttClient } from 'mqtt';
+import type { MqttClient } from 'mqtt';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { LightningStrike } from '../types/lightning.js';
 import { calculateGeohashSubscriptions } from '../utils/geohash.js';
+import { MqttUnavailableError } from '../errors/ApiError.js';
+
+/**
+ * The `mqtt` package is an **optional** dependency: it is the only dependency
+ * reached by a single tool, and `get_lightning_activity` is absent from the
+ * default `basic` preset. Declaring it optional lets an installer drop 38
+ * packages with `--omit=optional`.
+ *
+ * That only works if nothing imports it at module load. The import below is
+ * type-only (it erases at compile time), and the value half is resolved lazily
+ * at the one call site that needs it — `ensureConnected`. A static import here
+ * would take the whole server down at startup when the package is absent, not
+ * just this tool: `src/index.ts` imports this module unconditionally, above the
+ * tool gate.
+ *
+ * Note that `import type` still requires the package at **build** time — `tsc`
+ * must resolve its declarations even though the emitted JavaScript never loads
+ * it. The opt-out is therefore a property of the published package, not of a
+ * source build.
+ */
+type MqttModule = (typeof import('mqtt'))['default'];
+
+/**
+ * Three-state resolution memo. `undefined` = not yet attempted, a module =
+ * loaded, `null` = attempted and confirmed absent. Without it, an absent module
+ * re-throws and re-logs on every query and every prewarmed location.
+ */
+let mqttModule: MqttModule | null | undefined;
+
+/**
+ * Single-flight guard for an import already in progress.
+ *
+ * The value memo alone does not close the startup race: `prewarmLightningMonitoring`
+ * fires `void prewarmLocation(...)` per saved location without awaiting the
+ * previous one, so with two saved locations both callers can observe
+ * `mqttModule === undefined` before either import settles, both start an import,
+ * and both emit the supposedly once-per-process warning.
+ */
+let mqttLoadPromise: Promise<MqttModule> | undefined;
+
+/**
+ * Resolve the optional `mqtt` package, at most once per process.
+ *
+ * Throws `MqttUnavailableError` when the package is genuinely absent. Any other
+ * import failure is a real fault and propagates unchanged **without** being
+ * memoised, so a transient problem is retried rather than cached as an absence
+ * for the life of the process.
+ */
+async function loadMqtt(): Promise<MqttModule> {
+  // Explicit three-state discrimination: `null` and `undefined` mean different
+  // things here, so these checks are deliberately not a `!= null` test.
+  if (mqttModule === null) {
+    throw new MqttUnavailableError();
+  }
+  if (mqttModule !== undefined) {
+    return mqttModule;
+  }
+  if (mqttLoadPromise !== undefined) {
+    return mqttLoadPromise;
+  }
+
+  // Assigned synchronously, before the first await, or the race above is
+  // unchanged. Every concurrent caller receives this same promise, so the
+  // classification and the warning below happen exactly once.
+  mqttLoadPromise = import('mqtt').then(
+    (loaded) => {
+      mqttModule = loaded.default;
+      mqttLoadPromise = undefined;
+      return mqttModule;
+    },
+    (error: unknown) => {
+      mqttLoadPromise = undefined;
+
+      if ((error as NodeJS.ErrnoException | undefined)?.code === 'ERR_MODULE_NOT_FOUND') {
+        mqttModule = null;
+        // Said once per process, on the transition to `null`. Callers must not
+        // repeat it: prewarm runs this path once per saved location.
+        logger.warn('Lightning detection unavailable: the optional mqtt package is not installed', {
+          package: 'mqtt',
+          tool: 'get_lightning_activity',
+          remedy: 'Reinstall without --omit=optional'
+        });
+        throw new MqttUnavailableError();
+      }
+
+      // Leave the memo `undefined` — this is a real fault, not an absence, and
+      // reporting it as "not installed" would send the user after the wrong fix.
+      throw error;
+    }
+  );
+
+  return mqttLoadPromise;
+}
 
 /**
  * Raw lightning strike data from MQTT
@@ -108,6 +201,21 @@ export class BlitzortungService {
         }, 100);
       });
     }
+
+    // Resolve the optional package BEFORE touching connection state.
+    //
+    // Placement is load-bearing. `isConnecting` is cleared only by the catch at
+    // the foot of the try below, and the early-return above treats
+    // `isConnecting === true` as "someone else is connecting" and polls a
+    // setInterval that resolves only when `isConnected` flips or `isConnecting`
+    // clears. A throw after the flag is set but outside that catch's reach would
+    // strand the flag, turning every later lightning call into a promise that
+    // never settles — an endless poll with no error and no timeout, so the MCP
+    // client hangs instead of being told the package is missing.
+    //
+    // Invariant: `isConnecting` is false on every path out of this method that
+    // did not connect.
+    const mqtt = await loadMqtt();
 
     this.isConnecting = true;
 
@@ -482,6 +590,15 @@ export class BlitzortungService {
 
       return strikes;
     } catch (error) {
+      // An absent optional package is a contract failure, not an empty feed.
+      // Falling through to `return []` would render "no strikes" — a fabricated
+      // all-clear on safety data, built from a packaging state rather than from
+      // anything the detection network said. Rethrown before the generic
+      // logger.error below so an absent module does not log a line per query;
+      // the loader already said it once for the whole process.
+      if (error instanceof MqttUnavailableError) {
+        throw error;
+      }
       logger.error('Failed to fetch lightning data', error as Error);
       // Return empty array on error to allow graceful degradation
       return [];
@@ -510,6 +627,12 @@ export class BlitzortungService {
         radiusKm
       });
     } catch (error) {
+      // The loader's single line is the whole of "say it once". This catch runs
+      // once per saved location, so repeating it here would produce exactly the
+      // per-location spam the memo exists to prevent.
+      if (error instanceof MqttUnavailableError) {
+        return;
+      }
       logger.warn('Failed to pre-warm lightning monitoring for location', {
         error: (error as Error).message
       });
