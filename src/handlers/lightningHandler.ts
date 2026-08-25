@@ -147,7 +147,9 @@ function calculateStatistics(strikes: LightningStrike[], radiusKm: number, timeW
  */
 function assessSafety(strikes: LightningStrike[], statistics: LightningStatistics): LightningSafetyAssessment {
   const nearestStrike = strikes[0] || null;
-  const nearestDistance = nearestStrike?.distance || null;
+  // `??`, never `||`: a strike at exactly 0 km is falsy, and `|| null` would send it down the
+  // `nearestDistance === null` arm below and render a green SAFE all-clear for a strike overhead.
+  const nearestDistance = nearestStrike?.distance ?? null;
   const nearestTime = nearestStrike?.timestamp || null;
 
   // Determine if there's active thunderstorm activity
@@ -165,7 +167,13 @@ function assessSafety(strikes: LightningStrike[], statistics: LightningStatistic
   // Safety assessment based on nearest strike distance
   if (nearestDistance === null || nearestDistance > 50) {
     level = 'safe';
-    message = 'No significant lightning activity detected in the area.';
+    // `safe` covers two different facts, and they must not share a sentence: no strikes were
+    // found at all, or strikes were found and the nearest is beyond the 50 km threshold. The
+    // second must state the fact and claim only what the band means — never assert an absence
+    // above a report that goes on to list the strikes.
+    message = nearestDistance === null
+      ? 'No significant lightning activity detected in the area.'
+      : `Nearest lightning ${nearestDistance.toFixed(1)} km away — no immediate lightning threat at this location.`;
     recommendations.push('Continue to monitor weather conditions.');
     recommendations.push('Lightning can strike from distant storms, so stay alert to changing conditions.');
   } else if (nearestDistance > 16) {
@@ -262,9 +270,19 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
   };
 
   if (!coverage.isComplete && safety.level === 'safe') {
-    safety.message =
-      'No lightning strikes observed during the limited monitoring period. ' +
-      'This does NOT confirm the absence of lightning activity.';
+    // Only the *message* is gated on whether there is a nearest-strike distance at all: with one
+    // present this wording would deny the very list printed beneath it. Key on the same value
+    // `assessSafety` banded on rather than on `strikes.length`, so the two can never disagree
+    // about one report — a strike carrying no distance has `length === 1` and a null distance at
+    // once. The coverage recommendation below is unconditional with respect to the strike count —
+    // partial coverage makes the result inconclusive either way — but it stays inside the `safe`
+    // gate, because "treat this as inconclusive" above an EXTREME DANGER warning would degrade a
+    // life-safety message.
+    if (safety.nearestStrikeDistance === null) {
+      safety.message =
+        'No lightning strikes observed during the limited monitoring period. ' +
+        'This does NOT confirm the absence of lightning activity.';
+    }
     safety.recommendations.unshift(
       `Live monitoring of this area covers only ${coverageMinutes.toFixed(1)} of the requested ` +
       `${timeWindow} minutes — treat this result as inconclusive and re-check shortly.`
@@ -324,10 +342,20 @@ export function formatLightningActivityResponse(
     const since = response.coverage.monitoringSince
       ? ` (since ${response.coverage.monitoringSince.toISOString()})`
       : '';
+    // What partial coverage under-informs depends on what was found. With no nearest-strike
+    // distance the caveat is about the absence; with one present the absence is not in doubt —
+    // the under-informed number is that distance, which is what the verdict rests on. Key on the
+    // same value the verdict was banded on, not on `strikes.length`, so the sentence can never
+    // contradict the message above it. The distance itself is deliberately not repeated here: it
+    // is rendered below, and a second copy is a second rounding site that could disagree with it.
+    const coverageCaveat = response.safety.nearestStrikeDistance === null
+      ? `An absence of strikes in this report does not confirm an absence of lightning. `
+      : `The nearest-strike distance below is therefore a floor — a closer strike could have ` +
+        `occurred during the minutes that were not monitored. `;
     lines.push(
       `⚠️ **Limited monitoring coverage:** Live strike collection for this area spans ` +
       `${response.coverage.coverageMinutes.toFixed(1)} of the requested ${response.timeWindow} minutes${since}. ` +
-      `An absence of strikes in this report does not confirm an absence of lightning. ` +
+      coverageCaveat +
       `Re-check in a few minutes or consult official weather services before making safety decisions.`
     );
     lines.push('');

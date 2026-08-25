@@ -347,27 +347,36 @@ passed and the exit code was 0; only reading the line caught it.
 
 ---
 
-## G12 — `check-doc-versions.sh` validates three of the four test-count sites
+## G12 — `check-doc-versions.sh` validates three of the **five** test-count sites
 
 **Trigger:** any change that moves the test count — i.e. every commit that adds
 or removes a test.
 
-**Rule:** when the count moves, **four** places change: `README.md`'s shields
+**Rule:** when the count moves, **five** places change: `README.md`'s shields
 badge (line ~6), `README.md`'s "N tests" body line (~61), `README.md`'s
-`npm test` comment (~346), and `CLAUDE.md`'s **Test Coverage** line (~578).
-`update-docs-for-release.sh` rewrites all four; the checker validates only
-three. **The `npm test` comment is the unvalidated one** — read it back by eye
-after any hand-edit, and never infer it from a green checker.
+`npm test` comment (~381), `CLAUDE.md`'s **Test Coverage** line (~579), and
+`docs/README.md`'s **Test Coverage** line (~78).
+`update-docs-for-release.sh` rewrites all five; the checker validates only
+three. **Two are unvalidated — the `npm test` comment and `docs/README.md`** —
+so read both back by eye after any hand-edit, and never infer either from a
+green checker.
 
-**Why:** the checker's README test-count grep (`[0-9,]+ (automated )?tests`)
-takes `head -1`, which lands on the body line at ~61 and never reaches the
-`Run all N tests` comment 285 lines further down. The failure is silent and
-reads as success: `✅ README.md test count` while that line is stale.
+**Why:** two separate gaps. The checker's README test-count grep
+(`[0-9,]+ (automated )?tests`) takes `head -1`, which lands on the body line at
+~61 and never reaches the `Run all N tests` comment 320 lines further down. And
+the script reads `docs/README.md` only for `Current Version:` (`:60-70`) — it has
+exactly three test-count checks (`:104` README body, `:113` `CLAUDE.md`, `:122`
+the badge) and never looks at that file's count at all. Both failures are silent
+and read as success: `✅ README.md test count` while the comment is stale, and no
+line at all about `docs/README.md`. `docs/README.md` is the more insidious of the
+two, because `update-docs-for-release.sh:219-222` silently repairs it at the next
+release — so the inconsistency is invisible until someone reads the file.
 
-**Verify:** set `Run all N tests` in `README.md` to a deliberately wrong number
-and run `./scripts/check-doc-versions.sh` — it still reports all checks passed.
-(The same experiment on the **badge** now correctly fails; do not use the badge
-to test this entry.)
+**Verify:** set `Run all N tests` in `README.md` **and** the `N tests, 100% pass
+rate` line in `docs/README.md` to deliberately wrong numbers, then run
+`./scripts/check-doc-versions.sh` — it still reports all checks passed. (The same
+experiment on the **badge** now correctly fails; do not use the badge to test this
+entry.)
 
 **Evidence:** first recorded 2026-08-24 (`338c2b0`) as "the badge is never
 validated". Re-running that Verify line on 2026-08-24 during the
@@ -378,15 +387,24 @@ lint candidate — the entry was written against a stale reading of the script.
 The `head -1` gap at `README.md:346` is real and survives, confirmed by the same
 deliberate-wrong-value experiment: `9,999` there still reports `✅`.
 
-**Status:** active, **narrowed** 2026-08-24, **re-verified 2026-08-24**
-(optional-mqtt curation): `Run all 9,999 tests` in `README.md` still produced
-`✅ All documentation checks passed!`. Note the line has since moved to
-`README.md:381` — a new section was inserted above it — so match it by content,
-never by line number. Lint candidate — anchoring a third check on
-`Run all [0-9,]+ tests` specifically would close it mechanically and
-let this entry retire. Standing lesson beyond the specific gap: an entry
-asserting that a checker *misses* something has a shelf life, so run its Verify
-line before relying on it.
+**Broadened 2026-08-25** (`99ba469`, lightning-safe-message-coherence): a
+**fifth** site, `docs/README.md`'s **Test Coverage** line, was found by the
+Antigravity plan review (R2) — a site this entry had never listed, and one the
+checker never reads. The review's stated consequence ("the acceptance gate will
+fail") was wrong, which is the point: it fails *silently*. Verify line re-run the
+same day with **both** unvalidated sites set to `9,999`, and
+`./scripts/check-doc-versions.sh` still reported `✅ All documentation checks
+passed!`.
+
+**Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
+2026-08-25**. Match every site by content, never by line number — the `npm test`
+comment has moved twice (346 → 381). Lint candidate — anchoring a check on
+`Run all [0-9,]+ tests` and one on `docs/README.md`'s count would close both gaps
+mechanically and let this entry retire. Standing lesson beyond the specific gaps:
+an entry asserting that a checker *misses* something has a shelf life, so run its
+Verify line before relying on it — and an entry enumerating sites can be
+**incomplete** as easily as stale, so re-derive the list from
+`update-docs-for-release.sh` rather than trusting the entry's own count.
 
 ---
 
@@ -619,7 +637,12 @@ Codex plan review (R3). It corrected the design plan's framing (which called
 lightning "a tool that is switched off"), added a test contract, and added a
 built-dist probe that would otherwise have been missed entirely.
 
-**Status:** active.
+**Status:** active. **Re-verified live 2026-08-25** (`99ba469`,
+lightning-safe-message-coherence T5): under the genuine default preset the
+server exposes 6 tools — `get_lightning_activity` **absent**,
+`get_weather_summary` **present** — and the summary rendered the changed
+lightning text in four safety states. Getting that probe honest required [G26]:
+the first attempt ran from the repo root and silently tested the `full` preset.
 
 ---
 
@@ -840,6 +863,46 @@ written minutes earlier; all three copies corrected to say a restart is needed.
 
 **Status:** active. Related: [G21] (the same file's mock/runtime divergences),
 [G11], [G23].
+
+---
+
+## G26 — The repo's own `.env` means a probe from the repo root is not testing the default configuration
+
+**Trigger:** verifying **default-configuration** behaviour of the built dist —
+the default tool preset, default units, default log level, analytics off — by
+spawning `node dist/index.js` and unsetting the relevant variable.
+
+**Rule:** unsetting the variable in the child env is **not enough**.
+`src/index.ts` imports `dotenv/config`, which reads `.env` from the **process's
+cwd**, so a server spawned from the repo root silently inherits the repo's own
+gitignored `.env`. To probe a default install, spawn the dist with **cwd set
+outside the repo** *and* delete the variables from the child env. Assert the
+default you expected before reading anything else — `tools/list` is the cheap
+check for the preset.
+
+**Why:** the repo `.env` sets `ENABLED_TOOLS`, `LOG_LEVEL` and the `ANALYTICS_*`
+trio. A G19 check of "does `get_weather_summary`'s lightning section work on a
+default install?", run from the repo root with `ENABLED_TOOLS` deleted from the
+child env, reported **17 tools exposed** — the `full` preset — so it exercised
+the very configuration the check exists to look past, and its green result meant
+nothing. Run again from a temp cwd it reported **6 tools**, with
+`get_lightning_activity` absent and `get_weather_summary` present: the actual
+claim G19 makes, actually tested. This is the same hazard as [G10]'s
+key-propagation half seen from the other side — there a base worktree has *no*
+`.env` and silently runs keyless; here the repo root *has* one and silently runs
+configured. Both come from dotenv resolving per-process cwd.
+
+**Verify:** spawn the built dist twice with `ENABLED_TOOLS` deleted from the
+child environment — once with `cwd` at the repo root, once with `cwd` at a fresh
+temp directory — and compare `tools/list` counts. 17 vs 6 is the trap.
+
+**Evidence:** 2026-08-25 (`99ba469`, lightning-safe-message-coherence T5) — the
+first summary probe reported `tools exposed: 17 | get_lightning_activity present:
+true` while claiming to test the `basic` preset, in which that tool is absent.
+
+**Status:** active. Related: [G10] (the same dotenv-cwd hazard, inverted),
+[G19] (the check this defeats). Lint candidate — a probe helper that always
+spawns from a clean temp cwd would close it mechanically.
 
 ---
 
