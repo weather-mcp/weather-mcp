@@ -123,7 +123,7 @@ All free, all public, no authentication required:
 | [RCC ACIS](https://www.rcc-acis.org/) | Daily record high/low temperatures | US |
 | [EUMETNET MeteoAlarm](https://meteoalarm.org/) | Official national weather warnings (38 European countries) | Europe |
 | [MSC GeoMet](https://api.weather.gc.ca/) | Environment and Climate Change Canada weather alerts | Canada |
-| [NDMA SACHET](https://sachet.ndma.gov.in/) | Official Indian warnings (CAP, polygon geometry) — public domain | India |
+| [NDMA SACHET](https://sachet.ndma.gov.in/) | Official Indian warnings (CAP; polygon geometry served from a separate endpoint, so alerts are matched at country level) — public domain | India |
 | [PAGASA](https://publicalert.pagasa.dost.gov.ph/) | Official Philippine warnings (CAP, inline polygons) — CC BY 4.0 | Philippines |
 | [BMKG](https://www.bmkg.go.id/) | Official Indonesian nowcast warnings (CAP, inline polygons) — attribution required | Indonesia |
 | [NIFC WFIGS](https://data-nifc.opendata.arcgis.com/) | Active wildfire perimeters and incidents | US |
