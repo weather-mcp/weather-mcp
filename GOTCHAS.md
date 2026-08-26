@@ -900,9 +900,12 @@ temp directory — and compare `tools/list` counts. 17 vs 6 is the trap.
 first summary probe reported `tools exposed: 17 | get_lightning_activity present:
 true` while claiming to test the `basic` preset, in which that tool is absent.
 
-**Status:** active. Related: [G10] (the same dotenv-cwd hazard, inverted),
-[G19] (the check this defeats). Lint candidate — a probe helper that always
-spawns from a clean temp cwd would close it mechanically.
+**Status:** active. **Verify line re-run 2026-08-25** (`3d85370`, issue-80
+lightning band rounding T4): repo-root cwd reported **17** tools, temp cwd
+reported **6**. The trap is intact and unchanged. Related: [G10] (the same
+dotenv-cwd hazard, inverted), [G19] (the check this defeats). Lint candidate — a
+probe helper that always spawns from a clean temp cwd would close it
+mechanically.
 
 ---
 
@@ -965,6 +968,87 @@ Florida was in fact producing 62 strikes within 500 km at that moment.
 **Status:** active. Same family as [G10]'s vacuous-hash half — a failed
 measurement that renders as a clean result. Not lintable: only the probe's author
 knows what shape the response should have had.
+
+---
+
+## G29 — Correcting a published threshold table means grepping the whole doc set, then classifying every hit
+
+**Trigger:** rewriting a published band, threshold, or category table — the
+lightning safety bands, the wildfire AWARENESS bands, an AQI or UV table.
+
+**Rule:** before declaring the docs touch-set complete, `grep -rn` the repo for
+the **old endpoint strings** and classify every hit as **live reference** or
+**frozen history**. Rewrite the live ones; leave the frozen ones alone. An
+unexpected live hit is a stop-and-ask, not a silent extra edit.
+
+**Why:** the same table is copied into places a per-page docs map does not
+reach, and the two classes need opposite treatment. Rewriting a table inside a
+shipped `## [X.Y.Z]` changelog entry falsifies the record of what that version
+actually shipped — the bindings' `<user-docs>` list does not include
+`CHANGELOG.md` at all, and the new `[Unreleased]` entry supersedes the old text
+in the same file anyway. But missing a *live* copy leaves a reader classifying a
+report by a table the code no longer honours, which is the whole defect being
+fixed. Neither failure is visible from the page you set out to edit.
+
+**Verify:** `grep -rn --exclude-dir=node_modules --exclude-dir=dist -E
+'>50 ?km|16-50 ?km|8-16 ?km|<8 ?km' .` and confirm every hit is accounted for by
+class.
+
+**Evidence:** 2026-08-25 (`3d85370`, issue-80 lightning band rounding T4) —
+raised as `codex-R2` and re-rated to a note by `/plan-triage`, which rejected the
+proposed edit and kept the discipline. The grep returned four classes from one
+pattern: `docs/TOOLS.md:698-701` live (rewritten), `CHANGELOG.md:522-525` frozen
+inside `## [1.5.0] - 2025-11-09` (left alone), `CHANGELOG.md:394` and
+`docs/TOOLS.md:817` the **wildfire** AWARENESS band belonging to a different plan
+in the same sequence, and four `it()` titles in a test file that is a lock and
+must not be edited. Only one of the four was this plan's work, and no per-page
+docs map would have surfaced the other three.
+
+**Status:** active. Immediately load-bearing — plans 2 and 3 of the band-rounding
+sequence correct the wildfire, river and marine tables next, and the grep above
+already names two of their hits. Not lintable: only a human can tell a live
+reference from a frozen record.
+
+---
+
+## G30 — The first lightning probe of any point always reports zero strikes
+
+**Trigger:** writing a live probe, QA driver, or smoke test that calls
+`get_lightning_activity` (or `get_weather_summary` with `include: ['lightning']`)
+looking for real convection.
+
+**Rule:** warm the points first, **keep the same process alive**, wait, then
+read. The Blitzortung feed only begins buffering an area once that area is first
+queried, so a cold first call returns `Total Strikes: 0` and
+`SAFE (LIMITED DATA)` no matter what the sky is doing. Never conclude "no
+convection anywhere" from a first-pass sweep, and never restart the process
+between the warm-up and the read — the buffer lives in the process.
+
+**Why:** the cold-start report is not an error and not malformed. It passes
+[G28]'s shape assertion — `## 📊 Lightning Statistics` present, a real
+`**Total Strikes:** 0` line, a coherent verdict — and it carries its own honest
+explanation of why coverage is short. So a driver that correctly asserts shape
+still records a false negative, and the sweep looks like a completed
+observation rather than an un-run one. This is the same failure family as
+[G10]'s vacuous-hash half and [G28], reached by a third route: a *legitimate*
+result that answers a different question from the one asked.
+
+**Verify:** spawn the built dist, call `get_lightning_activity` at four widely
+separated points, and confirm every one reports coverage of roughly `0.2 of the
+requested 60 minutes` and zero strikes — then wait four minutes in the same
+process and re-read.
+
+**Evidence:** 2026-08-25 (`3d85370`, issue-80 lightning band rounding T4) — six
+seed points (Tampa, Kansas City, Darwin, Singapore, Lagos, Manaus) all returned
+0 strikes at 0.2/60 minutes of coverage on first contact. One kept-alive process
+that warmed all six and waited 240 s then found **436 strikes at Tampa**, nearest
+112.8 km — live convection that the cold sweep had reported as a quiet sky.
+
+**Status:** active. Related: [G28] (assert the shape — necessary here but not
+sufficient), [G10] (a clean-looking result from an un-run measurement). Also
+related: the auto-memory note `live-verification-driver-hangs` — the driver holds
+a persistent MQTT connection, so it needs an explicit `process.exit(0)` and two
+must never run in parallel. Not lintable.
 
 ---
 
