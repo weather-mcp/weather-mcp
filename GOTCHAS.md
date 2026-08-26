@@ -1132,6 +1132,69 @@ is there, it is a manual step in `## Docs impact`.
 
 ---
 
+## G32 — Mutating back to the old implementation does not prove a fixture discriminates the *rejected* ones
+
+**Trigger:** a design plan that names two or more candidate implementations of a
+computation and rejects all but one; a mutation check written to satisfy [G13].
+
+**Rule:** mutate to **every** implementation the plan rejected, not only to the
+one the code had before. A fixture is only as sharp as the alternatives it can
+tell apart, and the plan has already written down which alternatives are
+plausible enough to need telling apart — that list *is* the mutation set.
+
+**Why:** cap-disclosure-accuracy rejected three ways to count the same number —
+the display-capped slice (the bug), the whole country-level block (the fix), and
+the feed-scoped service total. The two new fixtures were mutation-checked
+against the first and both turned red, so the check read as done. Substituting
+the third left all 2,572 tests green while rendering *"Area geometry for 4 alerts
+… rather than matched to your point"* directly beneath *"3 active warnings
+matched to your location"* — the failure the plan had predicted in writing, in
+the opposite direction from the bug. The fixtures set `matched` empty, which
+collapses two of the three expressions onto the third; the old fixtures had
+collapsed a different pair the same way.
+
+**Verify:** grep the design plan for `**Rejected:` and mutate to each one in
+turn. Any that stays green is a fixture that is degenerate along that axis.
+
+**Evidence:** 2026-08-26 (cap-disclosure-accuracy diff review, finding 1) —
+closed by `0deb47b`, which adds a case carrying three matched-but-flagged
+warnings beside one that lost geometry entirely, so the block-scoped count and
+the feed-scoped total no longer render the same number.
+
+**Status:** active. Sharper instance of [G13] — the degeneracy is not in a
+*value* the fixture repeats but in a *set* the fixture leaves empty.
+
+---
+
+## G33 — A live smoke test that asserts a security allowlist is asserting the publisher's behaviour, not ours
+
+**Trigger:** an integration test that runs an allowlist, validator, or signature
+check over entries fetched live from a third-party feed.
+
+**Rule:** assert that rejections are **counted and disclosed**, not that there
+are none. An allowlist exists precisely because upstream can publish something
+outside it; a test that fails when it does converts correct defensive behaviour
+into a red release gate.
+
+**Verify:** point the assertion at the disclosure path — the entry lands in
+`dropped`, `dropped` reaches `unavailableCount`, the render says "not an
+all-clear" — and log the rejected URLs rather than failing on them.
+
+**Evidence:** 2026-08-26 (cap-disclosure-accuracy diff review, finding 2) —
+PAGASA began serving its four newest CAP documents from
+`https://121.58.193.10/output/gfa/…` instead of `publicalert.pagasa.dost.gov.ph`.
+`isAllowedFeedUrl` rejected them, `nationalCap.ts:493` counted them into
+`unavailableCount`, and the user-facing output was correct and honest.
+`tests/integration/national-cap-alerts.test.ts:136` went red on `main` and on
+every open branch, blocking `/release` on a defect that was not ours and that the
+code had already handled as designed.
+
+**Status:** active. Closed by `bcda01c`, which asserts that the allowlist still
+matches the feed at all, logs every rejection by host, and no longer fails on
+which documents the publisher chooses to serve from where.
+
+---
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
