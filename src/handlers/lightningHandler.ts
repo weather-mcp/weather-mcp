@@ -18,6 +18,7 @@ import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { validateLatitude, validateLongitude, validateDetail, DetailLevel } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { displayValue } from '../utils/displayBanding.js';
 import { ValidationError } from '../errors/ApiError.js';
 
 interface LightningActivityArgs {
@@ -151,6 +152,10 @@ function assessSafety(strikes: LightningStrike[], statistics: LightningStatistic
   // `nearestDistance === null` arm below and render a green SAFE all-clear for a strike overhead.
   const nearestDistance = nearestStrike?.distance ?? null;
   const nearestTime = nearestStrike?.timestamp || null;
+  // Band on the number the report actually prints, not the raw measurement: every sentence below
+  // renders `.toFixed(1)`, so banding on the raw value lets two reports show the same distance under
+  // different verdicts (issue #80). Per the caller contract shared with getFrostbiteRisk/getWbgtCategory.
+  const shownDistance = nearestDistance === null ? null : displayValue(nearestDistance, 1);
 
   // Determine if there's active thunderstorm activity
   // Active if: strikes in last 10 minutes OR high strike rate
@@ -165,27 +170,27 @@ function assessSafety(strikes: LightningStrike[], statistics: LightningStatistic
   const recommendations: string[] = [];
 
   // Safety assessment based on nearest strike distance
-  if (nearestDistance === null || nearestDistance > 50) {
+  if (shownDistance === null || shownDistance > 50) {
     level = 'safe';
     // `safe` covers two different facts, and they must not share a sentence: no strikes were
     // found at all, or strikes were found and the nearest is beyond the 50 km threshold. The
     // second must state the fact and claim only what the band means — never assert an absence
     // above a report that goes on to list the strikes.
-    message = nearestDistance === null
+    message = shownDistance === null
       ? 'No significant lightning activity detected in the area.'
-      : `Nearest lightning ${nearestDistance.toFixed(1)} km away — no immediate lightning threat at this location.`;
+      : `Nearest lightning ${shownDistance.toFixed(1)} km away — no immediate lightning threat at this location.`;
     recommendations.push('Continue to monitor weather conditions.');
     recommendations.push('Lightning can strike from distant storms, so stay alert to changing conditions.');
-  } else if (nearestDistance > 16) {
+  } else if (shownDistance > 16) {
     level = 'elevated';
-    message = `Lightning detected ${nearestDistance.toFixed(1)} km away. Thunderstorm in the vicinity.`;
+    message = `Lightning detected ${shownDistance.toFixed(1)} km away. Thunderstorm in the vicinity.`;
     recommendations.push('Move activities indoors if possible.');
     recommendations.push('Avoid open areas, tall objects, and bodies of water.');
     recommendations.push('If outdoors, seek shelter in a substantial building or hard-topped vehicle.');
     recommendations.push('Monitor conditions closely - storms can move quickly.');
-  } else if (nearestDistance > 8) {
+  } else if (shownDistance > 8) {
     level = 'high';
-    message = `Lightning strike detected ${nearestDistance.toFixed(1)} km away. High risk - seek shelter immediately.`;
+    message = `Lightning strike detected ${shownDistance.toFixed(1)} km away. High risk - seek shelter immediately.`;
     recommendations.push('SEEK SHELTER IMMEDIATELY in a substantial building or hard-topped vehicle.');
     recommendations.push('Do NOT shelter under trees or in open-sided structures.');
     recommendations.push('Stay away from windows, doors, and electrical equipment.');
@@ -193,7 +198,7 @@ function assessSafety(strikes: LightningStrike[], statistics: LightningStatistic
     recommendations.push('Wait 30 minutes after the last thunder before resuming outdoor activities.');
   } else {
     level = 'extreme';
-    message = `EXTREME DANGER: Lightning strike within ${nearestDistance?.toFixed(1)} km. You are in immediate danger.`;
+    message = `EXTREME DANGER: Lightning strike within ${shownDistance.toFixed(1)} km. You are in immediate danger.`;
     recommendations.push('⚠️ TAKE IMMEDIATE SHELTER - Lightning is striking nearby!');
     recommendations.push('Get inside a substantial building or hard-topped vehicle NOW.');
     recommendations.push('If no shelter available, crouch low immediately with feet together.');
