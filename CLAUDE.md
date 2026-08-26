@@ -610,3 +610,49 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 **Last Updated:** 2026-08-26 (v1.25.3)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
+
+<!-- devwf:begin -->
+## dev-workflow (installed)
+
+This project runs the **dev-workflow** pipeline. `.claude/commands/` and
+`.claude/scripts/` are symlinks into a shared checkout, so the slash commands
+and the chaining scripts are the same in every project that uses it. The docs
+root is **`.devdocs/`** — design plans, implementation plans, reviews, triage
+briefs, the playbook (`orchestration-playbook.md`), the project's bindings
+(`orchestration-bindings.md`), and a `README.md` that is the folder map.
+**Read `.devdocs/README.md` before touching the pipeline**; the playbook is
+the methodology and the bindings resolve every project-specific fact it names.
+
+**The stages, in order.** `/design-plan` (a DRAFT in `.devdocs/backlog/`) →
+the human promotes it to `.devdocs/` (SETTLED) →
+`.claude/scripts/plan-pipeline.sh <plan>` (unattended: `/impl-plan` → reviews
+across vendors → `/plan-triage`) → `/run-plan` (interactive, in a session; it
+needs the Agent tool) → `.claude/scripts/post-run-pipeline.sh` (unattended
+diff reviews + diff triage) → `/test-drive` → `/release`. Beside the chain:
+`/quick-fix` for a change whose *risk* is trivial, and `/quota-route` for
+deciding where a piece of work should run and whether it should run now.
+
+**Before launching any script** (`plan-pipeline.sh`, `plan-review-multi.sh`,
+`post-run-pipeline.sh`):
+
+- Run `/quota-route <the exact invocation>`, or by hand
+  `.claude/scripts/plan-budget.sh <plan>`. It reads the live quota of every
+  vendor CLI and prints the exact calls per vendor with a verdict. **Every
+  percentage those print is used, not remaining.** Never hand-write a vendor
+  quota table.
+- Review breadth follows the plan's `Weight:` — one routed reviewer for
+  `light` and `standard`, every vendor only for `heavy`. Omit `--agents` and
+  the scripts apply that rule; `--all` on a standard plan is a choice, and the
+  script says so.
+- Scripts with interactive pickers need a TTY: run them with the `!` prefix,
+  or pass the plan path and flags explicitly. A chain runs 20–60 minutes —
+  launch it detached (`setsid nohup … </dev/null > run.log 2>&1 &`) and watch
+  the pid, never grep the log for a finish line. Exit code **3** means the
+  chain suspended itself on quota; its closing block carries the exact
+  `--resume` command and the time to run it.
+
+**Every stage ends with a `NEXT` block** — `PROCEED`, `FIX FIRST`, or `STOP`,
+then the exact next action. Follow the verb. A `FIX FIRST` that arrives after
+`/plan-triage` is that stage's own verdict (amend the plan, then `/run-plan`),
+not a sign that triage was skipped.
+<!-- devwf:end -->
