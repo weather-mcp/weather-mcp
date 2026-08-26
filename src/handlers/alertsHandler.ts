@@ -634,8 +634,12 @@ async function handleNationalCapAlerts(
 
       if (shownCountryLevel.length > 0) {
         if (lostGeometry > 0) {
+          // "treated as", not "listed at": the claim is about how the alert was
+          // routed — country-level rather than matched — and stays true for the
+          // ones the display cap pushed into the remainder, which are counted
+          // here but printed nowhere on this page.
           output += `*Area geometry for ${lostGeometry} alert${lostGeometry > 1 ? 's' : ''} could not be loaded or parsed, `;
-          output += `so ${lostGeometry > 1 ? 'they are' : 'it is'} listed at country level rather than matched to your point.*\n\n`;
+          output += `so ${lostGeometry > 1 ? 'they are' : 'it is'} treated as country-level rather than matched to your point.*\n\n`;
         }
         output += `**Country-level warnings** — *matched at country level (no usable area geometry for these alerts) — they may not affect your exact location:*\n\n`;
         for (const warning of shownCountryLevel) {
