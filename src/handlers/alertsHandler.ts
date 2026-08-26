@@ -5,8 +5,10 @@
  *   US → NOAA (the original path, byte-identical output),
  *   Canada → MSC GeoMet (Environment and Climate Change Canada),
  *   MeteoAlarm member countries → the country's MeteoAlarm feed,
- *   India / Philippines / Indonesia → their national CAP feeds (NDMA SACHET,
- *     PAGASA, BMKG), matched to the requested point by alert polygon
+ *   Philippines / Indonesia → their national CAP feeds (PAGASA, BMKG), matched
+ *     to the requested point by the alert's own polygon; India → NDMA SACHET,
+ *     listed at country level, because SACHET serves geometry from a separate
+ *     endpoint that returns 403 to server-side clients
  *     (see .devdocs/archive/completed/plan-national-cap-alerts.md D1),
  *   elsewhere → the optional keyed Google Weather API fallback when a
  *     `GOOGLE_WEATHER_API_KEY` is configured, else a clean not-covered
@@ -1237,9 +1239,9 @@ function notCoveredResult(
   output += `Weather alerts are not yet available for ${region}.\n\n`;
   output += `Current alert coverage: the United States (NOAA National Weather Service), `;
   output += `Canada (Environment and Climate Change Canada), the European MeteoAlarm `;
-  output += `member countries (matched at country level), and — via their national CAP feeds, `;
-  output += `matched by alert polygon — India (NDMA SACHET), the Philippines (PAGASA), and `;
-  output += `Indonesia (BMKG).\n`;
+  output += `member countries (matched at country level), and — via their national CAP feeds — `;
+  output += `the Philippines (PAGASA) and Indonesia (BMKG), matched by alert polygon, and `;
+  output += `India (NDMA SACHET), matched at country level.\n`;
 
   if (reverseLookupFailed) {
     output += `\n*Note: the country lookup service was unavailable, so routing fell back to coordinate checks.*\n`;

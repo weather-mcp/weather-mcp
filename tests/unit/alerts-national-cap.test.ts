@@ -255,6 +255,21 @@ describe('national CAP routing', () => {
     // The keyless coverage sentence must never name Google.
     expect(text).not.toContain('Google');
   });
+
+  it('attributes polygon matching to the Philippines and Indonesia but not to India', async () => {
+    const { text } = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      google: makeGoogleFake(false),
+      passNational: false
+    });
+
+    // SACHET serves geometry from an endpoint that 403s server-side clients,
+    // so Indian warnings are listed at country level with a note. Claiming
+    // uniform point-level precision for all three feeds overstates the answer.
+    expect(text).toContain('the Philippines (PAGASA) and Indonesia (BMKG), matched by alert polygon');
+    expect(text).toContain('India (NDMA SACHET), matched at country level');
+    expect(text).not.toContain('matched by alert polygon — India (NDMA SACHET)');
+  });
 });
 
 // ---------------------------------------------------------------------------
