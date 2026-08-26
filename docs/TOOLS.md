@@ -676,7 +676,7 @@ Get real-time lightning strike detection and safety assessment for outdoor activ
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `radius` (optional): Search radius in kilometers (1-500, default: 100)
-- `timeWindow` (optional): Historical time window in minutes (1-180, default: 60)
+- `timeWindow` (optional): Historical time window in minutes (5-120, default: 60)
 - `detail` (optional): `"summary"`, `"standard"` (default), or `"full"` — `full` lists up to 25 nearest strikes instead of 10; statistics always cover every detected strike regardless of level
 
 *Coordinates not required when `location_name` or `city_name` is provided.

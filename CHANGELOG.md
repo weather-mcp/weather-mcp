@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The `get_lightning_activity` parameter reference no longer publishes a `timeWindow` range the server rejects.** `docs/TOOLS.md` documented `timeWindow` as accepting `1-180` minutes while the handler validates `5-120`, so a caller following the reference with `timeWindow: 1` or `timeWindow: 180` got a validation error for a value the reference called legal. The documented range is now the range the server enforces. **Documentation only — no behaviour changed**, and the fix brings the docs up to the code rather than the reverse: the validator, its own error message (*"timeWindow must be a number between 5 and 120 minutes"*) and the published tool schema in `src/index.ts` already agreed on `5-120`, and the documented default of `60` was correct throughout. (`docs/TOOLS.md`)
+
 ## [1.25.3] - 2026-08-26
 
 ### Fixed
