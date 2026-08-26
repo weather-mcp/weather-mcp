@@ -37,9 +37,13 @@
  * `capParse.ts` or a live host/path drift in `NATIONAL_CAP_FEEDS` must never
  * be swallowed as "the network was flaky".
  *
- * Assertions here are shape-only — array-ness, field presence/typeof, URL
- * allowlist membership, polygon-ring closure — never on live *content*
- * (alerts come and go; a specific event/count/identifier is never asserted).
+ * Assertions here are shape-only — array-ness, field presence/typeof,
+ * polygon-ring closure — never on live *content* (alerts come and go; a
+ * specific event/count/identifier is never asserted). The feed **allowlist**
+ * is asserted at the one grain that is ours rather than the publisher's:
+ * that `NATIONAL_CAP_FEEDS` still matches the feed at all. Which individual
+ * documents a publisher chooses to serve from a host outside it is live
+ * content like any other — see the comment on that assertion below.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -133,8 +137,38 @@ describe('National CAP alerts — live index smoke (tolerant of network flake)',
             expect(typeof entry.identifier).toBe('string');
             expect(entry.identifier.length).toBeGreaterThan(0);
             expect(entry.documentUrl.startsWith('https://')).toBe(true);
-            expect(isAllowedFeedUrl(entry.documentUrl, feed)).toBe(true);
           }
+
+          // The allowlist is an SSRF control, not a prediction of what the
+          // publisher will serve. A feed may legitimately start publishing
+          // *some* documents from a host outside it — PAGASA served its four
+          // newest CAP documents from a bare IP (`https://121.58.193.10/output/`)
+          // on 2026-08-26 while the other 47 stayed on
+          // `publicalert.pagasa.dost.gov.ph` — and the service already handles
+          // that correctly: `loadDocument` refuses the URL, logs a
+          // `url-not-allowed` security event, returns `undefined`, and the
+          // caller counts it into `unavailableCount`, which renders as an
+          // explicit "could not be loaded ... this is not an all-clear for
+          // those alerts". Asserting that *every* live entry is allowlisted
+          // therefore turned a correct refusal into a red release gate.
+          //
+          // What is still a real regression is our allowlist no longer
+          // matching the feed **at all** — a host or path move in
+          // `NATIONAL_CAP_FEEDS` that this file exists to catch. That is what
+          // is asserted; every rejection is logged by host so a drift is
+          // visible in the run rather than silent.
+          const rejected = result.entries.filter(
+            entry => !isAllowedFeedUrl(entry.documentUrl, feed)
+          );
+          if (rejected.length > 0) {
+            const hosts = [...new Set(rejected.map(entry => new URL(entry.documentUrl).host))];
+            console.warn(
+              `National CAP index (${cc}): ${rejected.length}/${result.entries.length} ` +
+                `document URLs are outside the feed allowlist [${hosts.join(', ')}] — ` +
+                `they will be refused and disclosed as unavailable, not silently dropped.`
+            );
+          }
+          expect(rejected.length).toBeLessThan(result.entries.length);
         }
 
         expect(typeof result.trimmed).toBe('boolean');
