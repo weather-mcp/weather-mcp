@@ -577,7 +577,7 @@ npm audit             # No critical vulnerabilities
 ## Project Status
 
 - **Version:** 1.25.2 — Production Ready ✅
-- **Test Coverage:** 2,573 tests, 100% pass rate
+- **Test Coverage:** 2,574 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):

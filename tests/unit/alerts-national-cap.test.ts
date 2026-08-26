@@ -528,6 +528,49 @@ describe('geometry-lost disclosure', () => {
     expect(text).toContain('Area geometry for 1 alert could not be loaded or parsed');
     expect(text).not.toContain('Area geometry for 4 alerts');
   });
+
+  it('discloses geometry lost when the matched block consumes the whole display cap', async () => {
+    // The sibling branch, which had no coverage at all: twelve matched
+    // warnings exhaust STANDARD_DISPLAY_CAP, so `shownCountryLevel` is empty
+    // and the **Country-level warnings** block never renders. Without this
+    // line the fact that five alerts have no usable geometry would vanish
+    // into the remainder count silently. Computing the count over the shown
+    // slice makes it 0 here and renders nothing.
+    const matched = Array.from({ length: 12 }, (_unused, index) =>
+      warningFixture({
+        identifier: `IN-matched-${index}`,
+        polygons: [RING_AROUND_DELHI],
+        severity: 'Extreme'
+      })
+    );
+    const lost = Array.from({ length: 5 }, (_unused, index) =>
+      warningFixture({
+        identifier: `IN-lost-${index}`,
+        polygons: [],
+        polygonUnavailable: true,
+        severity: 'Minor'
+      })
+    );
+
+    const { text } = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      national: makeNationalFake({
+        warnings: [...matched, ...lost],
+        polygonUnavailableCount: 5
+      })
+    });
+
+    expect(text).toContain('**12 active warnings matched to your location**');
+    expect(text).toContain(
+      '*5 further alerts had no usable area geometry and are counted in the remainder below rather than matched to your point.*'
+    );
+    expect(text).toContain('…and 7 more warnings');
+
+    // The country-level block never rendered, so neither its header nor the
+    // disclosure that sits above it may appear.
+    expect(text).not.toContain('**Country-level warnings**');
+    expect(text).not.toContain('could not be loaded or parsed');
+  });
 });
 
 // ---------------------------------------------------------------------------
