@@ -1,0 +1,31 @@
+/**
+ * Round a raw computed value to the same precision the render site will
+ * display it at, mirroring `toFixed` rather than `Math.round`.
+ *
+ * `toFixed` and `Math.round` disagree on negative halves — `(-2.5).toFixed(0)`
+ * is `"-3"` while `Math.round(-2.5)` is `-2` — so this helper matches the
+ * render site's own rounding rather than a generic round, which is the
+ * entire point of having it.
+ *
+ * Per the caller contract: pass this value to the band, and pass the same
+ * `decimals` the render site passes to `toFixed`. That is the invariant
+ * this helper exists to hold — the number the user reads and the band it
+ * falls in can never disagree at an edge.
+ *
+ * `decimals` must be an integer in `toFixed`'s own valid range (0-100);
+ * this helper does not re-validate it, because every call site is in-repo
+ * and passes a literal.
+ *
+ * @param raw The raw computed value
+ * @param decimals The number of decimal places the render site formats to
+ * @returns `raw` rounded to `decimals` places via `toFixed`, or `raw`
+ *   unchanged when it is not finite (NaN or +/-Infinity), so a non-finite
+ *   value is never converted into a number the caller would then band
+ */
+export function displayValue(raw: number, decimals: number): number {
+  if (!Number.isFinite(raw)) {
+    return raw;
+  }
+
+  return Number(raw.toFixed(decimals));
+}
