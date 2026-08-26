@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.25.1 (Production Ready)
+- **Version:** 1.25.2 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -58,6 +58,7 @@ src/
 │   ├── cache.ts             # LRU cache with TTL
 │   ├── validation.ts        # Input validation (all user inputs go through here)
 │   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
+│   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── logger.ts            # Structured logging to stderr
 │   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates
 │   ├── geography.ts         # isInUS and region helpers
@@ -193,7 +194,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 - **Never trust the HTTP 200 alone.** Open-Meteo and others return 200 with all-null series for uncovered points (pollen outside Europe, flood at sea, ensemble probability). Guard with `!= null`, not `!== undefined` — JSON `null` survives `!== undefined` and then coerces to 0 in arithmetic/conversion (the v1.20.0 F1 and normals-averaging bugs).
 - **Parse CSV/JSON by field name, never by position.** Two live shapes of the same feed have differed in column order and count.
 - **Verify documented shapes live before building on them.** Documented field names, enum casing, duration formats, and error codes have all been wrong upstream (Google Weather: six divergences; FIRMS Area API counts calendar UTC days while flat files are rolling 24 h). Record the verified shape in the plan doc.
-- **Bands and categories are computed from the rounded display value**, so the displayed number and its category can never disagree.
+- **Bands and categories are computed from the rounded display value** — via `displayValue` (`src/utils/displayBanding.ts`), which mirrors the render site's `toFixed` rather than `Math.round`, because the two disagree on negative halves — so the displayed number and its category can never disagree.
 - **When a station publishes a value, band off the published value** (NOAA `windChill`) so the risk line never contradicts the "Feels Like" line above it; when computing, say what basis was used.
 - **Heuristic bands are disclosed as project heuristics** (Fosberg categories, model-agreement bands, frostbite times, WBGT) — never presented as official ratings; mandatory inline caveats where the model's assumptions bite (WBGT full-sun).
 
@@ -575,15 +576,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.25.1 — Production Ready ✅
+- **Version:** 1.25.2 — Production Ready ✅
 - **Test Coverage:** 2,569 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.25.2:** A lightning report's safety band now keys on the distance it prints, not a hidden raw value
 - **New in v1.25.1:** Lightning no longer claims no strikes were observed in a report listing strikes
 - **New in v1.25.0:** Optional `mqtt` dependency — lightning reports unavailable rather than an all-clear when it is absent
-- **New in v1.24.0:** Keyless national CAP alerts for India, the Philippines and Indonesia; heat/cold stress context on current conditions
 
 ## Useful References
 
@@ -606,6 +607,6 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-08-25 (v1.25.1)
+**Last Updated:** 2026-08-26 (v1.25.2)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
