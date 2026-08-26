@@ -59,7 +59,7 @@ src/
 │   ├── validation.ts        # Input validation (all user inputs go through here)
 │   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
-│   ├── logger.ts            # Structured logging to stderr
+│   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing
 │   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates
 │   ├── geography.ts         # isInUS and region helpers
 │   ├── timezone.ts          # Local-time formatting, formatObservationAge
@@ -72,7 +72,7 @@ src/
 │   ├── airQuality.ts / marine.ts / snow.ts / distance.ts / geohash.ts
 │   └── version.ts
 ├── config/
-│   ├── cache.ts             # Cache TTLs + CACHE_*/API_TIMEOUT_MS/LOG_LEVEL parsing
+│   ├── cache.ts             # Cache TTLs + CACHE_*/API_TIMEOUT_MS parsing
 │   ├── units.ts             # WEATHER_UNITS and per-unit overrides
 │   ├── tools.ts             # ENABLED_TOOLS presets (basic/standard/full) and tool names
 │   ├── defaultLocation.ts   # WEATHER_DEFAULT_LOCATION
@@ -369,11 +369,14 @@ WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
                                # docs/GOOGLE_WEATHER_KEY_SETUP.md
 
 # Logging
-LOG_LEVEL=1                    # 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR (default: 1)
+LOG_LEVEL=1                    # 0/DEBUG, 1/INFO, 2/WARN, 3/ERROR — number or name,
+                               # names case-insensitive (default: 1). An unrecognized
+                               # value warns on stderr and falls back to INFO.
 ```
 
-Cache/API/logging variables are validated in `src/config/cache.ts`; unit variables
-are parsed and validated in `src/config/units.ts`; optional keys in `src/config/api.ts`.
+Cache and API variables are validated in `src/config/cache.ts`; `LOG_LEVEL` is parsed
+in `src/utils/logger.ts`; unit variables are parsed and validated in
+`src/config/units.ts`; optional keys in `src/config/api.ts`.
 Per-call unit parameters are resolved by `src/utils/unitPreferences.ts` and formatted
 via `src/utils/unitFormat.ts`.
 

@@ -263,7 +263,7 @@ Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weath
 | `CACHE_MAX_SIZE` | `1000` | Max cache entries (100–10000) |
 | `API_TIMEOUT_MS` | `30000` | Upstream API timeout (5000–120000) |
 | `WEATHER_LIGHTNING_PREWARM` | `true` | Subscribe saved locations' geohashes at startup so `get_lightning_activity` has coverage before the first query. Set `false` to skip this and avoid the persistent MQTT connection at startup. No effect when the lightning tool is disabled. |
-| `LOG_LEVEL` | `1` | 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR (logs go to stderr) |
+| `LOG_LEVEL` | `1` | `0`/`DEBUG`, `1`/`INFO`, `2`/`WARN`, `3`/`ERROR` — number or name, names case-insensitive. An unrecognized value warns on stderr and falls back to `INFO`. Logs go to stderr |
 | `NCEI_API_TOKEN` | — | Optional [free NCEI token](https://www.ncdc.noaa.gov/cdo-web/token) for official NOAA climate normals (US); falls back to Open-Meteo automatically. See [Optional API keys](#optional-api-keys) |
 | `FIRMS_MAP_KEY` | — | Optional [free FIRMS key](https://firms.modaps.eosdis.nasa.gov/api/map_key/) for targeted wildfire queries and up to 5 days of detection history. See [Optional API keys](#optional-api-keys) |
 | `GOOGLE_POLLEN_API_KEY` | — | Optional key for pollen outside Europe (incl. the US). **Requires a Google Cloud billing account** — free tier is 5,000 lookups/month. See [Optional API keys](#optional-api-keys) and [the setup guide](./docs/GOOGLE_POLLEN_KEY_SETUP.md) |
