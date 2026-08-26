@@ -524,7 +524,7 @@ async function handleNationalCapAlerts(
   const countryPhrase = withArticle(countryName);
   const publisher = feed?.publisher ?? countryName;
 
-  const { warnings, unavailableCount, polygonUnavailableCount, indexTrimmed } =
+  const { warnings, unavailableCount, indexTrimmed } =
     await nationalCapService.getWarnings(countryCode);
 
   // Split by geometry, in the one order that is safe on safety data:
@@ -621,12 +621,17 @@ async function handleNationalCapAlerts(
         output += renderNationalCapWarning(warning, detail);
       }
 
+      // The count is computed from the block itself, never from the service's
+      // total, so this line can never disagree with the warnings printed
+      // beneath it. The country-level *block* is the whole `countryLevel` set —
+      // the alerts the display cap pushed into the remainder are part of the
+      // block this sentence describes, not separate from it. Computing over
+      // `shownCountryLevel` made the number change with `detail` and contradict
+      // the remainder line beneath it.
+      const lostGeometry = countryLevel.filter(warning => warning.polygonUnavailable).length;
+
       if (shownCountryLevel.length > 0) {
-        // The count here is computed from the block itself, never from the
-        // service's total, so this line can never disagree with the warnings
-        // printed beneath it.
-        const lostGeometry = shownCountryLevel.filter(warning => warning.polygonUnavailable).length;
-        if (polygonUnavailableCount > 0 && lostGeometry > 0) {
+        if (lostGeometry > 0) {
           output += `*Area geometry for ${lostGeometry} alert${lostGeometry > 1 ? 's' : ''} could not be loaded or parsed, `;
           output += `so ${lostGeometry > 1 ? 'they are' : 'it is'} listed at country level rather than matched to your point.*\n\n`;
         }
@@ -639,7 +644,6 @@ async function handleNationalCapAlerts(
         // country-level block never renders. Its alerts are still counted in
         // the remainder note below, but without this line the fact that they
         // have no usable geometry would vanish silently.
-        const lostGeometry = countryLevel.filter(warning => warning.polygonUnavailable).length;
         if (lostGeometry > 0) {
           output += `*${lostGeometry} further alert${lostGeometry > 1 ? 's' : ''} had no usable area geometry `;
           output += `and ${lostGeometry > 1 ? 'are' : 'is'} counted in the remainder below rather than matched to your point.*\n\n`;
