@@ -89,6 +89,72 @@ describe('parseLogLevel', () => {
       expect(parseLogLevel('3wat')).not.toBe(LogLevel.ERROR);
     });
   });
+
+  // The warning is the only unstructured line this server writes to stderr; every
+  // other line is one JSON record (Logger.log, src/utils/logger.ts:99). It also
+  // echoes operator input. These four hold that pair together: the echo stays
+  // useful for the values that are invisible without it, and stays one bounded
+  // line for the values that would otherwise run away with the stream.
+  describe('how the warning echoes the offending value', () => {
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
+    const messageFor = (raw: string): string => {
+      parseLogLevel(raw);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      return warnSpy.mock.calls[0][0] as string;
+    };
+
+    it('renders an ordinary typo byte-for-byte as it always has, so the fix costs the diagnostic nothing', () => {
+      expect(messageFor('4')).toBe(
+        'Invalid LOG_LEVEL: "4". Expected 0-3 or DEBUG/INFO/WARN/ERROR. Using default: INFO'
+      );
+    });
+
+    it('escapes an embedded newline so the warning cannot be read as two lines', () => {
+      // Short enough to survive the cap, so this tests the escaping alone.
+      const message = messageFor('2\nFORGED');
+
+      // The property that matters to a line-oriented log collector: one line out,
+      // whatever went in. Asserted on the whole message, not on a substring of it.
+      expect(message.split('\n')).toHaveLength(1);
+      expect(message).toContain('\\n');
+      // Still diagnosable — the operator can see what they actually set.
+      expect(message).toContain('FORGED');
+    });
+
+    it('truncates a full forged JSON record before the escaping even has to hold', () => {
+      // The realistic shape: long enough that the cap alone defeats it. Escaping
+      // and bounding are independent defences, and this asserts they compose.
+      const forged = '2\n{"timestamp":"2026-01-01T00:00:00.000Z","level":"ERROR","message":"FORGED"}';
+      const message = messageFor(forged);
+
+      expect(message.split('\n')).toHaveLength(1);
+      expect(message).not.toContain('FORGED');
+      expect(message).toContain('(truncated from 77 characters)');
+    });
+
+    it('bounds a runaway value and reports the length it did not print', () => {
+      const long = 'x'.repeat(4096);
+      const message = messageFor(long);
+
+      expect(message.length).toBeLessThan(200);
+      expect(message).toContain('"' + 'x'.repeat(64) + '"');
+      expect(message).toContain('(truncated from 4096 characters)');
+      expect(message).toContain('Using default: INFO');
+    });
+
+    it('says nothing about truncation for a value that was not truncated', () => {
+      expect(messageFor('x'.repeat(64))).not.toContain('truncated');
+    });
+  });
 });
 
 // NOTE on how "stderr" is observed below: under this repo's Vitest (v4.1.11,

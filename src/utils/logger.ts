@@ -183,8 +183,20 @@ export function parseLogLevel(raw: string | undefined): LogLevel {
   // loudly, so a misconfiguration cannot hide its own diagnosis. console.warn, not
   // logger.warn: the singleton is mid-construction here, and console.warn goes to
   // stderr, the only stream an MCP server may use.
+  // Echo the value through JSON.stringify rather than between literal quotes, and
+  // bound it. Showing it verbatim is the whole point of the diagnostic — "" and
+  // "  " are invisible any other way, and stringify keeps both the quoting and the
+  // whitespace — but this is the one unstructured line on a stream where every
+  // other line is a single JSON record (Logger.log, :99). An embedded newline
+  // would therefore let a mistyped LOG_LEVEL forge a log entry for anything
+  // reading that stream by line; stringify escapes it. The cap stops a pasted
+  // file from becoming the entire warning. Ordinary typos are untouched:
+  // JSON.stringify('4') is "4", byte for byte what this line printed before.
+  const MAX_ECHO = 64;
+  const echoed = JSON.stringify(raw.slice(0, MAX_ECHO));
+  const truncated = raw.length > MAX_ECHO ? ` (truncated from ${raw.length} characters)` : '';
   console.warn(
-    `Invalid LOG_LEVEL: "${raw}". Expected 0-3 or DEBUG/INFO/WARN/ERROR. Using default: INFO`
+    `Invalid LOG_LEVEL: ${echoed}${truncated}. Expected 0-3 or DEBUG/INFO/WARN/ERROR. Using default: INFO`
   );
   return LogLevel.INFO;
 }
