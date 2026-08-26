@@ -5,8 +5,10 @@
  *   US → NOAA (the original path, byte-identical output),
  *   Canada → MSC GeoMet (Environment and Climate Change Canada),
  *   MeteoAlarm member countries → the country's MeteoAlarm feed,
- *   India / Philippines / Indonesia → their national CAP feeds (NDMA SACHET,
- *     PAGASA, BMKG), matched to the requested point by alert polygon
+ *   Philippines / Indonesia → their national CAP feeds (PAGASA, BMKG), matched
+ *     to the requested point by the alert's own polygon; India → NDMA SACHET,
+ *     listed at country level, because SACHET serves geometry from a separate
+ *     endpoint that returns 403 to server-side clients
  *     (see .devdocs/archive/completed/plan-national-cap-alerts.md D1),
  *   elsewhere → the optional keyed Google Weather API fallback when a
  *     `GOOGLE_WEATHER_API_KEY` is configured, else a clean not-covered
@@ -524,7 +526,7 @@ async function handleNationalCapAlerts(
   const countryPhrase = withArticle(countryName);
   const publisher = feed?.publisher ?? countryName;
 
-  const { warnings, unavailableCount, polygonUnavailableCount, indexTrimmed } =
+  const { warnings, unavailableCount, indexTrimmed } =
     await nationalCapService.getWarnings(countryCode);
 
   // Split by geometry, in the one order that is safe on safety data:
@@ -621,14 +623,23 @@ async function handleNationalCapAlerts(
         output += renderNationalCapWarning(warning, detail);
       }
 
+      // The count is computed from the block itself, never from the service's
+      // total, so this line can never disagree with the warnings printed
+      // beneath it. The country-level *block* is the whole `countryLevel` set —
+      // the alerts the display cap pushed into the remainder are part of the
+      // block this sentence describes, not separate from it. Computing over
+      // `shownCountryLevel` made the number change with `detail` and contradict
+      // the remainder line beneath it.
+      const lostGeometry = countryLevel.filter(warning => warning.polygonUnavailable).length;
+
       if (shownCountryLevel.length > 0) {
-        // The count here is computed from the block itself, never from the
-        // service's total, so this line can never disagree with the warnings
-        // printed beneath it.
-        const lostGeometry = shownCountryLevel.filter(warning => warning.polygonUnavailable).length;
-        if (polygonUnavailableCount > 0 && lostGeometry > 0) {
+        if (lostGeometry > 0) {
+          // "treated as", not "listed at": the claim is about how the alert was
+          // routed — country-level rather than matched — and stays true for the
+          // ones the display cap pushed into the remainder, which are counted
+          // here but printed nowhere on this page.
           output += `*Area geometry for ${lostGeometry} alert${lostGeometry > 1 ? 's' : ''} could not be loaded or parsed, `;
-          output += `so ${lostGeometry > 1 ? 'they are' : 'it is'} listed at country level rather than matched to your point.*\n\n`;
+          output += `so ${lostGeometry > 1 ? 'they are' : 'it is'} treated as country-level rather than matched to your point.*\n\n`;
         }
         output += `**Country-level warnings** — *matched at country level (no usable area geometry for these alerts) — they may not affect your exact location:*\n\n`;
         for (const warning of shownCountryLevel) {
@@ -639,7 +650,6 @@ async function handleNationalCapAlerts(
         // country-level block never renders. Its alerts are still counted in
         // the remainder note below, but without this line the fact that they
         // have no usable geometry would vanish silently.
-        const lostGeometry = countryLevel.filter(warning => warning.polygonUnavailable).length;
         if (lostGeometry > 0) {
           output += `*${lostGeometry} further alert${lostGeometry > 1 ? 's' : ''} had no usable area geometry `;
           output += `and ${lostGeometry > 1 ? 'are' : 'is'} counted in the remainder below rather than matched to your point.*\n\n`;
@@ -1233,9 +1243,9 @@ function notCoveredResult(
   output += `Weather alerts are not yet available for ${region}.\n\n`;
   output += `Current alert coverage: the United States (NOAA National Weather Service), `;
   output += `Canada (Environment and Climate Change Canada), the European MeteoAlarm `;
-  output += `member countries (matched at country level), and — via their national CAP feeds, `;
-  output += `matched by alert polygon — India (NDMA SACHET), the Philippines (PAGASA), and `;
-  output += `Indonesia (BMKG).\n`;
+  output += `member countries (matched at country level), and — via their national CAP feeds — `;
+  output += `the Philippines (PAGASA) and Indonesia (BMKG), matched by alert polygon, and `;
+  output += `India (NDMA SACHET), matched at country level.\n`;
 
   if (reverseLookupFailed) {
     output += `\n*Note: the country lookup service was unavailable, so routing fell back to coordinate checks.*\n`;

@@ -255,6 +255,21 @@ describe('national CAP routing', () => {
     // The keyless coverage sentence must never name Google.
     expect(text).not.toContain('Google');
   });
+
+  it('attributes polygon matching to the Philippines and Indonesia but not to India', async () => {
+    const { text } = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      google: makeGoogleFake(false),
+      passNational: false
+    });
+
+    // SACHET serves geometry from an endpoint that 403s server-side clients,
+    // so Indian warnings are listed at country level with a note. Claiming
+    // uniform point-level precision for all three feeds overstates the answer.
+    expect(text).toContain('the Philippines (PAGASA) and Indonesia (BMKG), matched by alert polygon');
+    expect(text).toContain('India (NDMA SACHET), matched at country level');
+    expect(text).not.toContain('matched by alert polygon — India (NDMA SACHET)');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -397,6 +412,163 @@ describe('geometry-lost disclosure', () => {
       })
     });
 
+    expect(text).not.toContain('could not be loaded or parsed');
+  });
+
+  it('keeps the geometry-lost count equal to the whole country-level block at every detail level', async () => {
+    // Thirty is chosen so standard (cap 10) and full (cap 25) each land on a
+    // distinct, unmistakable remainder count — a coincidence cannot hide a
+    // scope slip back to the display-capped slice.
+    const warnings = Array.from({ length: 30 }, (_unused, index) =>
+      warningFixture({
+        identifier: `IN-lost-${index}`,
+        polygons: [],
+        polygonUnavailable: true
+      })
+    );
+
+    const standard = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      national: makeNationalFake({ warnings, polygonUnavailableCount: 30 })
+    });
+    const full = await callAlerts({ ...NEW_DELHI, detail: 'full' }, {
+      country: 'in',
+      national: makeNationalFake({ warnings, polygonUnavailableCount: 30 })
+    });
+
+    expect(standard.text).toContain('Area geometry for 30 alerts could not be loaded or parsed');
+    expect(standard.text).toContain('…and 20 more warnings');
+    expect(full.text).toContain('Area geometry for 30 alerts could not be loaded or parsed');
+    expect(full.text).toContain('…and 5 more warnings');
+
+    // The disclosure is a fact about the feed, not about the caller's
+    // requested verbosity — it must read identically at both detail levels.
+    const disclosureRegex = /\*Area geometry for \d+ alerts? could not be loaded or parsed[^\n]*\*/;
+    const standardDisclosure = standard.text.match(disclosureRegex)?.[0];
+    const fullDisclosure = full.text.match(disclosureRegex)?.[0];
+    expect(standardDisclosure).toBeDefined();
+    expect(standardDisclosure).toBe(fullDisclosure);
+  });
+
+  it('discloses geometry lost only in the remainder, above the country-level header', async () => {
+    // Ten warnings that were simply never given geometry by the publisher
+    // (no polygonUnavailable flag) rank Extreme and fill the standard cap
+    // exactly; two that lost already-published geometry rank Minor and fall
+    // into the remainder. The old count (over the shown slice) would have
+    // been 0 here and rendered nothing — this is the case that proves the
+    // guard now reads the whole block.
+    const published = Array.from({ length: 10 }, (_unused, index) =>
+      warningFixture({
+        identifier: `IN-published-${index}`,
+        polygons: [],
+        severity: 'Extreme'
+      })
+    );
+    const lost = Array.from({ length: 2 }, (_unused, index) =>
+      warningFixture({
+        identifier: `IN-lost-${index}`,
+        polygons: [],
+        polygonUnavailable: true,
+        severity: 'Minor'
+      })
+    );
+
+    const { text } = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      national: makeNationalFake({
+        warnings: [...published, ...lost],
+        polygonUnavailableCount: 2
+      })
+    });
+
+    expect(text).toContain('Area geometry for 2 alerts could not be loaded or parsed');
+    expect(text.indexOf('Area geometry for 2 alerts could not be loaded or parsed')).toBeLessThan(
+      text.indexOf('**Country-level warnings**')
+    );
+  });
+
+  it('counts the country-level block only, when a matched warning also lost geometry', async () => {
+    // The fixture that tells the block count apart from the service's
+    // feed-scoped `polygonUnavailableCount` — the implementation the design
+    // rejected by name. D4/G8 matches a warning whose *incomplete* ring set
+    // contains the point, so a warning can be `polygonUnavailable` **and**
+    // matched. The feed total counts those three, and would render "4 alerts
+    // ... rather than matched to your point" directly beneath "3 active
+    // warnings matched to your location" — wrong in the opposite direction
+    // from the display-capped slice this branch replaced.
+    //
+    // Every other fixture in this describe block leaves `matched` empty,
+    // which collapses the feed total onto the block count and makes the two
+    // indistinguishable. This one must not.
+    const matchedButFlagged = Array.from({ length: 3 }, (_unused, index) =>
+      warningFixture({
+        identifier: `IN-matched-${index}`,
+        polygons: [RING_AROUND_DELHI],
+        polygonUnavailable: true,
+        ringsDropped: 1
+      })
+    );
+    const lostEntirely = warningFixture({
+      identifier: 'IN-lost-0',
+      polygons: [],
+      polygonUnavailable: true
+    });
+
+    const { text } = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      national: makeNationalFake({
+        warnings: [...matchedButFlagged, lostEntirely],
+        // The real service derives this over the whole returned view, so all
+        // four flagged warnings are in it — including the three matched ones.
+        polygonUnavailableCount: 4
+      })
+    });
+
+    expect(text).toContain('**3 active warnings matched to your location**');
+    expect(text).toContain('Area geometry for 1 alert could not be loaded or parsed');
+    expect(text).not.toContain('Area geometry for 4 alerts');
+  });
+
+  it('discloses geometry lost when the matched block consumes the whole display cap', async () => {
+    // The sibling branch, which had no coverage at all: twelve matched
+    // warnings exhaust STANDARD_DISPLAY_CAP, so `shownCountryLevel` is empty
+    // and the **Country-level warnings** block never renders. Without this
+    // line the fact that five alerts have no usable geometry would vanish
+    // into the remainder count silently. Computing the count over the shown
+    // slice makes it 0 here and renders nothing.
+    const matched = Array.from({ length: 12 }, (_unused, index) =>
+      warningFixture({
+        identifier: `IN-matched-${index}`,
+        polygons: [RING_AROUND_DELHI],
+        severity: 'Extreme'
+      })
+    );
+    const lost = Array.from({ length: 5 }, (_unused, index) =>
+      warningFixture({
+        identifier: `IN-lost-${index}`,
+        polygons: [],
+        polygonUnavailable: true,
+        severity: 'Minor'
+      })
+    );
+
+    const { text } = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      national: makeNationalFake({
+        warnings: [...matched, ...lost],
+        polygonUnavailableCount: 5
+      })
+    });
+
+    expect(text).toContain('**12 active warnings matched to your location**');
+    expect(text).toContain(
+      '*5 further alerts had no usable area geometry and are counted in the remainder below rather than matched to your point.*'
+    );
+    expect(text).toContain('…and 7 more warnings');
+
+    // The country-level block never rendered, so neither its header nor the
+    // disclosure that sits above it may appear.
+    expect(text).not.toContain('**Country-level warnings**');
     expect(text).not.toContain('could not be loaded or parsed');
   });
 });

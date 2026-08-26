@@ -38,8 +38,11 @@ in `the alert's own polygon` terminated a single-quoted string in
 
 **Status:** active. **Re-verified 2026-08-24** (optional-mqtt curation): two
 deliberate `TS2322`/`TS6133` errors in `src/utils/version.ts` still left
-`npm test` reporting 103 files / 2,519 tests passing. Lint candidate — the gate
-already runs `build` before `test`; the trap is reading only the second result.
+`npm test` reporting 103 files / 2,519 tests passing. **Re-verified 2026-08-26**
+(cap-disclosure-accuracy curation): the same two error codes in
+`src/handlers/alertsHandler.ts` while that file's own suite reported 41/41
+passing. The trap is intact and unchanged. Lint candidate — the gate already
+runs `build` before `test`; the trap is reading only the second result.
 
 ---
 
@@ -434,9 +437,17 @@ remainder-note-detail diff review; closed by `74b69ab`, which added a
 clear-majority case and an exact-tie case. Both new cases also fail when the
 loop is mutated to take the last severity seen rather than the most common.
 
-**Status:** active. Sharper instance of [G11] — every assertion passes and the
-output is still wrong. Not lintable: only a human can tell that a fixture is
-degenerate with respect to the thing it claims to test.
+**Status:** active. **Verify line re-run 2026-08-26** (cap-disclosure-accuracy
+curation): mutating `count > topCount` to `>=` still turns exactly one test red
+(`alerts-remainder-detail.test.ts` — *"resolves a tie deterministically, by
+first appearance in the remainder"*), so `74b69ab`'s tie case still holds the
+line. The same run applied this entry prospectively rather than forensically:
+the two new fixtures in `alerts-national-cap.test.ts` were mutation-checked
+*before* being committed (revert `countryLevel` → `shownCountryLevel`, confirm
+both go red), which is the cheaper end of this lesson. Sharper instance of [G11]
+— every assertion passes and the output is still wrong. Not lintable: only a
+human can tell that a fixture is degenerate with respect to the thing it claims
+to test.
 
 ---
 
@@ -618,7 +629,9 @@ any section `get_weather_summary` can render — `current`, `forecast`, `alerts`
 
 **Rule:** grep **both** the tool dispatch in `src/index.ts` and the summary's
 own `switch` in `weatherSummaryHandler.ts`. Exercise the change through both
-tools, and document both user-visible consequences.
+tools, and document both user-visible consequences. **Read what the summary
+passes down before assuming the sub-tool's own default applies** — it does not
+forward an absent parameter, it substitutes its own.
 
 **Why:** preset membership differs between the two. `get_lightning_activity` is
 absent from the default `basic` preset while `get_weather_summary` — which calls
@@ -629,8 +642,21 @@ radius wrong. The summary also catches per-section failures into a
 `## <section> (unavailable)` block, so a thrown error surfaces very differently
 there than it does from the tool.
 
+**And the summary calls the same handler with different arguments, not with
+the caller's.** `weatherSummaryHandler.ts` builds one `subArgs` object for every
+section, and `const detail = validateDetail(typedArgs.detail, 'summary')` makes
+its default detail **`summary`**, not the `standard` that `get_alerts` defaults
+to on its own. So a change gated on detail level can be *invisible* through the
+summary at its default while being live through the specialized tool — the two
+paths render different branches of the same handler. `subArgs` also blanks
+`compare_models` and `ensemble_spread` outright. "Same handler, therefore same
+output" is the wrong inference; the right one is "same handler, different
+arguments, so check which branch each path lands in".
+
 **Verify:** search `SummarySection` and the summary switch, then drive the
-changed section through both MCP tools against the built dist.
+changed section through both MCP tools against the built dist — and drive the
+summary at an **explicit** detail level as well as at its default, comparing the
+two in one run.
 
 **Evidence:** 2026-08-24 (optional-mqtt) — raised as a minor finding in the
 Codex plan review (R3). It corrected the design plan's framing (which called
@@ -643,6 +669,19 @@ server exposes 6 tools — `get_lightning_activity` **absent**,
 `get_weather_summary` **present** — and the summary rendered the changed
 lightning text in four safety states. Getting that probe honest required [G26]:
 the first attempt ran from the repo root and silently tested the `full` preset.
+
+**Broadened 2026-08-26** (`f2bb40e`, cap-disclosure-accuracy T4) with the
+`subArgs` half above. The implementation plan asserted that
+`get_weather_summary` "passes no `detail`, so it renders at the `standard`
+default" and built its live probe on that; the probe came back with **no
+disclosure line at all** and would have read as a clean negative ([G28]) had the
+plan's expected shape not been asserted first. The summary was rendering the
+`detail === 'summary'` counts branch, where the changed line has never existed.
+Re-run at an explicit `detail: 'standard'`, both paths disclosed the same
+corrected count in the same run. The plan's premise was wrong, not the code —
+which is the point: this is a claim a plan can state confidently and get
+backwards, because it is invisible in the summary's own `switch`. Lint candidate
+— a test asserting `subArgs.detail` for each section would pin it mechanically.
 
 ---
 
