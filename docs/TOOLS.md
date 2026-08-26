@@ -694,11 +694,12 @@ Provides real-time lightning strike detection from the Blitzortung.org global li
 
 **Returns:**
 - Real-time lightning strikes within specified radius
-- 4-level safety assessment:
-  - **Safe** (>50km): No immediate lightning threat
-  - **Elevated** (16-50km): Monitor conditions, plan indoor access
-  - **High** (8-16km): Seek shelter immediately
-  - **Extreme** (<8km): Active thunderstorm, dangerous conditions
+- 4-level safety assessment, banded on the nearest-strike distance **as displayed** (rounded to 0.1 km),
+  so the verdict can never disagree with the number shown:
+  - **Extreme** (≤8 km): Active thunderstorm, dangerous conditions
+  - **High** (>8–16 km): Seek shelter immediately
+  - **Elevated** (>16–50 km): Monitor conditions, plan indoor access
+  - **Safe** (>50 km): No immediate lightning threat
 - Comprehensive statistics:
   - Total strikes and strike density (per sq km)
   - Strikes per minute rate
