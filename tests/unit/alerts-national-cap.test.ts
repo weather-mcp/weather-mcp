@@ -486,6 +486,48 @@ describe('geometry-lost disclosure', () => {
       text.indexOf('**Country-level warnings**')
     );
   });
+
+  it('counts the country-level block only, when a matched warning also lost geometry', async () => {
+    // The fixture that tells the block count apart from the service's
+    // feed-scoped `polygonUnavailableCount` — the implementation the design
+    // rejected by name. D4/G8 matches a warning whose *incomplete* ring set
+    // contains the point, so a warning can be `polygonUnavailable` **and**
+    // matched. The feed total counts those three, and would render "4 alerts
+    // ... rather than matched to your point" directly beneath "3 active
+    // warnings matched to your location" — wrong in the opposite direction
+    // from the display-capped slice this branch replaced.
+    //
+    // Every other fixture in this describe block leaves `matched` empty,
+    // which collapses the feed total onto the block count and makes the two
+    // indistinguishable. This one must not.
+    const matchedButFlagged = Array.from({ length: 3 }, (_unused, index) =>
+      warningFixture({
+        identifier: `IN-matched-${index}`,
+        polygons: [RING_AROUND_DELHI],
+        polygonUnavailable: true,
+        ringsDropped: 1
+      })
+    );
+    const lostEntirely = warningFixture({
+      identifier: 'IN-lost-0',
+      polygons: [],
+      polygonUnavailable: true
+    });
+
+    const { text } = await callAlerts(NEW_DELHI, {
+      country: 'in',
+      national: makeNationalFake({
+        warnings: [...matchedButFlagged, lostEntirely],
+        // The real service derives this over the whole returned view, so all
+        // four flagged warnings are in it — including the three matched ones.
+        polygonUnavailableCount: 4
+      })
+    });
+
+    expect(text).toContain('**3 active warnings matched to your location**');
+    expect(text).toContain('Area geometry for 1 alert could not be loaded or parsed');
+    expect(text).not.toContain('Area geometry for 4 alerts');
+  });
 });
 
 // ---------------------------------------------------------------------------
