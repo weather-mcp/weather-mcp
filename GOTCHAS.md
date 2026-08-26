@@ -1052,6 +1052,47 @@ must never run in parallel. Not lintable.
 
 ---
 
+## G31 — A new module under `src/` has no changelog bullet to hang off, so the architecture map is missed
+
+**Trigger:** a task adds a file to `src/utils/`, `src/services/`, or `src/config/`
+— especially a small pure helper introduced as an internal refactor rather than
+as a user-visible feature.
+
+**Rule:** adding a module is a **docs touch** on `CLAUDE.md`, and the design
+plan's `## Docs impact` must say so. Two edits, not one: a line in the
+`src/` architecture map, and a mention wherever `CLAUDE.md`'s conventions
+section states the rule the module now enforces.
+
+**Why:** the release docs walk is driven by the changelog's `### Added` /
+`### Changed` bullets — "which page does this bullet touch?" A helper extracted
+to hold an existing convention produces **no bullet of its own**; it is invisible
+inside the bullet for the fix it enabled. So the per-bullet walk cannot reach it,
+the per-page `<user-docs>` map does not list an architecture map as a page, and
+`check-doc-versions.sh` only checks version, tool and test counts. Nothing in the
+gate or the release procedure fails. The map simply goes quietly stale, one
+module at a time, and the file that new contributors and AI assistants read first
+stops describing the tree.
+
+**Verify:** `for f in src/utils/*.ts src/services/*.ts src/config/*.ts; do
+grep -q "$(basename "$f")" CLAUDE.md || echo "MISSING FROM MAP: $f"; done`
+
+**Evidence:** 2026-08-26 (v1.25.2 release, step 4b) — `src/utils/displayBanding.ts`
+shipped on `feat/issue-80-lightning-band-rounding` with a design plan, an impl
+plan with a dedicated docs task, a clean cross-vendor diff review (0 blockers,
+0 majors) and a passing QA record, and **none of them** put it in `CLAUDE.md`'s
+utils map. It was caught only by the release's structural pass, which asks what
+the diff changed rather than what the changelog says. `CLAUDE.md:196` was in the
+same position: it already stated "bands and categories are computed from the
+rounded display value" and now had a shared helper enforcing it, with nothing
+naming it.
+
+**Status:** active. Load-bearing for plans 2 and 3 of the band-rounding sequence,
+which consume this same helper and may add their own. Lintable — the `Verify`
+loop above is a two-line check that belongs in `check-doc-versions.sh`; until it
+is there, it is a manual step in `## Docs impact`.
+
+---
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
