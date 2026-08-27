@@ -26,6 +26,7 @@ import { resolveLocationAsync, prependLocationLine } from '../utils/locationReso
 import { validateDetail } from '../utils/validation.js';
 import { guessTimezoneFromCoords, formatObservationAge } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
+import { displayValue } from '../utils/displayBanding.js';
 import { isInUS } from '../utils/geography.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -362,32 +363,53 @@ async function formatNIFCWildfire(
       }
 
       // Safety recommendations based on the nearest ACTIVE (uncontained) wildfire.
-      // A fully-contained fire — however close — no longer drives the escalation
-      // tier (F3: a 100%-contained fire was producing EXTREME DANGER wording).
+      // A fire whose containment *displays* as fully contained — however close —
+      // no longer drives the escalation tier (F3: a 100%-contained fire was
+      // producing EXTREME DANGER wording).
+      //
+      // Exclude on the *displayed* containment: formatFireDetails prints
+      // `toFixed(0)`, so a fire at 99.6% renders `100%` and must not drive the
+      // tier — otherwise the report shows `**Containment:** 100%` and
+      // `EXTREME DANGER` together, the incoherence F3 was introduced to remove,
+      // surviving at the rounding edge. This is deliberately the one
+      // less-cautious edge in the band-rounding sequence (design plan,
+      // "Containment").
       const wildfires = firesWithDistance.filter(f => f.fire.type === 'Wildfire');
-      const nearestWildfire = wildfires.find(f => f.fire.containment < 100);
+      const nearestWildfire = wildfires.find(f => displayValue(f.fire.containment, 0) < 100);
 
       if (wildfires.length > 0) {
         output += `\n## Safety Assessment\n\n`;
 
         if (nearestWildfire) {
-          const dist = nearestWildfire.distance;
+          // Band on the number the report prints, not the raw measurement:
+          // formatFireDetails renders `distance.toFixed(1)`, so banding on the
+          // raw value lets two reports show the same `5.0 km` under different
+          // tiers. `<=` rather than `<` because rounding down toward the
+          // displayed figure would otherwise move a fire *out* of the more
+          // dangerous tier. It fires only where the raw distance has reached a
+          // threshold but still displays at it: `[5, 5.05]`, `[25, 25.05)` and
+          // `[50, 50.05]` km. The three windows are deliberately written
+          // asymmetric — `toFixed` disagrees with itself on exact halves, so
+          // 5.05 and 50.05 display low while 25.05 displays high (G36). Derive
+          // them, do not assume symmetry. And because the sentence printed
+          // beneath says "within 5 km", which includes 5.0.
+          const dist = displayValue(nearestWildfire.distance, 1);
           const nearestOverall = wildfires[0];
           if (nearestOverall !== nearestWildfire) {
             output += `ℹ️ Nearest fire (${nearestOverall.fire.name}, ${nearestOverall.distance.toFixed(1)} km) is 100% contained and excluded from the danger assessment.\n\n`;
           }
 
-          if (dist < 5) {
+          if (dist <= 5) {
             output += `⚠️ **EXTREME DANGER** - Wildfire within 5 km\n`;
             output += `- Evacuate immediately if advised by authorities\n`;
             output += `- Monitor local emergency alerts\n`;
             output += `- Have evacuation plan ready\n`;
-          } else if (dist < 25) {
+          } else if (dist <= 25) {
             output += `🟠 **HIGH ALERT** - Wildfire within 25 km\n`;
             output += `- Monitor fire conditions closely\n`;
             output += `- Prepare for possible evacuation\n`;
             output += `- Watch for smoke and changing conditions\n`;
-          } else if (dist < 50) {
+          } else if (dist <= 50) {
             output += `🟡 **CAUTION** - Wildfire within 50 km\n`;
             output += `- Be aware of smoke and air quality impacts\n`;
             output += `- Monitor local news and fire updates\n`;
@@ -580,18 +602,22 @@ async function formatFIRMSWildfire(
       // as the NIFC path, wording adjusted for detections. No containment
       // logic — FIRMS has none (D5).
       const nearest = clusters[0];
+      // Band on the displayed distance with `<=`, exactly as the NIFC ladder
+      // above does and for the same reasons — see the comment there.
+      // formatClusterDetails renders `cluster.distanceKm.toFixed(1)`.
+      const nearestShown = displayValue(nearest.distanceKm, 1);
       output += `\n## Safety Assessment\n\n`;
-      if (nearest.distanceKm < 5) {
+      if (nearestShown <= 5) {
         output += `⚠️ **EXTREME DANGER** - Satellite fire detections within 5 km\n`;
         output += `- Evacuate immediately if advised by authorities\n`;
         output += `- Monitor local emergency alerts\n`;
         output += `- Have evacuation plan ready\n`;
-      } else if (nearest.distanceKm < 25) {
+      } else if (nearestShown <= 25) {
         output += `🟠 **HIGH ALERT** - Satellite fire detections within 25 km\n`;
         output += `- Monitor fire conditions closely\n`;
         output += `- Prepare for possible evacuation\n`;
         output += `- Watch for smoke and changing conditions\n`;
-      } else if (nearest.distanceKm < 50) {
+      } else if (nearestShown <= 50) {
         output += `🟡 **CAUTION** - Satellite fire detections within 50 km\n`;
         output += `- Be aware of smoke and air quality impacts\n`;
         output += `- Monitor local news and fire updates\n`;
