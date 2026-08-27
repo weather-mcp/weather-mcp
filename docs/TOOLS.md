@@ -751,7 +751,7 @@ Monitor river levels and flood status worldwide — NOAA gauge observations in t
 **Returns (US path):**
 - Nearest river gauges with current water levels
 - Observed trend per gauge (rising/falling/steady with magnitude and window)
-- Flood stage thresholds (action, minor, moderate, major). Forecast-series points are labelled against the gauge's thresholds using the stage **as displayed** (two decimals), so a point printing at its action stage is labelled; the published thresholds themselves are NOAA's own values and are not rounded.
+- Flood stage thresholds (action, minor, moderate, major) — **only for gauges that publish them.** Many NWPS gauges return no threshold set at all, and those reports carry no flood-stage section and no threshold-derived labels; the `**Flood Category:**` line you see on most gauges comes from NOAA's own published status string, not from these thresholds. Where thresholds are published, forecast-series points are labelled against them using the stage **as displayed** (two decimals), so a point printing at its action stage is labelled; the published thresholds themselves are NOAA's own values and are not rounded.
 - Current flood status and forecast (multi-point forecast series at `detail="full"` for gauges that have one — mostly tidal and major-river gauges)
 - Streamflow data (cubic feet per second)
 - Distance to each gauge from query location
