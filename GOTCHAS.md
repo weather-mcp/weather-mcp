@@ -1275,6 +1275,53 @@ given assertion is about a stream or about a call.
 
 ---
 
+## G35 — Release prose is a JavaScript replacement string, so a `$` in a changelog bullet rewrites the file
+
+**Trigger:** any script that promotes author-written text into a file with
+`String.prototype.replace(pattern, string)` — in this repo,
+`scripts/update-docs-for-release.sh` promoting `## [Unreleased]` into the new
+version section.
+
+**Rule:** pass a **function** as the replacement (`() => text`), or escape every
+`$` as `$$`. A function replacement inserts the string literally and has no
+metacharacters at all, which is the only form that is safe against text nobody
+audited for `$`. The same hazard has a `sed` half — `/`, `&`, `\` in a `sed`
+replacement — which the same script already guards with `SUMMARY_SED`; the JS
+half was missed because the syntax looks like plain interpolation.
+
+**Why:** in a string replacement JS interprets `$$`, `` $` ``, `$'`, `$&` and
+`$1`-`$9`. `` $` `` means *everything in the subject string before the match* and
+`$'` means *everything after it*, so a single stray `` $` `` duplicates an
+arbitrarily large slab of the file into the middle of the inserted text. Nothing
+throws, the write succeeds, and `scripts/check-doc-versions.sh` passes over the
+result — it checks version strings, tool counts and the link-reference block,
+none of which the corruption touches.
+
+**Verify:**
+
+```
+node -e "console.log('AB'.replace(/B/, 'x\$\`y'))"
+```
+
+Prints `AxAy`, not `AxB\`y`.
+
+**Evidence:** 2026-08-26, v1.25.4 prep. The `LOG_LEVEL` bullet contained *"the
+numeric form matches `^[0-3]$` rather than going through `parseInt`"*. The `$`
+was followed by a backtick, so the seven-line CHANGELOG header was spliced in
+after `^[0-3]`, and the remainder of the bullet was pushed below a second copy
+of the file's preamble. `check-doc-versions.sh` reported *"All documentation
+checks passed"* on the corrupted file. Caught by reading the promoted section,
+which is exactly what [G11] says to do. Fixed in the same release by switching
+line 94 to a function replacement.
+
+**Status:** active. Related: [G11] (read the real output, do not trust the
+green check), [G16] (the other way this same script has silently produced a
+plausible-looking wrong result). Lintable in principle — a grep for
+`\.replace(` with a template-literal second argument would find it — but there
+are three call sites in one script and two of them use `$1` deliberately.
+
+---
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
