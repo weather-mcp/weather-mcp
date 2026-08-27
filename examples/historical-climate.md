@@ -340,26 +340,27 @@ get_current_conditions({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KMDW
-**Time:** Aug 14, 2026, 12:40 PM (25 minutes ago)
+**Time:** Aug 27, 2026, 4:30 PM (20 minutes ago)
 
-**Conditions:** Mostly Cloudy
-**Temperature:** 77°F
-**Dewpoint:** 70°F
-**Humidity:** 78%
-**Pressure:** 30.07 inHg
-**Visibility:** 10.0 miles
-**Cloud Cover:** Broken clouds at 1900ft, Broken clouds at 2400ft, Broken clouds at 10000ft
+**Conditions:** Partly Cloudy
+**Temperature:** 79°F
+**Dewpoint:** 61°F
+**Humidity:** 54%
+**Wind:** 10 mph from 80°
+**Pressure:** 30.01 inHg
+**Visibility:** 10.0 miles (clear)
+**Cloud Cover:** Scattered clouds at 5000ft, Scattered clouds at 8000ft
 
 ## 📊 Climate Context
 
-**Normal High:** 84°F
-**Normal Low:** 67°F
+**Normal High:** 82°F
+**Normal Low:** 66°F
 **Normal Precipitation:** 0.12 in
 
 *Climate normals based on 1991-2020 data*
 *Source: NCEI*
 
-**Records for Aug 14:** High 99°F (1944) · Low 48°F (1964) — records since 1928
+**Records for Aug 27:** High 99°F (2024) · Low 51°F (1968) — records since 1928
 Records: NOAA Regional Climate Centers (ACIS)
 
 ---
@@ -374,5 +375,5 @@ Records: NOAA Regional Climate Centers (ACIS)
 **Features shown:** `get_historical_weather` — any date range back to 1940, anywhere (Open-Meteo archive) · `include_normals` — 30-year normal high/low with departure from normal, plus the US record high/low for the date and the year it was set (NOAA Regional Climate Centers).
 
 <!-- capture-stamp -->
-*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

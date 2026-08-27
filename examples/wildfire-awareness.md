@@ -56,24 +56,9 @@ get_wildfire_info({
 
 ### Status
 **Size:** 7196 acres (2912 hectares)
-**Containment:** 67% ███████░░░
+**Containment:** 80% ████████░░
 **Discovery Date:** 6/28/2026
-**Days Active:** 46
-
----
-
-## Fishhook
-
-**Type:** 🔥 Wildfire
-**Distance:** 165.6 km (102.9 mi)
-**Location:** US-CO, Routt County near Steamboat Springs
-**Coordinates:** 40.4142, -106.7256
-
-### Status
-**Size:** 309 acres (125 hectares)
-**Containment:** 100% ██████████
-**Discovery Date:** 7/12/2026
-**Days Active:** 33
+**Days Active:** 60
 
 ---
 
@@ -86,24 +71,9 @@ get_wildfire_info({
 
 ### Status
 **Size:** 102003 acres (41279 hectares)
-**Containment:** 72% ███████░░░
+**Containment:** 77% ████████░░
 **Discovery Date:** 6/29/2026
-**Days Active:** 46
-
----
-
-## Fuhr Gulch
-
-**Type:** 🔥 Wildfire
-**Distance:** 249.0 km (154.7 mi)
-**Location:** US-CO, Moffat County near Craig
-**Coordinates:** 40.4128, -107.7817
-
-### Status
-**Size:** 1650 acres (668 hectares)
-**Containment:** 100% ██████████
-**Discovery Date:** 7/21/2026
-**Days Active:** 23
+**Days Active:** 59
 
 ---
 
@@ -116,9 +86,39 @@ get_wildfire_info({
 
 ### Status
 **Size:** 603 acres (244 hectares)
-**Containment:** 76% ████████░░
+**Containment:** 100% ██████████
 **Discovery Date:** 8/6/2026
-**Days Active:** 8
+**Days Active:** 21
+
+---
+
+## Elk
+
+**Type:** 🔥 Wildfire
+**Distance:** 272.2 km (169.1 mi)
+**Location:** US-CO, Hinsdale County near Lake City
+**Coordinates:** 38.1242, -107.3548
+
+### Status
+**Size:** 7257 acres (2937 hectares)
+**Containment:** 33% ███░░░░░░░
+**Discovery Date:** 7/9/2026
+**Days Active:** 49
+
+---
+
+## Stewart
+
+**Type:** 🔥 Wildfire
+**Distance:** 275.9 km (171.4 mi)
+**Location:** US-CO, Rio Blanco County
+**Coordinates:** 39.8367, -108.2165
+
+### Status
+**Size:** 26 acres (10 hectares)
+**Containment:** 0% ░░░░░░░░░░
+**Discovery Date:** 8/26/2026
+**Days Active:** 1
 
 ---
 
@@ -171,9 +171,9 @@ get_air_quality({
 **Timezone:** America/Denver
 **Elevation:** 1599m
 
-**Observation Time:** 8/14/2026, 2:00:00 PM
+**Observation Time:** 8/27/2026, 3:00:00 PM
 
-## 🟡 US Air Quality Index: 59
+## 🟡 US Air Quality Index: 54
 
 **Category:** Moderate (Yellow)
 **Description:** Air quality is acceptable
@@ -183,26 +183,34 @@ Air quality is acceptable; however, unusually sensitive people may experience mi
 
 ⚠️ **Caution:** Unusually sensitive people should consider reducing prolonged outdoor exertion.
 
-## 🟡 UV Index: 5.7
+## 🟡 UV Index: 5.5
 
 **Level:** Moderate
 **Description:** Protection recommended
 **Recommendation:** Wear sunscreen, hat, and sunglasses. Seek shade during midday hours.
 
-*Note: UV index under clear sky would be 8.9*
+*Note: UV index under clear sky would be 6.5*
 
 ## Pollutant Concentrations
 
-**PM2.5 (Fine Particulate Matter):** 7.3 μg/m³
-**PM10 (Coarse Particulate Matter):** 7.9 μg/m³
-**Ozone (O₃):** 137 μg/m³
-**Nitrogen Dioxide (NO₂):** 1.9 μg/m³
-**Sulfur Dioxide (SO₂):** 0.70 μg/m³
-**Carbon Monoxide (CO):** 136 μg/m³
+**PM2.5 (Fine Particulate Matter):** 5.7 μg/m³
+**PM10 (Coarse Particulate Matter):** 8.5 μg/m³
+**Ozone (O₃):** 127 μg/m³
+**Nitrogen Dioxide (NO₂):** 1.5 μg/m³
+**Sulfur Dioxide (SO₂):** 0.60 μg/m³
+**Carbon Monoxide (CO):** 141 μg/m³
 **Ammonia (NH₃):** N/A
-**Aerosol Optical Depth:** 0.160 (atmospheric haze indicator)
+**Aerosol Optical Depth:** 0.110 (atmospheric haze indicator)
 
-*European AQI: 61 (Poor)*
+## 🌾 Pollen
+
+**Weed:** 5 (Very High) — in season
+
+In season: Ragweed (Very High)
+
+*Universal Pollen Index (0–5) for today. Source: Includes pollen data from Google.*
+
+*European AQI: 58 (Moderate)*
 ````
 
 </details>
@@ -238,14 +246,15 @@ get_current_conditions({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KBJC
-**Time:** Aug 14, 2026, 1:47 PM (36 minutes ago)
+**Time:** Aug 27, 2026, 3:19 PM (31 minutes ago)
 
-**Conditions:**  Rain
-**Temperature:** 86°F
-**Wind:** 7 mph from 20°
-**Pressure:** 30.15 inHg
-**Visibility:** 10.0 miles
-**Cloud Cover:** Scattered clouds at 10007ft
+**Conditions:** Partly Cloudy
+**Temperature:** 88°F
+**Dewpoint:** 45°F
+**Humidity:** 22%
+**Pressure:** 30.25 inHg
+**Visibility:** 10.0 miles (clear)
+**Cloud Cover:** Scattered clouds at 12008ft
 
 ## Fire Weather
 
@@ -253,8 +262,8 @@ get_current_conditions({
 Current conditions do not meet thresholds for fire weather concerns. Fire danger indices are calculated during periods of low humidity, high temperatures, and strong winds.
 
 **Atmospheric Monitoring:**
-**Mixing Height:** 205 ft (very poor dispersion)
-**Transport Wind:** 7 mph (moderate smoke transport)
+**Mixing Height:** 108 ft (very poor dispersion)
+**Transport Wind:** 9 mph (moderate smoke transport)
 
 *Fire danger indices (Haines Index, Grassland Fire Danger, Red Flag Threat) are calculated during elevated fire risk periods, typically during dry seasons or when Red Flag conditions are possible.*
 
@@ -311,16 +320,16 @@ get_wildfire_info({
 
 ⚠️ Satellite heat detections — not managed incident data. No fire names, sizes, or containment are available; detections may include industrial heat sources, gas flares, or agricultural burns.
 
-🔥 **11 satellite fire detections in the last 3 days, grouped into 8 clusters within 200 km**
+🔥 **9 satellite fire detections in the last 3 days, grouped into 7 clusters within 200 km**
 
 ## Detection Cluster 1
 
-**Detections:** 1 hotspot (1 day / 0 night)
-**Distance:** 21.7 km (13.5 mi) WNW
-**Center:** 38.0279, 23.4857
-**Peak intensity:** 5.0 MW (fire radiative power)
-**Newest detection:** 2 days ago
-**Confidence:** 1 nominal
+**Detections:** 2 hotspots (2 day / 0 night)
+**Distance:** 7.8 km (4.9 mi) NE
+**Center:** 38.0379, 23.7848
+**Peak intensity:** 2.5 MW (fire radiative power)
+**Newest detection:** 34.3 hours ago
+**Confidence:** 2 low
 **Satellite:** Suomi NPP (VIIRS)
 
 ---
@@ -328,10 +337,10 @@ get_wildfire_info({
 ## Detection Cluster 2
 
 **Detections:** 1 hotspot (0 day / 1 night)
-**Distance:** 52.1 km (32.4 mi) NNE
-**Center:** 38.3732, 24.0597
-**Peak intensity:** 1.5 MW (fire radiative power)
-**Newest detection:** 43.5 hours ago
+**Distance:** 13.5 km (8.4 mi) NW
+**Center:** 38.0814, 23.6355
+**Peak intensity:** 1.1 MW (fire radiative power)
+**Newest detection:** 45.7 hours ago
 **Confidence:** 1 nominal
 **Satellite:** Suomi NPP (VIIRS)
 
@@ -339,42 +348,42 @@ get_wildfire_info({
 
 ## Detection Cluster 3
 
-**Detections:** 1 hotspot (0 day / 1 night)
-**Distance:** 95.6 km (59.4 mi) WSW
-**Center:** 37.6087, 22.7482
-**Peak intensity:** 1.2 MW (fire radiative power)
-**Newest detection:** 19.8 hours ago
-**Confidence:** 1 nominal
+**Detections:** 2 hotspots (0 day / 2 night)
+**Distance:** 23.9 km (14.9 mi) NW
+**Center:** 38.1286, 23.5250
+**Peak intensity:** 2.6 MW (fire radiative power)
+**Newest detection:** 45.7 hours ago
+**Confidence:** 2 nominal
 **Satellite:** Suomi NPP (VIIRS)
 
 ---
 
 ## Detection Cluster 4
 
-**Detections:** 2 hotspots (2 day / 0 night)
-**Distance:** 127.4 km (79.2 mi) NNW
-**Center:** 38.9365, 22.9139
-**Peak intensity:** 6.4 MW (fire radiative power)
-**Newest detection:** 8.4 hours ago
-**Confidence:** 2 nominal
+**Detections:** 1 hotspot (1 day / 0 night)
+**Distance:** 38.1 km (23.7 mi) NNW
+**Center:** 38.3170, 23.6256
+**Peak intensity:** 2.9 MW (fire radiative power)
+**Newest detection:** 34.3 hours ago
+**Confidence:** 1 low
 **Satellite:** Suomi NPP (VIIRS)
 
 ---
 
 ## Detection Cluster 5
 
-**Detections:** 1 hotspot (0 day / 1 night)
-**Distance:** 152.7 km (94.9 mi) NNW
-**Center:** 39.1703, 22.8423
-**Peak intensity:** 1.1 MW (fire radiative power)
-**Newest detection:** 19.8 hours ago
-**Confidence:** 1 nominal
+**Detections:** 1 hotspot (1 day / 0 night)
+**Distance:** 49.1 km (30.5 mi) N
+**Center:** 38.4241, 23.6822
+**Peak intensity:** 2.2 MW (fire radiative power)
+**Newest detection:** 34.3 hours ago
+**Confidence:** 1 low
 **Satellite:** Suomi NPP (VIIRS)
 
 ---
 
 
-*Note: 3 additional clusters found within radius (showing nearest 5 only — use detail="full" for more)*
+*Note: 2 additional clusters found within radius (showing nearest 5 only — use detail="full" for more)*
 
 ## Safety Assessment
 
@@ -425,25 +434,25 @@ get_current_conditions({
 ````markdown
 # Current Weather Conditions
 
-**Time:** Aug 14, 2026, 11:15 PM
+**Time:** Aug 28, 2026, 12:45 AM
 
 **Conditions:** Clear sky
-**Temperature:** 77°F
-**Today's Range:** High 90°F / Low 75°F
-**Dewpoint:** 48°F
-**Humidity:** 36%
-**Wind:** 5 mph from 23°, gusting to 14 mph
-**Pressure:** 29.94 inHg
+**Temperature:** 80°F
+**Today's Range:** High 97°F / Low 76°F
+**Dewpoint:** 59°F
+**Humidity:** 48%
+**Wind:** 3 mph from 56°, gusting to 7 mph
+**Pressure:** 30.00 inHg
 **Cloud Cover:** 0%
 
 ## Fire Weather
 
-**🟢 Fosberg Fire Weather Index:** 11 (Low)
+**🟢 Fosberg Fire Weather Index:** 6 (Low)
 Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.
 
 **Dryness context:**
-- **Vapour-pressure deficit:** 2.0 kPa (high drying power)
-- **Topsoil moisture (top 1 cm):** 0.07 m³/m³ (very dry)
+- **Vapour-pressure deficit:** 1.8 kPa (moderate drying power)
+- **Topsoil moisture (top 1 cm):** 0.08 m³/m³ (very dry)
 
 *Derived by this server from Open-Meteo model data — not an official fire-danger rating. Heed warnings from your national fire authority.*
 
@@ -459,5 +468,5 @@ Computed from current temperature, humidity, and sustained wind. Higher values m
 **Features shown:** `get_wildfire_info` on both paths — NIFC named incidents in the US (containment, distance, safety tier) and NASA FIRMS satellite heat detections everywhere else (clustered hotspots, no names or containment, never an all-clear) · `get_current_conditions` with `include_fire_weather` on both paths — NOAA's published indices in the US, a server-computed Fosberg index with dryness context elsewhere, each labeled for what it is · `get_air_quality` on the US path — US AQI scale, pollutant breakdown (PM2.5 is the smoke signal), UV index, health recommendations.
 
 <!-- capture-stamp -->
-*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

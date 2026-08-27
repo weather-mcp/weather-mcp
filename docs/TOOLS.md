@@ -83,6 +83,10 @@ Honest framing is part of the output: spread across models is a *proxy* for
 uncertainty, not a guarantee — a tight spread can still be wrong, and model run
 times differ and are not shown.
 
+The agreement band (`tight` / `moderate` / `divergent`) is keyed on the spread
+**as displayed** — the whole degree the line prints — so the number and its
+label can never disagree.
+
 Interactions, each deliberate:
 
 | With | Behavior |
@@ -246,10 +250,13 @@ What's the weather right now in Tokyo?
 - Heat index or wind chill (when applicable)
 - 24-hour temperature range
 - Recent precipitation
-- Cloud cover and visibility
+- Cloud cover and visibility (the visibility descriptor — `clear`, `haze/mist`, `fog`, `dense fog` — is keyed on the figure **as displayed**, **in the unit the report prints**, so it follows the km figure under metric preferences rather than a hidden miles value)
 - Snow depth on ground (when available)
 - Climate normals comparison (when `include_normals=true`), plus the US record high/low for today's date with attribution "Records: NOAA Regional Climate Centers (ACIS)"
 - Fire weather indices (when `include_fire_weather=true`) — Haines Index, Grassland Fire Danger, Red Flag Threat, mixing height, transport winds, as published by NOAA
+  (the category beside each figure — Red Flag Threat, and on the international
+  path vapour-pressure deficit and topsoil moisture — is keyed on the value **as
+  displayed**, so the number and its label can never disagree)
 - Thermal-stress context in extreme conditions (automatic, see below)
 - All timestamps in local timezone
 
@@ -549,7 +556,7 @@ Get comprehensive air quality data for any location worldwide.
 *Coordinates not required when `location_name` or `city_name` is provided.
 
 **Description:**
-Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index. With `forecast=true`, the full forecast range is shown grouped by calendar day — each day gets a dated header with its peak AQI **and peak UV index** (e.g. `— peak US AQI 63 (Moderate) · UV 10 (Very High)`), plus 6-hour period ranges labeled by the period's peak AQI category. Hours already past are skipped; days with no UV data omit the UV clause.
+Provides current air quality conditions using the Open-Meteo Air Quality API with automatic AQI scale selection (US AQI for US locations, European EAQI elsewhere). Includes health recommendations, pollutant concentrations, and UV index. With `forecast=true`, the full forecast range is shown grouped by calendar day — each day gets a dated header with its peak AQI **and peak UV index** (e.g. `— peak US AQI 63 (Moderate) · UV 10 (Very High)`), plus 6-hour period ranges labeled by the period's peak AQI category. Hours already past are skipped; days with no UV data omit the UV clause. The AQI and UV categories are keyed on the figures **as displayed** — the rounded AQI and the one-decimal UV index the report prints — so a number and the category beside it can never disagree.
 
 **Pollen — three states.** Pollen rides the CAMS *European* model on the same Open-Meteo endpoint, so it has exactly three behaviors:
 

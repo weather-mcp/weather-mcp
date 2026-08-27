@@ -37,12 +37,13 @@ get_weather_summary({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KOKC
-**Time:** Aug 14, 2026, 12:40 PM (23 minutes ago)
+**Time:** Aug 27, 2026, 4:20 PM (28 minutes ago)
 
 **Conditions:** Clear
-**Temperature:** 99°F
-**Pressure:** 30.00 inHg
-**Visibility:** 10.0 miles
+**Temperature:** 93°F
+**Wind:** 5 mph from 80°
+**Pressure:** 30.03 inHg
+**Visibility:** 10.0 miles (clear)
 **Cloud Cover:** Clear at 12500ft
 
 ---
@@ -57,28 +58,28 @@ get_weather_summary({
 **Showing:** 4 periods
 
 ## This Afternoon
-**Temperature:** 104°F
-**Precipitation Chance:** 1%
-**Wind:** 15 mph SSW
-**Forecast:** Sunny
+**Temperature:** 93°F
+**Precipitation Chance:** 4%
+**Wind:** 7 mph NE
+**Forecast:** Partly Sunny
 
 ## Tonight
-**Temperature:** 80°F
-**Precipitation Chance:** 0%
-**Wind:** 12 to 15 mph S
-**Forecast:** Clear
+**Temperature:** 74°F
+**Precipitation Chance:** 4%
+**Wind:** 3 to 7 mph E
+**Forecast:** Mostly Clear
 
-## Saturday
-**Temperature:** 102°F
-**Precipitation Chance:** 0%
-**Wind:** 13 mph SSW
+## Friday
+**Temperature:** 97°F
+**Precipitation Chance:** 1%
+**Wind:** 3 to 7 mph ESE
 **Forecast:** Sunny
 
-## Saturday Night
-**Temperature:** 81°F
-**Precipitation Chance:** 0%
-**Wind:** 9 to 13 mph S
-**Forecast:** Mostly Clear
+## Friday Night
+**Temperature:** 76°F
+**Precipitation Chance:** 1%
+**Wind:** 8 mph SE
+**Forecast:** Clear
 
 ---
 *Data source: NOAA National Weather Service (US)*
@@ -89,21 +90,20 @@ get_weather_summary({
 
 **Location:** 35.4730, -97.5171
 **Status:** Active alerts only
-**Updated:** Aug 14, 2026, 1:02 PM
+**Updated:** Aug 27, 2026, 4:47 PM
 
 ⚠️ **1 active alert found**
 
-🟡 **Heat Advisory**
+⚪ **Air Quality Alert**
 ---
-**Heat Advisory issued August 14 at 9:00AM CDT until August 16 at 7:00PM CDT by NWS Norman OK**
+**Air Quality Alert issued August 27 at 3:20PM CDT by NWS Norman OK**
 
-**Severity:** Moderate | **Urgency:** Expected | **Certainty:** Likely
-**Area:** Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Stephens; Garvin; Murray; Pontotoc; Coal; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan
-**Effective:** Aug 14, 2026, 9:00 AM
-**Expires:** Aug 14, 2026, 11:00 PM
-**Ends:** Aug 16, 2026, 7:00 PM
+**Severity:** Unknown | **Urgency:** Unknown | **Certainty:** Unknown
+**Area:** Logan; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland
+**Effective:** Aug 27, 2026, 3:20 PM
+**Expires:** Aug 28, 2026, 10:00 PM
 
-**Recommended Response:** Execute
+**Recommended Response:** Monitor
 **Sender:** NWS Norman OK
 
 *Showing a condensed summary. Use detail="full" for complete alert descriptions.*
@@ -154,36 +154,48 @@ get_alerts({
 
 **Location:** 35.4676, -97.5164
 **Status:** Active alerts only
-**Updated:** Aug 14, 2026, 1:02 PM
+**Updated:** Aug 27, 2026, 4:48 PM
 
 ⚠️ **1 active alert found**
 
-🟡 **Heat Advisory**
+⚪ **Air Quality Alert**
 ---
-**Heat Advisory issued August 14 at 9:00AM CDT until August 16 at 7:00PM CDT by NWS Norman OK**
+**Air Quality Alert issued August 27 at 3:20PM CDT by NWS Norman OK**
 
-**Severity:** Moderate | **Urgency:** Expected | **Certainty:** Likely
-**Area:** Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Stephens; Garvin; Murray; Pontotoc; Coal; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan
-**Effective:** Aug 14, 2026, 9:00 AM
-**Expires:** Aug 14, 2026, 11:00 PM
-**Ends:** Aug 16, 2026, 7:00 PM
+**Severity:** Unknown | **Urgency:** Unknown | **Certainty:** Unknown
+**Area:** Logan; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland
+**Effective:** Aug 27, 2026, 3:20 PM
+**Expires:** Aug 28, 2026, 10:00 PM
 
 **Description:**
-* WHAT...Heat index values up to 110 expected.
+The following statement was issued by the Oklahoma Department of
+Environmental Quality.
 
-* WHERE...Portions of central, east central, southeast, and southern
-Oklahoma.
+An Air Quality Alert for Ozone has been issued for Friday, August 28
+for the Oklahoma City Metropolitan area due to expected high
+concentrations of ozone.
 
-* WHEN...Until 7 PM CDT Sunday.
+Public Health Recommendations: Persons with existing heart or
+respiratory ailments should reduce physical exertion and outdoor
+activity.
 
-* IMPACTS...Hot temperatures and high humidity may cause heat
-illnesses.
+The general public is encouraged to help alleviate the problem by
+reducing vehicle miles traveled by riding the bus, carpooling, or
+avoiding unnecessary trips. The public is also asked to avoid
+refueling during the morning and early afternoon hours, and to avoid
+the use of two cycle engines such as lawn mowers, motorcycles, weed
+trimmers, and outboard engines. It is also advised to limit outdoor
+burning.
 
-**Instructions:**
-Drink plenty of fluids, stay in an air-conditioned room, stay out of
-the sun, and check up on relatives and neighbors.
+To view the latest air quality map, visit airnow.gov or the AirNow
+app.
 
-**Recommended Response:** Execute
+For hourly updates on concentrations and possible health warnings,
+telephone the Oklahoma Department of Environmental Quality at
+405-702-4100. For more information on health effects, call the
+American Lung Association of Oklahoma at 405-748-4674
+
+**Recommended Response:** Monitor
 **Sender:** NWS Norman OK
 
 ---
@@ -230,14 +242,14 @@ get_weather_imagery({
 
 ## 🎬 Animation Frames (13 frames)
 
-### Frame 1 - 2026-08-14T16:00:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/f6081e2877c2/512/6/14/25/4/1_1.png
+### Frame 1 - 2026-08-27T19:40:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/9f14554e767e/512/6/14/25/4/1_1.png
 
-### Frame 7 - 2026-08-14T17:00:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/7fcf71dea4f5/512/6/14/25/4/1_1.png
+### Frame 7 - 2026-08-27T20:40:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/97c6404425cc/512/6/14/25/4/1_1.png
 
-### Frame 13 - 2026-08-14T18:00:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/976bc5372bde/512/6/14/25/4/1_1.png
+### Frame 13 - 2026-08-27T21:40:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/4f9de34f3b2f/512/6/14/25/4/1_1.png
 
 *Showing 3 of 13 frames for brevity — use detail="full" for all frames*
 
@@ -249,7 +261,7 @@ get_weather_imagery({
 ⚠️ **DISCLAIMER:** RainViewer provides global precipitation radar. Data may have 5-10 minute delay. For official forecasts, consult local meteorological services.
 
 ---
-*Generated: 2026-08-14T18:03:21.395Z*
+*Generated: 2026-08-27T21:48:18.877Z*
 *Data source: RainViewer*
 ````
 
@@ -261,5 +273,5 @@ get_weather_imagery({
 **Features shown:** `get_weather_summary` one-call overview (current + forecast + alerts) · `get_alerts` `detail` levels (`standard` vs `full` alert text) · `get_weather_imagery` animated radar (RainViewer).
 
 <!-- capture-stamp -->
-*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

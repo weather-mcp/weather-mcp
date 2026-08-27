@@ -25,6 +25,13 @@
  * chance to forget. These are not an inconsistency: the invariant is the
  * same either way, and only the place that enforces it moves.
  *
+ * **A third shape applies when the band function's own seam tests are a lock.**
+ * Round at the call site, but through one module-private helper that pairs the
+ * rounding with the band (`bandAqi`/`bandUv` in `airQualityHandler.ts`), so
+ * several call sites share one contract without the band function changing.
+ * This is what to reach for when rounding *inside* the band function would
+ * rewrite what its existing tests pin.
+ *
  * `decimals` must be an integer in `toFixed`'s own valid range (0-100);
  * this helper does not re-validate it, because every call site is in-repo
  * and passes a literal.
