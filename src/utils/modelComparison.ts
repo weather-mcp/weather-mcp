@@ -391,7 +391,9 @@ function buildDay(
 
   const highStats = computeStatSummary(highValues.map(v => v.value));
   const lowStats = computeStatSummary(lowValues.map(v => v.value));
-  const band = classifyTempSpread(highStats.range, tempUnit);
+  // The handler prints the spread as a whole degree (`r0` in forecastHandler.ts),
+  // so band the same rounded figure; the raw range stays on the result for the min/max line.
+  const band = classifyTempSpread(Math.round(highStats.range), tempUnit);
 
   let outlierModel: string | undefined;
   let outlierUnnamed = false;
