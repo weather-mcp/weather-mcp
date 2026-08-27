@@ -310,9 +310,9 @@ remainder line at all, so the one line the change touches was absent from both
 sides. Six back-to-back retries all failed; a 4-minute backoff got a healthy pair
 on the second round, and the real diff was then exactly one line.
 
-**Status:** active. Related: the auto-memory note
-`live-verification-driver-hangs` (drivers need an explicit `process.exit(0)`;
-never run two live drivers in parallel).
+**Status:** active. Related: [G37] (a driver that constructs any service never
+exits without an explicit `process.exit(0)`, and parallel drivers were what
+first made this feed drift look like NOAA rate limiting).
 
 ---
 
@@ -1443,6 +1443,71 @@ published band table), [G32] (mutate to every rejected implementation).
 expectation that goes through `displayValue`. Partly lintable — a grep for
 `\.[0-9]*5\b` inside a seam table would find candidates, but only a human can
 tell a seam row from an ordinary fixture.
+
+---
+
+## G37 — A driver that constructs any service never exits, and the agent running it looks dead rather than blocked
+
+**Trigger:** writing a throwaway driver that imports a handler or service — the
+live-verification step of `/run-plan`, an adversarial probe in a `--diff`
+review, any scratch script under `.claude/scratch/`.
+
+**Rule:** end every such driver with an explicit `process.exit(0)`, and run
+them strictly one at a time. When a review leg or a driver goes quiet,
+diagnose by **CPU and process tree**, never by log silence: compare
+`/proc/<pid>/stat` jiffies over a few seconds, read `wchan`, and run
+`pgrep -a -P <pid>`. If the children are stranded drivers, kill **them**, not
+the chain — the CLI then flushes and exits 0 with its work intact.
+
+**Why:** every service constructor calls `new Cache(...)`, which arms a ref'd
+5-minute `setInterval` at `src/utils/cache.ts:42` and never `.unref()`s it —
+`src/analytics/collector.ts:274` is the only unref'd timer in the tree. One
+constructed service therefore holds Node's event loop open forever: the script
+body runs, prints, and the process stays. Nothing in the output says "hung".
+
+The second half is what makes this expensive. A vendor CLI invoked
+non-interactively (`agy -p`, and the other `--print`-style modes) **buffers its
+entire response until it exits**, so a leg that has already finished the review
+and written the document is indistinguishable from one that died — zero bytes
+of log either way. The CLI is not thinking; it is blocked reaping child shells
+that will never return. Waiting it out costs the full per-leg timeout and
+produces no document.
+
+**Verify:** with `dist/` built, a two-line driver that constructs one service
+and nothing else prints its line and then hangs —
+
+```
+node -e 'import("./dist/services/nifc.js").then(m=>{new (Object.values(m).find(v=>typeof v==="function"))();console.log("body finished")})'
+```
+
+exits 124 under `timeout 10`, not 0. Adding `process.exit(0)` after the log
+makes it exit 0 immediately.
+
+**Evidence:** 2026-08-27, `post-run-pipeline.sh` on `feat/wildfire-band-rounding`
+— the Antigravity/Gemini diff-review leg appeared dead for 16 minutes: `agy`
+parked in `futex_do_wait` with 4 s of CPU across 19 minutes of wall clock,
+`gemini.log` at 0 bytes, no new files in the worktree. It had written nine
+`scratch-adversarial-N.ts` probes importing `./src/handlers/wildfireHandler.js`,
+**none** with `process.exit(0)`, stranding 22 `npm`/`tsx`/`esbuild` processes.
+The review was **already complete** — the review document's mtime was 00:27 and
+the stall ran to 00:43. Killing only the probe trees released the CLI, which
+exited 0 with the review intact; the leg reported 0 blockers / 0 majors and a
+mutation pass turning 18 tests red. Aborting instead would have spent a second
+vendor call to redo finished work.
+
+One trap inside the fix: `pkill -f '<driver-name>'` matches the cmdline of the
+shell running it, so the kill takes out its own tool call (exit 144) — collect
+PIDs with `ps -eo pid,cmd | grep -v grep` first, or split the literal.
+
+**Status:** active. This is the entry the trap deserved: it existed only as a
+cross-reference on [G10]'s Status line ("the auto-memory note
+`live-verification-driver-hangs`"), with no trigger of its own, which is why a
+review agent that read `GOTCHAS.md` as instructed still wrote nine
+non-exiting drivers. Related: [G10] (byte-identity runs, where parallel drivers
+first self-inflicted what looked like NOAA rate limiting), [G11] (read the
+rendered output — which is what these drivers exist to produce). Lintable: a
+scratch driver that imports from `src/` or `dist/` and contains no
+`process.exit(` is a mechanical grep.
 
 ---
 
