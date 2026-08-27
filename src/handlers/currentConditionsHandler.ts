@@ -60,6 +60,7 @@ import { DataNotFoundError, InvalidLocationError, ServiceUnavailableError } from
 import { logger } from '../utils/logger.js';
 import { UnitPreferences } from '../config/units.js';
 import { DisplayThresholds } from '../config/displayThresholds.js';
+import { displayValue } from '../utils/displayBanding.js';
 import {
   getHainesCategory,
   getGrasslandFireDangerCategory,
@@ -721,12 +722,13 @@ async function formatNOAACurrentConditions(
 
       // Red Flag Threat Index
       if (redFlagValue !== null) {
-        const redFlagCategory = getRedFlagCategory(redFlagValue);
+        const redFlagShown = Math.round(redFlagValue);
+        const redFlagCategory = getRedFlagCategory(redFlagShown);
         const emoji = redFlagCategory.level === 'Low' ? '🟢' :
                       redFlagCategory.level === 'Moderate' ? '🟡' :
                       redFlagCategory.level === 'High' ? '🟠' : '🔴';
 
-        output += `**${emoji} Red Flag Threat:** ${Math.round(redFlagValue)} (${redFlagCategory.level})\n`;
+        output += `**${emoji} Red Flag Threat:** ${redFlagShown} (${redFlagCategory.level})\n`;
         output += `${redFlagCategory.description}\n\n`;
       }
 
@@ -889,10 +891,12 @@ function formatOpenMeteoFireWeather(
   if (hasVpd || hasSoil) {
     output += `**Dryness context:**\n`;
     if (hasVpd) {
-      output += `- **Vapour-pressure deficit:** ${vpdKPa!.toFixed(1)} kPa (${describeVpd(vpdKPa!)})\n`;
+      const vpdShown = displayValue(vpdKPa!, 1);
+      output += `- **Vapour-pressure deficit:** ${vpdShown.toFixed(1)} kPa (${describeVpd(vpdShown)})\n`;
     }
     if (hasSoil) {
-      output += `- **Topsoil moisture (top 1 cm):** ${topsoilMoisture!.toFixed(2)} m³/m³ (${describeTopsoilMoisture(topsoilMoisture!)})\n`;
+      const soilShown = displayValue(topsoilMoisture!, 2);
+      output += `- **Topsoil moisture (top 1 cm):** ${soilShown.toFixed(2)} m³/m³ (${describeTopsoilMoisture(soilShown)})\n`;
     }
     output += `\n`;
   }

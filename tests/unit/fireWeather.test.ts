@@ -127,11 +127,12 @@ describe('Fire Weather Utilities', () => {
     });
 
     describe('Edge cases', () => {
-      it('should handle decimal values (fall through to else)', () => {
-        // Note: Function uses strict equality for 4 and 5, so decimals fall through
-        expect(getHainesCategory(3.5).level).toBe('Very High'); // Not === 4 or 5, > 3
-        expect(getHainesCategory(4.5).level).toBe('Very High'); // Not === 4 or 5
-        expect(getHainesCategory(5.5).level).toBe('Very High'); // Not === 4 or 5
+      it('bands decimal values on the contiguous ladder', () => {
+        // The ladder is contiguous (<=3 / <=4 / <=5 / else), so a decimal
+        // bands into the rung it falls within rather than the top rung.
+        expect(getHainesCategory(3.5).level).toBe('Moderate');
+        expect(getHainesCategory(4.5).level).toBe('High');
+        expect(getHainesCategory(5.5).level).toBe('Very High');
       });
 
       it('should handle NaN gracefully', () => {
@@ -239,11 +240,12 @@ describe('Fire Weather Utilities', () => {
     });
 
     describe('Edge cases', () => {
-      it('should handle decimal values (fall through to else)', () => {
-        // Note: Function uses strict equality for 2 and 3, so decimals fall through
-        expect(getGrasslandFireDangerCategory(1.5).level).toBe('Very High'); // Not === 2 or 3, > 1
-        expect(getGrasslandFireDangerCategory(2.5).level).toBe('Very High'); // Not === 2 or 3
-        expect(getGrasslandFireDangerCategory(3.5).level).toBe('Very High'); // Not === 2 or 3
+      it('bands decimal values on the contiguous ladder', () => {
+        // The ladder is contiguous (<=1 / <=2 / <=3 / else), so a decimal
+        // bands into the rung it falls within rather than the top rung.
+        expect(getGrasslandFireDangerCategory(1.5).level).toBe('Moderate');
+        expect(getGrasslandFireDangerCategory(2.5).level).toBe('High');
+        expect(getGrasslandFireDangerCategory(3.5).level).toBe('Very High');
       });
 
       it('should handle NaN gracefully', () => {
