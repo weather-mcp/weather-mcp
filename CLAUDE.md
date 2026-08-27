@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.25.5 (Production Ready)
+- **Version:** 1.25.6 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -579,15 +579,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.25.5 — Production Ready ✅
-- **Test Coverage:** 2,660 tests, 100% pass rate
+- **Version:** 1.25.6 — Production Ready ✅
+- **Test Coverage:** 2,700 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.25.6:** Marine sea state and river flood category now key on the values the report prints
 - **New in v1.25.5:** The wildfire danger tier now keys on the distance the report prints
 - **New in v1.25.4:** Numeric LOG_LEVEL values now take effect instead of leaving the server at full DEBUG
-- **New in v1.25.3:** A national CAP alert list's geometry disclosure now counts the block it describes, not the page
 
 ## Useful References
 
@@ -610,7 +610,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-08-27 (v1.25.5)
+**Last Updated:** 2026-08-27 (v1.25.6)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

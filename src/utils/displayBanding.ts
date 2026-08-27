@@ -12,6 +12,19 @@
  * this helper exists to hold — the number the user reads and the band it
  * falls in can never disagree at an edge.
  *
+ * **Two conventions exist for *where* that rounding happens, and both are
+ * correct — choose by call-site count.** With a single caller, round at the
+ * caller and pass the rounded value into the band function
+ * (`assessSafety`/`getFrostbiteRisk` in `thermalStress.ts`). With several
+ * callers, round **inside** the band function instead
+ * (`getWaveHeightCategory` and `getSafetyAssessment` in `marine.ts`, three
+ * call sites between them; `deriveFloodCategory` in
+ * `riverConditionsHandler.ts` takes the same shape for symmetry). The reason
+ * is that a caller-side contract several sites must remember is exactly how
+ * the convention drifted in the first place — every one of those sites is a
+ * chance to forget. These are not an inconsistency: the invariant is the
+ * same either way, and only the place that enforces it moves.
+ *
  * `decimals` must be an integer in `toFixed`'s own valid range (0-100);
  * this helper does not re-validate it, because every call site is in-repo
  * and passes a literal.

@@ -608,7 +608,7 @@ Provides comprehensive marine weather data with intelligent dual-source support:
 - Wind waves (locally generated) height and direction
 - Swell height, period, and direction (from distant systems)
 - Ocean current velocity and direction
-- Sea state interpretation (Calm → Phenomenal based on Douglas Sea Scale)
+- Sea state interpretation (Calm → Phenomenal based on Douglas Sea Scale). The sea-state category and the safety assessment are keyed on the wave height and period **as displayed** (metres and seconds, one decimal), so the label can never disagree with the number beside it.
 - Safety assessment for maritime activities
 - Wave period for planning and safety
 - Optional daily forecast up to 16 days (`forecast_days`, default 5; days past the marine model's ~10-day horizon are trimmed with a note)
@@ -751,7 +751,7 @@ Monitor river levels and flood status worldwide — NOAA gauge observations in t
 **Returns (US path):**
 - Nearest river gauges with current water levels
 - Observed trend per gauge (rising/falling/steady with magnitude and window)
-- Flood stage thresholds (action, minor, moderate, major)
+- Flood stage thresholds (action, minor, moderate, major) — **only for gauges that publish them.** Many NWPS gauges return no threshold set at all, and those reports carry no flood-stage section and no threshold-derived labels; the `**Flood Category:**` line you see on most gauges comes from NOAA's own published status string, not from these thresholds. Where thresholds are published, forecast-series points are labelled against them using the stage **as displayed** (two decimals), so a point printing at its action stage is labelled; the published thresholds themselves are NOAA's own values and are not rounded.
 - Current flood status and forecast (multi-point forecast series at `detail="full"` for gauges that have one — mostly tidal and major-river gauges)
 - Streamflow data (cubic feet per second)
 - Distance to each gauge from query location

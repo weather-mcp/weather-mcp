@@ -310,9 +310,26 @@ remainder line at all, so the one line the change touches was absent from both
 sides. Six back-to-back retries all failed; a 4-minute backoff got a healthy pair
 on the second round, and the real diff was then exactly one line.
 
-**Status:** active. Related: [G37] (a driver that constructs any service never
-exits without an explicit `process.exit(0)`, and parallel drivers were what
-first made this feed drift look like NOAA rate limiting).
+**Extended 2026-08-27** (`028b750`, river/marine band-rounding T5) — **the
+vacuity can come from the *subject you picked*, not only from a failing feed,
+and that half survives a perfectly healthy upstream.** The plan named St. Louis
+as the US river point for a change to the forecast-series flood label. Roughly
+4 in 5 NWPS gauges carry no forecast series at all, and St. Louis's carry none —
+so even on a green feed that probe renders no series, exercises none of the
+changed code, and hashes identical on both sides. The run's first sweep hit
+*both* halves at once: the construct count was zero because NOAA was also
+rate-limiting, and the body read `Error details: Rate limit exceeded for NOAA`
+on each side. **So the construct grep is not only a health check on the feed; it
+is a check that the subject you chose can express the construct at all.** Choose
+the probe subject by confirming it carries the construct (here: probe candidate
+tidal and major-river points and keep one whose gauges have a series — Portland
+OR yielded 8), then assert the count, then compare hashes. Re-pointing there took
+the count from 0/0 to 16/16.
+
+**Status:** active, **extended 2026-08-27**. Related: [G37] (a driver that
+constructs any service never exits without an explicit `process.exit(0)`, and
+parallel drivers were what first made this feed drift look like NOAA rate
+limiting), [G28] (a probe whose parse cannot see what it is looking for).
 
 ---
 
@@ -1108,9 +1125,14 @@ that hit was still "leave" — `docs/releases/CHANGELOG.md` is the frozen
 historical copy ending at 1.6.0 that the bindings say never to write to — so a
 missed hit here would have cost nothing; the next one may not be frozen.
 
-**Status:** active, **sharpened 2026-08-27**. Plan 2 of the band-rounding
-sequence has now landed (wildfire, `cd0f317`); plans 3 and 4 correct the river,
-marine and non-safety tables next, and the grep above already names their hits.
+**Status:** active, **sharpened 2026-08-27**. Plans 2 and 3 of the band-rounding
+sequence have now landed (wildfire `cd0f317`; river/marine `028b750`). Plan 3's
+grep returned **no unexpected live hit**: two live `docs/TOOLS.md` lines edited,
+one live `README.md` row with no thresholds to correct, and four frozen
+`CHANGELOG.md` entries plus three captured `examples/` lines left alone. Note
+that plan 3 had **no wrong table to fix** — neither tool publishes a threshold
+table — so the grep's whole value there was proving the absence. Plan 4 (the
+non-safety sites) corrects real tables next.
 Not lintable: only a human can tell a live reference from a frozen record.
 
 ---
@@ -1249,7 +1271,24 @@ recognising before "sharpening" a test that is already correct:
   mutation to be caught by the coherence and seam contracts instead, and write
   the prediction table that way.
 
-**Status:** active, **extended 2026-08-27**. **Re-run 2026-08-26** (`07661a9`,
+**A third way, found 2026-08-27** (`432ade3`, river/marine band-rounding T2):
+**an alternative can be indistinguishable at some seams and distinguishable at
+others, so one green mutation row proves nothing about the rule.** The marine
+design rejected shifting the threshold (`meters < t - 0.05`) rather than rounding
+the value. At five of the seven tenths-aligned Douglas thresholds that mutation is
+*mathematically identical* to the shipped rule, because `(0.05)`, `(0.45)`,
+`(2.45)`, `(3.95)` and `(5.95)` all `toFixed(1)` **up**, landing the naive shift
+exactly on the true rounding boundary. At the two whose half rounds **down** —
+`(8.95).toFixed(1)` is `"8.9"`, `(13.95).toFixed(1)` is `"13.9"` — the rules
+diverge, at exactly **one double each**. A mutation check run only at `0.5` would
+have reported "no test catches this" and invited a fixture that cannot exist;
+run only at `9.0` it would have reported full coverage. **Sweep every seam, report
+the divergence set per seam, and put a row on each seam that has one.** The
+corollary for plans: a `t - 0.06`-style "just below" row cannot catch this class
+at all — where the divergence is a single double, only a fixture *on* that double
+discriminates.
+
+**Status:** active, **extended 2026-08-27 (twice)**. **Re-run 2026-08-26** (`07661a9`,
 issue-78-log-level-numeric T2), where the design named three parsers and
 rejected two: the shipped bug turned 18/32 red, the issue's own
 `isNaN(Number(…))`-guard proposal 9/32 (all on the fail-loud contract), and bare
@@ -1508,6 +1547,49 @@ first self-inflicted what looked like NOAA rate limiting), [G11] (read the
 rendered output — which is what these drivers exist to produce). Lintable: a
 scratch driver that imports from `src/` or `dist/` and contains no
 `process.exit(` is a mechanical grep.
+
+---
+
+## G38 — `FORCE_COLOR` makes `check-doc-versions.sh` fail a check that is actually passing
+
+**Trigger:** running `./scripts/check-doc-versions.sh` from inside an agent
+harness, a CI job, or any environment that exports `FORCE_COLOR` — i.e. every
+`/run-plan` and `/release` driven by Claude Code.
+
+**Rule:** invoke it as `env -u FORCE_COLOR ./scripts/check-doc-versions.sh`.
+If it reports `❌ server.json description length: <N> (registry limit is 100)`
+for an `N` that is plainly ≤ 100, that is this bug and **not** a real registry
+violation. **Do not shorten `server.json`'s description to make it pass** — that
+edits a published registry field to satisfy a broken comparison.
+
+**Why:** the check reads the length with
+`DESC_LEN=$(node -p "require('./server.json').description.length")`
+(`scripts/check-doc-versions.sh:163`). `node -p` inspects its result, and under
+`FORCE_COLOR` it wraps the number in ANSI colour codes, so `DESC_LEN` becomes
+`\033[33m98\033[39m` rather than `98`. Bash's `[ "$DESC_LEN" -le 100 ]` then
+fails on a non-integer, control falls through to the `else` branch, and the
+script prints a confident ❌ and increments `ERRORS` — so it exits non-zero and
+the conditional gate addition can never pass in that environment. Nothing in the
+message hints that the value was never compared. The failure direction is safe
+(it cries wolf rather than passing a real violation), but it is indistinguishable
+from a genuine one, and the obvious "fix" damages a published field.
+
+**Verify:** `node -p "require('./server.json').description.length" | cat -A`
+prints `^[[33m98^[[39m$` with `FORCE_COLOR` set and `98$` without it; the script
+then reports ❌ and ✅ respectively over an unchanged `server.json`.
+
+**Evidence:** 2026-08-27 (`432ade3`, river/marine band-rounding T2) — the T2
+subagent reported the ❌ as "a pre-existing script bug with ANSI codes leaking
+into an integer comparison", which was right about the mechanism. `server.json`
+was byte-identical to `main` and untouched by that plan, and `main` reports the
+same ❌ from the same harness, so nothing about the branch caused it.
+
+**Status:** active. Lintable, and the better fix is in the script rather than in
+every caller: `node -p` on a bare value should be `node -e 'process.stdout.write(String(...))'`,
+or the result piped through `tr -dc '0-9'`. Until then the `env -u` invocation is
+the workaround. Related: [G12] (the same script's silent *under*-validation — this
+entry is its mirror, a loud over-validation), [G9] and [G14] (release tooling that
+runs more than it appears to).
 
 ---
 
