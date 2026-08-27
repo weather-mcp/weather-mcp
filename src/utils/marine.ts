@@ -2,6 +2,7 @@
  * Utility functions for marine conditions data formatting and interpretation
  */
 
+import { displayValue } from './displayBanding.js';
 import type { GridpointResponse, GridpointDataSeries } from '../types/noaa.js';
 
 /**
@@ -157,50 +158,54 @@ export function getWaveHeightCategory(meters: number | undefined): WaveHeightCat
     };
   }
 
+  // Band on the figure `formatWaveHeight` prints (`toFixed(1)`), so the label can
+  // never disagree with the number beside it.
+  const shown = displayValue(meters, 1);
+
   // Based on WMO Sea State Code and Douglas Sea Scale
-  if (meters < 0.1) {
+  if (shown < 0.1) {
     return {
       description: 'Calm (glassy)',
       level: 'Calm',
       recommendation: 'Ideal for all water activities'
     };
-  } else if (meters < 0.5) {
+  } else if (shown < 0.5) {
     return {
       description: 'Calm (rippled)',
       level: 'Calm',
       recommendation: 'Excellent conditions for all vessels'
     };
-  } else if (meters < 1.25) {
+  } else if (shown < 1.25) {
     return {
       description: 'Smooth',
       level: 'Slight',
       recommendation: 'Good conditions for most activities'
     };
-  } else if (meters < 2.5) {
+  } else if (shown < 2.5) {
     return {
       description: 'Slight',
       level: 'Moderate',
       recommendation: 'Safe for experienced boaters'
     };
-  } else if (meters < 4.0) {
+  } else if (shown < 4.0) {
     return {
       description: 'Moderate',
       level: 'Moderate',
       recommendation: 'Use caution, especially for small craft'
     };
-  } else if (meters < 6.0) {
+  } else if (shown < 6.0) {
     return {
       description: 'Rough',
       level: 'Rough',
       recommendation: 'Hazardous for small vessels, secure all gear'
     };
-  } else if (meters < 9.0) {
+  } else if (shown < 9.0) {
     return {
       description: 'Very Rough',
       level: 'Very Rough',
       recommendation: 'Dangerous conditions, avoid non-essential travel'
     };
-  } else if (meters < 14.0) {
+  } else if (shown < 14.0) {
     return {
       description: 'High',
       level: 'High',
@@ -240,11 +245,16 @@ export function getSafetyAssessment(
 
   const waveCategory = getWaveHeightCategory(totalWaveHeight);
 
+  // Band on the figures `formatWaveHeight` and `formatWavePeriod` print (both
+  // `toFixed(1)`), so the clause can never disagree with the numbers beside it.
+  const shownHeight = displayValue(totalWaveHeight, 1);
+  const shownPeriod = wavePeriod === undefined ? undefined : displayValue(wavePeriod, 1);
+
   // Adjust based on wave period (short period = choppy/uncomfortable)
   let adjustedDescription = waveCategory.description;
-  if (wavePeriod !== undefined && wavePeriod < 6 && totalWaveHeight > 1.0) {
+  if (shownPeriod !== undefined && shownPeriod < 6 && shownHeight > 1.0) {
     adjustedDescription += ' and choppy (short period)';
-  } else if (wavePeriod !== undefined && wavePeriod > 12 && totalWaveHeight > 2.0) {
+  } else if (shownPeriod !== undefined && shownPeriod > 12 && shownHeight > 2.0) {
     adjustedDescription += ' with long-period swell (powerful)';
   }
 
