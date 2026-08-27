@@ -267,6 +267,33 @@ function forecastPeakResponse(peakValue: number): OpenMeteoAirQualityResponse {
   } as unknown as OpenMeteoAirQualityResponse;
 }
 
+/**
+ * European-scale sibling of `forecastPeakResponse` — CDR-2 (diff-review codex).
+ * `formatHourlyForecast` reads `hourly.european_aqi` when the point is outside
+ * the US, so a US-only fixture can never exercise the EU forecast branch.
+ */
+function euForecastPeakResponse(peakValue: number): OpenMeteoAirQualityResponse {
+  const time: string[] = [];
+  const european_aqi: number[] = [];
+  for (let h = 0; h < 24; h++) {
+    time.push(`2026-07-16T${String(h).padStart(2, '0')}:00`);
+    european_aqi.push(h >= 12 && h <= 17 ? peakValue : 20);
+  }
+  return {
+    latitude: 50,
+    longitude: 10,
+    generationtime_ms: 0.1,
+    utc_offset_seconds: 0,
+    timezone: 'UTC',
+    timezone_abbreviation: 'UTC',
+    elevation: 0,
+    current_units: { time: 'iso8601', interval: 'seconds' },
+    current: { time: '2026-07-16T00:00', interval: 3600, european_aqi: 20 },
+    hourly_units: { time: 'iso8601' },
+    hourly: { time, european_aqi }
+  } as unknown as OpenMeteoAirQualityResponse;
+}
+
 const seamRows: SeamRow[] = [
   {
     label: 'us_aqi 50.49 -> prints 50, Good (seam, was Moderate)',
@@ -330,6 +357,39 @@ const seamRows: SeamRow[] = [
       return result.content[0].text;
     },
     expectedText: '**12 PM – 5 PM:** US AQI 150 (Unhealthy for Sensitive Groups)'
+  },
+  // CDR-2 (diff-review codex): every row above drives the US-primary
+  // direction, so the inverse secondary branch (airQualityHandler.ts:303-305,
+  // European primary -> `*US AQI: N (...)*`) and the European-scale forecast
+  // sites had no seam row at all — a raw-category mutant confined to either
+  // stayed green. Expected strings produced by running the handler first (G36).
+  {
+    label: 'secondary reference line (inverse): us_aqi 150.4 under a European primary -> *US AQI: 150 (Unhealthy for Sensitive Groups)*',
+    render: () => renderCurrent(EU_POINT, { european_aqi: 10, us_aqi: 150.4 }),
+    expectedText: '*US AQI: 150 (Unhealthy for Sensitive Groups)*'
+  },
+  {
+    label: 'secondary reference line (inverse): us_aqi 50.49 under a European primary -> *US AQI: 50 (Good)*',
+    render: () => renderCurrent(EU_POINT, { european_aqi: 10, us_aqi: 50.49 }),
+    expectedText: '*US AQI: 50 (Good)*'
+  },
+  {
+    label: 'per-day forecast header, European scale: peak european_aqi 60.4 -> peak EU AQI 60 (Moderate)',
+    render: async () => {
+      getAirQualityMock.mockResolvedValue(euForecastPeakResponse(60.4));
+      const result = await callHandler({ ...EU_POINT, forecast: true });
+      return result.content[0].text;
+    },
+    expectedText: 'peak EU AQI 60 (Moderate)'
+  },
+  {
+    label: 'six-hour period line, European scale: 12 PM - 5 PM at 60.4 -> EU AQI 60 (Moderate)',
+    render: async () => {
+      getAirQualityMock.mockResolvedValue(euForecastPeakResponse(60.4));
+      const result = await callHandler({ ...EU_POINT, forecast: true });
+      return result.content[0].text;
+    },
+    expectedText: '**12 PM – 5 PM:** EU AQI 60 (Moderate)'
   }
 ];
 

@@ -41,6 +41,8 @@ import type { GeocodingService } from '../../src/services/geocoding.js';
 import type { ObservationResponse, StationCollectionResponse, GridpointResponse } from '../../src/types/noaa.js';
 import type { OpenMeteoForecastResponse } from '../../src/types/openmeteo.js';
 import type { BoundingBox, MetarObservation } from '../../src/types/aviationWeather.js';
+import { metersToMiles } from '../../src/utils/units.js';
+import { DisplayThresholds } from '../../src/config/displayThresholds.js';
 
 // ---------------------------------------------------------------------------
 // Shared fixtures — NOAA path
@@ -351,6 +353,104 @@ describe('handleGetCurrentConditions — visibility descriptor keys on the displ
     expect(seenImperial.size).toBeGreaterThan(1);
     expect(seenMetric.size).toBeGreaterThan(1);
   });
+
+  // CDR-1 (diff-review codex): the window above samples ONE seam (1500-1700 m),
+  // so a raw-banding mutant confined to any *other* threshold — notably the
+  // metric dense-fog seam — stays green. Sweep every descriptor boundary in
+  // BOTH unit systems instead of one hand-picked window.
+  //
+  // The sample points are DERIVED from DisplayThresholds, not hardcoded, so a
+  // moved threshold moves its window with it. Deriving where to *sample* is
+  // not re-implementing the banding: the assertion below is still the
+  // unit-free "one printed figure, one descriptor", which holds whatever the
+  // ladder says.
+  //
+  // Printed figures are 1 d.p. in the displayed unit, so a descriptor boundary
+  // lands where the *printed* value first reaches the threshold:
+  //   imperial — printed miles p = ceil(t*10)/10; raw miles at that flip = p - 0.05
+  //   metric   — smallest printed km p with metersToMiles(p*1000) >= t;
+  //              raw metres at that flip = (p - 0.05) * 1000
+  const VIS_THRESHOLDS = [
+    DisplayThresholds.visibility.denseFog,
+    DisplayThresholds.visibility.fog,
+    DisplayThresholds.visibility.hazeMist,
+    DisplayThresholds.visibility.clear,
+  ];
+
+  /** Raw metres at which the printed IMPERIAL figure first reaches `t` miles. */
+  function imperialSeamMeters(t: number): number {
+    const printed = Math.ceil(t * 10) / 10;
+    return (printed - 0.05) * 1609.344;
+  }
+
+  /** Raw metres at which the printed METRIC figure first reaches `t` miles. */
+  function metricSeamMeters(t: number): number {
+    for (let tenths = 1; tenths <= 2000; tenths++) {
+      const printedKm = tenths / 10;
+      if (metersToMiles(printedKm * 1000) >= t) {
+        return (printedKm - 0.05) * 1000;
+      }
+    }
+    throw new Error(`no metric seam found for ${t} miles`);
+  }
+
+  it('seam sweep at EVERY descriptor boundary, both units: one printed figure never carries two descriptors', async () => {
+    const LINE_RE = /^\*\*Visibility:\*\* (\S+) (miles|km)(?: \((.+)\))?$/;
+
+    // Every boundary, in BOTH unit systems' metre terms. A window is swept in
+    // both units regardless of which unit put it on the list: the imperial
+    // dense-fog seam sits at ~402 m and the metric one at ~450 m, and a mutant
+    // parked at 403 m in metric is invisible to a window centred on 450.
+    const centres = new Set<number>();
+    for (const t of VIS_THRESHOLDS) {
+      centres.add(imperialSeamMeters(t));
+      centres.add(metricSeamMeters(t));
+    }
+
+    const seen = { imperial: new Map<string, Set<string>>(), metric: new Map<string, Set<string>>() };
+    let renderCount = 0;
+    let parseCount = 0;
+
+    for (const units of ['imperial', 'metric'] as const) {
+      for (const centre of centres) {
+        // +/- 2 m at 1/4 m, division-indexed (never scaled multiplication, G36).
+        for (let i = -8; i <= 8; i++) {
+          const meters = centre + i / 4;
+          if (meters <= 0) continue;
+          const text = textOf(await callNoaa(buildObservation(meters), { units }));
+          const line = text.split('\n').find(l => l.startsWith('**Visibility:**'));
+          renderCount++;
+          expect(line).toBeDefined();
+          const match = line!.match(LINE_RE);
+          expect(match).not.toBeNull(); // G28: a parse that finds nothing must fail
+          parseCount++;
+          const [, printed, , descriptor] = match!;
+          const bucket = seen[units];
+          if (!bucket.has(printed)) bucket.set(printed, new Set());
+          bucket.get(printed)!.add(descriptor ?? '(none)');
+        }
+      }
+    }
+
+    expect(parseCount).toBe(renderCount);
+
+    for (const units of ['imperial', 'metric'] as const) {
+      for (const [printed, descriptors] of seen[units]) {
+        expect(
+          descriptors.size,
+          `${units} ${printed} had descriptors ${[...descriptors].join(', ')}`
+        ).toBe(1);
+      }
+
+      // The windows must actually reach every rung of the ladder, or a rung
+      // could be mutated freely and this test would still be green.
+      const reached = new Set([...seen[units].values()].flatMap(d => [...d]));
+      expect(
+        [...reached].sort(),
+        `${units} windows did not reach every descriptor state`
+      ).toEqual(['(none)', 'clear', 'dense fog', 'fog', 'haze/mist']);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -381,6 +481,43 @@ describe('handleGetCurrentConditions — fire-weather NOAA path keys on the prin
       await callNoaa(buildObservation(16090), { include_fire_weather: true }, gridpoint)
     );
     expect(text).toContain('**🟡 Red Flag Threat:** 59 (Moderate)');
+  });
+
+  // CDR-1 (diff-review codex): the 59.6/59.4 pair above pins ONE of the three
+  // Red Flag seams, so a raw-banding mutant confined to the 30 or 80 boundary
+  // stayed green. Pin the other two. Every expected string below was produced
+  // by running the handler first (G36), never copied from a review.
+
+  it('Red Flag 29.6 rounds to 30 and crosses into Moderate (moved row)', async () => {
+    const gridpoint = buildGridpoint({ redFlagThreatIndex: 29.6 });
+    const text = textOf(
+      await callNoaa(buildObservation(16090), { include_fire_weather: true }, gridpoint)
+    );
+    expect(text).toContain('**\u{1F7E1} Red Flag Threat:** 30 (Moderate)');
+  });
+
+  it('Red Flag 29.4 rounds to 29 and stays Low (control — does not move)', async () => {
+    const gridpoint = buildGridpoint({ redFlagThreatIndex: 29.4 });
+    const text = textOf(
+      await callNoaa(buildObservation(16090), { include_fire_weather: true }, gridpoint)
+    );
+    expect(text).toContain('**\u{1F7E2} Red Flag Threat:** 29 (Low)');
+  });
+
+  it('Red Flag 79.6 rounds to 80 and crosses into Very High (moved row)', async () => {
+    const gridpoint = buildGridpoint({ redFlagThreatIndex: 79.6 });
+    const text = textOf(
+      await callNoaa(buildObservation(16090), { include_fire_weather: true }, gridpoint)
+    );
+    expect(text).toContain('**\u{1F534} Red Flag Threat:** 80 (Very High)');
+  });
+
+  it('Red Flag 79.4 rounds to 79 and stays High (control — does not move)', async () => {
+    const gridpoint = buildGridpoint({ redFlagThreatIndex: 79.4 });
+    const text = textOf(
+      await callNoaa(buildObservation(16090), { include_fire_weather: true }, gridpoint)
+    );
+    expect(text).toContain('**\u{1F7E0} Red Flag Threat:** 79 (High)');
   });
 
   it('Haines 4.5 renders raw (not rounded) and bands High via the contiguous ladder', async () => {
@@ -421,6 +558,58 @@ describe('handleGetCurrentConditions — fire-weather Open-Meteo dryness context
     const response = buildOpenMeteoCurrentResponse({ vapour_pressure_deficit: null, soil_moisture_0_to_1cm: 0.0996 });
     const text = textOf(await callOpenMeteo(response));
     expect(text).toContain('**Topsoil moisture (top 1 cm):** 0.10 m³/m³ (dry)');
+  });
+
+  // CDR-1 (diff-review codex): the pairs above pin the VPD 1 kPa and topsoil
+  // 0.1 seams only; a mutant confined to VPD 2/3 or topsoil 0.2/0.3 stayed
+  // green. Expected strings produced by running the handler first (G36).
+
+  it('VPD 1.96 kPa displays as 2.0 and bands high (moved row)', async () => {
+    const response = buildOpenMeteoCurrentResponse({ vapour_pressure_deficit: 1.96, soil_moisture_0_to_1cm: null });
+    const text = textOf(await callOpenMeteo(response));
+    expect(text).toContain('**Vapour-pressure deficit:** 2.0 kPa (high drying power)');
+  });
+
+  it('VPD 1.94 kPa displays as 1.9 and stays moderate (control — does not move)', async () => {
+    const response = buildOpenMeteoCurrentResponse({ vapour_pressure_deficit: 1.94, soil_moisture_0_to_1cm: null });
+    const text = textOf(await callOpenMeteo(response));
+    expect(text).toContain('**Vapour-pressure deficit:** 1.9 kPa (moderate drying power)');
+  });
+
+  it('VPD 2.96 kPa displays as 3.0 and bands extreme (moved row)', async () => {
+    const response = buildOpenMeteoCurrentResponse({ vapour_pressure_deficit: 2.96, soil_moisture_0_to_1cm: null });
+    const text = textOf(await callOpenMeteo(response));
+    expect(text).toContain('**Vapour-pressure deficit:** 3.0 kPa (extreme drying power)');
+  });
+
+  it('VPD 2.94 kPa displays as 2.9 and stays high (control — does not move)', async () => {
+    const response = buildOpenMeteoCurrentResponse({ vapour_pressure_deficit: 2.94, soil_moisture_0_to_1cm: null });
+    const text = textOf(await callOpenMeteo(response));
+    expect(text).toContain('**Vapour-pressure deficit:** 2.9 kPa (high drying power)');
+  });
+
+  it('topsoil moisture 0.1996 displays as 0.20 and bands moist (moved row)', async () => {
+    const response = buildOpenMeteoCurrentResponse({ vapour_pressure_deficit: null, soil_moisture_0_to_1cm: 0.1996 });
+    const text = textOf(await callOpenMeteo(response));
+    expect(text).toContain('**Topsoil moisture (top 1 cm):** 0.20 m\u00B3/m\u00B3 (moist)');
+  });
+
+  it('topsoil moisture 0.194 displays as 0.19 and stays dry (control — does not move)', async () => {
+    const response = buildOpenMeteoCurrentResponse({ vapour_pressure_deficit: null, soil_moisture_0_to_1cm: 0.194 });
+    const text = textOf(await callOpenMeteo(response));
+    expect(text).toContain('**Topsoil moisture (top 1 cm):** 0.19 m\u00B3/m\u00B3 (dry)');
+  });
+
+  it('topsoil moisture 0.2996 displays as 0.30 and bands wet (moved row)', async () => {
+    const response = buildOpenMeteoCurrentResponse({ vapour_pressure_deficit: null, soil_moisture_0_to_1cm: 0.2996 });
+    const text = textOf(await callOpenMeteo(response));
+    expect(text).toContain('**Topsoil moisture (top 1 cm):** 0.30 m\u00B3/m\u00B3 (wet)');
+  });
+
+  it('topsoil moisture 0.294 displays as 0.29 and stays moist (control — does not move)', async () => {
+    const response = buildOpenMeteoCurrentResponse({ vapour_pressure_deficit: null, soil_moisture_0_to_1cm: 0.294 });
+    const text = textOf(await callOpenMeteo(response));
+    expect(text).toContain('**Topsoil moisture (top 1 cm):** 0.29 m\u00B3/m\u00B3 (moist)');
   });
 
   it('topsoil moisture 0.094 displays as 0.09 and stays very dry (control — does not move)', async () => {
