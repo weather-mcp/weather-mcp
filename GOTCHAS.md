@@ -1591,6 +1591,47 @@ the workaround. Related: [G12] (the same script's silent *under*-validation — 
 entry is its mirror, a loud over-validation), [G9] and [G14] (release tooling that
 runs more than it appears to).
 
+## G39 — `publish.yml` goes red on a publish that succeeded, because npm's processing outlasts the verify window
+
+**Trigger:** pushing a `vX.Y.Z` tag. The **Publish to npm** step is green and the
+**Verify publication** step is red with
+`::error::vX.Y.Z not visible on npm after 10 attempts`.
+
+**Rule:** read the **Publish to npm** step's own output before treating this as a
+failed release. If it ends with `+ @dangahagan/weather-mcp@X.Y.Z` and a
+`Provenance statement published to transparency log` line, **the package is
+published** — the tarball is accepted, signed and logged, and the red X is only
+the verifier's patience running out. Re-check with
+`curl -s https://registry.npmjs.org/@dangahagan/weather-mcp | jq '.["dist-tags"].latest'`
+before doing anything corrective. **Never re-run the workflow or `npm publish` by
+hand on this signal** — the version already exists, so a republish can only fail
+or, worse, be worked around by bumping to a version nobody asked for.
+
+**Why:** `npm publish` returns as soon as the registry accepts the tarball, and
+says so itself: `Your package is being processed and may take a few minutes to
+become available.` The verify step polls `npm view` 10 times at 15-second
+intervals — a 2.5-minute budget against a lag npm explicitly describes in
+minutes. The two are not related to each other by anything but luck.
+
+**Verify:** compare the timestamps. On v1.25.6 the verifier gave up at
+`19:50:35Z` and the version became visible at `19:51:10Z` — **35 seconds** later.
+The publish had completed at `19:48:02Z`.
+
+**Evidence:** 2026-08-27, v1.25.6 (run `33110039433`). npm's own
+`.time["1.25.6"]` is `2026-08-27T19:51:10.607Z`; `latest` moved to 1.25.6 and the
+provenance statement was in the sigstore log (`logIndex=2618799930`) the whole
+time. The release was complete and correct while the workflow displayed a
+failure — which is the dangerous half: a red publish run reads as "not shipped"
+to anyone glancing at the Actions tab, and a later release cut on that
+misreading would be the real damage.
+
+**Status:** active. The fix is in the workflow, not in the reader: widen the poll
+(30 attempts at 15s, or 10 at 60s) and, on exhaustion, distinguish "publish step
+failed" from "still propagating" rather than emitting a bare error. Filed as a
+follow-up. Related: [G9] and [G14] (release tooling that runs more than it
+appears to), [G38] (the sibling case — a release check that reports a confident
+failure it never actually measured).
+
 ---
 
 ## Graveyard
