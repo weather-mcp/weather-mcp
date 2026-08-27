@@ -310,9 +310,9 @@ remainder line at all, so the one line the change touches was absent from both
 sides. Six back-to-back retries all failed; a 4-minute backoff got a healthy pair
 on the second round, and the real diff was then exactly one line.
 
-**Status:** active. Related: the auto-memory note
-`live-verification-driver-hangs` (drivers need an explicit `process.exit(0)`;
-never run two live drivers in parallel).
+**Status:** active. Related: [G37] (a driver that constructs any service never
+exits without an explicit `process.exit(0)`, and parallel drivers were what
+first made this feed drift look like NOAA rate limiting).
 
 ---
 
@@ -400,7 +400,14 @@ same day with **both** unvalidated sites set to `9,999`, and
 passed!`.
 
 **Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
-2026-08-25**, **Verify line re-run 2026-08-26** (`07661a9`,
+2026-08-25**, **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
+band-rounding T2 — the count moved 2,611 → 2,660 and all five sites were edited
+by content; with both unvalidated sites then set to `9,999` against the real
+`2,660`, `./scripts/check-doc-versions.sh` still printed `✅ README.md test
+count`, `✅ CLAUDE.md test count`, `✅ README.md tests badge` and `✅ All
+documentation checks passed!`, never once naming the two it does not read — the
+trap is intact and both gaps are still exactly the two this entry names), **and
+2026-08-26** (`07661a9`,
 issue-78-log-level-numeric T2 — both unvalidated sites set to `9,999` with the
 real count at `2,606`, and `./scripts/check-doc-versions.sh` still reported
 `✅ All documentation checks passed!`; the trap is intact and unchanged, and
@@ -944,7 +951,12 @@ temp directory — and compare `tools/list` counts. 17 vs 6 is the trap.
 first summary probe reported `tools exposed: 17 | get_lightning_activity present:
 true` while claiming to test the `basic` preset, in which that tool is absent.
 
-**Status:** active. **Verify line re-run 2026-08-25** (`3d85370`, issue-80
+**Status:** active. **Verify line re-run 2026-08-27** (wildfire band-rounding
+T3): the live probe spawned the built dist from a temp cwd with `ENABLED_TOOLS`
+**unset** and got **6 tools, `get_wildfire_info` absent**, against the 17 a
+repo-root spawn reports — run as an explicit control *before* the keyed and
+keyless FIRMS probes beside it, so the isolation was proven rather than assumed.
+**Re-run 2026-08-25** (`3d85370`, issue-80
 lightning band rounding T4): repo-root cwd reported **17** tools, temp cwd
 reported **6**. **Re-run again 2026-08-26** (`6c75bcc`,
 issue-78-log-level-numeric T4), this time on the `LOG_LEVEL` half the entry
@@ -1028,10 +1040,26 @@ obvious in seconds. **The general form:** a module that exports a pure function
 import, so a probe that imports it to call it counts them twice. Probe the
 singleton the shipped code actually uses.
 
-**Status:** active, **broadened 2026-08-26**. Same family as [G10]'s
-vacuous-hash half — a failed or mis-scoped measurement that renders as a clean
-result. Not lintable: only the probe's author knows what shape the response
-should have had.
+**Broadened again 2026-08-27** (`cd0f317`, wildfire band-rounding T3) — the
+third direction: a **false positive**, where a parse that does not model the
+domain reports correct output as a defect. A live Boise probe printed
+`**Distance:** 2.7 km` and `**AWARENESS**`, which reads as an obvious
+contradiction — 2.7 km should be the most dangerous tier. It was not a defect.
+The tier keys on the nearest **uncontained** fire, the 2.7 km fire was 100%
+contained and excluded, and the report said so in its own words two lines above
+the tier. The parser had taken the *first* `**Distance:**` line, which is the
+nearest fire overall, not the one the tier is computed from. **The general
+form:** whenever the value under test is computed over a *filtered* subset, a
+parse anchored on the first row of the unfiltered list will disagree with it
+legitimately — anchor on what the code anchors on, or read the report ([G11])
+before calling it a regression. Nearly reported as a live defect on a correct
+build.
+
+**Status:** active, **broadened 2026-08-26 and 2026-08-27**. Same family as
+[G10]'s vacuous-hash half — a failed or mis-scoped measurement that renders as a
+clean result — and now its mirror, a correct result that renders as a failure.
+Not lintable: only the probe's author knows what shape the response should have
+had.
 
 ---
 
@@ -1068,10 +1096,22 @@ in the same sequence, and four `it()` titles in a test file that is a lock and
 must not be edited. Only one of the four was this plan's work, and no per-page
 docs map would have surfaced the other three.
 
-**Status:** active. Immediately load-bearing — plans 2 and 3 of the band-rounding
-sequence correct the wildfire, river and marine tables next, and the grep above
-already names two of their hits. Not lintable: only a human can tell a live
-reference from a frozen record.
+**Sharpened 2026-08-27** (`cd0f317`, wildfire band-rounding T4) — **the grep
+pattern is itself a place to miss a hit.** The plan's pattern
+(`\(<5 ?km\)|\(5-25 ?km\)|…`) did not match `docs/releases/CHANGELOG.md:30-33`,
+which writes the same band as `(< 5 km)` — a space after the `<`. Raised as `R4`
+by the plan review and confirmed: one frozen file, four unclassified lines. The
+same table gets typed with and without spaces around `<`, `-` and `km` across
+years of entries, so **write the pattern with `?` on every separator**
+(`\(< ?5 ?km\)`) and re-run it after editing, not only before. The action for
+that hit was still "leave" — `docs/releases/CHANGELOG.md` is the frozen
+historical copy ending at 1.6.0 that the bindings say never to write to — so a
+missed hit here would have cost nothing; the next one may not be frozen.
+
+**Status:** active, **sharpened 2026-08-27**. Plan 2 of the band-rounding
+sequence has now landed (wildfire, `cd0f317`); plans 3 and 4 correct the river,
+marine and non-safety tables next, and the grep above already names their hits.
+Not lintable: only a human can tell a live reference from a frozen record.
 
 ---
 
@@ -1186,7 +1226,30 @@ closed by `0deb47b`, which adds a case carrying three matched-but-flagged
 warnings beside one that lost geometry entirely, so the block-scoped count and
 the feed-scoped total no longer render the same number.
 
-**Status:** active. **Re-run 2026-08-26** (`07661a9`,
+**Two ways a mutation row can be green without the fixture being weak, both
+found 2026-08-27** (`7a1e65d`, wildfire band-rounding T2), and both worth
+recognising before "sharpening" a test that is already correct:
+
+- **A rejected alternative may have been rejected on non-behavioural grounds,
+  in which case no fixture can discriminate it.** The wildfire design rejected
+  shifted raw thresholds (`dist < 5.05`) because they encode the render
+  precision as a magic constant in six places that breaks silently if
+  `toFixed(1)` ever changes — a *maintainability* argument. Measured, the
+  shipped rule `displayValue(d,1) <= T` and that alternative differ at
+  **exactly two doubles on the whole real line**, `5.05` and `50.05`, and at
+  the third seam they do not differ at all because `(25.05).toFixed(1)` rounds
+  up. A haversine-placed fixture cannot land on an exact double ([G36]), so the
+  axis is unreachable through the handler. **Measure the divergence set and
+  report it; do not manufacture a red.** The right output is a sentence saying
+  which alternative is behaviourally indistinguishable and why.
+- **Mutating to the pre-fix implementation cannot turn a "never worse than
+  before" contract red** — that contract compares the new tier against the old
+  rule reimplemented inline, so reproducing the old rule exactly makes it hold
+  by *equality* everywhere. It is a tautology, not a gap. Expect such a
+  mutation to be caught by the coherence and seam contracts instead, and write
+  the prediction table that way.
+
+**Status:** active, **extended 2026-08-27**. **Re-run 2026-08-26** (`07661a9`,
 issue-78-log-level-numeric T2), where the design named three parsers and
 rejected two: the shipped bug turned 18/32 red, the issue's own
 `isNaN(Number(…))`-guard proposal 9/32 (all on the fail-loud contract), and bare
@@ -1342,8 +1405,21 @@ accident. The rows read as obviously correct, and a builder who trusts them
 will "fix" the code rather than the row — which here means banding on the raw
 value again, reintroducing the defect the plan exists to remove.
 
+**Broadened 2026-08-27** (`cd0f317`, wildfire band-rounding T3) — **the same trap
+bites the *measurement*, not just the test table.** A sweep that reports "N cases
+become more cautious" has to decide whether the exact half is inside the window,
+and **how you index the sweep decides it for you**: `10010/200` is the *same*
+double as the literal `50.05` (`toFixed(1)` → `"50.0"`, so it is in), while
+`10010*0.005` is a *different* double, `50.050000000000004` (`toFixed(1)` →
+`"50.1"`, so it is out). Two sweeps of the same nominal range and step therefore
+publish different counts, and the number goes into a changelog. Index a seam
+sweep by division (`i/N`), never by repeated or scaled multiplication, and say
+which you used beside the count.
+
 **Verify:** `node -e 'for (const v of [5.05,25.05,50.05]) console.log(v.toFixed(1))'`
-prints `5.0 25.1 50.0`.
+prints `5.0 25.1 50.0`; and
+`node -e 'console.log((10010/200).toFixed(1), (10010*0.005).toFixed(1))'`
+prints `50.0 50.1` — same nominal value, opposite side of the seam.
 
 **Evidence:** 2026-08-26 — wildfire band-rounding plan review, raised
 independently as R1 by **both** the Claude and Codex legs. The impl plan
@@ -1355,7 +1431,8 @@ answer was already in the tree: `tests/unit/displayBanding.test.ts:10` pinned
 and its test title already said *"floating-point storage of .05 differs by
 value"*.
 
-**Status:** active. Immediately load-bearing — plans 3 and 4 of the
+**Status:** active, **broadened 2026-08-27** (measurement half). Immediately
+load-bearing — plans 3 and 4 of the
 band-rounding sequence both write seam tables next (river/marine thresholds at
 0.1/0.5/1.25/2.5/4.0/6.0/9.0/14.0 m, and the non-safety sites of
 [#82](https://github.com/weather-mcp/weather-mcp/issues/82)), and the marine
@@ -1366,6 +1443,71 @@ published band table), [G32] (mutate to every rejected implementation).
 expectation that goes through `displayValue`. Partly lintable — a grep for
 `\.[0-9]*5\b` inside a seam table would find candidates, but only a human can
 tell a seam row from an ordinary fixture.
+
+---
+
+## G37 — A driver that constructs any service never exits, and the agent running it looks dead rather than blocked
+
+**Trigger:** writing a throwaway driver that imports a handler or service — the
+live-verification step of `/run-plan`, an adversarial probe in a `--diff`
+review, any scratch script under `.claude/scratch/`.
+
+**Rule:** end every such driver with an explicit `process.exit(0)`, and run
+them strictly one at a time. When a review leg or a driver goes quiet,
+diagnose by **CPU and process tree**, never by log silence: compare
+`/proc/<pid>/stat` jiffies over a few seconds, read `wchan`, and run
+`pgrep -a -P <pid>`. If the children are stranded drivers, kill **them**, not
+the chain — the CLI then flushes and exits 0 with its work intact.
+
+**Why:** every service constructor calls `new Cache(...)`, which arms a ref'd
+5-minute `setInterval` at `src/utils/cache.ts:42` and never `.unref()`s it —
+`src/analytics/collector.ts:274` is the only unref'd timer in the tree. One
+constructed service therefore holds Node's event loop open forever: the script
+body runs, prints, and the process stays. Nothing in the output says "hung".
+
+The second half is what makes this expensive. A vendor CLI invoked
+non-interactively (`agy -p`, and the other `--print`-style modes) **buffers its
+entire response until it exits**, so a leg that has already finished the review
+and written the document is indistinguishable from one that died — zero bytes
+of log either way. The CLI is not thinking; it is blocked reaping child shells
+that will never return. Waiting it out costs the full per-leg timeout and
+produces no document.
+
+**Verify:** with `dist/` built, a two-line driver that constructs one service
+and nothing else prints its line and then hangs —
+
+```
+node -e 'import("./dist/services/nifc.js").then(m=>{new (Object.values(m).find(v=>typeof v==="function"))();console.log("body finished")})'
+```
+
+exits 124 under `timeout 10`, not 0. Adding `process.exit(0)` after the log
+makes it exit 0 immediately.
+
+**Evidence:** 2026-08-27, `post-run-pipeline.sh` on `feat/wildfire-band-rounding`
+— the Antigravity/Gemini diff-review leg appeared dead for 16 minutes: `agy`
+parked in `futex_do_wait` with 4 s of CPU across 19 minutes of wall clock,
+`gemini.log` at 0 bytes, no new files in the worktree. It had written nine
+`scratch-adversarial-N.ts` probes importing `./src/handlers/wildfireHandler.js`,
+**none** with `process.exit(0)`, stranding 22 `npm`/`tsx`/`esbuild` processes.
+The review was **already complete** — the review document's mtime was 00:27 and
+the stall ran to 00:43. Killing only the probe trees released the CLI, which
+exited 0 with the review intact; the leg reported 0 blockers / 0 majors and a
+mutation pass turning 18 tests red. Aborting instead would have spent a second
+vendor call to redo finished work.
+
+One trap inside the fix: `pkill -f '<driver-name>'` matches the cmdline of the
+shell running it, so the kill takes out its own tool call (exit 144) — collect
+PIDs with `ps -eo pid,cmd | grep -v grep` first, or split the literal.
+
+**Status:** active. This is the entry the trap deserved: it existed only as a
+cross-reference on [G10]'s Status line ("the auto-memory note
+`live-verification-driver-hangs`"), with no trigger of its own, which is why a
+review agent that read `GOTCHAS.md` as instructed still wrote nine
+non-exiting drivers. Related: [G10] (byte-identity runs, where parallel drivers
+first self-inflicted what looked like NOAA rate limiting), [G11] (read the
+rendered output — which is what these drivers exist to produce). Lintable: a
+scratch driver that imports from `src/` or `dist/` and contains no
+`process.exit(` is a mechanical grep.
 
 ---
 
