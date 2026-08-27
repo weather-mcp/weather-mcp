@@ -648,11 +648,17 @@ deciding where a piece of work should run and whether it should run now.
   the scripts apply that rule; `--all` on a standard plan is a choice, and the
   script says so.
 - Scripts with interactive pickers need a TTY: run them with the `!` prefix,
-  or pass the plan path and flags explicitly. A chain runs 20–60 minutes —
-  launch it detached (`setsid nohup … </dev/null > run.log 2>&1 &`) and watch
-  the pid, never grep the log for a finish line. Exit code **3** means the
-  chain suspended itself on quota; its closing block carries the exact
-  `--resume` command and the time to run it.
+  or pass the plan path and flags explicitly. Exit code **3** means the chain
+  suspended itself on quota; its closing block carries the exact `--resume`
+  command and the time to run it.
+- **Launch it with `run_in_background`, then wait once.** Launch the script
+  with `run_in_background`. Then run `.claude/scripts/plan-status.sh --wait` in
+  the background and do nothing else for this run until it returns. Check on
+  progress only with `.claude/scripts/plan-status.sh` — never `ps`, `pgrep`, a
+  hand-written Monitor, or an `until` loop; the same script path runs for every
+  project on this machine. When `--wait` returns the run is over, and it exits
+  with the run's own code: stop any monitor or shell you started for it before
+  reading the results.
 
 **Every stage ends with a `NEXT` block** — `PROCEED`, `FIX FIRST`, or `STOP`,
 then the exact next action. Follow the verb. A `FIX FIRST` that arrives after
