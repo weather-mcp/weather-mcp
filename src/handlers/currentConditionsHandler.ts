@@ -18,6 +18,7 @@ import {
   formatWindSpeedQV,
   formatPressureQV,
   formatVisibilityQV,
+  visibilityDisplayValue,
   formatHeightFromFt,
   formatPrecipFromMm,
   formatPressureFromPa,
@@ -47,7 +48,8 @@ import {
   fahrenheitToCelsius,
   kphToMph,
   mpsToMph,
-  knotsToMph
+  knotsToMph,
+  metersToMiles
 } from '../utils/units.js';
 import {
   calculateWindChillF,
@@ -582,9 +584,15 @@ async function formatNOAACurrentConditions(
     output += `**Pressure:** ${formatPressureQV(props.barometricPressure, prefs)}\n`;
   }
 
-  // Enhanced visibility and cloud cover (canonical miles drives the descriptors)
+  // Enhanced visibility and cloud cover. Band the descriptor on the figure the
+  // line prints, in the unit it prints (miles or km at one decimal); the
+  // thresholds are in miles, so a km figure is converted back with the same
+  // constant the ladder has always used.
   if (props.visibility && props.visibility.value !== null) {
-    const visibilityMiles = props.visibility.value * 0.000621371;
+    const shownVisibility = visibilityDisplayValue(props.visibility.value, prefs);
+    const visibilityMiles = prefs.distance === 'km'
+      ? metersToMiles(shownVisibility * 1000)
+      : shownVisibility;
     output += `**Visibility:** ${formatVisibilityQV(props.visibility, prefs)}`;
 
     // Add descriptive text for visibility

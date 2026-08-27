@@ -25,6 +25,7 @@ import {
   extractValue,
 } from './units.js';
 import { kmToMiles } from './distance.js';
+import { displayValue } from './displayBanding.js';
 
 // ---------------------------------------------------------------------------
 // Labels
@@ -163,9 +164,19 @@ export function formatPrecipFromMm(mm: number, prefs: UnitPreferences): string {
   return withLabel(value, precipitationLabel(prefs), precipDecimals(prefs));
 }
 
-export function formatVisibilityFromM(meters: number, prefs: UnitPreferences): string {
+/**
+ * The visibility figure exactly as `formatVisibilityFromM` prints it — in the
+ * preferred unit, rounded to the one decimal it renders at — so a caller that
+ * bands the descriptor can key on the number the reader sees. Returns the
+ * number, not the string; `formatVisibilityFromM` renders from this.
+ */
+export function visibilityDisplayValue(meters: number, prefs: UnitPreferences): number {
   const value = prefs.distance === 'km' ? meters / 1000 : metersToMiles(meters);
-  return withLabel(value, prefs.distance === 'km' ? 'km' : 'miles', 1);
+  return displayValue(value, 1);
+}
+
+export function formatVisibilityFromM(meters: number, prefs: UnitPreferences): string {
+  return withLabel(visibilityDisplayValue(meters, prefs), prefs.distance === 'km' ? 'km' : 'miles', 1);
 }
 
 export function formatDistanceFromKm(km: number, prefs: UnitPreferences): string {
