@@ -400,7 +400,12 @@ same day with **both** unvalidated sites set to `9,999`, and
 passed!`.
 
 **Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
-2026-08-25**. Match every site by content, never by line number — the `npm test`
+2026-08-25**, **Verify line re-run 2026-08-26** (`07661a9`,
+issue-78-log-level-numeric T2 — both unvalidated sites set to `9,999` with the
+real count at `2,606`, and `./scripts/check-doc-versions.sh` still reported
+`✅ All documentation checks passed!`; the trap is intact and unchanged, and
+both gaps are still exactly the two this entry names). Match every site by
+content, never by line number — the `npm test`
 comment has moved twice (346 → 381). Lint candidate — anchoring a check on
 `Run all [0-9,]+ tests` and one on `docs/README.md`'s count would close both gaps
 mechanically and let this entry retire. Standing lesson beyond the specific gaps:
@@ -941,7 +946,12 @@ true` while claiming to test the `basic` preset, in which that tool is absent.
 
 **Status:** active. **Verify line re-run 2026-08-25** (`3d85370`, issue-80
 lightning band rounding T4): repo-root cwd reported **17** tools, temp cwd
-reported **6**. The trap is intact and unchanged. Related: [G10] (the same
+reported **6**. **Re-run again 2026-08-26** (`6c75bcc`,
+issue-78-log-level-numeric T4), this time on the `LOG_LEVEL` half the entry
+names: same 17-vs-6 tool split, and with `LOG_LEVEL` deleted from the child env
+the repo-root spawn ran at **DEBUG** (the repo `.env:19`) while the temp-cwd
+spawn ran at **INFO**. Had the probe stayed at the repo root it would have
+"confirmed" a default install logs DEBUG. The trap is intact and unchanged. Related: [G10] (the same
 dotenv-cwd hazard, inverted), [G19] (the check this defeats). Lint candidate — a
 probe helper that always spawns from a clean temp cwd would close it
 mechanically.
@@ -1004,9 +1014,24 @@ is 1–500) and confirm the response contains no `**Total Strikes:**` line at al
 reported `total=null` for each, and the driver concluded "NO CONVECTION FOUND".
 Florida was in fact producing 62 strikes within 500 km at that moment.
 
-**Status:** active. Same family as [G10]'s vacuous-hash half — a failed
-measurement that renders as a clean result. Not lintable: only the probe's author
-knows what shape the response should have had.
+**Broadened 2026-08-26** (`21928d3`, issue-78-log-level-numeric T1) — the same
+rule, in the opposite direction: a *doubled positive*, not a clean negative. A
+sweep of `parseLogLevel` reported **two** `Invalid LOG_LEVEL:` warnings per
+invalid value where the contract says exactly one. The code was right and the
+probe was wrong: importing `dist/utils/logger.js` to reach the exported parser
+also runs the module body, which ends in `export const logger =
+createDefaultLogger()` and parses the same variable — so the probe's own import
+warned once before the probe's explicit call warned again. Dumping the raw
+stderr, as this entry's Rule says, showed two identical lines and made the cause
+obvious in seconds. **The general form:** a module that exports a pure function
+*and* calls it at load time will run that function's side effects once per
+import, so a probe that imports it to call it counts them twice. Probe the
+singleton the shipped code actually uses.
+
+**Status:** active, **broadened 2026-08-26**. Same family as [G10]'s
+vacuous-hash half — a failed or mis-scoped measurement that renders as a clean
+result. Not lintable: only the probe's author knows what shape the response
+should have had.
 
 ---
 
@@ -1161,8 +1186,16 @@ closed by `0deb47b`, which adds a case carrying three matched-but-flagged
 warnings beside one that lost geometry entirely, so the block-scoped count and
 the feed-scoped total no longer render the same number.
 
-**Status:** active. Sharper instance of [G13] — the degeneracy is not in a
-*value* the fixture repeats but in a *set* the fixture leaves empty.
+**Status:** active. **Re-run 2026-08-26** (`07661a9`,
+issue-78-log-level-numeric T2), where the design named three parsers and
+rejected two: the shipped bug turned 18/32 red, the issue's own
+`isNaN(Number(…))`-guard proposal 9/32 (all on the fail-loud contract), and bare
+`parseInt` exactly 4/32 — precisely the two traps (`"1.9"` accepted silently,
+`"3wat"` resolving to ERROR) that the design cited as its reason for rejecting
+it. Mutating only to the shipped bug would have looked complete while leaving
+both rejected parsers undiscriminated. Sharper instance of [G13] — the
+degeneracy is not in a *value* the fixture repeats but in a *set* the fixture
+leaves empty.
 
 ---
 
@@ -1192,6 +1225,100 @@ code had already handled as designed.
 **Status:** active. Closed by `bcda01c`, which asserts that the allowlist still
 matches the feed at all, logs every rejection by host, and no longer fails on
 which documents the publisher chooses to serve from where.
+
+---
+
+## G34 — Vitest replaces `globalThis.console`, so a `process.stderr.write` spy sees nothing
+
+**Trigger:** a unit test asserting that something reaches **stderr** and not
+**stdout** — the constraint every MCP server in this repo lives under, since
+stdout is the protocol transport.
+
+**Rule:** spy on the **`console` method identities** the source actually calls
+(`console.error`, `console.warn`, `console.log`), never on
+`process.stderr.write` / `process.stdout.write`. The stream spy is not merely
+awkward here, it records **zero calls** and therefore proves nothing — and it
+fails in the direction that reads as success, because a `not.toHaveBeenCalled()`
+assertion on stdout passes vacuously. Where the claim really is about the
+*stream*, make it against the **built dist** in a real child process with the
+two streams captured separately; a unit test cannot make it at all.
+
+**Why:** at worker startup Vitest swaps `globalThis.console` for its own
+`Console` instance bound to internal `Writable` buffers that forward to the
+reporter over RPC (`node_modules/vitest/dist/chunks/console.*.js`). The real
+`process.stdout`/`process.stderr` are never touched, so a spy on them observes
+nothing no matter what the code under test logs. What survives the swap is
+Node's documented contract for the method names themselves —
+`console.error`/`console.warn` go to stderr, `console.log` to stdout — which is
+why the method identity is the faithful boundary to assert on.
+
+**Verify:** in any test file, `vi.spyOn(process.stderr, 'write')` around a
+`console.error('marker')` call, then read `.mock.calls.length`. It is `0`.
+
+**Evidence:** 2026-08-26 (`07661a9`, issue-78-log-level-numeric T2) — the
+implementation plan specified two contracts as `vi.spyOn(process.stderr,
+'write')` / `vi.spyOn(process.stdout, 'write')`, one of them the
+"never touches stdout" assertion. Neither could be written as specified. The
+subagent reported it; the orchestrator re-ran the Verify line above
+independently before accepting it and got `process.stderr.write calls=0
+process.stdout.write calls=0`. Vitest **4.1.11**. The stream-level claim was
+made instead against the built dist — a 19-value sweep of the logger module and
+four child-process spawns of `dist/index.js`, stdout captured separately and
+empty on every one.
+
+**Status:** active, **version-stamped**. Re-run the Verify line after any Vitest
+major upgrade and retire this entry if the swap stops happening. Related:
+[G21] (the other way Vitest's module and global handling is not what the test
+file appears to say), [G11] (the dist is where a rendering or stream claim is
+actually checkable). Not lintable: only the test's author knows whether a
+given assertion is about a stream or about a call.
+
+---
+
+## G35 — Release prose is a JavaScript replacement string, so a `$` in a changelog bullet rewrites the file
+
+**Trigger:** any script that promotes author-written text into a file with
+`String.prototype.replace(pattern, string)` — in this repo,
+`scripts/update-docs-for-release.sh` promoting `## [Unreleased]` into the new
+version section.
+
+**Rule:** pass a **function** as the replacement (`() => text`), or escape every
+`$` as `$$`. A function replacement inserts the string literally and has no
+metacharacters at all, which is the only form that is safe against text nobody
+audited for `$`. The same hazard has a `sed` half — `/`, `&`, `\` in a `sed`
+replacement — which the same script already guards with `SUMMARY_SED`; the JS
+half was missed because the syntax looks like plain interpolation.
+
+**Why:** in a string replacement JS interprets `$$`, `` $` ``, `$'`, `$&` and
+`$1`-`$9`. `` $` `` means *everything in the subject string before the match* and
+`$'` means *everything after it*, so a single stray `` $` `` duplicates an
+arbitrarily large slab of the file into the middle of the inserted text. Nothing
+throws, the write succeeds, and `scripts/check-doc-versions.sh` passes over the
+result — it checks version strings, tool counts and the link-reference block,
+none of which the corruption touches.
+
+**Verify:**
+
+```
+node -e "console.log('AB'.replace(/B/, 'x\$\`y'))"
+```
+
+Prints `AxAy`, not `AxB\`y`.
+
+**Evidence:** 2026-08-26, v1.25.4 prep. The `LOG_LEVEL` bullet contained *"the
+numeric form matches `^[0-3]$` rather than going through `parseInt`"*. The `$`
+was followed by a backtick, so the seven-line CHANGELOG header was spliced in
+after `^[0-3]`, and the remainder of the bullet was pushed below a second copy
+of the file's preamble. `check-doc-versions.sh` reported *"All documentation
+checks passed"* on the corrupted file. Caught by reading the promoted section,
+which is exactly what [G11] says to do. Fixed in the same release by switching
+line 94 to a function replacement.
+
+**Status:** active. Related: [G11] (read the real output, do not trust the
+green check), [G16] (the other way this same script has silently produced a
+plausible-looking wrong result). Lintable in principle — a grep for
+`\.replace(` with a template-literal second argument would find it — but there
+are three call sites in one script and two of them use `$1` deliberately.
 
 ---
 

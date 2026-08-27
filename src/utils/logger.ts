@@ -12,6 +12,16 @@ export enum LogLevel {
   ERROR = 3,
 }
 
+/**
+ * Accepted spellings of LOG_LEVEL, in enum order — index N is LogLevel value N.
+ * The list is what the parser matches against: never index LogLevel by a runtime
+ * string. LogLevel is a *numeric* enum, so it carries reverse mappings: the `in`
+ * operator treats "3" as one of its keys, and the lookup then yields the *string*
+ * "ERROR" — which compares as NaN against a number and suppresses nothing.
+ * That was issue #78.
+ */
+const LOG_LEVEL_NAMES = ['DEBUG', 'INFO', 'WARN', 'ERROR'] as const;
+
 interface LogEntry {
   timestamp: string;
   level: string;
@@ -46,6 +56,14 @@ export class Logger {
    */
   setLevel(level: LogLevel): void {
     this.level = level;
+  }
+
+  /**
+   * The level currently in force. Used by the startup log line so it reports the
+   * effective level rather than the raw environment string.
+   */
+  getLevel(): LogLevel {
+    return this.level;
   }
 
   /**
@@ -142,18 +160,55 @@ export class Logger {
 }
 
 /**
- * Create the default logger instance
- * Level is controlled by LOG_LEVEL environment variable
+ * Resolve a raw LOG_LEVEL value to a level. Accepts `0`-`3` and the four names,
+ * case- and whitespace-insensitively. Anything else warns on stderr and falls
+ * back to INFO. Exported for reuse by the tests: pure, no I/O beyond the warning,
+ * no environment read.
+ */
+export function parseLogLevel(raw: string | undefined): LogLevel {
+  if (raw === undefined) return LogLevel.INFO;
+
+  const value = raw.trim().toUpperCase();
+
+  // Exact match on the four legal digits rather than parseInt, which would take
+  // "1.9" as 1 and "3wat" as 3. The domain has four members; exactness is free,
+  // and a typo should be told rather than rounded.
+  if (/^[0-3]$/.test(value)) return Number(value) as LogLevel;
+
+  const named = LOG_LEVEL_NAMES.indexOf(value as (typeof LOG_LEVEL_NAMES)[number]);
+  if (named >= 0) return named as LogLevel;
+
+  // Do not clamp an out-of-range value the way src/config/cache.ts does: clamping
+  // LOG_LEVEL=4 to ERROR would let a typo *silence* the server. Fall back to INFO,
+  // loudly, so a misconfiguration cannot hide its own diagnosis. console.warn, not
+  // logger.warn: the singleton is mid-construction here, and console.warn goes to
+  // stderr, the only stream an MCP server may use.
+  // Echo the value through JSON.stringify rather than between literal quotes, and
+  // bound it. Showing it verbatim is the whole point of the diagnostic — "" and
+  // "  " are invisible any other way, and stringify keeps both the quoting and the
+  // whitespace — but this is the one unstructured line on a stream where every
+  // other line is a single JSON record (Logger.log, :99). An embedded newline
+  // would therefore let a mistyped LOG_LEVEL forge a log entry for anything
+  // reading that stream by line; stringify escapes it. The cap stops a pasted
+  // file from becoming the entire warning. Ordinary typos are untouched:
+  // JSON.stringify('4') is "4", byte for byte what this line printed before.
+  const MAX_ECHO = 64;
+  const echoed = JSON.stringify(raw.slice(0, MAX_ECHO));
+  const truncated = raw.length > MAX_ECHO ? ` (truncated from ${raw.length} characters)` : '';
+  console.warn(
+    `Invalid LOG_LEVEL: ${echoed}${truncated}. Expected 0-3 or DEBUG/INFO/WARN/ERROR. Using default: INFO`
+  );
+  return LogLevel.INFO;
+}
+
+/**
+ * Create the default logger instance.
+ * The level comes from the LOG_LEVEL environment variable, which accepts either
+ * `0`-`3` or `DEBUG`/`INFO`/`WARN`/`ERROR` (case- and whitespace-insensitively).
+ * An unusable value warns on stderr and falls back to INFO — it does not clamp.
  */
 function createDefaultLogger(): Logger {
-  const levelStr = process.env.LOG_LEVEL?.toUpperCase();
-  let level = LogLevel.INFO; // Default to INFO
-
-  if (levelStr && levelStr in LogLevel) {
-    level = LogLevel[levelStr as keyof typeof LogLevel] as LogLevel;
-  }
-
-  return new Logger(level);
+  return new Logger(parseLogLevel(process.env.LOG_LEVEL));
 }
 
 // Export singleton instance

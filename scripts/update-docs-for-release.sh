@@ -91,9 +91,19 @@ if (body) {
   console.log('   ⚠️  Review the seeded entries — they are raw commit subjects.');
 }
 
+// The replacement is a **function**, not a string. That is load-bearing: a
+// string replacement makes JS interpret `$` sequences inside `body`, and `body`
+// is free-form release prose the author wrote. During v1.25.4 prep a bullet
+// reading "the numeric form matches `^[0-3]$` rather than going through
+// `parseInt`" spliced the whole file header into the middle of itself, because
+// `$` followed by a backtick is the replacement pattern meaning "everything
+// before the match". `$&`, `$'` and `$1`-`$9` are the same trap. A function
+// replacement inserts the string literally and has no metacharacters at all.
+// This mirrors the SUMMARY_SED escaping further down, which guards the sed
+// half of the same hazard.
 text = text.replace(
   /## \[Unreleased\]\n[\s\S]*?(?=\n## \[)/,
-  `## [Unreleased]\n\n## [${version}] - ${today}\n\n${body}\n`
+  () => `## [Unreleased]\n\n## [${version}] - ${today}\n\n${body}\n`
 );
 
 // --- link-reference block at the foot of the file ----------------------------

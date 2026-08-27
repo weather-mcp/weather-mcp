@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-2%2C574%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-2%2C611%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Three optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 2,574 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 2,611 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -263,7 +263,7 @@ Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weath
 | `CACHE_MAX_SIZE` | `1000` | Max cache entries (100–10000) |
 | `API_TIMEOUT_MS` | `30000` | Upstream API timeout (5000–120000) |
 | `WEATHER_LIGHTNING_PREWARM` | `true` | Subscribe saved locations' geohashes at startup so `get_lightning_activity` has coverage before the first query. Set `false` to skip this and avoid the persistent MQTT connection at startup. No effect when the lightning tool is disabled. |
-| `LOG_LEVEL` | `1` | 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR (logs go to stderr) |
+| `LOG_LEVEL` | `1` | `0`/`DEBUG`, `1`/`INFO`, `2`/`WARN`, `3`/`ERROR` — number or name, names case-insensitive. An unrecognized value warns on stderr and falls back to `INFO`. Logs go to stderr |
 | `NCEI_API_TOKEN` | — | Optional [free NCEI token](https://www.ncdc.noaa.gov/cdo-web/token) for official NOAA climate normals (US); falls back to Open-Meteo automatically. See [Optional API keys](#optional-api-keys) |
 | `FIRMS_MAP_KEY` | — | Optional [free FIRMS key](https://firms.modaps.eosdis.nasa.gov/api/map_key/) for targeted wildfire queries and up to 5 days of detection history. See [Optional API keys](#optional-api-keys) |
 | `GOOGLE_POLLEN_API_KEY` | — | Optional key for pollen outside Europe (incl. the US). **Requires a Google Cloud billing account** — free tier is 5,000 lookups/month. See [Optional API keys](#optional-api-keys) and [the setup guide](./docs/GOOGLE_POLLEN_KEY_SETUP.md) |
@@ -378,7 +378,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 2,574 tests
+npm test               # Run all 2,611 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

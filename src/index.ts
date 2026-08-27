@@ -33,7 +33,7 @@ import { blitzortungService } from './services/blitzortung.js';
 import { CacheConfig } from './config/cache.js';
 import { toolConfig } from './config/tools.js';
 import { getDefaultLocation } from './config/defaultLocation.js';
-import { logger } from './utils/logger.js';
+import { logger, LogLevel } from './utils/logger.js';
 import { formatErrorForUser } from './errors/ApiError.js';
 import { handleGetForecast } from './handlers/forecastHandler.js';
 import { handleGetCurrentConditions } from './handlers/currentConditionsHandler.js';
@@ -1005,7 +1005,7 @@ async function main() {
     logger.info('Weather MCP Server started', {
       version: SERVER_VERSION,
       cacheEnabled: CacheConfig.enabled,
-      logLevel: process.env.LOG_LEVEL || 'INFO',
+      logLevel: LogLevel[logger.getLevel()],
       enabledTools: toolConfig.getEnabledTools().length,
       toolList: toolConfig.getEnabledTools().join(', ')
     });

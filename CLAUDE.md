@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.25.3 (Production Ready)
+- **Version:** 1.25.4 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -59,7 +59,7 @@ src/
 │   ├── validation.ts        # Input validation (all user inputs go through here)
 │   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
-│   ├── logger.ts            # Structured logging to stderr
+│   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing
 │   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates
 │   ├── geography.ts         # isInUS and region helpers
 │   ├── timezone.ts          # Local-time formatting, formatObservationAge
@@ -72,7 +72,7 @@ src/
 │   ├── airQuality.ts / marine.ts / snow.ts / distance.ts / geohash.ts
 │   └── version.ts
 ├── config/
-│   ├── cache.ts             # Cache TTLs + CACHE_*/API_TIMEOUT_MS/LOG_LEVEL parsing
+│   ├── cache.ts             # Cache TTLs + CACHE_*/API_TIMEOUT_MS parsing
 │   ├── units.ts             # WEATHER_UNITS and per-unit overrides
 │   ├── tools.ts             # ENABLED_TOOLS presets (basic/standard/full) and tool names
 │   ├── defaultLocation.ts   # WEATHER_DEFAULT_LOCATION
@@ -369,11 +369,14 @@ WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
                                # docs/GOOGLE_WEATHER_KEY_SETUP.md
 
 # Logging
-LOG_LEVEL=1                    # 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR (default: 1)
+LOG_LEVEL=1                    # 0/DEBUG, 1/INFO, 2/WARN, 3/ERROR — number or name,
+                               # names case-insensitive (default: 1). An unrecognized
+                               # value warns on stderr and falls back to INFO.
 ```
 
-Cache/API/logging variables are validated in `src/config/cache.ts`; unit variables
-are parsed and validated in `src/config/units.ts`; optional keys in `src/config/api.ts`.
+Cache and API variables are validated in `src/config/cache.ts`; `LOG_LEVEL` is parsed
+in `src/utils/logger.ts`; unit variables are parsed and validated in
+`src/config/units.ts`; optional keys in `src/config/api.ts`.
 Per-call unit parameters are resolved by `src/utils/unitPreferences.ts` and formatted
 via `src/utils/unitFormat.ts`.
 
@@ -576,15 +579,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.25.3 — Production Ready ✅
-- **Test Coverage:** 2,574 tests, 100% pass rate
+- **Version:** 1.25.4 — Production Ready ✅
+- **Test Coverage:** 2,611 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.25.4:** Numeric LOG_LEVEL values now take effect instead of leaving the server at full DEBUG
 - **New in v1.25.3:** A national CAP alert list's geometry disclosure now counts the block it describes, not the page
 - **New in v1.25.2:** A lightning report's safety band now keys on the distance it prints, not a hidden raw value
-- **New in v1.25.1:** Lightning no longer claims no strikes were observed in a report listing strikes
 
 ## Useful References
 
@@ -607,7 +610,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-08-26 (v1.25.3)
+**Last Updated:** 2026-08-26 (v1.25.4)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
