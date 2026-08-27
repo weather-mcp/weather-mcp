@@ -1322,6 +1322,53 @@ are three call sites in one script and two of them use `$1` deliberately.
 
 ---
 
+## G36 — A seam row written from decimal intuition is wrong on binary halves
+
+**Trigger:** writing an expected tier/band for a value that sits on an exact
+half at the render precision (`x.x5` at `toFixed(1)`, `x.5` at `toFixed(0)`),
+in a test, an acceptance line, or a changelog claim.
+
+**Rule:** derive the expected display by running `(v).toFixed(n)` in node
+before writing the row, and never place a seam fixture on an exact half —
+offset it by at least 0.001 at one decimal. Prefer rows like `5.049` /
+`5.051` to `5.05`.
+
+**Why:** `toFixed` rounds the *stored* double, and adjacent decimal halves
+sit on different sides of their binary representation: `(5.05).toFixed(1)`
+and `(50.05).toFixed(1)` round down (`"5.0"`, `"50.0"`) while
+`(25.05).toFixed(1)` rounds up (`"25.1"`). A fixture placed by haversine adds
+a small floating-point residue on top, so an exact-half row is green or red by
+accident. The rows read as obviously correct, and a builder who trusts them
+will "fix" the code rather than the row — which here means banding on the raw
+value again, reintroducing the defect the plan exists to remove.
+
+**Verify:** `node -e 'for (const v of [5.05,25.05,50.05]) console.log(v.toFixed(1))'`
+prints `5.0 25.1 50.0`.
+
+**Evidence:** 2026-08-26 — wildfire band-rounding plan review, raised
+independently as R1 by **both** the Claude and Codex legs. The impl plan
+asserted `(5.05).toFixed(1)` is `"5.1"` and wrote `5.05 → HIGH` and
+`50.05 → AWARENESS` as "unchanged" seam rows; both are the opposite tier under
+the plan's own rule, so T2 would have gone red against a correct T1. The
+answer was already in the tree: `tests/unit/displayBanding.test.ts:10` pinned
+`displayValue(50.05, 1) === 50` when the lightning plan shipped the helper,
+and its test title already said *"floating-point storage of .05 differs by
+value"*.
+
+**Status:** active. Immediately load-bearing — plans 3 and 4 of the
+band-rounding sequence both write seam tables next (river/marine thresholds at
+0.1/0.5/1.25/2.5/4.0/6.0/9.0/14.0 m, and the non-safety sites of
+[#82](https://github.com/weather-mcp/weather-mcp/issues/82)), and the marine
+set is tenths-aligned, which is exactly where this bites. Related: [G13] (a
+fixture that cannot discriminate proves nothing), [G29] (correcting a
+published band table), [G32] (mutate to every rejected implementation).
+`tests/unit/displayBanding.test.ts` is the authoritative lock for any seam
+expectation that goes through `displayValue`. Partly lintable — a grep for
+`\.[0-9]*5\b` inside a seam table would find candidates, but only a human can
+tell a seam row from an ordinary fixture.
+
+---
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
