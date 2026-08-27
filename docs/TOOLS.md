@@ -811,11 +811,13 @@ Country routing matches `get_alerts`: saved/geocoded locations use their known c
 - Detection clusters within search radius, nearest first
 - Per cluster: detection count, distance + bearing, centroid, peak fire radiative power (MW), newest detection age, day/night mix, confidence summary, satellite
 
-**Both modes** include the 4-level safety assessment (keyed on the nearest uncontained fire for NIFC, the nearest detection cluster for FIRMS):
-- **EXTREME DANGER** (<5km): Evacuate if advised
-- **HIGH ALERT** (5-25km): Prepare for evacuation
-- **CAUTION** (25-50km): Monitor conditions
-- **AWARENESS** (>50km): Stay informed
+**Both modes** include the 4-level safety assessment, banded on the nearest uncontained fire's distance (NIFC) or the nearest detection cluster's distance (FIRMS) **as displayed** (rounded to 0.1 km), so the tier can never disagree with the number shown:
+- **EXTREME DANGER** (≤5 km): Evacuate if advised
+- **HIGH ALERT** (>5–25 km): Prepare for evacuation
+- **CAUTION** (>25–50 km): Monitor conditions
+- **AWARENESS** (>50 km): Stay informed
+
+On the NIFC path a fire whose containment **displays** as `100%` is excluded from the assessment, and the report says so by name; the tier keys on the nearest fire that is not.
 
 **Note:** US data from NIFC WFIGS (Wildland Fire Interagency Geospatial Services); global detections from NASA FIRMS (Fire Information for Resource Management System). Always consult official sources for evacuation orders — in the US, https://inciweb.nwcg.gov/
 
