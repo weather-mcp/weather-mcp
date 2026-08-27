@@ -15,6 +15,8 @@ import {
   formatPollutantConcentration,
   shouldUseUSAQI
 } from '../utils/airQuality.js';
+import type { AQICategory, UVIndexCategory } from '../utils/airQuality.js';
+import { displayValue } from '../utils/displayBanding.js';
 import type {
   OpenMeteoAirQualityResponse,
   OpenMeteoAirQualityHourlyData,
@@ -36,6 +38,18 @@ interface AirQualityArgs {
 
 const DEFAULT_FORECAST_DAYS = 5;
 const MAX_FORECAST_DAYS = 7; // Open-Meteo air quality API limit (168 hours)
+
+/** Round an AQI the way every render site prints it (Math.round) and band that figure. */
+function bandAqi(raw: number, useUSAQI: boolean): { shown: number; category: AQICategory } {
+  const shown = Math.round(raw);
+  return { shown, category: useUSAQI ? getUSAQICategory(shown) : getEuropeanAQICategory(shown) };
+}
+
+/** Same for UV: `decimals` is what the render site passes to toFixed (0 => Math.round). */
+function bandUv(raw: number, decimals: 0 | 1): { shown: number; category: UVIndexCategory } {
+  const shown = decimals === 0 ? Math.round(raw) : displayValue(raw, decimals);
+  return { shown, category: getUVIndexCategory(shown) };
+}
 
 /**
  * The six CAMS European-model pollen species, filtered to those carrying a
@@ -174,14 +188,14 @@ function formatAirQuality(
 
   // Display primary AQI with health information
   if (useUSAQI && current.us_aqi !== undefined) {
-    const category = getUSAQICategory(current.us_aqi);
+    const { shown, category } = bandAqi(current.us_aqi, true);
     const emoji = category.level === 'Good' ? '🟢' :
                   category.level === 'Moderate' ? '🟡' :
                   category.level === 'Unhealthy for Sensitive Groups' ? '🟠' :
                   category.level === 'Unhealthy' ? '🔴' :
                   category.level === 'Very Unhealthy' ? '🟣' : '🟤';
 
-    output += `## ${emoji} US Air Quality Index: ${Math.round(current.us_aqi)}\n\n`;
+    output += `## ${emoji} US Air Quality Index: ${shown}\n\n`;
     output += `**Category:** ${category.level} (${category.color})\n`;
     output += `**Description:** ${category.description}\n\n`;
     output += `**Health Implications:**\n${category.healthImplications}\n\n`;
@@ -189,14 +203,14 @@ function formatAirQuality(
       output += `⚠️ **Caution:** ${category.cautionaryStatement}\n\n`;
     }
   } else if (current.european_aqi !== undefined) {
-    const category = getEuropeanAQICategory(current.european_aqi);
+    const { shown, category } = bandAqi(current.european_aqi, false);
     const emoji = category.level === 'Good' ? '🟢' :
                   category.level === 'Fair' ? '🟢' :
                   category.level === 'Moderate' ? '🟡' :
                   category.level === 'Poor' ? '🟠' :
                   category.level === 'Very Poor' ? '🔴' : '🟣';
 
-    output += `## ${emoji} European Air Quality Index: ${Math.round(current.european_aqi)}\n\n`;
+    output += `## ${emoji} European Air Quality Index: ${shown}\n\n`;
     output += `**Category:** ${category.level} (${category.color})\n`;
     output += `**Description:** ${category.description}\n\n`;
     output += `**Health Implications:**\n${category.healthImplications}\n\n`;
@@ -207,13 +221,13 @@ function formatAirQuality(
 
   // UV Index
   if (current.uv_index !== undefined) {
-    const uvCategory = getUVIndexCategory(current.uv_index);
+    const { shown: uvShown, category: uvCategory } = bandUv(current.uv_index, 1);
     const uvEmoji = uvCategory.level === 'Low' ? '🟢' :
                     uvCategory.level === 'Moderate' ? '🟡' :
                     uvCategory.level === 'High' ? '🟠' :
                     uvCategory.level === 'Very High' ? '🔴' : '🟣';
 
-    output += `## ${uvEmoji} UV Index: ${current.uv_index.toFixed(1)}\n\n`;
+    output += `## ${uvEmoji} UV Index: ${uvShown.toFixed(1)}\n\n`;
     output += `**Level:** ${uvCategory.level}\n`;
     output += `**Description:** ${uvCategory.description}\n`;
     output += `**Recommendation:** ${uvCategory.recommendation}\n\n`;
@@ -284,9 +298,11 @@ function formatAirQuality(
 
   // Show secondary AQI for reference
   if (useUSAQI && current.european_aqi !== undefined) {
-    output += `*European AQI: ${Math.round(current.european_aqi)} (${getEuropeanAQICategory(current.european_aqi).level})*\n\n`;
+    const { shown, category } = bandAqi(current.european_aqi, false);
+    output += `*European AQI: ${shown} (${category.level})*\n\n`;
   } else if (!useUSAQI && current.us_aqi !== undefined) {
-    output += `*US AQI: ${Math.round(current.us_aqi)} (${getUSAQICategory(current.us_aqi).level})*\n\n`;
+    const { shown, category } = bandAqi(current.us_aqi, true);
+    output += `*US AQI: ${shown} (${category.level})*\n\n`;
   }
 
   // Add forecast summary if requested
@@ -447,12 +463,14 @@ function formatHourlyForecast(
     }
 
     // A day with no real UV data omits the UV clause entirely — never "UV 0 (Low)".
-    const uvClause = dayPeakUV === -Infinity
-      ? ''
-      : ` · UV ${Math.round(dayPeakUV)} (${getUVIndexCategory(dayPeakUV).level})`;
+    let uvClause = '';
+    if (dayPeakUV !== -Infinity) {
+      const { shown: uvShown, category: uvCategory } = bandUv(dayPeakUV, 0);
+      uvClause = ` · UV ${uvShown} (${uvCategory.level})`;
+    }
 
-    const peakCategory = useUSAQI ? getUSAQICategory(dayPeak) : getEuropeanAQICategory(dayPeak);
-    output += `### ${formatDayLabel(date)} — peak ${aqiScale} AQI ${Math.round(dayPeak)} (${peakCategory.level})${uvClause}\n\n`;
+    const { shown: peakShown, category: peakCategory } = bandAqi(dayPeak, useUSAQI);
+    output += `### ${formatDayLabel(date)} — peak ${aqiScale} AQI ${peakShown} (${peakCategory.level})${uvClause}\n\n`;
 
     // 6-hour periods aligned to the local clock (12 AM / 6 AM / 12 PM / 6 PM)
     const periods = new Map<number, number[]>();
@@ -483,10 +501,10 @@ function formatHourlyForecast(
 
       const startHour = parseInt(times[periodIndices[0]].slice(11, 13), 10);
       const endHour = parseInt(times[periodIndices[periodIndices.length - 1]].slice(11, 13), 10);
-      const category = useUSAQI ? getUSAQICategory(maxAQI) : getEuropeanAQICategory(maxAQI);
-      const range = Math.round(minAQI) === Math.round(maxAQI)
-        ? `${Math.round(maxAQI)}`
-        : `${Math.round(minAQI)}-${Math.round(maxAQI)}`;
+      const { shown, category } = bandAqi(maxAQI, useUSAQI);
+      const range = Math.round(minAQI) === shown
+        ? `${shown}`
+        : `${Math.round(minAQI)}-${shown}`;
 
       output += `- **${formatHour(startHour)} – ${formatHour(endHour)}:** ${aqiScale} AQI ${range} (${category.level})\n`;
     }
