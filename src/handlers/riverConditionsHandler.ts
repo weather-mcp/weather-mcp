@@ -10,6 +10,7 @@ import { resolveLocationAsync, prependLocationLine } from '../utils/locationReso
 import { validateDetail, validatePositiveInteger } from '../utils/validation.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
+import { displayValue } from '../utils/displayBanding.js';
 import { isInUS } from '../utils/geography.js';
 import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
 import { cubicMetersPerSecondToCubicFeetPerSecond } from '../utils/units.js';
@@ -774,10 +775,16 @@ function formatGaugeDetails(
  * below action stage (no flooding label needed inline).
  */
 function deriveFloodCategory(stage: number, categories: FloodCategories): 'major' | 'moderate' | 'minor' | 'action' | null {
-  if (stage >= categories.major) return 'major';
-  if (stage >= categories.moderate) return 'moderate';
-  if (stage >= categories.minor) return 'minor';
-  if (stage >= categories.action) return 'action';
+  // Band on the figure the series line prints (`toFixed(2)` at the one call site),
+  // not the raw stage. The thresholds stay raw — they are NOAA's published gauge
+  // metadata at NOAA's own precision, and rounding them would move the official
+  // action stage.
+  const shown = displayValue(stage, 2);
+
+  if (shown >= categories.major) return 'major';
+  if (shown >= categories.moderate) return 'moderate';
+  if (shown >= categories.minor) return 'minor';
+  if (shown >= categories.action) return 'action';
   return null;
 }
 
