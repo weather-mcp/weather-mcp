@@ -1823,6 +1823,65 @@ about test coverage is a grep, and greps are what this entry is about).
 
 ---
 
+## G42 — `update-docs-for-release.sh` aborts on a red suite *after* writing four files, and its own guard then blocks the retry
+
+**Trigger:** `./scripts/update-docs-for-release.sh <bump> "<summary>"` exits with
+`❌ Test suite is red — refusing to prepare a release`. Almost always a flake:
+six files under `tests/integration/` make live network calls.
+
+**Rule:** do **not** commit, and do **not** re-run the script. Revert the four
+files it already wrote, confirm the flake with a clean full run, then re-run the
+script from a clean tree:
+
+```bash
+git checkout -- CHANGELOG.md package.json package-lock.json server.json
+npm test                       # green ⇒ flake; red twice ⇒ real regression
+./scripts/update-docs-for-release.sh patch "<summary>"
+```
+
+**Why:** the abort sits at step 4 (`:167`), but steps 1–3 have already run —
+`npm version` has rewritten `package.json` and `package-lock.json` (`:39`),
+`server.json` is synced (`:44`), and `[Unreleased]` is already promoted into a
+dated `## [X.Y.Z]` section with its compare-link definition emitted (`:52-147`).
+So a "failed" run leaves a **half-prepared release in the working tree**, and the
+script's own precondition at `:32` (`git diff --quiet package.json server.json
+CHANGELOG.md`) then refuses the obvious retry with *"has uncommitted changes.
+Commit or stash first."*
+
+Both instinctive recoveries are wrong, and quietly:
+
+- **Re-running after the suite goes green** trips `:32` — or, if you obeyed its
+  advice and committed first, `npm version patch` reads the *already bumped*
+  `package.json` and you ship **1.25.9** with 1.25.8's notes. The version is
+  permanent once tagged.
+- **Committing the partial state and hand-finishing it** skips steps 4–9
+  entirely: the test count in five files, the tool count in six, the "New in"
+  line and its three-item prune, `Last Updated`, the social preview, and
+  `SECURITY.md`'s supported-versions row. `check-doc-versions.sh` catches the
+  counts; nothing catches the missing "New in" line.
+
+The red is real often enough that it must not be auto-retried — but the flake is
+common enough that the recovery is worth knowing by heart. Seen twice during
+v1.25.8 prep (2026-08-28), both single-test, neither reproducible across six
+subsequent full runs.
+
+**A second-order trap, paid for in the same session:** if you pipe `npm test`
+through a `grep` that selects only the summary lines, an intermittent red tells
+you a test failed and **discards its name**, so you cannot tell a flake from a
+regression without reproducing it. Capture to a file (`npm test 2>&1 | tee
+<scratch>/t.log`) and grep the file, not the stream.
+
+**Verify:** `sed -n '32,34p;148,172p' scripts/update-docs-for-release.sh` — the
+precondition guard and the red-suite abort, with steps 1–3 between them.
+
+**Status:** active. Script candidate: move the test run ahead of the first write,
+or trap a non-zero exit and revert the four files the script itself touched.
+Related: [G30] (a first live lightning probe reports zero strikes — the other
+"green means nothing yet" trap), [G10] (a check that cannot fail is not
+evidence).
+
+---
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
