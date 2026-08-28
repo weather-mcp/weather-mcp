@@ -9,28 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A lightning feed outage is now reported as unknown, not as a first-query cold start.**
-  A transport failure to the Blitzortung feed was caught, logged and turned into an empty result,
-  which was indistinguishable at the renderer from "this area has only just started being
-  monitored". The report then asserted the benign cause — that a location's first lookup starts
-  near zero coverage — and prescribed a remedy that cannot work during an outage: re-check shortly,
-  when every re-check reads the same zero. An unreachable feed now renders
-  `## ⚪ Safety Status: UNKNOWN (LIVE FEED UNAVAILABLE)` with an honest explanation naming the feed
-  and its automatic background reconnect, and advises consulting official weather services instead
-  of re-checking. A feed that drops partway through collection counts as an outage too, not only
-  one that never connects. Cold-start output is byte-identical. Buffered ELEVATED, HIGH and EXTREME
-  strikes retain their urgent verdict; buffered safe-band strikes remain listed, but the heading and
-  message say current conditions are unknown rather than "no immediate lightning threat". The
-  failure reason appears in the stderr log only — never in the report, and never with broker
-  detail: the three failure log sites now record only the error's `name` and `code`, because the
-  underlying message and stack name the broker host and port. A failed subscribe also no longer
-  leaves its geohashes recorded as subscribed. They were written before the broker had accepted
-  anything, so a second query for the same area — or the first query for a saved location whose
-  startup pre-warm failed — skipped resubscribing, found a coverage stamp for a topic no one was
-  listening to, and produced exactly the cold-start report this change exists to remove. Files:
-  `src/services/blitzortung.ts`, `src/handlers/lightningHandler.ts`,
-  `src/types/lightning.ts`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`.
+- **A lightning feed outage is now reported as unknown, not as a first-query cold
+  start.** A transport failure to the Blitzortung feed was caught, logged and turned
+  into an empty result, which was indistinguishable at the renderer from "this area
+  has only just started being monitored". The report then asserted the benign cause —
+  that a location's first lookup starts near zero coverage — and prescribed a remedy
+  that cannot work during an outage: re-check shortly, when every re-check reads the
+  same zero. An unreachable feed now renders
+  `## ⚪ Safety Status: UNKNOWN (LIVE FEED UNAVAILABLE)` with an honest explanation
+  naming the feed and its automatic background reconnect, and advises consulting
+  official weather services instead of re-checking. A feed that drops partway through
+  collection counts as an outage too, not only one that never connects. The same
+  ⚪ heading renders inline in `get_weather_summary`'s `lightning` section rather
+  than collapsing it. **Cold-start output is byte-identical** — a genuine first query
+  for an area reads exactly as it always has. Files: `src/services/blitzortung.ts`,
+  `src/handlers/lightningHandler.ts`, `src/types/lightning.ts`, `docs/TOOLS.md`,
+  `docs/ERROR_HANDLING.md`.
   ([#76](https://github.com/weather-mcp/weather-mcp/issues/76))
+
+- **Strikes already buffered from earlier monitoring now survive an outage instead of
+  being discarded.** Every transport failure returned an empty strike list, so the
+  server's own buffer went unread on the two outage shapes users hit most often — a
+  feed that was already down when the query started, and one whose subscribe was
+  refused. A strike 5 km away that arrived shortly before the feed dropped was
+  reported as nothing observed. Buffered **ELEVATED**, **HIGH** and **EXTREME**
+  strikes now retain their urgent verdict, with the full shelter recommendations and a
+  caveat that the live feed could not be reached; buffered safe-band strikes remain
+  listed, but the heading and message say current conditions are unknown rather than
+  "no immediate lightning threat". The strikes returned during an outage are filtered
+  by the query's own radius and time window, the same as on the healthy path.
+
+- **A failed subscribe no longer leaves its geohashes recorded as subscribed.** They
+  were written before the broker had accepted anything, so a second query for the same
+  area — or the first query for a saved location whose startup pre-warm failed —
+  skipped resubscribing, found a coverage stamp for a topic no one was listening to,
+  and produced exactly the cold-start report this release exists to remove. The
+  geohashes staged by a failed subscribe are now rolled back.
+
+- **The lightning failure logs no longer carry broker detail.** The three stderr sites
+  that record a feed failure passed the underlying error object through, and its
+  message and stack name the broker host and port; they now record only the error's
+  `name` and `code`. The failure reason has never appeared in the report itself, and
+  still does not.
 
 ## [1.25.8] - 2026-08-27
 
