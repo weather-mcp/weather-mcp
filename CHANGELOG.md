@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.10] - 2026-08-28
+
 ### Fixed
 
 - **An empty NOAA river result outside NWPS coverage now discloses the coverage
@@ -1467,7 +1469,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.9...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.10...HEAD
+[1.25.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.9...v1.25.10
 [1.25.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.8...v1.25.9
 [1.25.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.7...v1.25.8
 [1.25.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.6...v1.25.7
