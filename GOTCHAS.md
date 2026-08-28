@@ -326,7 +326,16 @@ tidal and major-river points and keep one whose gauges have a series — Portlan
 OR yielded 8), then assert the count, then compare hashes. Re-pointing there took
 the count from 0/0 to 16/16.
 
-**Status:** active, **extended 2026-08-27**. Related: [G37] (a driver that
+**Status:** active, **extended 2026-08-27**, **re-confirmed 2026-08-28**
+(`95faae9`, issue-85 river coverage disclosure T2) — a second instance of the
+subject-vacuity half, found the cheap way. The plan called for "a US point with
+no gauge in radius"; the candidate picked for it, Nevada `39.00,-117.00`,
+**returned 2 gauges**, so it could not express the construct at all. Memphis at
+`radius: 1` reaches the branch, and the pair then hashed identical with the
+construct grep non-zero on both sides. Confirming the subject *before* the sweep
+cost one probe; discovering it afterwards would have invalidated the record.
+Related: [G47] (the same vacuity where the output is a bare number, with a
+positive control in place of the construct grep), [G37] (a driver that
 constructs any service never exits without an explicit `process.exit(0)`, and
 parallel drivers were what first made this feed drift look like NOAA rate
 limiting), [G28] (a probe whose parse cannot see what it is looking for).
@@ -2113,6 +2122,56 @@ acceptance check before obeying it), [G45] (a contract that cannot reach its
 subject). Not lintable — the check is a human walking claims against proofs.
 
 ---
+
+---
+
+## G47 — A rate-limited upstream answers with a well-formed body that parses to a legitimate-looking zero, so every published count needs a positive control
+
+**Trigger:** measuring a count from a live upstream in order to **publish** it — a
+coverage table in a design plan, a number in a `CHANGELOG.md` bullet, a docs
+sentence naming how many of something a region has. Also any out-of-band `curl`
+standing in for what a service module fetches.
+
+**Rule:** measure a **known-non-zero control** in the same batch, and treat the
+whole batch as void unless the control comes back non-zero. Check for the
+upstream's own error envelope *before* counting — `len(d.get('gauges') or [])`
+reads a 429 error body as `0`. And reproduce the service's exact call shape:
+NWPS's `/gauges` silently ignores the bbox filter without `srid=EPSG_4326`
+(`src/services/noaa.ts:761`), so a hand-rolled query can measure something the
+code never asks for.
+
+**Why:** the failure is silent and it looks like data. NWPS enforces **10
+requests / 5 minutes** and says so only inside the JSON body, alongside HTTP 429.
+A sweep over Puerto Rico, the US Virgin Islands and Guam returned `0, 0, 0` —
+a *plausible* answer, close to the truth, and one that would have been recorded
+as confirming that no territory is gauged. Only the Nebraska control, which also
+read `0` against a known 60, showed that nothing had been measured at all. Rate
+limits are the common case against this host, not the exception: the same server
+had already 429'd that run's rendered-output probes an hour earlier. And the
+check that catches a *rendered* vacuity — [G10]'s construct grep — does not fire
+on a bare number, because a number has no construct to grep for. The control row
+is the numeric equivalent, and it is the only one available.
+
+**Verify:** issue eleven `/gauges` bbox requests inside five minutes and read the
+eleventh: HTTP 429 with
+`{"error":{"message":"Rate limit exceeded. Limit: 10 requests / 5 minutes.",...}}`,
+on which `d.get('gauges') or []` has length 0 and raises nothing.
+
+**Evidence:** 2026-08-28 (`b2b8d82`, issue-85 river coverage disclosure T4). The
+changelog bullet published *"Puerto Rico has 116 NWPS gauges while the US Virgin
+Islands and Guam have none"*. Under [G46] that number was re-measured rather than
+inherited from the design plan — and the first re-measure returned four zeros,
+control included. After a ~7 minute backoff the real figures reproduced the plan
+exactly: Nebraska **60**, Puerto Rico **116**, USVI **0**, Guam **0**. The same
+run's T2 probes had hit the identical limit and rendered the handler's `catch`
+block at all four points; they were discarded and re-run for the same reason.
+
+**Status:** active. Related: [G10] (prove the hash is not vacuous — the same
+failure with a number in place of rendered text), [G28] (a probe that fails
+validation reports as a clean negative), [G4] (never trust the HTTP 200 alone —
+here the status is 429 and the body is still well-formed JSON). Partly lintable:
+a measurement helper that refuses to report unless a named control row is
+non-zero would close it mechanically.
 
 ---
 
