@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.8] - 2026-08-27
+
 ### Fixed
 
 - **A lightning strike whose distance is unknown is now reported as unavailable
@@ -1383,7 +1385,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.7...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.8...HEAD
+[1.25.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.7...v1.25.8
 [1.25.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.6...v1.25.7
 [1.25.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.5...v1.25.6
 [1.25.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.4...v1.25.5

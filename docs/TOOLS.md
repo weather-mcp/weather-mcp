@@ -711,7 +711,10 @@ Provides real-time lightning strike detection from the Blitzortung.org global li
   - Total strikes and strike density (per sq km)
   - Strikes per minute rate
   - Distance to nearest strike
-  - Average distance of all strikes
+  - Average distance of all strikes (a mean over the strikes that carry a distance)
+  - A distance that is unknown reads `unavailable` rather than a figure, at the
+    nearest-strike line, the average line and the per-strike rows alike — so a printed
+    `0.0 km` means a strike directly overhead and nothing else
 - Strike details:
   - Polarity (cloud-to-ground vs intra-cloud)
   - Amplitude in kiloamperes (kA)
