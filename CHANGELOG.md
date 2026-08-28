@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A lightning strike whose distance is unknown is now reported as unavailable
+  at every site that prints it, instead of being read as a strike at zero
+  kilometres.** `LightningStrike.distance` is optional, but its only producer
+  (`filterStrikes` in `src/services/blitzortung.ts`) always sets it — so four
+  readers in `src/handlers/lightningHandler.ts` each invented their own handling
+  of a state none of them could observe, and two of them were wrong in opposite
+  directions. One such strike rendered `Nearest Strike: 0.0 km away` and
+  `Distance: undefined km` simultaneously, beneath a green *no significant
+  lightning activity detected* verdict. The `Nearest Strike` and
+  `Average Distance` lines and the per-strike `Distance` rows now say
+  `unavailable` when the distance is unknown, and print a figure only when there
+  is a real reading. **`0.0 km` therefore means a strike directly overhead and
+  nothing else** — the contract established for the safety assessment in
+  v1.25.1, now honoured by every reader. The average distance is a mean over the
+  strikes that carry a distance, rather than counting an unknown one as zero in
+  the numerator while still dividing by it. `LightningStatistics.nearestDistance`
+  and `averageDistance` are now `number | null` (`src/types/lightning.ts`).
+  **No live feed produces this state:** it is a latent invariant held in
+  `src/services/blitzortung.ts` with nothing enforcing it, reachable only through
+  a future second producer, and it is now honoured rather than assumed.
+  Reports with a distance on every strike are unchanged, byte for byte.
+  ([#83](https://github.com/weather-mcp/weather-mcp/issues/83))
+
 ## [1.25.7] - 2026-08-27
 
 ### Fixed
