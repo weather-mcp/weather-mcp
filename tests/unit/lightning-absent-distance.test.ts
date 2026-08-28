@@ -25,7 +25,8 @@ import * as blitzortungModule from '../../src/services/blitzortung.js';
 vi.mock('../../src/services/blitzortung.js', () => ({
   blitzortungService: {
     getLightningStrikes: vi.fn(),
-    getCoverageStart: vi.fn()
+    getCoverageStart: vi.fn(),
+    getFeedFailure: vi.fn(() => null)
   }
 }));
 

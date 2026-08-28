@@ -63,7 +63,8 @@ function buildResponseWithStrikes(count: number): LightningActivityResponse {
 vi.mock('../../src/services/blitzortung.js', () => ({
   blitzortungService: {
     getLightningStrikes: vi.fn(),
-    getCoverageStart: vi.fn()
+    getCoverageStart: vi.fn(),
+    getFeedFailure: vi.fn(() => null)
   }
 }));
 
