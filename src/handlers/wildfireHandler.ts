@@ -22,7 +22,7 @@ import { FIRMSService, FIRMSKeyRejectedError } from '../services/firms.js';
 import { NominatimService } from '../services/nominatim.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
-import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { resolveCountryCode, resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { validateDetail } from '../utils/validation.js';
 import { guessTimezoneFromCoords, formatObservationAge } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
@@ -178,41 +178,6 @@ export async function handleGetWildfireInfo(
   }
 
   return result;
-}
-
-/**
- * Country resolution, in the order get_alerts uses: a `country_code` the
- * resolution path already knows (saved location / geocoded city) > a cached
- * country-level Nominatim reverse lookup > nothing (the caller falls back to
- * `isInUS`).
- *
- * A missing service (test harnesses) skips the lookup silently; only a
- * *failed* lookup sets `lookupFailed`, which earns the one-line note.
- */
-async function resolveCountryCode(
-  resolvedCountryCode: string | undefined,
-  latitude: number,
-  longitude: number,
-  nominatimService?: NominatimService
-): Promise<{ countryCode: string | null; lookupFailed: boolean }> {
-  // Sources vary in casing; normalize to lowercase once.
-  let countryCode: string | null = resolvedCountryCode
-    ? resolvedCountryCode.toLowerCase()
-    : null;
-  let lookupFailed = false;
-
-  if (!countryCode && nominatimService) {
-    try {
-      countryCode = await nominatimService.reverseCountry(latitude, longitude);
-    } catch (error) {
-      lookupFailed = true;
-      logger.warn('Reverse country lookup failed; falling back to coordinate routing', {
-        error: error instanceof Error ? error.message : 'unknown'
-      });
-    }
-  }
-
-  return { countryCode, lookupFailed };
 }
 
 /**

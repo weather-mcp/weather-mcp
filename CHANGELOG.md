@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.10] - 2026-08-28
+
+### Fixed
+
+- **An empty NOAA river result outside NWPS coverage now discloses the coverage
+  gap instead of advising a wider search.** `get_river_conditions` with
+  `source: "noaa"` at a non-US point rendered
+  `ℹ️ **No river gauges found within 50 km**` followed by advice to expand the
+  radius — advice that cannot succeed at any radius, under an ℹ️ that reads as an
+  all-clear on a flood-safety tool. The coverage sentence existed but sat inside
+  the handler's `catch`, and a non-US NWPS query does not throw, so it was
+  unreachable in exactly the case it was written for.
+
+  The report now states that NOAA's National Water Prediction Service gauges
+  rivers in the United States and Puerto Rico only, that no gauges returned is an
+  absence of coverage rather than an all-clear, and names `source: "openmeteo"`
+  for global modeled discharge.
+
+  **This also covers the default path,** which is the commoner way to reach it:
+  `isInUS`'s CONUS bounding box contains Toronto and Vancouver, so those points
+  route to NWPS on `source: "auto"` and got the same unusable advice — they now
+  get the disclosure. **Routing itself is unchanged**; those points still route to
+  NWPS, the tool simply says so. The coverage set is matched against the country
+  the geocoder resolves, which is `us` for the United States and its territories.
+
+  **Known limitation:** NWPS gauges neither Guam nor the US Virgin Islands, but
+  OpenStreetMap resolves both to `us` at country zoom, so a forced
+  `source: "noaa"` query there still renders the in-coverage advice rather than
+  the disclosure — unchanged from before this fix, and tracked in
+  ([#86](https://github.com/weather-mcp/weather-mcp/issues/86)).
+
+  **A US point with no gauge in radius is untouched:** inside coverage, widening
+  the radius genuinely can find a gauge, so that advice still renders
+  byte-identically. Files: `src/handlers/riverConditionsHandler.ts`,
+  `src/utils/locationResolver.ts`, `docs/TOOLS.md`.
+  ([#85](https://github.com/weather-mcp/weather-mcp/issues/85))
+
 ## [1.25.9] - 2026-08-28
 
 ### Fixed
@@ -1432,7 +1469,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.9...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.10...HEAD
+[1.25.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.9...v1.25.10
 [1.25.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.8...v1.25.9
 [1.25.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.7...v1.25.8
 [1.25.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.6...v1.25.7

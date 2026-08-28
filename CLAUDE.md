@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.25.9 (Production Ready)
+- **Version:** 1.25.10 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -60,7 +60,7 @@ src/
 │   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing
-│   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates
+│   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates; shared country-code resolution
 │   ├── geography.ts         # isInUS and region helpers
 │   ├── timezone.ts          # Local-time formatting, formatObservationAge
 │   ├── normals.ts / records.ts / astronomy.ts        # Climate normals, US records, almanac
@@ -579,15 +579,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.25.9 — Production Ready ✅
-- **Test Coverage:** 2,800 tests, 100% pass rate
+- **Version:** 1.25.10 — Production Ready ✅
+- **Test Coverage:** 2,809 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.25.10:** A forced NOAA river query outside NWPS coverage now discloses the gap instead of advising a wider search
 - **New in v1.25.9:** A lightning feed outage now reports unknown and keeps buffered strikes, instead of a false cold start
 - **New in v1.25.8:** A lightning strike with no distance now reads as unavailable, not as zero kilometres
-- **New in v1.25.7:** Air quality, fire weather, visibility and model spread now key on the values the report prints
 
 ## Useful References
 
@@ -610,7 +610,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-08-28 (v1.25.9)
+**Last Updated:** 2026-08-28 (v1.25.10)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
