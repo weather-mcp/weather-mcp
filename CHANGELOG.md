@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.7] - 2026-08-27
+
+### Fixed
+
+- **Every non-safety category is now keyed on the number the report prints, so a
+  figure and the label beside it can never disagree.** Twelve sites across
+  `get_air_quality`, `get_current_conditions` and `get_forecast`'s
+  `compare_models` computed a category from a raw upstream value while printing
+  that value rounded. Sweeping the full grid of all twelve, **34 printed values
+  mapped to two different labels before this change and none do after**
+  (US AQI 5, European AQI 5, UV 4, Red Flag Threat 3, vapour-pressure deficit 3,
+  topsoil moisture 3, model spread 2 in °F and 2 in °C, visibility 3 imperial and
+  4 metric — every grid indexed by division). Touched
+  `src/handlers/airQualityHandler.ts`, `src/handlers/currentConditionsHandler.ts`,
+  `src/utils/fireWeather.ts`, `src/utils/modelComparison.ts` and
+  `src/utils/unitFormat.ts`.
+
+  **This is not a one-way change, and which way each surface moves is stated
+  rather than smoothed over.** Measured over a `±1` window at each ladder
+  threshold:
+
+  - *Toward caution:* **UV** (399 of 16,004 sampled cases, none the other way),
+    **Red Flag Threat**, and **vapour-pressure deficit** — all ascending `<`
+    ladders, so rounding up at a seam raises the label.
+  - *Away from caution:* **both AQI scales** (495 cases each, none the other
+    way). The US AQI and the European EAQI are published as whole numbers, so
+    banding on the integer is the correct reading of the scale rather than a
+    softening — the code had been classifying at a precision the scale does not
+    have. Also **topsoil moisture** and **imperial visibility**, by at most half
+    a display unit (0.005 m³/m³, 0.05 mi), because both are
+    descending-severity ladders; the alternative is two reports printing an
+    identical number under different words.
+  - **Visibility under metric preferences now keys on the km figure the report
+    prints.** It previously keyed on a miles value the report never showed.
+  - **A clear US report now reads `(clear)`.** NOAA publishes clear visibility
+    as 16090 m, which prints `10.0 miles` but failed a `>= 10.0` test on the
+    raw 9.99786 — so that branch could never fire, even at an exact ten statute
+    miles. Three captured examples gain the suffix.
+  - **The model-agreement spread bands on the whole degree it prints**, which in
+    °C makes the ladder `tight ≤ 2`, `moderate 3–4`, `divergent ≥ 5`. That
+    coarsening is inherent to printing a whole degree, not introduced here.
+  - **Haines Index and Grassland Fire Danger values between rungs no longer read
+    as the top rung.** Both ladders used strict equality on their middle rungs,
+    so a value of `4.5` (or `2.5`) matched no arm and fell through to
+    `Very High`. They are now contiguous; every integer keeps its label.
+
+  **Ensemble-spread confidence is deliberately unchanged** — the IQR it bands on
+  is never printed, so the rule has no referent there.
+
 ## [1.25.6] - 2026-08-27
 
 ### Fixed
@@ -1309,7 +1358,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.6...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.7...HEAD
+[1.25.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.6...v1.25.7
 [1.25.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.5...v1.25.6
 [1.25.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.4...v1.25.5
 [1.25.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.3...v1.25.4

@@ -31,19 +31,20 @@ get_current_conditions({
 **The server returned** (verbatim — this is exactly what the MCP client receives):
 
 ````markdown
-**Location:** Paris, Ile-de-France, Metropolitan France, France (48.8589, 2.3200)
+**Location:** Paris, Ile-de-France, Metropolitan France, France (48.8535, 2.3484)
 
-# Current Conditions — Villacoublay, ID, FR (LFPV)
+# Current Conditions — Paris/Le Bourge Arpt, ID, FR (LFPB)
 
-**Station:** Villacoublay, ID, FR (LFPV) — 13 km SW of the requested point, elev 171m
-**Observed:** Aug 14, 2026, 20:00 GMT+2 (5 minutes ago)
+**Station:** Paris/Le Bourge Arpt, ID, FR (LFPB) — 14 km NNE of the requested point, elev 50m
+**Observed:** Aug 27, 2026, 23:30 GMT+2 (20 minutes ago)
 
-**Temperature:** 36°C (dew point 10°C, humidity 21%)
-**Wind:** Variable at 2 km/h
+**Temperature:** 19°C (dew point 17°C, humidity 88%)
+**Wind:** SSE (160°) at 6 km/h
 **Visibility:** +9.7 km
-**Pressure:** 1014 hPa
+**Pressure:** 1010 hPa
+**Flight category:** VFR
 
-`METAR LFPV 141800Z AUTO VRB01KT 9999 ///CB 36/10 Q1014 TEMPO VRB15G30KT 4500 -TSRA`
+`METAR LFPB 272130Z AUTO 16003KT CAVOK 19/17 Q1010 NOSIG`
 
 ---
 *Data source: NOAA Aviation Weather Center (aviationweather.gov) — METAR station observation*
@@ -82,19 +83,17 @@ get_air_quality({
 **Timezone:** Europe/Paris
 **Elevation:** 36m
 
-**Observation Time:** 8/14/2026, 8:00:00 PM
+**Observation Time:** 8/27/2026, 11:00:00 PM
 
-## 🟡 European Air Quality Index: 57
+## 🟢 European Air Quality Index: 21
 
-**Category:** Moderate (Yellow)
-**Description:** Air quality is moderate
+**Category:** Fair (Green)
+**Description:** Air quality is fair
 
 **Health Implications:**
-Consider reducing intense outdoor activities if you experience symptoms.
+Enjoy your usual outdoor activities.
 
-⚠️ **Caution:** Sensitive individuals should consider reducing intense activities.
-
-## 🟢 UV Index: 0.1
+## 🟢 UV Index: 0.0
 
 **Level:** Low
 **Description:** Minimal protection required
@@ -102,27 +101,27 @@ Consider reducing intense outdoor activities if you experience symptoms.
 
 ## Pollutant Concentrations
 
-**PM2.5 (Fine Particulate Matter):** 10 μg/m³
-**PM10 (Coarse Particulate Matter):** 15 μg/m³
-**Ozone (O₃):** 125 μg/m³
-**Nitrogen Dioxide (NO₂):** 12 μg/m³
-**Sulfur Dioxide (SO₂):** 0.90 μg/m³
-**Carbon Monoxide (CO):** 187 μg/m³
-**Ammonia (NH₃):** 2.8 μg/m³
-**Aerosol Optical Depth:** 0.320 (atmospheric haze indicator)
+**PM2.5 (Fine Particulate Matter):** 6.3 μg/m³
+**PM10 (Coarse Particulate Matter):** 8.9 μg/m³
+**Ozone (O₃):** 52 μg/m³
+**Nitrogen Dioxide (NO₂):** 37 μg/m³
+**Sulfur Dioxide (SO₂):** 1.6 μg/m³
+**Carbon Monoxide (CO):** 237 μg/m³
+**Ammonia (NH₃):** 1.1 μg/m³
+**Aerosol Optical Depth:** 0.140 (atmospheric haze indicator)
 
 ## 🌾 Pollen
 
 **Alder:** 0 grains/m³
 **Birch:** 0 grains/m³
-**Grass:** 3.1 grains/m³
-**Mugwort:** 4.1 grains/m³
+**Grass:** 0.5 grains/m³
+**Mugwort:** 0.4 grains/m³
 **Olive:** 0 grains/m³
-**Ragweed:** 0.3 grains/m³
+**Ragweed:** 0 grains/m³
 
 *Pollen from the CAMS European forecast — available for European locations only.*
 
-*US AQI: 118 (Unhealthy for Sensitive Groups)*
+*US AQI: 37 (Good)*
 ````
 
 </details>
@@ -133,5 +132,5 @@ Consider reducing intense outdoor activities if you experience symptoms.
 **Features shown:** `source: "metar"` — real airport instrument observations anywhere on earth (station, distance, bearing, observation age always disclosed) · European pollen levels on `get_air_quality` (automatic for European locations) · European EAQI air-quality scale · per-call `units: "metric"`.
 
 <!-- capture-stamp -->
-*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

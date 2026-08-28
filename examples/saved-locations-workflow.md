@@ -153,7 +153,7 @@ list_saved_locations({})
 **Country:** US
 **Region:** California
 **Activities:** boating, fishing, hiking
-**Saved:** 8/14/2026
+**Saved:** 8/27/2026
 
 ---
 
@@ -201,37 +201,37 @@ get_forecast({
 **Elevation:** 6227ft
 **Showing:** 4 periods
 
-## Today
-**Temperature:** 67°F
-**Precipitation Chance:** 12%
-**Wind:** 5 mph SW
-**Forecast:** Sunny
+## This Afternoon
+**Temperature:** 74°F
+**Precipitation Chance:** 5%
+**Wind:** 10 mph W
+**Forecast:** Partly Sunny
 
-Sunny, with a high near 67. Southwest wind around 5 mph.
+Partly sunny, with a high near 74. West wind around 10 mph, with gusts as high as 20 mph.
 
 ## Tonight
-**Temperature:** 49°F
-**Precipitation Chance:** 5%
+**Temperature:** 55°F
+**Precipitation Chance:** 61%
+**Wind:** 0 to 10 mph SW
+**Forecast:** Mostly Cloudy then Rain Showers Likely
+
+Rain showers likely after 2am. Mostly cloudy, with a low around 55. Southwest wind 0 to 10 mph, with gusts as high as 20 mph. Chance of precipitation is 60%.
+
+## Friday
+**Temperature:** 63°F
+**Precipitation Chance:** 74%
 **Wind:** 0 to 5 mph SW
-**Forecast:** Mostly Clear
+**Forecast:** Rain Showers Likely
 
-Mostly clear, with a low around 49. Southwest wind 0 to 5 mph.
+Rain showers likely before 2pm, then showers and thunderstorms likely. Mostly cloudy, with a high near 63. Southwest wind 0 to 5 mph. Chance of precipitation is 70%.
 
-## Saturday
-**Temperature:** 70°F
-**Precipitation Chance:** 1%
-**Wind:** 0 to 5 mph SW
-**Forecast:** Sunny
-
-Sunny, with a high near 70. Southwest wind 0 to 5 mph.
-
-## Saturday Night
+## Friday Night
 **Temperature:** 51°F
-**Precipitation Chance:** 0%
-**Wind:** 0 to 5 mph W
-**Forecast:** Mostly Clear
+**Precipitation Chance:** 50%
+**Wind:** 5 mph SW
+**Forecast:** Chance Rain Showers then Partly Cloudy
 
-Mostly clear, with a low around 51. West wind 0 to 5 mph.
+A chance of rain showers before 8pm. Partly cloudy, with a low around 51. Southwest wind around 5 mph. Chance of precipitation is 50%.
 
 ---
 *Data source: NOAA National Weather Service (US)*
@@ -265,7 +265,7 @@ get_saved_location({
 **Region:** California
 **County:** Placer County
 **Activities:** boating, fishing, hiking
-**Saved:** 8/14/2026, 2:05:31 PM
+**Saved:** 8/27/2026, 5:50:21 PM
 
 ---
 
@@ -318,5 +318,5 @@ Use `save_location` to save new locations.
 *The activities you save travel with the location — ask "can we fish at the cabin Saturday?" and the assistant knows what and where "the cabin" is.*
 
 <!-- capture-stamp -->
-*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

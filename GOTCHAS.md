@@ -428,7 +428,14 @@ trap is intact and both gaps are still exactly the two this entry names), **and
 issue-78-log-level-numeric T2 — both unvalidated sites set to `9,999` with the
 real count at `2,606`, and `./scripts/check-doc-versions.sh` still reported
 `✅ All documentation checks passed!`; the trap is intact and unchanged, and
-both gaps are still exactly the two this entry names). Match every site by
+both gaps are still exactly the two this entry names). **Verify line re-run again 2026-08-27** (`a734bf0`/`ffe8e6b`, issue-82
+display-band-coherence T5 and T6 — the count moved 2,700 → 2,717 → 2,742 and all
+five sites were edited by content each time; with both unvalidated sites then set
+to `9,999` against the real `2,742`, `env -u FORCE_COLOR
+./scripts/check-doc-versions.sh` still printed `✅ README.md test count`,
+`✅ CLAUDE.md test count` and `✅ All documentation checks passed!`, never once
+naming the two it does not read — the trap is intact and both gaps are still
+exactly the two this entry names). Match every site by
 content, never by line number — the `npm test`
 comment has moved twice (346 → 381). Lint candidate — anchoring a check on
 `Run all [0-9,]+ tests` and one on `docs/README.md`'s count would close both gaps
@@ -712,6 +719,27 @@ which is the point: this is a claim a plan can state confidently and get
 backwards, because it is invisible in the summary's own `switch`. Lint candidate
 — a test asserting `subArgs.detail` for each section would pin it mechanically.
 
+**Sharpened 2026-08-27** (`ffe8e6b`, issue-82 display-band-coherence T6) — **the
+"substitutes its own" half is true of exactly seven keys, and guessing which is
+how a plan gets the blast radius wrong in the other direction.**
+`weatherSummaryHandler.ts:111-125` **spreads the caller's `args` first** and then
+overrides only `latitude`, `longitude`, `location_name`, `city_name`,
+`compare_models`, `ensemble_spread` and `detail`. Everything else — `units`,
+`units_*`, `include_fire_weather`, `source` — **passes straight through**,
+confirmed live: `units: 'metric'` renders `16.1 km (clear)` inside the summary's
+current section. So the rule is not "the summary substitutes its own arguments"
+but "the summary overrides seven named keys and forwards the rest": read the
+override list, do not infer it in either direction.
+
+And the `detail` hazard only bites sections that *read* `detail`.
+`currentConditionsHandler.ts` never reads it at all (its single match is the
+comment `// Cloud cover details`), so for that section the summary's default
+`summary` and an explicit `standard` render identically — which is why the T6
+probe could assert the same string at both levels rather than finding the
+counts-branch surprise the 2026-08-26 entry above records for alerts. **Check
+whether the section under test reads `detail` before predicting that the two
+paths diverge.**
+
 ---
 
 ## G20 — Never introduce an `await` between a synchronous guard flag and the check that reads it
@@ -980,7 +1008,13 @@ issue-78-log-level-numeric T4), this time on the `LOG_LEVEL` half the entry
 names: same 17-vs-6 tool split, and with `LOG_LEVEL` deleted from the child env
 the repo-root spawn ran at **DEBUG** (the repo `.env:19`) while the temp-cwd
 spawn ran at **INFO**. Had the probe stayed at the repo root it would have
-"confirmed" a default install logs DEBUG. The trap is intact and unchanged. Related: [G10] (the same
+"confirmed" a default install logs DEBUG. The trap is intact and unchanged. **Re-run 2026-08-27** (`1501080`, issue-82 display-band-coherence T7): temp cwd with
+`ENABLED_TOOLS` unset reported **6** tools against **17** from the repo root, run as an
+explicit control before any live read. The finding that made it worth running here:
+`get_air_quality` is **absent** from that default preset while `get_weather_summary` is
+**present**, so the summary is the *only* way a default install reaches the air-quality
+rendering under test — the same [G19] asymmetry this entry's 2026-08-25 evidence found
+for lightning, now on a second tool. Related: [G10] (the same
 dotenv-cwd hazard, inverted), [G19] (the check this defeats). Lint candidate — a
 probe helper that always spawns from a clean temp cwd would close it
 mechanically.
@@ -1072,9 +1106,29 @@ legitimately — anchor on what the code anchors on, or read the report ([G11])
 before calling it a regression. Nearly reported as a live defect on a correct
 build.
 
-**Status:** active, **broadened 2026-08-26 and 2026-08-27**. Same family as
+**Broadened again 2026-08-27** (`a734bf0`, issue-82 display-band-coherence T5) —
+**a fourth direction: a capture group too narrow to see the difference, which
+renders incoherence as coherence.** A seam sweep asserted that one printed value
+never carries two category labels, capturing the label with
+`/\*\*Category:\*\* (\S+)/`. `(\S+)` stops at the first space, so
+`Unhealthy for Sensitive Groups` and `Unhealthy` both captured as `Unhealthy` —
+and the set-size-1 assertion passed over a genuine collision. Measured: under the
+pre-fix rule a printed `150` maps to
+`{Unhealthy for Sensitive Groups (Orange), Unhealthy (Red)}`; the wide capture
+sees 2, the narrow capture sees 1. The sweep was blind at exactly the threshold
+the change's headline example used, and every other threshold *did* go red, so
+the suite looked thorough. **This codebase's ladders are mostly multi-word**
+(`Very High`, `Unhealthy for Sensitive Groups`, `moderate drying power`,
+`dense fog`), so a single-token capture is almost always wrong here: capture to
+end of line, and prefer including the trailing colour/qualifier so two rungs
+sharing a first word stay distinguishable. Sharper than "assert the shape you
+expected": here the shape was asserted and the *parse* could not represent the
+difference the assertion was about.
+
+**Status:** active, **broadened 2026-08-26 and twice on 2026-08-27**. Same family as
 [G10]'s vacuous-hash half — a failed or mis-scoped measurement that renders as a
-clean result — and now its mirror, a correct result that renders as a failure.
+clean result — its mirror, a correct result that renders as a failure, and now a
+parse too coarse to represent the failure at all.
 Not lintable: only the probe's author knows what shape the response should have
 had.
 
@@ -1470,7 +1524,22 @@ answer was already in the tree: `tests/unit/displayBanding.test.ts:10` pinned
 and its test title already said *"floating-point storage of .05 differs by
 value"*.
 
-**Status:** active, **broadened 2026-08-27** (measurement half). Immediately
+**Extended 2026-08-27** (`9d8ffb8`, issue-82 display-band-coherence T1) — **which
+*side* of a threshold rounding moves a value onto is the half that gets narrated
+backwards.** The plan wrote that its AQI seam was `x.5..x.99` "above an integer
+threshold", and built a fixture on `50.51` expecting `Good` before the fix. It is
+the opposite: on a `<=` ladder, `x.5..x.99` rounds **up** and keeps its rung,
+while `x.01..x.49` rounds **down onto** the threshold and changes rung. So
+`50.51 → 51` is `Moderate` on both sides (a control, not a seam) and `50.49 → 50`
+is the row that moves; likewise `150.4 → 150` and `60.4 → 60`. The stated
+expectation was unreachable — no raw value banded `Good` can round to `51` — and
+would have sent a builder hunting a defect in correct code. **Write the seam row
+by asking which raw values round *to* the threshold, not which sit near it**, and
+keep both a moving row and a non-moving control so the direction is visible
+([G13]).
+
+**Status:** active, **broadened 2026-08-27** (measurement half), **extended
+2026-08-27** (threshold-side half). Immediately
 load-bearing — plans 3 and 4 of the
 band-rounding sequence both write seam tables next (river/marine thresholds at
 0.1/0.5/1.25/2.5/4.0/6.0/9.0/14.0 m, and the non-safety sites of
@@ -1631,6 +1700,60 @@ failed" from "still propagating" rather than emitting a bare error. Filed as a
 follow-up. Related: [G9] and [G14] (release tooling that runs more than it
 appears to), [G38] (the sibling case — a release check that reports a confident
 failure it never actually measured).
+
+---
+
+## G40 — A plan's claim that no test covers something is a grep, and a fixed function's twin has a twin test
+
+**Trigger:** a plan that states a path has no test, or that exactly one existing
+test must change — especially when the same change closes a defect in **two
+sibling functions** and the plan names a test for only one of them. This is
+load-bearing whenever a project treats "an existing test's expectations would
+have to change" as a risk floor.
+
+**Rule:** re-derive the absence by grepping for the **symbol and the `it()`
+title**, once per function the diff touches — not once per file, and never from
+the plan's own prose. Where a fix has a twin, search for the twin's test with
+the *same* pattern that found the first one. If the first test's title names the
+defect ("fall through to else"), grep that title: a sibling defect written by the
+same hand usually carries the same words.
+
+**Why:** the absence claim decides scope. Here the plan and its triage brief both
+recorded that `getGrasslandFireDangerCategory` had **no** fall-through test, so
+the task was scoped to rewrite one `it` for `getHainesCategory` and *add* a
+grassland sibling. The grassland test existed — in the same file, in a parallel
+`Edge cases` block, under a byte-identical title
+(`it('should handle decimal values (fall through to else)')`), pinning
+`1.5/2.5/3.5 → Very High` with a comment naming the strict-equality defect. It
+could not survive the fix, so the authorized risk-floor trip doubled from three
+assertions to six, discovered mid-run rather than at planning. The remedy was
+correct and cheap — a sibling defect's test is a necessary consequence of fixing
+the sibling, not new scope — but it was a scope change the human had approved at
+a different size.
+
+Note what did *not* catch it: the design plan grepped `tests/unit/` for the
+visibility descriptor strings and correctly reported zero hits, so the discipline
+was present and applied to one claim and not the other. A citation table that
+verifies "this test exists and says X" ([G12]'s lesson about enumerations being
+incomplete rather than stale) will happily confirm every row it lists while the
+missing row is the one that matters.
+
+**Verify:** for any function whose ladder or branch structure a diff changes,
+`grep -rn "<functionName>" tests/` and read every `it()` title in the blocks that
+returns. Then `grep -rn "<the first test's it() title>" tests/` — more than one
+hit means more than one lock.
+
+**Evidence:** 2026-08-27 (`effa87b`, issue-82 display-band-coherence T2) — raised
+by the executing subagent as a Surprise after its first full-suite run went red
+on a test the task had told it did not exist. Confirmed by reading the file: two
+`it` blocks, identical titles, identical defect-naming comments, one per ladder.
+
+**Status:** active. Partly lintable — "two `it()` blocks with the same title in
+one file" is a mechanical grep, and so is "a plan asserts absence for symbol X
+while `tests/` mentions X". Related: [G12] (an enumeration can be incomplete as
+easily as stale), [G13] (a test that pins the defect by name is not coverage),
+[G32] (the rejected-alternative set is also something a plan enumerates and can
+under-enumerate).
 
 ---
 

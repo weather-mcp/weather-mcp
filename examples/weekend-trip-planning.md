@@ -42,49 +42,49 @@ get_forecast({
 **Timezone:** Asia/Tokyo
 **Forecast Days:** 3
 
-## Saturday, August 15
-**Temperature:** High 82°F / Low 75°F
-**Feels Like:** High 90°F / Low 81°F
-**Sunrise:** 4:59 AM
-**Sunset:** 6:31 PM
-**Moon:** Waxing Crescent (7% illuminated) · Rise 7:27 AM · Set 7:49 PM
-**Twilight:** Civil 4:32 AM / 6:58 PM · Nautical 3:59 AM / 7:30 PM · Astronomical 3:25 AM / 8:04 PM
-**Daylight Duration:** 13h 31m
-**Precipitation Chance:** 94%
-**Precipitation:** 0.02 in
-**Wind:** 3 mph ENE
+## Friday, August 28
+**Temperature:** High 90°F / Low 73°F
+**Feels Like:** High 102°F / Low 82°F
+**Sunrise:** 5:09 AM
+**Sunset:** 6:14 PM
+**Moon:** Full Moon (100% illuminated) · Rise 6:14 PM · Set 4:53 AM
+**Twilight:** Civil 4:43 AM / 6:40 PM · Nautical 4:11 AM / 7:11 PM · Astronomical 3:39 AM / 7:44 PM
+**Daylight Duration:** 13h 4m
+**Precipitation Chance:** 84%
+**Precipitation:** 0.03 in
+**Wind:** 3 mph NNW
 **Wind Gusts:** 20 mph
 **Conditions:** Light drizzle
-**UV Index:** 7.8
+**UV Index:** 5.6
 
-## Sunday, August 16
-**Temperature:** High 87°F / Low 71°F
-**Feels Like:** High 95°F / Low 78°F
-**Sunrise:** 5:00 AM
-**Sunset:** 6:30 PM
-**Moon:** Waxing Crescent (14% illuminated) · Rise 8:31 AM · Set 8:15 PM
-**Twilight:** Civil 4:33 AM / 6:56 PM · Nautical 4:00 AM / 7:29 PM · Astronomical 3:26 AM / 8:03 PM
-**Daylight Duration:** 13h 29m
-**Precipitation Chance:** 56%
-**Precipitation:** 0.00 in
+## Saturday, August 29
+**Temperature:** High 80°F / Low 72°F
+**Feels Like:** High 88°F / Low 78°F
+**Sunrise:** 5:10 AM
+**Sunset:** 6:13 PM
+**Moon:** Full Moon (99% illuminated) · Rise 6:39 PM · Set 5:55 AM
+**Twilight:** Civil 4:44 AM / 6:39 PM · Nautical 4:12 AM / 7:10 PM · Astronomical 3:40 AM / 7:42 PM
+**Daylight Duration:** 13h 2m
+**Precipitation Chance:** 94%
+**Precipitation:** 0.17 in
 **Wind:** 4 mph ENE
-**Wind Gusts:** 19 mph
-**Conditions:** Light drizzle
-**UV Index:** 6.7
+**Wind Gusts:** 22 mph
+**Conditions:** Moderate rain
+**UV Index:** 1.3
 
-## Monday, August 17
-**Temperature:** High 85°F / Low 73°F
-**Feels Like:** High 93°F / Low 80°F
-**Sunrise:** 5:01 AM
-**Sunset:** 6:29 PM
-**Moon:** Waxing Crescent (22% illuminated) · Rise 9:35 AM · Set 8:41 PM
-**Twilight:** Civil 4:34 AM / 6:55 PM · Nautical 4:01 AM / 7:27 PM · Astronomical 3:27 AM / 8:01 PM
-**Daylight Duration:** 13h 27m
-**Precipitation Chance:** 53%
-**Wind:** 6 mph SE
-**Wind Gusts:** 17 mph
+## Sunday, August 30
+**Temperature:** High 82°F / Low 70°F
+**Feels Like:** High 91°F / Low 76°F
+**Sunrise:** 5:11 AM
+**Sunset:** 6:12 PM
+**Moon:** Waning Gibbous (96% illuminated) · Rise 7:04 PM · Set 6:58 AM
+**Twilight:** Civil 4:44 AM / 6:37 PM · Nautical 4:13 AM / 7:08 PM · Astronomical 3:41 AM / 7:40 PM
+**Daylight Duration:** 13h 0m
+**Precipitation Chance:** 45%
+**Wind:** 4 mph N
+**Wind Gusts:** 14 mph
 **Conditions:** Overcast
-**UV Index:** 7.3
+**UV Index:** 4.5
 
 **Next full moon:** Aug 28 · **Next new moon:** Sep 11
 
@@ -135,8 +135,8 @@ get_weather_imagery({
 
 ## 📸 Current Imagery
 
-**Timestamp:** 2026-08-14T18:00:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/976bc5372bde/512/6/56/25/4/1_1.png
+**Timestamp:** 2026-08-27T21:40:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/4f9de34f3b2f/512/6/56/25/4/1_1.png
 
 **Interactive map:** https://www.rainviewer.com/map.html?loc=35.6769,139.7639,7
 *Opens live animated radar over a base map in the browser — the frame URLs above are transparent overlay tiles (blank where dry) and expire within about two hours.*
@@ -146,7 +146,7 @@ get_weather_imagery({
 ⚠️ **DISCLAIMER:** RainViewer provides global precipitation radar. Data may have 5-10 minute delay. For official forecasts, consult local meteorological services.
 
 ---
-*Generated: 2026-08-14T18:03:08.439Z*
+*Generated: 2026-08-27T21:48:07.117Z*
 *Data source: RainViewer*
 ````
 
@@ -158,5 +158,5 @@ get_weather_imagery({
 **Features shown:** `city_name` free-text geocoding (no coordinates needed) · `include_astronomy` (moon phase, moonrise/moonset, twilight times — computed locally, no extra API call) · `days` forecast-length control · `get_weather_imagery` radar (RainViewer) with a committed snapshot.
 
 <!-- capture-stamp -->
-*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

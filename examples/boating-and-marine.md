@@ -39,36 +39,36 @@ get_marine_conditions({
 
 ⚠️ **DISCLAIMER:** This data is modeled and may have limited accuracy in coastal areas. **NOT suitable for coastal navigation.** Always consult official marine forecasts for safety-critical decisions.
 
-**Observation Time:** Aug 15, 2026, 4:00 AM
+**Observation Time:** Aug 28, 2026, 7:45 AM
 
-## 🟤 Current Conditions: Slight
+## 🟡 Current Conditions: Moderate
 
-Smooth Conditions dominated by swell from distant systems.
+Slight Conditions dominated by swell from distant systems.
 
 ## 🌊 Wave Conditions
 
-**Significant Wave Height:** 1.0m (3.4ft) (Smooth)
-**Wave Direction:** SSE (158°)
-**Wave Period:** 8.8s
+**Significant Wave Height:** 1.5m (4.9ft) (Slight)
+**Wave Direction:** SSE (152°)
+**Wave Period:** 10.1s
 
 ### Wind Waves
 
-**Height:** 0.1m (0.2ft)
-**Direction:** SSE (162°)
-**Period:** 0.6s
+**Height:** 0.0m (0.1ft)
+**Direction:** WNW (286°)
+**Period:** 1.1s
 **Peak Period:** N/A
 
 ### Swell
 
-**Height:** 0.9m (3.0ft)
-**Direction:** SSE (163°)
-**Period:** 8.4s
+**Height:** 1.5m (4.8ft)
+**Direction:** SSE (156°)
+**Period:** 8.6s
 **Peak Period:** N/A
 
 ## 🌀 Ocean Currents
 
 **Velocity:** 0.20 m/s (0.39 knots)
-**Direction:** N (0°)
+**Direction:** E (90°)
 
 ---
 
@@ -76,26 +76,26 @@ Smooth Conditions dominated by swell from distant systems.
 
 **Next 3 days:**
 
-**Sat, Aug 15:**
-  • Max Wave Height: 1.6m (5.4ft) (Slight)
-  • Wave Direction: SSE (162°)
-  • Max Wave Period: 9.2s
-  • Swell Height: 1.0m (3.4ft)
-  • Swell Direction: SSE (164°)
-
-**Sun, Aug 16:**
-  • Max Wave Height: 1.6m (5.2ft) (Slight)
+**Fri, Aug 28:**
+  • Max Wave Height: 1.5m (5.1ft) (Slight)
   • Wave Direction: SSE (153°)
-  • Max Wave Period: 8.8s
-  • Swell Height: 1.3m (4.1ft)
-  • Swell Direction: SE (145°)
+  • Max Wave Period: 10.2s
+  • Swell Height: 1.5m (4.8ft)
+  • Swell Direction: SSE (156°)
 
-**Mon, Aug 17:**
-  • Max Wave Height: 1.5m (4.8ft) (Slight)
-  • Wave Direction: SE (132°)
-  • Max Wave Period: 8.3s
-  • Swell Height: 1.2m (3.8ft)
-  • Swell Direction: ESE (116°)
+**Sat, Aug 29:**
+  • Max Wave Height: 1.5m (5.0ft) (Slight)
+  • Wave Direction: SSE (149°)
+  • Max Wave Period: 8.6s
+  • Swell Height: 1.3m (4.2ft)
+  • Swell Direction: SSE (151°)
+
+**Sun, Aug 30:**
+  • Max Wave Height: 1.2m (4.1ft) (Smooth)
+  • Wave Direction: SSE (155°)
+  • Max Wave Period: 9.7s
+  • Swell Height: 1.0m (3.1ft)
+  • Swell Direction: SSE (156°)
 
 ---
 
@@ -144,13 +144,13 @@ get_lightning_activity({
 
 **Location:** -33.8688, 151.2093
 **Search Radius:** 250 km
-**Time Window:** 60 minutes (2026-08-14T17:04:35.516Z to 2026-08-14T18:04:35.516Z)
+**Time Window:** 60 minutes (2026-08-27T20:49:32.467Z to 2026-08-27T21:49:32.467Z)
 
 ## 🟢 Safety Status: SAFE (LIMITED DATA)
 
 No lightning strikes observed during the limited monitoring period. This does NOT confirm the absence of lightning activity.
 
-⚠️ **Limited monitoring coverage:** Live strike collection for this area spans 1.1 of the requested 60 minutes (since 2026-08-14T18:03:30.212Z). An absence of strikes in this report does not confirm an absence of lightning. Re-check in a few minutes or consult official weather services before making safety decisions.
+⚠️ **Limited monitoring coverage:** Live strike collection for this area spans 1.1 of the requested 60 minutes (since 2026-08-27T21:48:26.775Z). An absence of strikes in this report does not confirm an absence of lightning. Re-check in a few minutes or consult official weather services before making safety decisions.
 
 *Why: lightning is monitored via a live feed that only begins buffering strikes once an area is first queried, so a location’s first lookup starts near zero coverage and builds over the following minutes. Saved locations are pre-warmed at startup. Historical strikes cannot be backfilled.*
 
@@ -172,7 +172,7 @@ No lightning strikes detected in the search area during the time window.
 ⚠️ **DISCLAIMER:** Lightning data from Blitzortung.org community network. Data may have 5-15 minute delay. For life-safety decisions, consult official weather services and local emergency management. When thunder roars, go indoors!
 
 ---
-*Generated: 2026-08-14T18:04:35.516Z*
+*Generated: 2026-08-27T21:49:32.467Z*
 *Data source: Blitzortung.org*
 ````
 
@@ -184,5 +184,5 @@ No lightning strikes detected in the search area during the time window.
 **Features shown:** `get_marine_conditions` with `forecast_days` (waves, swell, period, currents, safety assessment) · `get_lightning_activity` real-time strike detection with `radius`/`timeWindow` and a 4-level safety assessment · metric units for an Australian location.
 
 <!-- capture-stamp -->
-*Captured 2026-08-14 with weather-mcp v1.19.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

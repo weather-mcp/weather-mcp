@@ -20,6 +20,10 @@ export interface HainesCategory {
  * - Low elevation (< 3,000 ft): 2-3 = Low, 4 = Moderate, 5-6 = High
  * - Mid elevation (3,000-10,000 ft): Same scale
  * - High elevation (> 10,000 ft): Same scale
+ *
+ * The ladder is contiguous (`<= 3` / `<= 4` / `<= 5` / else) so a non-integer
+ * value bands into the rung it falls within rather than falling through to
+ * the top rung.
  */
 export function getHainesCategory(hainesValue: number): HainesCategory {
   if (hainesValue <= 3) {
@@ -29,14 +33,14 @@ export function getHainesCategory(hainesValue: number): HainesCategory {
       fireGrowthPotential: 'Very low likelihood of large plume-dominated fire growth. Fires should remain relatively easy to control.',
       color: 'Green'
     };
-  } else if (hainesValue === 4) {
+  } else if (hainesValue <= 4) {
     return {
       level: 'Moderate',
       description: 'Moderate fire growth potential',
       fireGrowthPotential: 'Moderate likelihood of plume-dominated fire growth. Fires may develop rapidly and become difficult to control.',
       color: 'Yellow'
     };
-  } else if (hainesValue === 5) {
+  } else if (hainesValue <= 5) {
     return {
       level: 'High',
       description: 'High fire growth potential',
@@ -56,6 +60,10 @@ export function getHainesCategory(hainesValue: number): HainesCategory {
 /**
  * Get grassland fire danger category
  * Scale: 1-4 (Low, Moderate, High, Very High)
+ *
+ * The ladder is contiguous (`<= 1` / `<= 2` / `<= 3` / else) so a non-integer
+ * value bands into the rung it falls within rather than falling through to
+ * the top rung.
  */
 export function getGrasslandFireDangerCategory(value: number): {
   level: string;
@@ -68,13 +76,13 @@ export function getGrasslandFireDangerCategory(value: number): {
       description: 'Low fire danger in grassland/rangeland fuels',
       color: 'Green'
     };
-  } else if (value === 2) {
+  } else if (value <= 2) {
     return {
       level: 'Moderate',
       description: 'Moderate fire danger in grassland/rangeland fuels',
       color: 'Yellow'
     };
-  } else if (value === 3) {
+  } else if (value <= 3) {
     return {
       level: 'High',
       description: 'High fire danger in grassland/rangeland fuels',
