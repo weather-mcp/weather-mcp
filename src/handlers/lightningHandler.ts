@@ -274,10 +274,20 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
   const coverageMinutes = coverageStart
     ? Math.max(0, Math.min(timeWindow, (now.getTime() - coverageStart.getTime()) / (1000 * 60)))
     : 0;
+  // Keyed on the array this query returned, so an overlapping query's outcome can never be read
+  // here. `!= null` rather than `!== null`: a bare `vi.fn()` stub returns `undefined`, and treating
+  // that as an outage would flip every existing fixture onto the outage path.
+  const feedUnavailable = blitzortungService.getFeedFailure(strikes) != null;
   const coverage: LightningMonitoringCoverage = {
     monitoringSince: coverageStart,
     coverageMinutes,
-    isComplete: coverageMinutes >= timeWindow
+    // A failed feed cannot have covered the requested window, whatever the subscription stamps
+    // say. `geohashFirstSubscribed` is written before the subscribe call, and mqtt reconnects in
+    // the background, so an outage can otherwise coexist with a non-null coverage start and a
+    // complete-looking window - and every caveat below is gated on `!isComplete`, so the outage
+    // text would be skipped entirely. `coverageMinutes` stays honest about earlier monitoring.
+    isComplete: coverageMinutes >= timeWindow && !feedUnavailable,
+    feedUnavailable
   };
 
   if (!coverage.isComplete && safety.level === 'safe') {
@@ -289,14 +299,31 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
     // partial coverage makes the result inconclusive either way — but it stays inside the `safe`
     // gate, because "treat this as inconclusive" above an EXTREME DANGER warning would degrade a
     // life-safety message.
-    if (safety.nearestStrikeDistance === null) {
+    if (coverage.feedUnavailable) {
+      // An outage always leaves the buffer's own story intact, so both arms are needed. With no
+      // distance there is nothing to report at all; with one, the `safe` band would otherwise
+      // print "no immediate lightning threat at this location" - an affirmative all-clear - one
+      // line under an UNKNOWN heading. `elevated`/`high`/`extreme` never reach this gate, so a
+      // buffered urgent verdict is never weakened.
+      safety.message = safety.nearestStrikeDistance === null
+        ? 'The live lightning feed could not be reached, so no strikes could be observed for ' +
+          'this area. This is not an all-clear.'
+        : 'Buffered strikes from earlier monitoring are shown below, but the live lightning feed ' +
+          'could not be reached for this query, so current conditions are unknown. This is not ' +
+          'an all-clear.';
+    } else if (safety.nearestStrikeDistance === null) {
       safety.message =
         'No lightning strikes observed during the limited monitoring period. ' +
         'This does NOT confirm the absence of lightning activity.';
     }
     safety.recommendations.unshift(
-      `Live monitoring of this area covers only ${coverageMinutes.toFixed(1)} of the requested ` +
-      `${timeWindow} minutes — treat this result as inconclusive and re-check shortly.`
+      coverage.feedUnavailable
+        // No "re-check shortly": during an outage every re-check reads the same zero, so the
+        // remedy that works is a different source, not a second look at this one.
+        ? 'The live lightning feed was unreachable for this query — consult official weather ' +
+          'services (the NWS or your national authority) before making safety decisions.'
+        : `Live monitoring of this area covers only ${coverageMinutes.toFixed(1)} of the requested ` +
+          `${timeWindow} minutes — treat this result as inconclusive and re-check shortly.`
     );
   }
 
@@ -343,8 +370,16 @@ export function formatLightningActivityResponse(
   }[response.safety.level];
 
   const limitedData = !response.coverage.isComplete;
+  // Strict `=== true`, so a fixture built before this field existed reads as a cold start rather
+  // than an outage. The internal safety level stays `safe` - this is a render-time substitution,
+  // not a fifth level - and only `safe` is overridden, so a buffered EXTREME keeps its own heading.
+  const feedDown = response.coverage.feedUnavailable === true;
   const statusSuffix = limitedData && response.safety.level === 'safe' ? ' (LIMITED DATA)' : '';
-  lines.push(`## ${safetyIcon} Safety Status: ${response.safety.level.toUpperCase()}${statusSuffix}`);
+  if (feedDown && response.safety.level === 'safe') {
+    lines.push('## ⚪ Safety Status: UNKNOWN (LIVE FEED UNAVAILABLE)');
+  } else {
+    lines.push(`## ${safetyIcon} Safety Status: ${response.safety.level.toUpperCase()}${statusSuffix}`);
+  }
   lines.push('');
   lines.push(response.safety.message);
   lines.push('');
@@ -363,21 +398,43 @@ export function formatLightningActivityResponse(
       ? `An absence of strikes in this report does not confirm an absence of lightning. `
       : `The nearest-strike distance below is therefore a floor — a closer strike could have ` +
         `occurred during the minutes that were not monitored. `;
-    lines.push(
-      `⚠️ **Limited monitoring coverage:** Live strike collection for this area spans ` +
-      `${response.coverage.coverageMinutes.toFixed(1)} of the requested ${response.timeWindow} minutes${since}. ` +
-      coverageCaveat +
-      `Re-check in a few minutes or consult official weather services before making safety decisions.`
-    );
-    lines.push('');
-    // Explain WHY coverage is limited so a fresh/near-zero reading is not mistaken for
-    // verified calm — this is expected on a first query, not an error.
-    lines.push(
-      '*Why: lightning is monitored via a live feed that only begins buffering strikes once ' +
-      'an area is first queried, so a location’s first lookup starts near zero coverage and ' +
-      'builds over the following minutes. Saved locations are pre-warmed at startup. Historical ' +
-      'strikes cannot be backfilled.*'
-    );
+    // An outage selector above both existing variants, not a replacement for either: the two
+    // states have different causes and different remedies, and telling someone to re-check in a
+    // few minutes is advice that cannot work while the feed is down.
+    if (feedDown) {
+      lines.push(
+        `⚠️ **Live feed unavailable:** The connection to the lightning detection feed failed for ` +
+        `this query, so live strike collection for this area spans ` +
+        `${response.coverage.coverageMinutes.toFixed(1)} of the requested ${response.timeWindow} minutes${since} — ` +
+        `from earlier monitoring only, if any. ` +
+        (response.safety.nearestStrikeDistance === null
+          ? `No strikes could be observed; this is not an all-clear. `
+          : coverageCaveat) +
+        `Consult official weather services before making safety decisions.`
+      );
+      lines.push('');
+      lines.push(
+        '*Why: strikes come from a live Blitzortung.org feed, and the server could not reach it ' +
+        'for this query. It reconnects automatically in the background; a later query may ' +
+        'succeed. No strike data is fabricated while the feed is down.*'
+      );
+    } else {
+      lines.push(
+        `⚠️ **Limited monitoring coverage:** Live strike collection for this area spans ` +
+        `${response.coverage.coverageMinutes.toFixed(1)} of the requested ${response.timeWindow} minutes${since}. ` +
+        coverageCaveat +
+        `Re-check in a few minutes or consult official weather services before making safety decisions.`
+      );
+      lines.push('');
+      // Explain WHY coverage is limited so a fresh/near-zero reading is not mistaken for
+      // verified calm — this is expected on a first query, not an error.
+      lines.push(
+        '*Why: lightning is monitored via a live feed that only begins buffering strikes once ' +
+        'an area is first queried, so a location’s first lookup starts near zero coverage and ' +
+        'builds over the following minutes. Saved locations are pre-warmed at startup. Historical ' +
+        'strikes cannot be backfilled.*'
+      );
+    }
     lines.push('');
   }
 

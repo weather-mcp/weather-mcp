@@ -9,7 +9,7 @@
 
 import type { MqttClient } from 'mqtt';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
-import { LightningStrike } from '../types/lightning.js';
+import { LightningStrike, LightningFeedFailure, LightningFeedFailureReason } from '../types/lightning.js';
 import { calculateGeohashSubscriptions } from '../utils/geohash.js';
 import { MqttLoadFailedError, MqttUnavailableError } from '../errors/ApiError.js';
 
@@ -201,6 +201,20 @@ export class BlitzortungService {
   private isConnecting = false;
   private isConnected = false;
 
+  // A query's transport outcome is bound to the array that query returns, never held in a
+  // "last failure" field. `getLightningStrikes` suspends for 10s at the accumulation wait, and
+  // the MCP SDK starts each tools/call on its own promise chain, so overlapping queries would
+  // read each other's outcome through any shared field - rendering a successful query as an
+  // outage, or erasing a real one. A WeakMap lets a returned array take its entry with it.
+  private readonly feedFailures = new WeakMap<LightningStrike[], LightningFeedFailure>();
+
+  // Bumped on every connection loss (the `close` event, and the post-connect `error` event).
+  // A close after subscribe resolves rejects nothing, so the catch below never sees it, and
+  // mqtt's own reconnect can restore `isConnected` before the query returns - a final boolean
+  // check would miss the gap entirely. Comparing the counter across the collection window is
+  // what makes a mid-query outage distinguishable from a first-query cold start.
+  private connectionLossGeneration = 0;
+
   constructor() {
     // Start cleanup interval
     this.startCleanupInterval();
@@ -283,12 +297,14 @@ export class BlitzortungService {
         this.client!.on('error', (error) => {
           clearTimeout(timeoutId);
           this.isConnecting = false;
+          this.connectionLossGeneration++;
           logger.error('MQTT connection error', error);
           reject(error);
         });
 
         this.client!.on('close', () => {
           this.isConnected = false;
+          this.connectionLossGeneration++;
           logger.warn('MQTT connection closed');
         });
 
@@ -397,13 +413,21 @@ export class BlitzortungService {
   private async subscribeToLocation(
     latitude: number,
     longitude: number,
-    radiusKm: number
+    radiusKm: number,
+    // Invocation-local, so a caller can tell which transport phase its own failure came from.
+    // Deliberately an out-parameter rather than an instance field: pre-warm and overlapping
+    // queries all share this method, and a shared phase field would let one of them describe
+    // another's failure. Trailing and optional, so omitting it is exactly the old behaviour.
+    phase?: { current: 'connect' | 'subscribe' }
   ): Promise<void> {
     // Resolved here, outside `ensureConnected`, so that method contains no
     // await before it sets `isConnecting` (see the comment there). An absent
     // package therefore throws before any connection state is touched, and
     // concurrent callers all reject from the one shared import promise.
     const mqtt = await loadMqtt();
+    if (phase) {
+      phase.current = 'connect';
+    }
     await this.ensureConnected(mqtt);
 
     if (!this.client) {
@@ -433,6 +457,15 @@ export class BlitzortungService {
 
     // Subscribe to each geohash and track access time
     const subscriptions: string[] = [];
+    // The geohashes THIS call is the first to stamp. Both maps are written before the broker has
+    // accepted anything, so a failed subscribe must undo them: a geohash left behind is treated
+    // as subscribed forever after, which makes the next query for the same area compute an empty
+    // `potentialNewSubs`, skip `subscribe` entirely, and read a coverage start for a topic no one
+    // is listening to - a green LIMITED DATA verdict and "re-check shortly" while the feed is
+    // down, which is exactly the cold-start story this feature exists to stop telling. Only what
+    // this call staged is rolled back, so a geohash another call subscribed successfully is
+    // never dropped.
+    const staged: string[] = [];
     for (const geohash of geohashes) {
       if (!this.subscribedGeohashes.has(geohash)) {
         // IMPORTANT: Geohash characters must be separated by slashes in the topic
@@ -441,17 +474,32 @@ export class BlitzortungService {
         const topic = `${this.topicPrefix}/${geohashPath}/#`;
         subscriptions.push(topic);
         this.geohashFirstSubscribed.set(geohash, now);
+        staged.push(geohash);
       }
       // Update access time for all geohashes in this request (LRU tracking)
       this.subscribedGeohashes.set(geohash, now);
     }
 
     if (subscriptions.length > 0) {
+      if (phase) {
+        phase.current = 'subscribe';
+      }
       await new Promise<void>((resolve, reject) => {
         this.client!.subscribe(subscriptions, (error) => {
           if (error) {
-            logger.error('Failed to subscribe to topics', error, {
-              topics: subscriptions
+            for (const geohash of staged) {
+              this.subscribedGeohashes.delete(geohash);
+              this.geohashFirstSubscribed.delete(geohash);
+            }
+            // The `Error` slot is deliberately left empty, as in the loader above: the logger
+            // serialises message and stack, and mqtt's own errors carry the broker host and port
+            // in both (`connect ECONNREFUSED <host>:<port>`). Only the name and code are kept —
+            // enough to say which leg failed, without naming where it connected.
+            const failure = error as NodeJS.ErrnoException;
+            logger.error('Failed to subscribe to topics', undefined, {
+              topics: subscriptions,
+              name: failure.name,
+              code: failure.code
             });
             reject(error);
           } else {
@@ -586,6 +634,9 @@ export class BlitzortungService {
     radiusKm: number = 100,
     timeWindowMinutes: number = 60
   ): Promise<LightningStrike[]> {
+    // Local to this invocation - see subscribeToLocation's `phase` parameter.
+    const phase: { current: 'connect' | 'subscribe' } = { current: 'connect' };
+
     try {
       // Redact coordinates for logging to protect user privacy
       const redacted = redactCoordinatesForLogging(latitude, longitude);
@@ -597,7 +648,13 @@ export class BlitzortungService {
       });
 
       // Subscribe to the location
-      await this.subscribeToLocation(latitude, longitude, radiusKm);
+      await this.subscribeToLocation(latitude, longitude, radiusKm, phase);
+
+      // Captured AFTER the transport work succeeds, not before it: an initial connect that
+      // mqtt retries internally bumps the counter on its way to succeeding, and comparing
+      // against a pre-transport reading would flag that query as degraded after it had in
+      // fact connected. From here on, any bump is a loss during OUR collection window.
+      const generationAtSubscribe = this.connectionLossGeneration;
 
       // Wait for strikes to accumulate in buffer after subscription
       // This allows time for MQTT messages to arrive and be processed
@@ -611,6 +668,17 @@ export class BlitzortungService {
         radiusKm,
         timeWindowMinutes
       );
+
+      // A broker that drops after we subscribed rejects nothing, so the catch below never
+      // runs and the report would explain a real outage as a first-query cold start - the
+      // exact dishonesty this whole path exists to remove. Buffered strikes still carry their
+      // verdict; what changes is that the report stops claiming the coverage gap is benign.
+      if (this.connectionLossGeneration !== generationAtSubscribe || !this.isConnected) {
+        this.feedFailures.set(strikes, { at: new Date(), reason: 'connection_error' });
+        logger.warn('Lightning feed connection lost during collection', {
+          reason: 'connection_error'
+        });
+      }
 
       logger.info('Lightning data retrieved successfully', {
         totalStrikes: strikes.length,
@@ -629,9 +697,47 @@ export class BlitzortungService {
       if (error instanceof MqttUnavailableError || error instanceof MqttLoadFailedError) {
         throw error;
       }
-      logger.error('Failed to fetch lightning data', error as Error);
-      // Return empty array on error to allow graceful degradation
-      return [];
+
+      // Classify by the phase this invocation reached, never by the error's identity: only the
+      // connect timeout is ours (`new Error('MQTT connection timeout')`); the broker `error`
+      // event and the subscribe callback both reject with mqtt's own object unchanged. The
+      // reason never reaches rendered output - it exists so the stderr log can say which leg
+      // failed without carrying a broker URL or a raw upstream error into either surface.
+      const reason: LightningFeedFailureReason =
+        (error as Error).message === 'MQTT connection timeout'
+          ? 'connect_timeout'
+          : phase.current === 'subscribe'
+            ? 'subscribe_failed'
+            : 'connection_error';
+
+      // The `Error` slot is deliberately left empty, as in the loader and the subscribe callback
+      // above: `reason` is the sanitized classification, and passing mqtt's own object alongside
+      // it would serialise the message and stack that name the broker host and port — undoing
+      // the whole point of classifying by phase.
+      const failure = error as NodeJS.ErrnoException;
+      logger.error('Failed to fetch lightning data', undefined, {
+        reason,
+        name: failure.name,
+        code: failure.code
+      });
+
+      // Degrading (rather than throwing) is the settled classification: a transport failure is a
+      // degraded report, not a contract failure - get_weather_summary must keep its lightning
+      // section, and what was dishonest was the explanation, not the presence of a report.
+      //
+      // Read the buffer rather than returning `[]`. A failure to reach the feed says nothing about
+      // the strikes already in hand: they were detected, they are inside the requested window, and
+      // discarding them turns a stale report into an empty one - "no strikes could be observed"
+      // over a strike this server holds, which is the same shape of lie as the cold-start story
+      // this whole path exists to stop telling. A connection lost mid-collection already renders
+      // from the buffer (the generation check above returns `strikes`); reading it here is what
+      // makes the four transport-failure shapes agree instead of two of them silently dropping an
+      // EXTREME verdict. `filterStrikes` touches no network and returns a fresh array per call, so
+      // the distinct-array property below is preserved: two concurrent failures can never share one
+      // WeakMap entry.
+      const degraded = this.filterStrikes(latitude, longitude, radiusKm, timeWindowMinutes);
+      this.feedFailures.set(degraded, { at: new Date(), reason });
+      return degraded;
     }
   }
 
@@ -664,10 +770,28 @@ export class BlitzortungService {
       if (error instanceof MqttUnavailableError || error instanceof MqttLoadFailedError) {
         return;
       }
+      // Same rule as the two `logger.error` sites above: mqtt's own message names the broker
+      // host and port, so only the name and code are kept.
+      const failure = error as NodeJS.ErrnoException;
       logger.warn('Failed to pre-warm lightning monitoring for location', {
-        error: (error as Error).message
+        name: failure.name,
+        code: failure.code
       });
     }
+  }
+
+  /**
+   * The transport outcome of the query that produced `strikes`.
+   *
+   * Null when that query reached the broker, subscribed, and stayed connected for its whole
+   * collection window; otherwise the moment and sanitized cause of the transport failure it
+   * swallowed. Keyed on the returned array rather than held as a "last failure" field, so
+   * overlapping queries cannot exchange outcomes and a pre-warm - which has no result array -
+   * cannot set one at all. The returned object is never mutated after construction, so no
+   * defensive copy is made.
+   */
+  getFeedFailure(strikes: LightningStrike[]): LightningFeedFailure | null {
+    return this.feedFailures.get(strikes) ?? null;
   }
 
   /**

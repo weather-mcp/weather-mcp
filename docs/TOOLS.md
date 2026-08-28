@@ -722,6 +722,25 @@ Provides real-time lightning strike detection from the Blitzortung.org global li
 - Safety recommendations based on proximity
 - Geographic region-optimized data retrieval
 
+**Coverage states.** Strikes are collected into a live buffer that only fills while an area is
+subscribed, so a report can carry one of two coverage disclosures in place of a plain verdict:
+
+- **`🟢 SAFE (LIMITED DATA)`** — a first query for this area. The feed begins buffering strikes only
+  once an area is queried (saved locations are pre-warmed at startup), so coverage starts near zero
+  and builds over the following minutes. The report says to re-check in a few minutes. Historical
+  strikes cannot be backfilled.
+- **`⚪ UNKNOWN (LIVE FEED UNAVAILABLE)`** — the server could not reach the Blitzortung feed for this
+  query, either because the connection never succeeded or because it dropped partway through
+  collection. **This is not an all-clear**: no live strike data could be collected, so nothing is
+  known about current conditions. The server reconnects automatically in the background and a
+  later query may succeed, so the report does **not** suggest an immediate re-check — consult
+  official weather services instead.
+
+Strikes already buffered from earlier monitoring still render during an outage. Buffered
+**ELEVATED**, **HIGH** and **EXTREME** strikes retain their urgent verdict; buffered safe-band
+strikes remain listed, but the heading and message say current conditions are UNKNOWN rather than
+claiming no immediate threat.
+
 **Note:** Data provided by Blitzortung.org, a free community-operated lightning detection network. May have regional coverage variations.
 
 **Requires the optional `mqtt` package.** It is installed by default; if the server was installed with `--omit=optional` this tool returns an error naming the package and how to reinstall it, never a "no strikes" result. The same message appears in `get_weather_summary`'s `lightning` section. See [Optional dependency](../README.md#optional-dependency).
