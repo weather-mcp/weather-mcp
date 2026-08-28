@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.7] - 2026-08-27
+
 ### Fixed
 
 - **Every non-safety category is now keyed on the number the report prints, so a
@@ -1356,7 +1358,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.6...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.7...HEAD
+[1.25.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.6...v1.25.7
 [1.25.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.5...v1.25.6
 [1.25.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.4...v1.25.5
 [1.25.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.3...v1.25.4
