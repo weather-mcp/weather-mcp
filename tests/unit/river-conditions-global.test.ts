@@ -23,7 +23,9 @@ import type { NOAAService } from '../../src/services/noaa.js';
 import type { OpenMeteoService } from '../../src/services/openmeteo.js';
 import type { LocationStore } from '../../src/services/locationStore.js';
 import type { GeocodingService } from '../../src/services/geocoding.js';
+import type { NominatimService } from '../../src/services/nominatim.js';
 import type { OpenMeteoFloodResponse } from '../../src/types/openmeteo.js';
+import type { NWPSGauge } from '../../src/types/noaa.js';
 import { buildProbeGrid, PROBE_GRID_CENTER_INDEX } from '../../src/utils/riverDischarge.js';
 
 // ---------------------------------------------------------------------------
@@ -34,6 +36,18 @@ import { buildProbeGrid, PROBE_GRID_CENTER_INDEX } from '../../src/utils/riverDi
 const US_POINT = { latitude: 38.6270, longitude: -90.1994 };
 /** London, UK — outside the US routing boxes. */
 const LONDON = { latitude: 51.5074, longitude: -0.1278 };
+/** Rotterdam, NL — outside the US routing boxes and outside NWPS coverage. */
+const ROTTERDAM = { latitude: 51.92, longitude: 4.48 };
+/** Memphis, TN — genuinely US, inside NWPS coverage. */
+const MEMPHIS = { latitude: 35.15, longitude: -90.05 };
+/** Toronto, Canada — inside the deliberately sloppy CONUS box (isInUS true), but actually Canada. */
+const TORONTO = { latitude: 43.65, longitude: -79.38 };
+/** San Juan, Puerto Rico — NWPS-covered territory. */
+const PUERTO_RICO_POINT = { latitude: 18.4655, longitude: -66.1057 };
+/** St. Croix, US Virgin Islands — NIFC-covered but NOT NWPS-covered (D4). */
+const VIRGIN_ISLANDS_POINT = { latitude: 17.7333, longitude: -64.7833 };
+/** Hagåtña, Guam — NIFC-covered but NOT NWPS-covered (D4). */
+const GUAM_POINT = { latitude: 13.4443, longitude: 144.7937 };
 
 const FORECAST_DAYS_DEFAULT = 7;
 
@@ -159,10 +173,42 @@ function buildNoaaFake() {
   };
 }
 
+/**
+ * One NWPS gauge fixture, offset a tiny amount from the probe point so it
+ * survives the default 50 km radius filter (shape copied from
+ * tests/unit/riverConditions.test.ts:101-131).
+ */
+function buildGauge(latitude: number, longitude: number): NWPSGauge {
+  return {
+    lid: 'TEST1',
+    name: 'Test Gauge',
+    latitude: latitude + 0.001,
+    longitude,
+    state: { abbreviation: 'XX', name: 'Test' },
+    status: {
+      observed: {
+        primary: 4.2,
+        secondary: 0.05,
+        floodCategory: null,
+        validTime: '2026-07-16T14:00:00Z'
+      }
+    }
+  };
+}
+
 function buildOpenMeteoFake(cells: OpenMeteoFloodResponse[]) {
   return {
     getRiverDischarge: vi.fn().mockResolvedValue(cells)
   };
+}
+
+/**
+ * Copied from tests/unit/wildfire-routing.test.ts:71-75 — same shape, same
+ * one-method fake, used the same way to drive `resolveCountryCode`.
+ */
+function makeNominatimFake(impl: (lat: number, lon: number) => Promise<string | null>) {
+  const reverseCountry = vi.fn(impl);
+  return { service: { reverseCountry } as unknown as NominatimService, reverseCountry };
 }
 
 interface Fakes {
@@ -170,6 +216,8 @@ interface Fakes {
   openMeteo: ReturnType<typeof buildOpenMeteoFake>;
   locationStore: Record<string, never>;
   geocoding: Record<string, never>;
+  /** Optional and trailing — every existing call site omits it and is unaffected. */
+  nominatim?: ReturnType<typeof makeNominatimFake>;
 }
 
 function buildFakes(cells: OpenMeteoFloodResponse[]): Fakes {
@@ -188,7 +236,8 @@ function callRiverConditions(args: Record<string, unknown>, fakes: Fakes) {
     fakes.noaa as unknown as NOAAService,
     fakes.locationStore as unknown as LocationStore,
     fakes.geocoding as unknown as GeocodingService,
-    fakes.openMeteo as unknown as OpenMeteoService
+    fakes.openMeteo as unknown as OpenMeteoService,
+    fakes.nominatim?.service
   );
 }
 
@@ -518,5 +567,142 @@ describe('handleGetRiverConditions — Unicode', () => {
     const text = textOf(result);
 
     expect(text).toContain('m³/s');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 11. NOAA-path coverage disclosure (T3, issue-85) — driven through the
+// handler, never the (unexported) formatter, per G45: NWPS_COVERED_COUNTRIES
+// and the outsideCoverage computation live in the handler's selection logic,
+// so a formatter-level fixture would never execute the mutated lines.
+// ---------------------------------------------------------------------------
+
+describe('handleGetRiverConditions — NWPS coverage disclosure on a forced/empty noaa query (T3)', () => {
+  it('discloses NWPS coverage at Rotterdam (nl) instead of the in-coverage advice', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'nl');
+
+    const result = await callRiverConditions({ ...ROTTERDAM, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('United States and Puerto Rico only');
+    expect(text).toContain('not an all-clear');
+    expect(text).toContain('source: "openmeteo"');
+    expect(text).not.toContain('ℹ️');
+    expect(text).not.toContain('Try expanding the search radius');
+    expect(text).not.toContain('River gauges are typically');
+    expect(text).toContain('# River Conditions Report');
+    expect(text).toContain('**Search Radius:**');
+    expect(text).toContain('National Water Prediction Service (NWPS)');
+  });
+
+  it('renders a returned gauge instead of the disclosure — the flag can never suppress data', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'nl');
+    fakes.noaa.getNWPSGaugesInBoundingBox.mockResolvedValue([
+      buildGauge(ROTTERDAM.latitude, ROTTERDAM.longitude)
+    ]);
+
+    const result = await callRiverConditions({ ...ROTTERDAM, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('Test Gauge');
+    expect(text).not.toContain('United States and Puerto Rico only');
+  });
+});
+
+describe('handleGetRiverConditions — in-coverage empty result stays byte-identical (T3)', () => {
+  it('renders the three today-standard lines verbatim at Memphis (us)', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'us');
+
+    const result = await callRiverConditions({ ...MEMPHIS }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain(
+      'ℹ️ **No river gauges found within 50 km**\n\n' +
+        'Try expanding the search radius or choosing a location closer to rivers or streams.\n\n' +
+        '**Tip:** River gauges are typically located along major rivers and waterways.\n'
+    );
+    expect(text).not.toContain('not an all-clear');
+  });
+});
+
+describe('handleGetRiverConditions — the NWPS coverage seam: pr/vi/gu (T3, G32)', () => {
+  it('covers Puerto Rico (pr): renders the in-coverage advice, not the disclosure', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'pr');
+
+    const result = await callRiverConditions({ ...PUERTO_RICO_POINT, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('ℹ️ **No river gauges found within 50 km**');
+    expect(text).not.toContain('United States and Puerto Rico only');
+  });
+
+  it('discloses for the US Virgin Islands (vi) — NIFC-covered but not NWPS-covered', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'vi');
+
+    const result = await callRiverConditions({ ...VIRGIN_ISLANDS_POINT, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('United States and Puerto Rico only');
+    expect(text).not.toContain('ℹ️ **No river gauges found');
+  });
+
+  it('discloses for Guam (gu) — NIFC-covered but not NWPS-covered', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'gu');
+
+    const result = await callRiverConditions({ ...GUAM_POINT, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('United States and Puerto Rico only');
+    expect(text).not.toContain('ℹ️ **No river gauges found');
+  });
+});
+
+describe('handleGetRiverConditions — country lookup reached while isInUS is true (T3)', () => {
+  it('discloses at Toronto (ca) via the reverse-country lookup, though isInUS(Toronto) is true, and never touches Open-Meteo', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'ca');
+
+    const result = await callRiverConditions({ ...TORONTO }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('United States and Puerto Rico only');
+    expect(fakes.noaa.getNWPSGaugesInBoundingBox).toHaveBeenCalledTimes(1);
+    expect(fakes.openMeteo.getRiverDischarge).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleGetRiverConditions — a rejected country lookup still renders a result (T3)', () => {
+  it('falls back to isInUS (false at Rotterdam) and still discloses, never the generic error branch', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => {
+      throw new Error('nominatim unreachable');
+    });
+
+    const result = await callRiverConditions({ ...ROTTERDAM, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('United States and Puerto Rico only');
+    expect(text).not.toContain('❌ Error retrieving river gauge data');
+  });
+});
+
+describe('handleGetRiverConditions — no Nominatim service wired (T3, existing-harness shape)', () => {
+  it('falls back to isInUS: Memphis (true) renders today\'s advice, Rotterdam (false) renders the disclosure, and reverseCountry is never constructed', async () => {
+    const memphisFakes = buildFakes([]);
+    const memphisResult = await callRiverConditions({ ...MEMPHIS }, memphisFakes);
+    expect(textOf(memphisResult)).toContain('ℹ️ **No river gauges found within 50 km**');
+
+    const rotterdamFakes = buildFakes([]);
+    const rotterdamResult = await callRiverConditions({ ...ROTTERDAM, source: 'noaa' }, rotterdamFakes);
+    expect(textOf(rotterdamResult)).toContain('United States and Puerto Rico only');
+
+    expect(memphisFakes.nominatim).toBeUndefined();
+    expect(rotterdamFakes.nominatim).toBeUndefined();
   });
 });
