@@ -2223,6 +2223,53 @@ expose it), [G11] (read the real output — the only check that caught this), [G
 unreal). Not lintable: nothing in the type system distinguishes a reachable domain
 value from an unreachable one.
 
+## G49 — A re-based line citation computed by arithmetic is wrong twice over: the diff's line count is not the file's growth, and the cited line is often not the construct
+
+**Trigger:** a release moves a file that other documents cite by line number — a
+roadmap row, a plan's `## Docs impact`, an open-check block, a review anchor — and
+you update those citations to keep them usable.
+
+**Rule:** **measure the new line number; never derive it.** Grep the construct in the
+new file and read the number back. Two independent errors hide in the arithmetic, and
+they do not cancel:
+
+- `git diff --stat` reports **changed** lines (insertions + deletions), not net
+  growth. A hunk that rewrites ten lines and adds one reports `11`, and the file grew
+  by one.
+- The cited line may name a **call site** rather than the definition, or a sentence
+  inside a block rather than the block's opening. Two constructs that share a name sit
+  at different offsets and shift by different amounts if any hunk lands between them.
+
+**Why:** a stale citation is inert — the next reader greps and finds the construct
+anyway. A *confidently wrong* one is worse: it is precise, it is freshly stamped with
+the release that supposedly verified it, and it sends the next `/design-plan` to read
+the wrong part of the file. The failure is silent in both directions — nothing
+compiles these numbers and no gate checks them, so the error survives until someone
+acts on it.
+
+**Verify:** for each citation, `grep -n` the construct in the new file and in the base
+(`git show <base>:<path>`). Confirm the base number matches what the document actually
+claims before trusting your reading of what it meant; if it does not, the citation was
+already describing a different construct and re-basing it by any method would have
+carried that error forward.
+
+**Evidence:** 2026-08-28, the v1.25.10 release (issue-85 river coverage disclosure).
+Three figures were written into `ROADMAP.md` by arithmetic and all three were wrong.
+The merge stat's `54` was taken as the file's growth; `riverConditionsHandler.ts` went
+from 803 to 843 lines, so the real shift below the change was **+40**. The row-7
+citation `deriveFloodCategory:739` was read as the function definition and re-based to
+`:793`; `:739` was the **call site** (now `:779`) and the definition was at `:777`
+(now `:817`). And the long-standing `catch`-boundary citation `:311` was not the
+`catch` at all — that was at `:306` (now `:346`) — but the coverage sentence inside it
+(now `:351`). Caught only by grepping the file to check a number already written down.
+
+**Status:** active. Related: [G11] (read the real thing rather than trusting a
+derivation), [G46] (a docs task writes the plan's promise rather than the code's
+behaviour — the same class, one level up: a document asserting what it did not
+measure). Not lintable, but nearly so: a checker that greps each `path.ts:NNN`
+citation in the roadmap and reports the ones whose line no longer holds the named
+construct would catch every instance of this.
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
