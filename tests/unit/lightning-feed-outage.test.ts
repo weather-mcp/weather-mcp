@@ -449,6 +449,129 @@ describe('lightning feed-outage — service contracts (blitzortung.ts)', () => {
     }
   });
 
+  // -------------------------------------------------------------------------
+  // Contract 11 — the degraded return reads the buffer.
+  //
+  // Source: test-drive Observation 1. Contracts 1, 2a and 2b assert
+  // `toEqual([])` on a failed query, which is true only because their buffers
+  // were empty: every one of them fails on its FIRST query, so there was never
+  // anything to lose. That left the catch free to return a hard-coded `[]`, and
+  // it did - so a strike already detected and still inside the requested window
+  // vanished from the report the moment the feed went down, under the sentence
+  // "no strikes could be observed for this area". docs/TOOLS.md,
+  // docs/ERROR_HANDLING.md and the CHANGELOG all promise the opposite. The
+  // render side was never the problem (contracts 8 and 8b already prove it) -
+  // it was simply never handed a non-empty array on these two legs.
+  // -------------------------------------------------------------------------
+
+  /** Emit one strike into the service's buffer through the fake client's message handler. */
+  function bufferStrike(
+    client: ReturnType<typeof createFakeMqttClient>,
+    lat: number,
+    lon: number
+  ): void {
+    client.emit(
+      'message',
+      'blitzortung/1.1/d/r/5/#',
+      Buffer.from(JSON.stringify({ lat, lon, time: Date.now(), pol: 1, mcs: 12000, stat: 9 }))
+    );
+  }
+
+  it('contract 11 (subscribe leg): a strike buffered before the failure survives it, still classified subscribe_failed', async () => {
+    // First subscribe succeeds (buffers the strike); the second - the wider radius, which needs
+    // eight new geohashes - is rejected.
+    const client = createFakeMqttClient({
+      subscribeErrors: [null, new Error('subscribe rejected')]
+    });
+    vi.doMock('mqtt', () => createPresentMqttModule(client).esModule);
+    const { blitzortungService } = await importFreshBlitzortung();
+
+    vi.useFakeTimers();
+    try {
+      const firstPromise = blitzortungService.getLightningStrikes(40.0, -74.0, 100, 60);
+      await vi.advanceTimersByTimeAsync(1); // connect + subscribe settle
+      bufferStrike(client, 40.02, -74.0); // ~2 km from the query point
+      await vi.advanceTimersByTimeAsync(10000);
+      const firstResult = await firstPromise;
+      expect(firstResult).toHaveLength(1);
+      expect(blitzortungService.getFeedFailure(firstResult)).toBeNull();
+
+      // radius 200 needs geohashes radius 100 never subscribed, so this call really re-subscribes.
+      const secondResult = await blitzortungService.getLightningStrikes(40.0, -74.0, 200, 60);
+
+      expect(blitzortungService.getFeedFailure(secondResult)?.reason).toBe('subscribe_failed');
+      // The whole point: degraded, not empty.
+      expect(secondResult).toHaveLength(1);
+      expect(secondResult[0].latitude).toBeCloseTo(40.02, 4);
+      // A fresh array per degraded return, so the WeakMap entries never collide.
+      expect(secondResult).not.toBe(firstResult);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('contract 11 (connect leg): a connect timeout after an earlier success still returns the buffered strike', async () => {
+    // Two different clients from one module: the first connects and buffers, the second never
+    // fires 'connect', so the query after the connection drops hits the 30s connectTimeout.
+    const connected = createFakeMqttClient();
+    const dead = createFakeMqttClient({ connect: 'never' });
+    const clients = [connected, dead];
+    let handedOut = 0;
+    vi.doMock('mqtt', () => ({
+      default: { connect: vi.fn(() => clients[Math.min(handedOut++, clients.length - 1)]) }
+    }));
+    const { blitzortungService } = await importFreshBlitzortung();
+
+    vi.useFakeTimers();
+    try {
+      const firstPromise = blitzortungService.getLightningStrikes(40.0, -74.0, 100, 60);
+      await vi.advanceTimersByTimeAsync(1);
+      bufferStrike(connected, 40.02, -74.0);
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(await firstPromise).toHaveLength(1);
+
+      connected.emit('close'); // the broker goes away between queries
+
+      const secondPromise = blitzortungService.getLightningStrikes(40.0, -74.0, 100, 60);
+      await vi.advanceTimersByTimeAsync(30000); // past connectTimeout
+      const secondResult = await secondPromise;
+
+      expect(blitzortungService.getFeedFailure(secondResult)?.reason).toBe('connect_timeout');
+      expect(secondResult).toHaveLength(1);
+      expect(secondResult[0].latitude).toBeCloseTo(40.02, 4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('contract 11b: the degraded return is filtered like any other query, not a dump of the whole buffer', async () => {
+    const client = createFakeMqttClient({
+      subscribeErrors: [null, new Error('subscribe rejected')]
+    });
+    vi.doMock('mqtt', () => createPresentMqttModule(client).esModule);
+    const { blitzortungService } = await importFreshBlitzortung();
+
+    vi.useFakeTimers();
+    try {
+      const firstPromise = blitzortungService.getLightningStrikes(40.0, -74.0, 100, 60);
+      await vi.advanceTimersByTimeAsync(1);
+      bufferStrike(client, 40.02, -74.0); // ~2 km - inside every radius below
+      bufferStrike(client, 47.6, -122.3); // Seattle - in the buffer, nowhere near the query
+      await vi.advanceTimersByTimeAsync(10000);
+      await firstPromise;
+
+      const secondResult = await blitzortungService.getLightningStrikes(40.0, -74.0, 200, 60);
+
+      expect(blitzortungService.getFeedFailure(secondResult)?.reason).toBe('subscribe_failed');
+      // The far strike is in the buffer but outside the search radius: a degraded report must
+      // apply the same distance filter a healthy one does, or an outage would widen the search.
+      expect(secondResult).toHaveLength(1);
+      expect(secondResult[0].latitude).toBeCloseTo(40.02, 4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('contract 5: hygiene — the failure-classification log lines never carry the broker URL or mqtt://, and the failure object has exactly {at, reason}', async () => {
     const client = createFakeMqttClient();
     vi.doMock('mqtt', () => createPresentMqttModule(client).esModule);

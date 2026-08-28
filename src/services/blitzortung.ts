@@ -721,12 +721,21 @@ export class BlitzortungService {
         code: failure.code
       });
 
-      // A distinct array per degraded return, so two concurrent failures can never share one
-      // WeakMap entry. Returning `[]` (rather than throwing) is the settled classification:
-      // a transport failure is a degraded report, not a contract failure - get_weather_summary
-      // must keep its lightning section, and what was dishonest was the explanation, not the
-      // presence of a report.
-      const degraded: LightningStrike[] = [];
+      // Degrading (rather than throwing) is the settled classification: a transport failure is a
+      // degraded report, not a contract failure - get_weather_summary must keep its lightning
+      // section, and what was dishonest was the explanation, not the presence of a report.
+      //
+      // Read the buffer rather than returning `[]`. A failure to reach the feed says nothing about
+      // the strikes already in hand: they were detected, they are inside the requested window, and
+      // discarding them turns a stale report into an empty one - "no strikes could be observed"
+      // over a strike this server holds, which is the same shape of lie as the cold-start story
+      // this whole path exists to stop telling. A connection lost mid-collection already renders
+      // from the buffer (the generation check above returns `strikes`); reading it here is what
+      // makes the four transport-failure shapes agree instead of two of them silently dropping an
+      // EXTREME verdict. `filterStrikes` touches no network and returns a fresh array per call, so
+      // the distinct-array property below is preserved: two concurrent failures can never share one
+      // WeakMap entry.
+      const degraded = this.filterStrikes(latitude, longitude, radiusKm, timeWindowMinutes);
       this.feedFailures.set(degraded, { at: new Date(), reason });
       return degraded;
     }
