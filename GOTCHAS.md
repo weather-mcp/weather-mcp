@@ -1238,8 +1238,13 @@ seed points (Tampa, Kansas City, Darwin, Singapore, Lagos, Manaus) all returned
 that warmed all six and waited 240 s then found **436 strikes at Tampa**, nearest
 112.8 km — live convection that the cold sweep had reported as a quiet sky.
 
-**Status:** active. Related: [G28] (assert the shape — necessary here but not
-sufficient), [G10] (a clean-looking result from an un-run measurement). Also
+**Status:** active. **Verify line re-run 2026-08-28** (lightning-degradation-honesty
+T4, a plan whose whole subject is this render path): a fresh-process probe of
+Seattle `47.6062,-122.3321` against the real broker returned
+`**Total Strikes:** 0` at `**Monitoring Coverage:** 0.2 of 60 minutes` under
+`🟢 SAFE (LIMITED DATA)` — the cold start, exactly as described. The trap is
+intact and the figure is unchanged. Related: [G28] (assert the shape — necessary
+here but not sufficient), [G10] (a clean-looking result from an un-run measurement). Also
 related: the auto-memory note `live-verification-driver-hangs` — the driver holds
 a persistent MQTT connection, so it needs an explicit `process.exit(0)` and two
 must never run in parallel. Not lintable.
@@ -1356,7 +1361,20 @@ corollary for plans: a `t - 0.06`-style "just below" row cannot catch this class
 at all — where the divergence is a single double, only a fixture *on* that double
 discriminates.
 
-**Status:** active, **extended 2026-08-27 (twice)**. **Re-run 2026-08-26** (`07661a9`,
+**A fourth way, found 2026-08-28** (`0ac76d0`, lightning-degradation-honesty T3):
+**a mutation that deletes one half of a redundant guard goes red only where the
+other half cannot cover.** `getLightningStrikes` classifies a mid-query outage on
+`this.connectionLossGeneration !== generationAtSubscribe || !this.isConnected`.
+Deleting *only* the generation comparison leaves `!this.isConnected`, which still
+correctly catches a `close` with no reconnect — so the plain-close variant and the
+no-close control both stay **green**, and only the close-then-reconnect variant
+goes red. That is not a coverage gap: it is precisely the case the second half of
+the guard exists for, and the design said so in writing. **A plan that demands a
+mutation go red in "both variants" of a two-part guard has usually mis-specified
+its own acceptance** — report which variant discriminates and why, rather than
+manufacturing a red for the variant that is redundantly covered.
+
+**Status:** active, **extended 2026-08-27 (twice) and 2026-08-28**. **Re-run 2026-08-26** (`07661a9`,
 issue-78-log-level-numeric T2), where the design named three parsers and
 rejected two: the shipped bug turned 18/32 red, the issue's own
 `isNaN(Number(…))`-guard proposal 9/32 (all on the fail-loud contract), and bare
@@ -1799,6 +1817,30 @@ the note.
   practice and the grep is good practice, and together they contradict. The
   builder's temptation is to delete the comment.
 
+**A third direction, found 2026-08-28** (`01595d9`/`a729a2d`,
+lightning-degradation-honesty T2/T4): **a criterion no correct work can satisfy.**
+Distinct from a spurious fail on one wrong expression — these are impossible by
+construction, and both invite editing correct work to satisfy them.
+
+- **A diff filter that forgets the syntax the edit requires.** T2's check was
+  `git diff tests/ | grep '^[+-]' | grep -v getFeedFailure` returning only the
+  `+++/---` headers, to prove the four mock literals gained nothing but the stub.
+  Adding a member to an object literal requires a **trailing comma** on the line
+  above it, so every one of the four files shows a
+  `-getCoverageStart: vi.fn()` / `+getCoverageStart: vi.fn(),` pair. The check can
+  never be empty. Syntax is not an assertion; the [F12] footprint held.
+- **A hygiene grep that cannot tell our leak from upstream's own text.** T4
+  required zero `mqtt://` and `127.0.0.1` hits in the outputs *and the stderr
+  log*. The rendered reports were clean, but stderr carried 12 hits — and the
+  **base commit carried exactly the same 12** under the identical probe, from two
+  pre-existing lines the change never touched: the deliberate
+  `SECURITY: Using plaintext MQTT connection` warn that logs the broker at
+  connect, and `logger.error(msg, error)` passing the upstream `Error` through,
+  whose own `.message` is `connect ECONNREFUSED 127.0.0.1:1`. **Write a hygiene
+  criterion as a diff against the base, or scope it to the fields the change
+  adds** — "zero hits anywhere" is only satisfiable when nothing upstream ever
+  names the host, which for a transport error is never.
+
 **Verify:** with an uncommitted new file under `tests/`, run
 `git diff --stat main...HEAD -- tests/` and confirm it prints nothing, then
 `git status --short tests/` and confirm the file is listed as `??`. The first
@@ -1879,6 +1921,148 @@ or trap a non-zero exit and revert the four files the script itself touched.
 Related: [G30] (a first live lightning probe reports zero strikes — the other
 "green means nothing yet" trap), [G10] (a check that cannot fail is not
 evidence).
+
+---
+
+## G43 — A singleton "last result" field is not per-request across an `await`
+
+**Trigger:** an async service method records the outcome of a call in an instance
+field (`lastFailure`, `currentPhase`, `lastStatus`) and a caller reads that field
+*separately*, after awaiting the method.
+
+**Rule:** bind per-request metadata to the value the request returns — a
+`WeakMap` keyed on the returned object, or one result envelope. Never communicate
+a request's outcome through a `last*`/`current*`/phase field on a shared
+singleton unless every caller is demonstrably serialized. Where the degraded
+return is a bare `[]` or `{}`, allocate a **fresh** one per call: two calls that
+both return the same shared literal collapse to one key.
+
+**Why:** the MCP SDK starts every `tools/call` on its own promise chain
+(`node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js:284-367`) —
+there is no per-server request queue — and this server's services are
+module-level singletons. So any `await` inside a handler is a window in which
+another request, or a background pre-warm, runs and overwrites the field. The
+result is not a crash but a **swapped answer**: a successful query rendered under
+a failed query's verdict, or a real failure erased by a healthy query's reset.
+On a safety tool, that is a fabricated all-clear reached by a route no fixture
+covering one request at a time can see.
+
+**Verify:** start two calls on the same service, settle them in the *opposite*
+order to their start, and assert each returned value carries only its own
+metadata. Then make **both** fail and assert the two returned values are not the
+same object (`expect(a).not.toBe(b)`) — a shared degraded literal passes the
+first test and fails only this one, because in the first test only one side ever
+takes the degraded path. Include any background pre-warm that calls the same
+transport method.
+
+**Evidence:** 2026-08-28 (`a6ad9ec`/`0ac76d0`, lightning-degradation-honesty
+T1/T3, `Source: plan-review codex R1`). The plan as written specified
+`lastFeedFailure` and `transportPhase` as instance fields, cleared at the top of
+`getLightningStrikes` and written in its catch — while the handler read the getter
+only after the method resolved, and the method suspends **10 seconds** at its
+accumulation wait (`blitzortung.ts:605`). The interleaving B-clears →
+B-waits-10s → A-fails-writes → B-reads renders a *successful* lightning query as
+`⚪ UNKNOWN (LIVE FEED UNAVAILABLE)`. Caught at plan review, before any code
+existed. Shipped as a `WeakMap<LightningStrike[], LightningFeedFailure>` with a
+distinct array per degraded return, and an invocation-local phase passed as an
+out-parameter so a pre-warm cannot move a query's phase.
+
+**Status:** active. Related: [G20] (the sibling rule for a *synchronous* guard
+flag — same class, opposite direction: G20 forbids introducing an await inside
+the guard, G43 forbids relying on a field that spans one). Not lintable as
+written, but a grep for `private last[A-Z]` / `private current[A-Z]` on a
+singleton service is a plausible tripwire.
+
+---
+
+## G44 — A resolved subscribe promise does not cover a later stream disconnect
+
+**Trigger:** a live-feed query awaits connect/subscribe, then *waits* or
+accumulates for a window, while connection loss is delivered to an event listener
+rather than to the promise it awaited.
+
+**Rule:** track a monotonic connection-loss generation for the whole query
+window. Capture it **after** the transport work resolves — not before — and
+compare it before returning. Checking only the catch, or only a final
+`isConnected`, misses event-delivered loss and misses loss followed by reconnect.
+
+**Why:** `close` and post-connect `error` events do not reject an
+already-resolved connect or subscribe promise, so the query's own catch never
+runs and the result renders as a normal, complete answer. And `mqtt`'s
+`reconnectPeriod` restores `isConnected` on its own, so a final boolean check can
+read `true` across a real unmonitored gap. Capturing the generation *before*
+transport work is the mirror-image error: an initial connect that mqtt retries
+internally bumps the counter on its way to succeeding, and the query would be
+flagged degraded after it had in fact connected.
+
+**Verify:** connect and subscribe successfully, emit `close` during the
+accumulation window, and assert the result is classified degraded. Run a second
+variant that emits `connect` again before completion — that one is the case a
+bare `isConnected` check cannot catch, and it is the only variant that goes red
+if you delete the generation comparison alone (see [G32]'s partial-overlap rule).
+Keep a no-`close` control.
+
+**Evidence:** 2026-08-28 (`a6ad9ec`/`0ac76d0`, lightning-degradation-honesty
+T1/T3, `Source: plan-review codex R2`). `blitzortung.ts`'s `close` handler only
+set `isConnected = false` and warned, while `getLightningStrikes` waited 10 s
+after subscribing and recorded failures in its catch alone — so a broker that
+dropped mid-query rendered as `🟢 SAFE (LIMITED DATA)` explained as a first-query
+cold start, the exact defect the plan existed to remove, on a second execution
+path the plan had not enumerated.
+
+**Status:** active. Related: [G43] (the per-query binding this classification is
+carried on), [G9] (a live smoke test must rethrow what is not a transport
+failure). Not lintable.
+
+---
+
+## G45 — A mutation only goes red where the contract can reach it
+
+**Trigger:** running a plan's mutation check ([G13], [G32]) against a codebase
+with the three-layer split — service fetches, pure util computes, handler
+renders — or against any pair-wise contract where only one side takes the
+mutated path.
+
+**Rule:** before concluding a mutation is uncaught, check that the contract
+**executes the layer the mutation lives in**. A plan that calls something a
+"rendering contract" has named the *subject*, not the entry point: if the
+mutation is in the handler's selection logic, a fixture handed straight to the
+formatter can never reach it. Same for pairs — a contract asserting "A's outcome
+and B's outcome differ" cannot catch a mutation that only manifests when A and B
+take the *same* branch.
+
+**Why:** the split is deliberate here, and it makes the cheap test the wrong
+test. A hand-built response fixture is the natural way to pin rendered text, and
+it is genuinely the right tool for the formatter's own branching — but every
+computation that *chooses* what the fixture contains lives one layer up in the
+handler. Two of this plan's contracts read naturally as formatter tests and were
+written that way; both stayed green under the mutations they were specifically
+written to catch, because the mutated lines never executed. The failure is quiet
+in the worst way: the mutation check reports "no test catches this", and the
+tempting response is to weaken the plan or manufacture a fixture, when the fix is
+to re-drive the existing contract through the handler.
+
+**Verify:** for each mutation, name the file and function it edits, then confirm
+the failing contract's call stack actually enters that function — drive it
+through the handler (module mock + `vi.resetModules()` re-import) rather than
+through the pure renderer. If a mutation stays green, re-run it with the contract
+re-pointed at the mutated layer *before* recording it as uncovered.
+
+**Evidence:** 2026-08-28 (`0ac76d0`, lightning-degradation-honesty T3). Three
+instances in one task: (a) the outage-message evaluation-order mutation lives in
+`getLightningActivity`, so the formatter-only contract 6 stayed green until it was
+re-driven through the handler; (b) the `!= null` → `!== null` mutation is the
+*handler's* computation, not the formatter's `=== true` check, so a fixture with
+the field hand-omitted proved nothing and a handler-path case with a bare
+`vi.fn()` stub was needed; (c) the shared-degraded-array mutation ([G43]) cannot
+be caught by an A-fails/B-succeeds contract at all, because only the failing side
+touches the degraded-return path — catching it needed a new case where *both*
+queries fail, asserting object identity.
+
+**Status:** active. Related: [G13] (a fixture that cannot discriminate),
+[G32] (mutating to every *rejected implementation* — this entry is about the
+*entry point*, that one about the *alternative*), [G11] (read the real output).
+Not lintable.
 
 ---
 
