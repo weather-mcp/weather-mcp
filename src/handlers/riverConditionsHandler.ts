@@ -6,7 +6,8 @@ import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
-import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { resolveCountryCode, resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { NominatimService } from '../services/nominatim.js';
 import { validateDetail, validatePositiveInteger } from '../utils/validation.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
@@ -32,6 +33,14 @@ import { RateLimitError } from '../errors/ApiError.js';
 import type { NWPSGauge, GaugeStatus, NWPSStageFlowResponse, StageFlowDataPoint, FloodCategories } from '../types/noaa.js';
 import type { OpenMeteoFloodResponse } from '../types/openmeteo.js';
 import type { DetailLevel } from '../utils/validation.js';
+
+/**
+ * Countries NWPS actually gauges. Measured live 2026-08-28 against
+ * api.water.noaa.gov/nwps/v1/gauges: Puerto Rico 116 gauges, US Virgin Islands 0,
+ * Guam 0 — so this is deliberately NOT NIFC_COVERED_COUNTRIES {us, pr, vi, gu},
+ * which would misreport two territories (design D4).
+ */
+const NWPS_COVERED_COUNTRIES = new Set(['us', 'pr']);
 
 /**
  * NWPS emits large negative sentinels (e.g. -999, -999999) for missing stage/flow
@@ -168,7 +177,8 @@ export async function handleGetRiverConditions(
   noaaService: NOAAService,
   locationStore: LocationStore,
   geocodingService: GeocodingService,
-  openMeteoService?: OpenMeteoService
+  openMeteoService?: OpenMeteoService,
+  nominatimService?: NominatimService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as RiverConditionsArgs, locationStore, geocodingService);
@@ -183,7 +193,7 @@ export async function handleGetRiverConditions(
     : requestedSource === 'noaa';
 
   const output = useNOAA
-    ? await formatNOAARiverConditions(noaaService, latitude, longitude, args, detail)
+    ? await formatNOAARiverConditions(noaaService, latitude, longitude, args, detail, resolved.country_code, nominatimService)
     : await formatOpenMeteoRiverConditions(openMeteoService, latitude, longitude, args, detail);
 
   return prependLocationLine({
@@ -206,7 +216,9 @@ async function formatNOAARiverConditions(
   latitude: number,
   longitude: number,
   args: unknown,
-  detail: DetailLevel
+  detail: DetailLevel,
+  resolvedCountryCode?: string,
+  nominatimService?: NominatimService
 ): Promise<string> {
   // Validate radius parameter
   let radius = (args as RiverConditionsArgs)?.radius ?? 50; // default 50 km
@@ -248,9 +260,37 @@ async function formatNOAARiverConditions(
       .sort((a, b) => a.distance - b.distance); // Sort by nearest first
 
     if (gaugesWithDistance.length === 0) {
-      output += `ℹ️ **No river gauges found within ${radius} km**\n\n`;
-      output += `Try expanding the search radius or choosing a location closer to rivers or streams.\n\n`;
-      output += `**Tip:** River gauges are typically located along major rivers and waterways.\n`;
+      // Lazy, and only here: the answer only ever chooses between two renderings of an
+      // empty result, and Nominatim is rate-limited to 1 req/sec server-wide (design D2).
+      // `lookupFailed` is deliberately discarded — the fallback is `isInUS`, exactly what
+      // this code did before, so a note would describe a non-event (design D7).
+      const { countryCode } = await resolveCountryCode(
+        resolvedCountryCode, latitude, longitude, nominatimService
+      );
+      const outsideCoverage = countryCode
+        ? !NWPS_COVERED_COUNTRIES.has(countryCode)
+        : !isInUS(latitude, longitude);
+
+      if (outsideCoverage) {
+        // A successful-but-empty NWPS response outside its coverage. "No gauges" here means
+        // "this authority does not gauge rivers at this location", which is emphatically not
+        // an all-clear — so no ℹ️, and none of the in-coverage advice, which cannot succeed
+        // at any radius. The forced source (or the CONUS-box auto route) is honoured as
+        // asked: disclose rather than error or silently swap authorities (design D1/D5).
+        output += `**NOAA's National Water Prediction Service gauges rivers in the United `;
+        output += `States and Puerto Rico only, and this location appears to be outside that `;
+        output += `coverage.**\n\n`;
+        output += `No gauges were returned — but that is an absence of coverage, not an `;
+        output += `all-clear. Rivers here may be in flood; NWPS simply does not gauge them.\n\n`;
+        output += `Use \`source: "openmeteo"\` (or omit \`source\`) for Open-Meteo Flood (GloFAS) `;
+        output += `modeled river discharge, which is global.\n`;
+      } else {
+        // Inside coverage, widening a 50 km radius genuinely can find a gauge, so the
+        // advice is actionable here and this output stays byte-identical.
+        output += `ℹ️ **No river gauges found within ${radius} km**\n\n`;
+        output += `Try expanding the search radius or choosing a location closer to rivers or streams.\n\n`;
+        output += `**Tip:** River gauges are typically located along major rivers and waterways.\n`;
+      }
     } else {
       output += `📊 **Found ${gaugesWithDistance.length} river gauge${gaugesWithDistance.length > 1 ? 's' : ''}**\n\n`;
 

@@ -875,7 +875,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_river_conditions':
         return await withAnalytics('get_river_conditions', async () =>
-          handleGetRiverConditions(args, noaaService, locationStore, geocodingService, openMeteoService)
+          handleGetRiverConditions(args, noaaService, locationStore, geocodingService, openMeteoService, nominatimService)
         );
 
       case 'get_wildfire_info':
