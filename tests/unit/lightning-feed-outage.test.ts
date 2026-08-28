@@ -260,6 +260,61 @@ describe('lightning feed-outage — service contracts (blitzortung.ts)', () => {
     }
   });
 
+  it('regression codex-B1: a failed subscribe leaves no stamp behind, so a same-area retry really re-subscribes', async () => {
+    // The bug this pins: both maps are written BEFORE the subscribe callback runs, and the
+    // error branch used to reject without undoing them. The second query for the same area then
+    // computed an empty `potentialNewSubs`, never called `subscribe`, and returned a clean
+    // (failure-free) empty array with a coverage stamp — `SAFE (LIMITED DATA)` plus "re-check
+    // shortly" for a feed that is down. Same coordinates and radius on both calls, so the
+    // geohash set is identical and the skip is reachable.
+    const client = createFakeMqttClient({
+      subscribeErrors: [new Error('first subscribe rejected'), new Error('retry subscribe rejected')]
+    });
+    vi.doMock('mqtt', () => createPresentMqttModule(client).esModule);
+    const { blitzortungService } = await importFreshBlitzortung();
+
+    vi.useFakeTimers();
+    try {
+      const first = await blitzortungService.getLightningStrikes(40, -74, 100, 60);
+      expect(blitzortungService.getFeedFailure(first)?.reason).toBe('subscribe_failed');
+      expect(client.subscribe).toHaveBeenCalledTimes(1);
+
+      // Nothing was subscribed, so nothing may claim coverage — the stamp is the half of the
+      // bug that produced the dishonest render, and it must be gone too.
+      expect(blitzortungService.getCoverageStart(40, -74, 100)).toBeNull();
+
+      const second = await blitzortungService.getLightningStrikes(40, -74, 100, 60);
+      expect(client.subscribe).toHaveBeenCalledTimes(2);
+      expect(blitzortungService.getFeedFailure(second)?.reason).toBe('subscribe_failed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('regression codex-B1: a failed pre-warm does not stop the first query for that area from re-subscribing', async () => {
+    // The startup path into the same bug: `prewarmLocation` swallows its failure, so without a
+    // rollback the very FIRST user query for a pre-warmed saved location inherited the poisoned
+    // stamps and reported no failure at all.
+    const client = createFakeMqttClient({
+      subscribeErrors: [new Error('prewarm subscribe rejected'), new Error('query subscribe rejected')]
+    });
+    vi.doMock('mqtt', () => createPresentMqttModule(client).esModule);
+    const { blitzortungService } = await importFreshBlitzortung();
+
+    vi.useFakeTimers();
+    try {
+      await blitzortungService.prewarmLocation(35, -80, 100); // fails, swallowed
+      expect(client.subscribe).toHaveBeenCalledTimes(1);
+      expect(blitzortungService.getCoverageStart(35, -80, 100)).toBeNull();
+
+      const result = await blitzortungService.getLightningStrikes(35, -80, 100, 60);
+      expect(client.subscribe).toHaveBeenCalledTimes(2);
+      expect(blitzortungService.getFeedFailure(result)?.reason).toBe('subscribe_failed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('contract 4b: overlapping queries never exchange outcomes — the contract a shared "last failure" field would fail', async () => {
     const client = createFakeMqttClient({
       // Call order: B's subscribe (index 0) succeeds; A's subscribe (index 1) fails.
@@ -432,6 +487,96 @@ describe('lightning feed-outage — service contracts (blitzortung.ts)', () => {
       vi.useRealTimers();
     }
   });
+  it('contract 5 (subscribe leg): the emitted subscribe-failure and classification lines carry nothing from mqtt\'s own message', async () => {
+    // Contract 5 above drives only the `close` path, which never reaches either `logger.error`.
+    // This drives the subscribe leg, where mqtt's real errors read
+    // `connect ECONNREFUSED <host>:<port>` — a broker address inside the error's own message and
+    // stack. The sentinel stands in for that address.
+    //
+    // Asserted at `console.error`, NOT at a `logger.error` spy: an Error has no enumerable own
+    // properties, so `JSON.stringify` of a spied call renders it `{}` and a spy-level assertion
+    // passes against code that leaks. `logger.log` copies `error.message` and `error.stack` into
+    // the entry it emits, so the emitted line is the only place the contract is real.
+    const SENTINEL = 'mqtt://sentinel.invalid:1883';
+    const client = createFakeMqttClient({
+      subscribeErrors: [new Error(`connect ECONNREFUSED ${SENTINEL}`)]
+    });
+    vi.doMock('mqtt', () => createPresentMqttModule(client).esModule);
+    const { blitzortungService } = await importFreshBlitzortung();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.useFakeTimers();
+    try {
+      const result = await blitzortungService.getLightningStrikes(16, 16, 100, 60);
+      expect(blitzortungService.getFeedFailure(result)?.reason).toBe('subscribe_failed');
+
+      const emitted = consoleSpy.mock.calls.map(call => String(call[0]));
+      // Both `logger.error` sites on this leg must have fired: the subscribe callback's and the
+      // classification catch's. Without this the sentinel assertions could pass vacuously.
+      expect(emitted.some(line => line.includes('Failed to subscribe to topics'))).toBe(true);
+      expect(emitted.some(line => line.includes('Failed to fetch lightning data'))).toBe(true);
+      // The classification still reaches the log — sanitizing must not cost the diagnostic.
+      expect(emitted.some(line => line.includes('subscribe_failed'))).toBe(true);
+
+      // Scoped to the failure lines themselves. `console.error` is the sink for EVERY log
+      // level (stderr is the MCP requirement), so the stream also carries the pre-existing
+      // connect lines that name the broker on purpose — the contract is about what a failure
+      // discloses, not about the transport being unnameable anywhere.
+      const failureLines = emitted.filter(line => {
+        const message = (JSON.parse(line) as { message?: string }).message;
+        return (
+          message === 'Failed to subscribe to topics' ||
+          message === 'Failed to fetch lightning data'
+        );
+      });
+      expect(failureLines).toHaveLength(2);
+      for (const line of failureLines) {
+        expect(line).not.toContain(SENTINEL);
+        expect(line).not.toContain('sentinel.invalid');
+        expect(line).not.toContain('mqtt://');
+        expect(line).not.toContain('ECONNREFUSED');
+        // The whole leak was `message` + `stack` being copied into the entry by `logger.log`.
+        expect(line).not.toContain('"stack"');
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('contract 5 (pre-warm leg): the emitted pre-warm warning carries nothing from mqtt\'s own message either', async () => {
+    const SENTINEL = 'mqtt://sentinel.invalid:1883';
+    const client = createFakeMqttClient({
+      subscribeErrors: [new Error(`connect ECONNREFUSED ${SENTINEL}`)]
+    });
+    vi.doMock('mqtt', () => createPresentMqttModule(client).esModule);
+    const { blitzortungService } = await importFreshBlitzortung();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.useFakeTimers();
+    try {
+      await blitzortungService.prewarmLocation(17, 17, 100); // fails, swallowed
+
+      const emitted = consoleSpy.mock.calls.map(call => String(call[0]));
+      expect(
+        emitted.some(line => line.includes('Failed to pre-warm lightning monitoring for location'))
+      ).toBe(true);
+
+      const failureLines = emitted.filter(
+        line =>
+          (JSON.parse(line) as { message?: string }).message ===
+          'Failed to pre-warm lightning monitoring for location'
+      );
+      expect(failureLines).toHaveLength(1);
+      for (const line of failureLines) {
+        expect(line).not.toContain(SENTINEL);
+        expect(line).not.toContain('sentinel.invalid');
+        expect(line).not.toContain('mqtt://');
+        expect(line).not.toContain('ECONNREFUSED');
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('lightning feed-outage — render contracts (lightningHandler.ts)', () => {
@@ -562,6 +707,46 @@ describe('lightning feed-outage — render contracts (lightningHandler.ts)', () 
     });
 
     expect(result.coverage.feedUnavailable).toBe(false);
+  });
+
+  it('contract 7 (handler path): a reachable feed with partial coverage renders the cold-start message, recommendation, heading and *Why:*', async () => {
+    // Contract 7 above drives the FORMATTER with a hand-built fixture, and the handler-path case
+    // beside it asserts only the boolean — so mutating the selector at lightningHandler.ts to
+    // `if (true)` stayed green in the very file written to pin it (codex-M2). This drives the
+    // whole cold-start branch through `getLightningActivity`: a feed that answered (no failure)
+    // with only part of the window covered must still say "does NOT confirm" and "re-check
+    // shortly", which the outage arm replaces wholesale.
+    const stub = buildServiceStub({
+      getLightningStrikes: vi.fn().mockResolvedValue([]),
+      getCoverageStart: vi.fn().mockReturnValue(new Date(Date.now() - 2 * 60 * 1000)),
+      getFeedFailure: vi.fn(() => null)
+    });
+    const { getLightningActivity, formatLightningActivityResponse: format } =
+      await importFreshLightningHandler(stub);
+
+    const result = await getLightningActivity({
+      latitude: 40.7128,
+      longitude: -74.006,
+      timeWindow: 60
+    });
+
+    expect(result.coverage.feedUnavailable).toBe(false);
+    expect(result.coverage.isComplete).toBe(false);
+    expect(result.safety.message).toContain('does NOT confirm the absence of lightning activity');
+    expect(result.safety.message).not.toContain('could not be reached');
+    expect(result.safety.recommendations[0]).toContain('treat this result as inconclusive');
+    expect(result.safety.recommendations[0]).toContain('re-check shortly');
+    expect(result.safety.recommendations[0]).not.toContain('unreachable');
+
+    const out = format(result);
+
+    expect(out).toContain('## 🟢 Safety Status: SAFE (LIMITED DATA)');
+    expect(out).toContain('⚠️ **Limited monitoring coverage:**');
+    expect(out).toContain('Re-check in a few minutes');
+    expect(out).toContain('only begins buffering');
+    expect(out).not.toContain('UNKNOWN');
+    expect(out).not.toContain('Live feed unavailable');
+    expect(out).not.toContain('not an all-clear');
   });
 
   it('contract 8: an outage with a buffered strike at 4 km keeps the EXTREME heading and verdict, with the outage caveat beneath it', async () => {

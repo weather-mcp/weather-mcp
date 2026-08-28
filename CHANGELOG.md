@@ -22,7 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strikes retain their urgent verdict; buffered safe-band strikes remain listed, but the heading and
   message say current conditions are unknown rather than "no immediate lightning threat". The
   failure reason appears in the stderr log only — never in the report, and never with broker
-  detail. Files: `src/services/blitzortung.ts`, `src/handlers/lightningHandler.ts`,
+  detail: the three failure log sites now record only the error's `name` and `code`, because the
+  underlying message and stack name the broker host and port. A failed subscribe also no longer
+  leaves its geohashes recorded as subscribed. They were written before the broker had accepted
+  anything, so a second query for the same area — or the first query for a saved location whose
+  startup pre-warm failed — skipped resubscribing, found a coverage stamp for a topic no one was
+  listening to, and produced exactly the cold-start report this change exists to remove. Files:
+  `src/services/blitzortung.ts`, `src/handlers/lightningHandler.ts`,
   `src/types/lightning.ts`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`.
   ([#76](https://github.com/weather-mcp/weather-mcp/issues/76))
 
