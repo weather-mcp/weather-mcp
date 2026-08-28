@@ -178,6 +178,43 @@ next lightning query genuinely re-attempts the load — but Node caches the fail
 within one process every retry replays the same error even once the files on disk are fixed. MCP
 clients spawn the server per session, so reconnecting is usually enough.
 
+#### Lightning feed unreachable
+
+```
+## ⚪ Safety Status: UNKNOWN (LIVE FEED UNAVAILABLE)
+
+The live lightning feed could not be reached, so no strikes could be observed for
+this area. This is not an all-clear.
+```
+
+**Unlike the two package cases above, this is not a tool error.** It arrives *inside* a normal
+lightning report, and `get_lightning_activity` still returns a result. The two states differ in
+what can be repaired: a missing or broken `mqtt` package is a permanent property of the install
+that only the user can fix, so the tool refuses rather than answering. An unreachable broker is
+transient — the client reconnects on its own — and the report still carries real information: the
+location, the requested window, how much of it was actually monitored, and any strikes already
+buffered from earlier monitoring.
+
+Reporting it in-result also keeps `get_weather_summary` useful. The same ⚪ heading and explanation
+render inline in the summary's `lightning` section; it does **not** collapse to
+`## lightning (unavailable)` the way a thrown error would.
+
+What the report will and will not claim:
+
+- It never says "no strikes" as a finding. A feed that could not be reached observed nothing, and
+  the report says so in those words.
+- It does not tell you to re-check shortly. During an outage every re-check reads the same zero, so
+  the advice is to consult official weather services — the NWS or your national authority.
+- Strikes buffered before the outage keep their verdict. A buffered EXTREME strike still renders as
+  EXTREME; a buffered strike beyond the safe-band threshold stays listed, but under the UNKNOWN
+  heading rather than an all-clear.
+
+The cause (connect timeout, connection error, or a failed subscribe) is written to the **stderr log
+only**, never to the report. Nothing about the broker — its URL included — reaches either surface.
+
+No action is usually needed. If every lightning query reports an outage, check outbound access to
+the broker on port 1883, or set `BLITZORTUNG_MQTT_URL` to a reachable one.
+
 ## Service Status Tool
 
 ### Usage
