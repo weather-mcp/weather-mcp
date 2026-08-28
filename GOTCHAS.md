@@ -36,7 +36,7 @@ in `the alert's own polygon` terminated a single-quoted string in
 `src/index.ts`; `npm test` reported 101 files / 2,492 tests passing while
 `npm run build` emitted three TS1005/TS1128 errors.
 
-**Status:** active. **Re-verified 2026-08-24** (optional-mqtt curation): two
+**Status:** active. **Verify line re-run 2026-08-28** (issue-83 absent-strike-distance curation): a `TS2322` and two `TS6133` errors planted in `src/handlers/lightningHandler.ts` — the file this plan changed — while `npm test` reported 114 files / 2,772 tests passing. The trap is intact. The same run also exercised this entry in the **load-bearing direction**: widening `LightningStatistics` to `number | null` *first* produced exactly two `TS18047` errors at the two render sites and no others, which is the only evidence that no other `src/` file consumes the field — a green suite says nothing about it. **Re-verified 2026-08-24** (optional-mqtt curation): two
 deliberate `TS2322`/`TS6133` errors in `src/utils/version.ts` still left
 `npm test` reporting 103 files / 2,519 tests passing. **Re-verified 2026-08-26**
 (cap-disclosure-accuracy curation): the same two error codes in
@@ -435,7 +435,7 @@ to `9,999` against the real `2,742`, `env -u FORCE_COLOR
 ./scripts/check-doc-versions.sh` still printed `✅ README.md test count`,
 `✅ CLAUDE.md test count` and `✅ All documentation checks passed!`, never once
 naming the two it does not read — the trap is intact and both gaps are still
-exactly the two this entry names). Match every site by
+exactly the two this entry names). **Verify line re-run again 2026-08-28** (`b4d8722`, issue-83 absent-strike-distance T2 — the count moved 2,759 → 2,772 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,772`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count`, `✅ CLAUDE.md test count` and `✅ All documentation checks passed!`, never once naming the two it does not read — the trap is intact and both gaps are still exactly the two this entry names). Match every site by
 content, never by line number — the `npm test`
 comment has moved twice (346 → 381). Lint candidate — anchoring a check on
 `Run all [0-9,]+ tests` and one on `docs/README.md`'s count would close both gaps
@@ -739,6 +739,20 @@ probe could assert the same string at both levels rather than finding the
 counts-branch surprise the 2026-08-26 entry above records for alerts. **Check
 whether the section under test reads `detail` before predicting that the two
 paths diverge.**
+
+**Re-verified 2026-08-28** (`de592f6`, issue-83 absent-strike-distance) — and worth
+noting that the Verify line does **not** require a live probe. That plan forbade
+one (the state is unreachable through `filterStrikes`, and per [G30] a first
+lightning probe reports zero strikes anyway), yet the summary path was still
+driven for real: a scratch driver stubbed `blitzortungService` on the built dist
+and called `handleGetWeatherSummary` directly at its default `detail` and at all
+three explicit levels. All four rendered the changed lines identically
+(`**Nearest Strike:** distance unavailable`, no `0.0 km`, no `undefined`). The
+implementation plan had *inferred* both paths agreed, on the sound-looking
+ground that the statistics lines sit outside any `detail` gate — which is exactly
+the inference the 2026-08-26 entry above records getting backwards for alerts.
+**A fixture-driven drive of the summary handler costs a minute and replaces the
+inference; "no live probe allowed" is not a reason to skip it.**
 
 ---
 
@@ -1754,6 +1768,58 @@ while `tests/` mentions X". Related: [G12] (an enumeration can be incomplete as
 easily as stale), [G13] (a test that pins the defect by name is not coverage),
 [G32] (the rejected-alternative set is also something a plan enumerates and can
 under-enumerate).
+
+---
+
+## G41 — A plan's mechanical acceptance check can be vacuous or spurious, so test the check before obeying it
+
+**Trigger:** a plan hands you a mechanical criterion meant to prove a property
+of your own *uncommitted* work — a grep that must return a count, a `git diff`
+invocation that must list exactly one file.
+
+**Rule:** before trusting a pass, run the check against a state you know should
+fail it; before "fixing" code to satisfy a failure, check whether the criterion
+itself is wrong. **Never delete correct code or a correct comment to make a
+mechanical check pass** — report the discrepancy instead and let the plan carry
+the note.
+
+**Why:** the two failure directions cost different things and both are quiet.
+
+- **Vacuous pass — the dangerous one.** `git diff --stat main...HEAD -- tests/`
+  compares two *commits*. An untracked file is not in either, so for a task whose
+  whole deliverable is a **new** file the command returns empty output before the
+  commit — byte-identical to what it returns when the work was never done. Used
+  as an F12 lock check ("the pre-existing test files are unedited: this lists
+  only the new file"), it reads as green while proving nothing at all. What
+  actually checks it is `git status --short tests/` plus a per-file
+  `git diff --quiet tests/unit/<lock>.test.ts`.
+- **Spurious fail.** A grep asserting a retired expression is gone will match the
+  plan's *own prescribed comment* quoting that expression to explain what
+  changed. This repo's plans routinely dictate both — the comment is good
+  practice and the grep is good practice, and together they contradict. The
+  builder's temptation is to delete the comment.
+
+**Verify:** with an uncommitted new file under `tests/`, run
+`git diff --stat main...HEAD -- tests/` and confirm it prints nothing, then
+`git status --short tests/` and confirm the file is listed as `??`. The first
+command is the one plans keep reaching for.
+
+**Evidence:** 2026-08-28, issue-83 absent-strike-distance. The plan's T2
+acceptance read *"`git diff --stat main...HEAD -- tests/` lists only it"*, which
+the subagent correctly reported as unsatisfiable-as-written and worked around
+with per-file `git diff --quiet` (all four locks CLEAN). The same plan's T1
+acceptance required
+`grep -c 'distance || 0\|distance || \|\.distance?\.toFixed'` to return `0`,
+while its own prescribed comment for that edit reads *"`s.distance || 0` added 0
+for a distance-less strike"* — so the grep returned `1` on a correct
+implementation (`76c98a4`). Zero *code* sites remained; the same grep minus
+comment lines returned `0`.
+
+**Status:** active. Lint candidate on the vacuous half — a plan-authoring check
+could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
+contains a file marked **new**. Related: [G10] (prove the hash is not vacuous —
+same family, a check that cannot fail is not evidence), [G40] (a plan's claim
+about test coverage is a grep, and greps are what this entry is about).
 
 ---
 
