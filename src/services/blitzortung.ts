@@ -457,6 +457,15 @@ export class BlitzortungService {
 
     // Subscribe to each geohash and track access time
     const subscriptions: string[] = [];
+    // The geohashes THIS call is the first to stamp. Both maps are written before the broker has
+    // accepted anything, so a failed subscribe must undo them: a geohash left behind is treated
+    // as subscribed forever after, which makes the next query for the same area compute an empty
+    // `potentialNewSubs`, skip `subscribe` entirely, and read a coverage start for a topic no one
+    // is listening to - a green LIMITED DATA verdict and "re-check shortly" while the feed is
+    // down, which is exactly the cold-start story this feature exists to stop telling. Only what
+    // this call staged is rolled back, so a geohash another call subscribed successfully is
+    // never dropped.
+    const staged: string[] = [];
     for (const geohash of geohashes) {
       if (!this.subscribedGeohashes.has(geohash)) {
         // IMPORTANT: Geohash characters must be separated by slashes in the topic
@@ -465,6 +474,7 @@ export class BlitzortungService {
         const topic = `${this.topicPrefix}/${geohashPath}/#`;
         subscriptions.push(topic);
         this.geohashFirstSubscribed.set(geohash, now);
+        staged.push(geohash);
       }
       // Update access time for all geohashes in this request (LRU tracking)
       this.subscribedGeohashes.set(geohash, now);
@@ -477,8 +487,19 @@ export class BlitzortungService {
       await new Promise<void>((resolve, reject) => {
         this.client!.subscribe(subscriptions, (error) => {
           if (error) {
-            logger.error('Failed to subscribe to topics', error, {
-              topics: subscriptions
+            for (const geohash of staged) {
+              this.subscribedGeohashes.delete(geohash);
+              this.geohashFirstSubscribed.delete(geohash);
+            }
+            // The `Error` slot is deliberately left empty, as in the loader above: the logger
+            // serialises message and stack, and mqtt's own errors carry the broker host and port
+            // in both (`connect ECONNREFUSED <host>:<port>`). Only the name and code are kept —
+            // enough to say which leg failed, without naming where it connected.
+            const failure = error as NodeJS.ErrnoException;
+            logger.error('Failed to subscribe to topics', undefined, {
+              topics: subscriptions,
+              name: failure.name,
+              code: failure.code
             });
             reject(error);
           } else {
@@ -689,7 +710,16 @@ export class BlitzortungService {
             ? 'subscribe_failed'
             : 'connection_error';
 
-      logger.error('Failed to fetch lightning data', error as Error, { reason });
+      // The `Error` slot is deliberately left empty, as in the loader and the subscribe callback
+      // above: `reason` is the sanitized classification, and passing mqtt's own object alongside
+      // it would serialise the message and stack that name the broker host and port — undoing
+      // the whole point of classifying by phase.
+      const failure = error as NodeJS.ErrnoException;
+      logger.error('Failed to fetch lightning data', undefined, {
+        reason,
+        name: failure.name,
+        code: failure.code
+      });
 
       // A distinct array per degraded return, so two concurrent failures can never share one
       // WeakMap entry. Returning `[]` (rather than throwing) is the settled classification:
@@ -731,8 +761,12 @@ export class BlitzortungService {
       if (error instanceof MqttUnavailableError || error instanceof MqttLoadFailedError) {
         return;
       }
+      // Same rule as the two `logger.error` sites above: mqtt's own message names the broker
+      // host and port, so only the name and code are kept.
+      const failure = error as NodeJS.ErrnoException;
       logger.warn('Failed to pre-warm lightning monitoring for location', {
-        error: (error as Error).message
+        name: failure.name,
+        code: failure.code
       });
     }
   }
