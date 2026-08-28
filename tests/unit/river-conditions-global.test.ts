@@ -628,6 +628,19 @@ describe('handleGetRiverConditions — in-coverage empty result stays byte-ident
   });
 });
 
+/**
+ * These cases pin the *predicate* — that `NWPS_COVERED_COUNTRIES` is `{us, pr}` and
+ * not the wildfire tool's `{us, pr, vi, gu}`.
+ *
+ * They do **not** describe production behaviour, and must not be read as proof that
+ * Guam or the USVI receive the disclosure. Nominatim is queried at `zoom=3`
+ * (`src/services/nominatim.ts:378-383`), and at country zoom OpenStreetMap resolves
+ * every US territory to `us` — never `gu`, `vi` or `pr` — on the reverse path and on
+ * the forward path that `city_name` / `save_location` use. So the three codes injected
+ * below are values the live resolver cannot emit for these coordinates: in production
+ * all three points match `us`, are treated as covered, and render the in-coverage
+ * advice. Measured live 2026-08-28 by the issue-85 test drive; tracked in #86.
+ */
 describe('handleGetRiverConditions — the NWPS coverage seam: pr/vi/gu (T3, G32)', () => {
   it('covers Puerto Rico (pr): renders the in-coverage advice, not the disclosure', async () => {
     const fakes = buildFakes([]);
