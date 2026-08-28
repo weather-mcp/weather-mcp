@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.9] - 2026-08-28
+
 ### Fixed
 
 - **A lightning feed outage is now reported as unknown, not as a first-query cold
@@ -1430,7 +1432,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.8...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.9...HEAD
+[1.25.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.8...v1.25.9
 [1.25.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.7...v1.25.8
 [1.25.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.6...v1.25.7
 [1.25.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.5...v1.25.6

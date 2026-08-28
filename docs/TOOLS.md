@@ -731,10 +731,10 @@ subscribed, so a report can carry one of two coverage disclosures in place of a 
   strikes cannot be backfilled.
 - **`⚪ UNKNOWN (LIVE FEED UNAVAILABLE)`** — the server could not reach the Blitzortung feed for this
   query, either because the connection never succeeded or because it dropped partway through
-  collection. **This is not an all-clear**: no strikes could be observed, so nothing is known about
-  current conditions. The server reconnects automatically in the background and a later query may
-  succeed, so the report does **not** suggest an immediate re-check — consult official weather
-  services instead.
+  collection. **This is not an all-clear**: no live strike data could be collected, so nothing is
+  known about current conditions. The server reconnects automatically in the background and a
+  later query may succeed, so the report does **not** suggest an immediate re-check — consult
+  official weather services instead.
 
 Strikes already buffered from earlier monitoring still render during an outage. Buffered
 **ELEVATED**, **HIGH** and **EXTREME** strikes retain their urgent verdict; buffered safe-band
