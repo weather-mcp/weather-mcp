@@ -38,8 +38,8 @@ export interface LightningStatistics {
   totalStrikes: number;
   cloudToGroundStrikes: number;
   intraCloudStrikes: number;
-  averageDistance: number;
-  nearestDistance: number;
+  averageDistance: number | null;  // null when no strike carries a distance (0 when there are no strikes)
+  nearestDistance: number | null;  // null when strikes[0] carries no distance (0 when there are no strikes)
   strikesPerMinute: number;
   densityPerSqKm: number;
 }

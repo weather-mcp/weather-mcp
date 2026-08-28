@@ -118,12 +118,18 @@ function calculateStatistics(strikes: LightningStrike[], radiusKm: number, timeW
   const cloudToGround = strikes.filter(s => Math.abs(s.amplitude) > 20).length;
   const intraCloud = strikes.length - cloudToGround;
 
-  // Calculate average distance
-  const totalDistance = strikes.reduce((sum, s) => sum + (s.distance || 0), 0);
-  const averageDistance = totalDistance / strikes.length;
+  // Mean over the strikes that actually carry a distance. `s.distance || 0` added 0 for a
+  // distance-less strike while still counting it in the divisor, dragging the mean toward
+  // zero (issue #83). A strike whose distance is unknown contributes nothing to either side.
+  const located = strikes.filter((s): s is LightningStrike & { distance: number } => s.distance != null);
+  const averageDistance = located.length > 0
+    ? located.reduce((sum, s) => sum + s.distance, 0) / located.length
+    : null;
 
-  // Nearest distance
-  const nearestDistance = strikes[0]?.distance || 0;
+  // Nearest distance. `??`, never `||`, for the same reason as assessSafety: a strike at exactly
+  // 0 km is falsy, and `|| 0` also turns an *absent* distance into a printed `0.0 km` — the
+  // opposite lie. Unknown is null, not zero (issue #83).
+  const nearestDistance = strikes[0]?.distance ?? null;
 
   // Strikes per minute
   const strikesPerMinute = strikes.length / timeWindowMinutes;
@@ -397,8 +403,16 @@ export function formatLightningActivityResponse(
   if (response.statistics.totalStrikes > 0) {
     lines.push(`**Cloud-to-Ground:** ${response.statistics.cloudToGroundStrikes}`);
     lines.push(`**Intra-Cloud:** ${response.statistics.intraCloudStrikes}`);
-    lines.push(`**Nearest Strike:** ${response.statistics.nearestDistance.toFixed(1)} km away`);
-    lines.push(`**Average Distance:** ${response.statistics.averageDistance.toFixed(1)} km`);
+    lines.push(
+      response.statistics.nearestDistance === null
+        ? '**Nearest Strike:** distance unavailable'
+        : `**Nearest Strike:** ${response.statistics.nearestDistance.toFixed(1)} km away`
+    );
+    lines.push(
+      response.statistics.averageDistance === null
+        ? '**Average Distance:** unavailable'
+        : `**Average Distance:** ${response.statistics.averageDistance.toFixed(1)} km`
+    );
     lines.push(`**Strike Rate:** ${response.statistics.strikesPerMinute.toFixed(2)} strikes/minute`);
     lines.push(`**Density:** ${response.statistics.densityPerSqKm.toFixed(4)} strikes/km²`);
     lines.push(`**Active Thunderstorm:** ${response.safety.isActiveThunderstorm ? 'Yes' : 'No'}`);
@@ -417,7 +431,9 @@ export function formatLightningActivityResponse(
       const ageMinutes = (response.generatedAt.getTime() - strike.timestamp.getTime()) / (1000 * 60);
       const polaritySymbol = strike.polarity > 0 ? '+' : '−';
       lines.push(`### Strike ${index + 1}`);
-      lines.push(`- **Distance:** ${strike.distance?.toFixed(1)} km`);
+      lines.push(strike.distance != null
+        ? `- **Distance:** ${strike.distance.toFixed(1)} km`
+        : '- **Distance:** unavailable');
       lines.push(`- **Time:** ${strike.timestamp.toISOString()} (${ageMinutes.toFixed(1)} minutes ago)`);
       lines.push(`- **Location:** ${strike.latitude.toFixed(4)}, ${strike.longitude.toFixed(4)}`);
       lines.push(`- **Polarity:** ${polaritySymbol} (${strike.polarity > 0 ? 'Positive' : 'Negative'})`);
