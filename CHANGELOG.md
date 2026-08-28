@@ -24,12 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Toronto and Vancouver, so those points route to NWPS on `source: "auto"` and
   got the same unusable advice — they now get the disclosure. **Routing itself is
   unchanged**; those points still route to NWPS, the tool simply says so. The
-  coverage set is the United States and Puerto Rico, deliberately not the wildfire
-  tool's territory list — measured live, Puerto Rico has 116 NWPS gauges while the
-  US Virgin Islands and Guam have none, so reusing that list would misreport two
-  territories. A US point with no gauge in radius is untouched: inside coverage,
-  widening the radius genuinely can find a gauge, so that advice still renders
-  byte-identically. (#85)
+  coverage set is matched against the country the geocoder resolves, which is `us`
+  for the United States and its territories. **Known limitation:** NWPS gauges
+  neither Guam nor the US Virgin Islands, but OpenStreetMap resolves both to `us`
+  at country zoom, so a forced `source: "noaa"` query there still renders the
+  in-coverage advice rather than the disclosure — unchanged from before this fix,
+  and tracked in #86. A US point with no gauge in radius is untouched: inside
+  coverage, widening the radius genuinely can find a gauge, so that advice still
+  renders byte-identically. (#85)
 
 ## [1.25.9] - 2026-08-28
 
