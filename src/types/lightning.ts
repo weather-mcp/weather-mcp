@@ -66,6 +66,25 @@ export interface LightningMonitoringCoverage {
   monitoringSince: Date | null; // When live coverage of the queried area began (null = unknown/none)
   coverageMinutes: number;      // Minutes of the requested window actually monitored
   isComplete: boolean;          // True when coverage spans the full requested window
+  feedUnavailable: boolean;     // True when THIS query's transport to the live feed failed - never set by pre-warm
+}
+
+/**
+ * Why a lightning query could not reach the live feed. Classified at the point
+ * of failure from the transport phase, never from an error message, so no broker
+ * URL or upstream error detail can reach a rendered report or a log line.
+ */
+export type LightningFeedFailureReason = 'connect_timeout' | 'connection_error' | 'subscribe_failed';
+
+/**
+ * The moment and sanitized cause of a transport failure a lightning query
+ * swallowed. Associated with the array that query returned, never stored as a
+ * "last failure" field: queries overlap, so a shared field would let one query's
+ * outcome be read by another.
+ */
+export interface LightningFeedFailure {
+  at: Date;
+  reason: LightningFeedFailureReason;
 }
 
 /**

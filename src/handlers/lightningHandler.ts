@@ -277,7 +277,8 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
   const coverage: LightningMonitoringCoverage = {
     monitoringSince: coverageStart,
     coverageMinutes,
-    isComplete: coverageMinutes >= timeWindow
+    isComplete: coverageMinutes >= timeWindow,
+    feedUnavailable: false
   };
 
   if (!coverage.isComplete && safety.level === 'safe') {
