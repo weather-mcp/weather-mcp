@@ -282,7 +282,7 @@ async function formatNOAARiverConditions(
         output += `coverage.**\n\n`;
         output += `No gauges were returned — but that is an absence of coverage, not an `;
         output += `all-clear. Rivers here may be in flood; NWPS simply does not gauge them.\n\n`;
-        output += `Use \`source: "openmeteo"\` (or omit \`source\`) for Open-Meteo Flood (GloFAS) `;
+        output += `Use \`source: "openmeteo"\` for Open-Meteo Flood (GloFAS) `;
         output += `modeled river discharge, which is global.\n`;
       } else {
         // Inside coverage, widening a 50 km radius genuinely can find a gauge, so the

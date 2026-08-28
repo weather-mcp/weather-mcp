@@ -672,6 +672,9 @@ describe('handleGetRiverConditions — country lookup reached while isInUS is tr
     const text = textOf(result);
 
     expect(text).toContain('United States and Puerto Rico only');
+    // The disclosure must not advise omitting `source`: this caller already did,
+    // and the CONUS box routed them here. The advice would loop.
+    expect(text).not.toContain('or omit');
     expect(fakes.noaa.getNWPSGaugesInBoundingBox).toHaveBeenCalledTimes(1);
     expect(fakes.openMeteo.getRiverDischarge).not.toHaveBeenCalled();
   });
