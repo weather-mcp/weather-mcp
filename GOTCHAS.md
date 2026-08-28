@@ -2064,6 +2064,56 @@ queries fail, asserting object identity.
 *entry point*, that one about the *alternative*), [G11] (read the real output).
 Not lintable.
 
+## G46 — A docs task writes the plan's promise, not the code's behaviour
+
+**Trigger:** a task whose deliverable is user-facing prose — `docs/TOOLS.md`,
+`docs/ERROR_HANDLING.md`, `README.md`, or a `CHANGELOG.md` `[Unreleased]` entry —
+written from the design plan's own wording, on a plan whose earlier tasks are
+already green.
+
+**Rule:** every behavioural sentence a docs task publishes must name the test or
+the live probe that proves it. A claim traced only to the design plan is a claim
+about what was *intended*, and nothing downstream will catch the difference. If
+the proof does not exist, the sentence is not ready to ship — narrow it to what
+is proven, or go and make the code true, but do not publish it and move on.
+
+**Why:** the docs task sits at the end of the run, after the gate has been green
+for several commits, and its natural source is the plan paragraph that specified
+the feature. That paragraph describes the design, which is exactly the thing the
+implementation may have diverged from. Nothing between the sentence and the
+registry re-reads it against the code: the unit suite asserts rendered output for
+the states the tests construct, `check-doc-versions.sh` checks version, tool and
+test counts rather than claims, and a diff review reads the diff — where the docs
+and the code it describes both look correct in isolation. On a safety tool the
+result is the project's own worst failure mode with the polarity reversed: not a
+fabricated all-clear in the report, but a published promise the report does not
+keep.
+
+**Verify:** walk each behavioural claim the task adds and point it at a contract
+name or a captured probe. Where the claim is about a *failure* path, induce the
+failure rather than mocking it — the failure legs are where the divergence
+hides, because they are the legs the happy-path tests never enter.
+
+**Evidence:** 2026-08-28 (`a729a2d`, lightning-degradation-honesty T4; caught at
+`/test-drive`, fixed by `09bcd5f`). Three shipped documents — `docs/TOOLS.md`
+§11, `docs/ERROR_HANDLING.md`, and the `[Unreleased]` entry — published *"Strikes
+already buffered from earlier monitoring still render during an outage. Buffered
+ELEVATED, HIGH and EXTREME strikes retain their urgent verdict"*, taken verbatim
+from the design plan. The service's catch returned `[]` on every transport
+failure, so the buffer was never read on two of the four failure shapes,
+including the one users hit most often. The suite was green at 2,797 tests, the
+diff review filed three findings and none of them was this, and the handler's
+buffered-outage message arm was *structurally unreachable* on those paths — dead
+code that read as live. It surfaced only when a drive stood up a fake broker,
+buffered a 5 km strike, killed the broker between queries, and read the rendered
+report. The fix was one line.
+
+**Status:** active. Related: [G11] (read the real output), [G41] (test the
+acceptance check before obeying it), [G45] (a contract that cannot reach its
+subject). Not lintable — the check is a human walking claims against proofs.
+
+---
+
 ---
 
 ## Graveyard
