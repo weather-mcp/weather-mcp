@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **An empty NOAA river result outside NWPS coverage now discloses the coverage
+  gap instead of advising a wider search.** `get_river_conditions` with
+  `source: "noaa"` at a non-US point rendered
+  `ℹ️ **No river gauges found within 50 km**` followed by advice to expand the
+  radius — advice that cannot succeed at any radius, under an ℹ️ that reads as an
+  all-clear on a flood-safety tool. The coverage sentence existed but sat inside
+  the handler's `catch`, and a non-US NWPS query does not throw, so it was
+  unreachable in exactly the case it was written for. The report now states that
+  NOAA's National Water Prediction Service gauges rivers in the United States and
+  Puerto Rico only, that no gauges returned is an absence of coverage rather than
+  an all-clear, and names `source: "openmeteo"` for global modeled discharge.
+  This also covers the default path: `isInUS`'s CONUS bounding box contains
+  Toronto and Vancouver, so those points route to NWPS on `source: "auto"` and
+  got the same unusable advice — they now get the disclosure. **Routing itself is
+  unchanged**; those points still route to NWPS, the tool simply says so. The
+  coverage set is the United States and Puerto Rico, deliberately not the wildfire
+  tool's territory list — measured live, Puerto Rico has 116 NWPS gauges while the
+  US Virgin Islands and Guam have none, so reusing that list would misreport two
+  territories. A US point with no gauge in radius is untouched: inside coverage,
+  widening the radius genuinely can find a gauge, so that advice still renders
+  byte-identically. (#85)
+
 ## [1.25.9] - 2026-08-28
 
 ### Fixed

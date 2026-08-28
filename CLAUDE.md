@@ -60,7 +60,7 @@ src/
 │   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing
-│   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates
+│   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates; shared country-code resolution
 │   ├── geography.ts         # isInUS and region helpers
 │   ├── timezone.ts          # Local-time formatting, formatObservationAge
 │   ├── normals.ts / records.ts / astronomy.ts        # Climate normals, US records, almanac
