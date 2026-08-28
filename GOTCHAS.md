@@ -2169,11 +2169,59 @@ block at all four points; they were discarded and re-run for the same reason.
 **Status:** active. Related: [G10] (prove the hash is not vacuous — the same
 failure with a number in place of rendered text), [G28] (a probe that fails
 validation reports as a clean negative), [G4] (never trust the HTTP 200 alone —
-here the status is 429 and the body is still well-formed JSON). Partly lintable:
-a measurement helper that refuses to report unless a named control row is
-non-zero would close it mechanically.
+here the status is 429 and the body is still well-formed JSON), [G48] (the
+sibling from the same feature, where the unreal thing is an injected domain
+*value* rather than a measured count). Partly lintable: a measurement helper
+that refuses to report unless a named control row is non-zero would close it
+mechanically.
 
 ---
+
+## G48 — A fixture can supply a value the live resolver never produces, so a passing, mutation-checked test proves nothing about production
+
+**Trigger:** a test injects a **domain value** — a country code, currency, locale,
+status enum, MIME type — through a fake, and a branch is selected by comparing that
+value against a set. The risk is not the comparison; it is whether the upstream can
+ever hand you that value at all.
+
+**Rule:** before asserting on an injected domain value, **measure what the live
+resolver returns for that same input**, at the exact parameters production sends.
+If the two differ, the test is describing a world that does not exist. Assert on a
+value the resolver can actually emit, and if a set member turns out unreachable, say
+so where it is defined.
+
+**Why:** this failure survives every check the project already runs. The test is
+green, [G45]'s "the mutation must go red where the contract reaches it" is satisfied,
+and even [G32]'s stronger form — mutate to the *rejected* implementation and confirm
+exactly the right cases flip — passes cleanly, because the mutation and the fixture
+share the same false premise. Nothing inside the suite can see it: the suite never
+calls the resolver. Only reading real output at a real point can.
+
+**Verify:** for each injected value, issue the live request the service issues and
+compare. A set member that no live input can match is unreachable code, not tested
+code.
+
+**Evidence:** 2026-08-28, the `/test-drive` pass on issue-85 (river coverage
+disclosure). `NWPS_COVERED_COUNTRIES = new Set(['us', 'pr'])` was chosen so that Guam
+and the USVI — which NWPS does not gauge — would receive the coverage disclosure, and
+three cases at `tests/unit/river-conditions-global.test.ts` injected `'pr'`, `'vi'`
+and `'gu'` to prove it. The G32 mutation check widened the set to `{us, pr, vi, gu}`
+and turned **exactly two** red, which read as strong evidence. But
+`reverseCountry` asks Nominatim at `zoom=3`, and at country zoom OpenStreetMap
+resolves **every US territory to `us`** — on the reverse path and on the forward path
+`city_name` uses. So no live input produces `'pr'`, `'vi'` or `'gu'` for those
+coordinates: Guam and the USVI match `us`, are treated as covered, and still render
+the advice the issue was filed to remove — futile at Guam, which returns 0 gauges at
+the maximum `radius: 500`. The `'pr'` member is unreachable; Puerto Rico is covered
+because it resolves to `us`. Tracked in #86.
+
+**Status:** active. Related: [G45] (a mutation only goes red where the contract can
+reach it — this is the case where it goes red for the wrong reason), [G32] (mutating
+to the rejected implementation, which shares the fixture's premise and so cannot
+expose it), [G11] (read the real output — the only check that caught this), [G47]
+(the sibling from the same branch, where the *number* rather than the *value* was
+unreal). Not lintable: nothing in the type system distinguishes a reachable domain
+value from an unreachable one.
 
 ## Graveyard
 
