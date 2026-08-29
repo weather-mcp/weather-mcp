@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A forced `source: "noaa"` river query at Guam or the US Virgin Islands
+  now renders the NWPS coverage disclosure instead of advice that cannot
+  work.** `get_river_conditions` decided NWPS coverage from a country-code
+  set alone (`{us, pr}`), but OpenStreetMap's `reverseCountry` lookup
+  resolves every US territory to `us` at country zoom — the same code
+  Puerto Rico gets — so the set matched and the tool advised expanding the
+  search radius, even though NWPS has no gauges to find there at any
+  radius. Guam and the US Virgin Islands (verified live at St Croix) now
+  render the same "United States and Puerto Rico only" disclosure Toronto
+  and Vancouver already got in v1.25.10, naming `source: "openmeteo"` as
+  the global alternative.
+
+  **Coverage now requires both signals**: the country set and the same
+  `isInUS` bounding boxes the tool already used to route `source: "auto"`.
+  Puerto Rico and the mainland are unaffected — San Juan still returns its
+  56 NWPS gauges, and Toronto/Vancouver's routing to NWPS is untouched, so
+  they still reach the disclosure exactly as before. As a side effect, the
+  Nominatim reverse-country lookup is now skipped entirely for a point
+  outside every box, since the outcome there no longer depends on what
+  country it resolves to — one fewer rate-limited request per
+  forced-`noaa` query at a non-US point.
+
+  Files: `src/handlers/riverConditionsHandler.ts`.
+  ([#86](https://github.com/weather-mcp/weather-mcp/issues/86))
+
 ## [1.25.11] - 2026-08-29
 
 ### Fixed
