@@ -403,7 +403,12 @@ release — so the inconsistency is invisible until someone reads the file.
 
 **Verify:** set `Run all N tests` in `README.md` **and** the `N tests, 100% pass
 rate` line in `docs/README.md` to deliberately wrong numbers, then run
-`./scripts/check-doc-versions.sh` — it still reports all checks passed. (The same
+`./scripts/check-doc-versions.sh` — it still reports all checks passed.
+**Verify line re-run 2026-08-28** (openmeteo-nullable-series-types curation, on a
+tree whose count had just moved 2,809 → 2,814): both sites set to `9,999`, and
+the script still printed `✅ README.md test count: 2814`, `✅ CLAUDE.md test
+count: 2814` and `✅ All documentation checks passed!`. The trap is intact and
+unchanged. (The same
 experiment on the **badge** now correctly fails; do not use the badge to test this
 entry.)
 
@@ -1694,9 +1699,14 @@ into an integer comparison", which was right about the mechanism. `server.json`
 was byte-identical to `main` and untouched by that plan, and `main` reports the
 same ❌ from the same harness, so nothing about the branch caused it.
 
-**Status:** active. Lintable, and the better fix is in the script rather than in
-every caller: `node -p` on a bare value should be `node -e 'process.stdout.write(String(...))'`,
-or the result piped through `tr -dc '0-9'`. Until then the `env -u` invocation is
+**Status:** active. **Not re-tested 2026-08-28** (openmeteo-nullable-series-types
+T6): the run invoked the script as `env -u FORCE_COLOR` throughout and it reported
+`server.json description length: 98 (≤ 100)` correctly. That is the workaround
+working, **not** evidence the underlying bug is gone — do not read a clean run
+under `env -u` as a reason to retire this entry. Lintable, and the better fix is
+in the script rather than in every caller: `node -p` on a bare value should be
+`node -e 'process.stdout.write(String(...))'`, or the result piped through
+`tr -dc '0-9'`. Until then the `env -u` invocation is
 the workaround. Related: [G12] (the same script's silent *under*-validation — this
 entry is its mirror, a loud over-validation), [G9] and [G14] (release tooling that
 runs more than it appears to).
@@ -1866,11 +1876,31 @@ for a distance-less strike"* — so the grep returned `1` on a correct
 implementation (`76c98a4`). Zero *code* sites remained; the same grep minus
 comment lines returned `0`.
 
+**A fourth direction, found 2026-08-28** (`dc4b8be`, openmeteo-nullable-series-types
+T5): **a sibling task silently disarms a later task's grep.** The check was valid
+when the plan was written and still valid when the task ran — what changed is the
+text it greps for. T5's acceptance was
+`grep -rn "declared types say number\[\]\|trusting the declared" src/` returning
+nothing, to prove three stale comments had been rewritten. T1 had earlier moved
+one of those comments above a new `import` and **reflowed it**, putting a line
+break between `trusting` and `the declared` — so the pattern no longer matched
+that file at all, and the grep would have reported clean while the stale comment
+stood. Caught by grepping the **construct** the comment is about
+(`declared \`number\[\]\``) rather than the plan's literal prose.
+
+The general rule: **an acceptance grep keyed to a prose phrase is fragile against
+reflow, and any earlier task that touches the same comment can break it.** Key
+acceptance greps to code constructs, or to a phrase short enough to survive
+rewrapping, and re-run the check against a state you know should fail it — here,
+the un-rewritten comment.
+
 **Status:** active. Lint candidate on the vacuous half — a plan-authoring check
 could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
 contains a file marked **new**. Related: [G10] (prove the hash is not vacuous —
 same family, a check that cannot fail is not evidence), [G40] (a plan's claim
-about test coverage is a grep, and greps are what this entry is about).
+about test coverage is a grep, and greps are what this entry is about), [G49] (a
+citation that drifts under an earlier edit — the same cross-task staleness, in a
+document rather than a check).
 
 ---
 
@@ -2269,6 +2299,94 @@ behaviour — the same class, one level up: a document asserting what it did not
 measure). Not lintable, but nearly so: a checker that greps each `path.ts:NNN`
 citation in the roadmap and reports the ones whose line no longer holds the named
 construct would catch every instance of this.
+
+
+## G50 — A task's temporary verification write counts against `parallel-safe`, and its backup path must be task-scoped
+
+**Trigger:** two tasks marked `parallel-safe` on disjoint `Files:` lists, where
+either one's self-check temporarily edits, generates, or restores a live
+worktree file that appears in **neither** list — the classic case being "widen
+the type file, run `tsc`, restore it".
+
+**Rule:** put temporary verification writes and their backup paths in the
+parallel touch-set. Serialize the tasks, or give each an isolated worktree.
+Back up to a **task-scoped `mktemp`** restored by a shell `trap`, never a
+shared literal path:
+
+```bash
+BACKUP=$(mktemp); trap 'cp "$BACKUP" <file>; rm -f "$BACKUP"' EXIT
+cp <file> "$BACKUP"
+```
+
+Confirm the restore landed (`git diff --quiet <file>`) before handing back, and
+run nothing else against the worktree while the mutation is in flight.
+
+**Why:** two failure modes, both quiet. A sibling task's gate observes the
+transient state and goes **red on work that is correct** — here the widened type
+file reports 59 errors tree-wide. And two overlapping backup/restore loops
+sharing one path can restore an already-mutated backup, leaving the mutation in
+the worktree permanently, where the next commit sweeps it up. The reader's
+disjointness test passes on a false reading, because the mutated file is in
+neither `Files:` list — which is exactly what makes this worth an entry rather
+than leaving it to judgment.
+
+**Verify:** take any plan whose task self-check mutates a shared file, and check
+whether that file appears in the task's `Files:` list. If it does not, the
+`parallel-safe` marker was decided on incomplete information.
+
+**Evidence:** filed as a candidate by the Codex plan review of
+openmeteo-nullable-series-types (2026-08-28), which found T2 and T3 marked
+`parallel-safe` while both rewrote `src/types/openmeteo.ts` through a shared
+literal `/tmp-backup`. Triage found that path **unwritable in this environment**
+(`/tmp-backup` is at the filesystem root), so the self-check could not have run
+at all — a second, independent reason the literal path is wrong. Confirmed in
+the run: serialized T2→T3→T4 with `mktemp`+`trap` backups, and every restore
+verified clean (`7e946d7`, `8b87f0b`, `dc4b8be`). This project had already lost
+orchestrator edits once to a subagent mutating the shared tree.
+
+**Status:** active. Related: [G27] (restore by file copy, never `git checkout --`
+— the same backup discipline for the uncommitted-fix case).
+
+---
+
+## G51 — Widening a type does not make a value newly reachable; it only stops the compiler denying it
+
+**Trigger:** landing a null-guard, range-guard, or variant-guard ahead of the
+type change that will admit the value — and reasoning about when the guard
+"becomes live".
+
+**Rule:** a declaration is a claim about the wire, not a control over it. If the
+upstream already sends the value, the guard is load-bearing **the moment it
+lands**, and the type change only stops the compiler certifying the old code as
+safe. Never describe a guard as "not yet reachable until the types widen", and
+never defer landing one on that reasoning.
+
+**Why:** the inference is seductive precisely on the plans where it is most
+wrong. On a type-honesty plan the guards land first (so every commit stays
+green) and the widening lands last as the completeness proof, so a builder sees
+"my guard compiles against `number[]`" and concludes nothing can reach it yet.
+The opposite is true: the reason the plan exists is that the wire has been
+sending `null` all along while the type denied it, and the guard is what stops
+`Math.round(null)` rendering a fabricated `0`. Believing the guard is inert
+invites skipping its live verification, or writing a changelog sentence in the
+future tense for behaviour that is already live.
+
+**Verify:** for the value in question, issue the request production issues and
+read the raw upstream body — not the parsed object, whose type is the thing in
+question. If the wire carries the value, reachability predates the declaration.
+
+**Evidence:** 2026-08-28 (`04765a3`, openmeteo-nullable-series-types T4). The
+builder's own Surprises section reported that its live probe returned non-null
+temperatures, then concluded *"nothing in the current build makes a null value
+reach these lines yet — this becomes reachable once T5 lands the wider types"*.
+Open-Meteo answers HTTP 200 with JSON `null` past a model's horizon regardless
+of what `src/types/openmeteo.ts` says; T5 changed what the compiler permits,
+never what the wire sends.
+
+**Status:** active. Related: [G48] (a fixture can supply a value the live
+resolver never produces — this is that entry read backwards: the live resolver
+produces a value the *type* denies), [G11] (read the real output). Not
+lintable — it is a claim about the upstream, not about the code.
 
 ## Graveyard
 
