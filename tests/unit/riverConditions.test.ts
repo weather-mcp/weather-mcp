@@ -17,6 +17,25 @@ import {
 import { RateLimitError } from '../../src/errors/ApiError.js';
 import type { GaugeStatus, NWPSGauge, HistoricCrest, StageFlowDataPoint, FloodCategories } from '../../src/types/noaa.js';
 
+/**
+ * `flood` now reaches the renderer ONLY from the per-gauge detail endpoint
+ * (`getNWPSGauge`); the bounding-box response has never carried it. These builders
+ * put `flood` on the gauge they hand to the bbox mock, so the detail mock hands the
+ * same object back — the enriched path is then the one under test, rather than a
+ * silently inert call whose rejection `Promise.allSettled` would swallow.
+ */
+function detailFromBbox(bboxMock: ReturnType<typeof vi.fn>): ReturnType<typeof vi.fn> {
+  return vi.fn().mockImplementation(async (lid: string) => {
+    const lastCall = bboxMock.mock.results.at(-1);
+    const gauges = (lastCall ? await lastCall.value : []) as NWPSGauge[];
+    const found = gauges.find(g => g.lid === lid);
+    if (!found) {
+      throw new Error(`no detail response for ${lid}`);
+    }
+    return found;
+  });
+}
+
 function status(overrides: Partial<GaugeStatus> = {}): GaugeStatus {
   return {
     primary: 4.2,
@@ -83,7 +102,11 @@ describe('handleGetRiverConditions', () => {
   const BASE_LON = -71.0589;
 
   const getNWPSGaugesInBoundingBoxMock = vi.fn();
-  const noaaService = { getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock } as never;
+  const getNWPSGaugeMock = detailFromBbox(getNWPSGaugesInBoundingBoxMock);
+  const noaaService = {
+    getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+    getNWPSGauge: getNWPSGaugeMock
+  } as never;
   const locationStore = {} as never;
   const geocodingService = {} as never;
   // US coordinates route to NOAA, so the Open-Meteo service is never consulted here.
@@ -346,9 +369,11 @@ describe('handleGetRiverConditions observed trend', () => {
 
   const getNWPSGaugesInBoundingBoxMock = vi.fn();
   const getNWPSStageFlowMock = vi.fn();
+  const getNWPSGaugeMock = detailFromBbox(getNWPSGaugesInBoundingBoxMock);
   const noaaService = {
     getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
-    getNWPSStageFlow: getNWPSStageFlowMock
+    getNWPSStageFlow: getNWPSStageFlowMock,
+    getNWPSGauge: getNWPSGaugeMock
   } as never;
 
   beforeEach(() => {
@@ -447,9 +472,11 @@ describe('handleGetRiverConditions forecast series (detail="full")', () => {
 
   const getNWPSGaugesInBoundingBoxMock = vi.fn();
   const getNWPSStageFlowMock = vi.fn();
+  const getNWPSGaugeMock = detailFromBbox(getNWPSGaugesInBoundingBoxMock);
   const noaaService = {
     getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
-    getNWPSStageFlow: getNWPSStageFlowMock
+    getNWPSStageFlow: getNWPSStageFlowMock,
+    getNWPSGauge: getNWPSGaugeMock
   } as never;
 
   beforeEach(() => {
@@ -623,7 +650,11 @@ describe('handleGetRiverConditions flood stages and crests (T2)', () => {
   const BASE_LON = -71.0589;
 
   const getNWPSGaugesInBoundingBoxMock = vi.fn();
-  const noaaService = { getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock } as never;
+  const getNWPSGaugeMock = detailFromBbox(getNWPSGaugesInBoundingBoxMock);
+  const noaaService = {
+    getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+    getNWPSGauge: getNWPSGaugeMock
+  } as never;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -728,7 +759,8 @@ describe('handleGetRiverConditions flood stages and crests (T2)', () => {
     });
     const noaaServiceWithStageFlow = {
       getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
-      getNWPSStageFlow: getNWPSStageFlowMock
+      getNWPSStageFlow: getNWPSStageFlowMock,
+      getNWPSGauge: detailFromBbox(getNWPSGaugesInBoundingBoxMock)
     } as never;
 
     const seriesResult = await handleGetRiverConditions(

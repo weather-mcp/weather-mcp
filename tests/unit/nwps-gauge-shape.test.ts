@@ -39,14 +39,19 @@ const KCMO3 = loadGauge('KCMO3');
 /**
  * Run the captured gauge straight through the public handler. The gauge's own
  * coordinates are used as the query point (distance 0), so the default 50 km
- * radius never filters it out and no `radius` override is needed. T3 has not
- * wired the per-gauge detail call yet, so the bounding-box mock is made to
- * hand back the capture's `flood` object intact — this locks the render
- * against real bytes, not the eventual wiring.
+ * radius never filters it out and no `radius` override is needed.
+ *
+ * This reproduces the production split exactly: the bounding-box response is
+ * served WITHOUT a `flood` object — which is the defect issue #84 is about, the
+ * list endpoint has never carried one — and the capture's `flood` arrives only
+ * from `getNWPSGauge`, the per-gauge detail endpoint. So these assertions cover
+ * the fetch and the render together, over real bytes.
  */
 async function renderCapture(gauge: NWPSGauge): Promise<string> {
+  const { flood: _flood, ...bboxGauge } = gauge;
   const noaaService = {
-    getNWPSGaugesInBoundingBox: vi.fn().mockResolvedValue([gauge])
+    getNWPSGaugesInBoundingBox: vi.fn().mockResolvedValue([bboxGauge]),
+    getNWPSGauge: vi.fn().mockResolvedValue(gauge)
   } as never;
 
   const result = await handleGetRiverConditions(

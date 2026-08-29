@@ -116,6 +116,15 @@ const FLOOD_LEVEL_LABELS: ReadonlyArray<readonly [keyof FloodCategories, string]
   ['major', 'Major Flood']
 ];
 
+/**
+ * One settled result from the per-gauge batch. The two calls are tagged and carry
+ * their own lid rather than being matched by array position, so one rejection can
+ * never be mistaken for the other's result.
+ */
+type GaugeFetchOutcome =
+  | { kind: 'stageflow'; lid: string; stageflow: NWPSStageFlowResponse }
+  | { kind: 'detail'; lid: string; detail: NWPSGauge };
+
 export interface StageTrend {
   direction: 'rising' | 'falling' | 'steady';
   delta: number; // ft, latest minus baseline
@@ -331,24 +340,56 @@ async function formatNOAARiverConditions(
       const crestCap = detail === 'full' ? 25 : 3;
       const gaugesToShow = gaugesWithDistance.slice(0, maxGaugesToShow);
 
-      // Fetch each shown gauge's stage/flow series for the observed trend
-      // (30-min cache in the service). Nearest-first in small batches; NWPS
-      // rate-limits (429s observed live), so stop asking after the first
-      // rate-limit rejection — any gauge without a series just shows no trend.
+      // Fetch each shown gauge's stage/flow series for the observed trend (30-min
+      // cache in the service) and its per-gauge detail, which is the only endpoint
+      // carrying flood-stage thresholds and crests — the bounding-box list response
+      // has no `flood` object at all. Both calls go in the same batch so they
+      // overlap rather than doubling wall-clock, and they share one rate-limit
+      // state: a 429 from either stops asking for both.
+      //
+      // Nearest-first in small batches; NWPS rate-limits (429s observed live), so
+      // stop after the first rate-limit rejection. Thresholds are garnish (D6) — a
+      // gauge whose detail call failed renders exactly as it does today: no
+      // threshold section, no crest section, and NOAA's own **Flood Category:**
+      // line, which comes from the bbox response, intact. No retries: these
+      // methods do not route through `makeRequest` and must not gain any.
       const stageflowByLid = new Map<string, NWPSStageFlowResponse>();
+      const floodByLid = new Map<string, NWPSGauge['flood']>();
       for (let i = 0; i < gaugesToShow.length; i += TREND_FETCH_BATCH) {
         const batch = gaugesToShow.slice(i, i + TREND_FETCH_BATCH);
+        // Each call is settled independently and carries its own lid, so a rejected
+        // detail call can never suppress the same gauge's trend, or vice versa. The
+        // async wrappers matter: they turn a synchronous throw (a service missing
+        // the method) into a rejection this batch swallows, rather than one that
+        // escapes into the handler's catch and replaces the whole gauge list with
+        // an error block.
         const results = await Promise.allSettled(
-          batch.map(async ({ gauge }) => noaaService.getNWPSStageFlow(gauge.lid))
+          batch.flatMap(({ gauge }) => [
+            (async (): Promise<GaugeFetchOutcome> => ({
+              kind: 'stageflow',
+              lid: gauge.lid,
+              stageflow: await noaaService.getNWPSStageFlow(gauge.lid)
+            }))(),
+            (async (): Promise<GaugeFetchOutcome> => ({
+              kind: 'detail',
+              lid: gauge.lid,
+              detail: await noaaService.getNWPSGauge(gauge.lid)
+            }))()
+          ])
         );
         let rateLimited = false;
-        results.forEach((result, j) => {
+        for (const result of results) {
           if (result.status === 'fulfilled') {
-            stageflowByLid.set(batch[j].gauge.lid, result.value);
+            const outcome = result.value;
+            if (outcome.kind === 'stageflow') {
+              stageflowByLid.set(outcome.lid, outcome.stageflow);
+            } else {
+              floodByLid.set(outcome.lid, outcome.detail.flood);
+            }
           } else if (result.reason instanceof RateLimitError) {
             rateLimited = true;
           }
-        });
+        }
         if (rateLimited) {
           break;
         }
@@ -360,7 +401,14 @@ async function formatNOAARiverConditions(
         // detail levels the existing single-point Forecast block is byte-identical to
         // pre-T7 behavior.
         const forecastSeries = detail === 'full' ? stageflowByLid.get(gauge.lid)?.forecast?.data : undefined;
-        output += formatGaugeDetails(gauge, distance, timezone, crestCap, trend, forecastSeries);
+        // G7 — spread the BBOX gauge and take ONLY `flood` from the detail response.
+        // Never `{ ...detail }` and never mutate the gauge in the bbox array: that
+        // array is cached for 24h and the detail response is too, while both carry
+        // `status.observed`/`status.forecast`, which are per-refresh state on a
+        // 30-minute cache. Importing the detail response's status would freeze a
+        // 30-minute observation into a 24-hour entry.
+        const enriched: NWPSGauge = { ...gauge, flood: floodByLid.get(gauge.lid) };
+        output += formatGaugeDetails(enriched, distance, timezone, crestCap, trend, forecastSeries);
       }
 
       if (gaugesWithDistance.length > maxGaugesToShow) {

@@ -37,9 +37,23 @@ const FORECAST_SERIES_CAP = 80;
 
 const getNWPSGaugesInBoundingBoxMock = vi.fn();
 const getNWPSStageFlowMock = vi.fn();
+// `flood` now reaches the renderer only from the per-gauge detail endpoint, so the
+// detail mock hands back the same gauge the bbox mock produced. Without it the
+// thresholds never arrive and every seam row in this file degenerates to "no
+// category" — which is exactly the silent inertness this wiring exists to prevent.
+const getNWPSGaugeMock = vi.fn().mockImplementation(async (lid: string) => {
+  const lastCall = getNWPSGaugesInBoundingBoxMock.mock.results.at(-1);
+  const gauges = (lastCall ? await lastCall.value : []) as NWPSGauge[];
+  const found = gauges.find(g => g.lid === lid);
+  if (!found) {
+    throw new Error(`no detail response for ${lid}`);
+  }
+  return found;
+});
 const noaaService = {
   getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
-  getNWPSStageFlow: getNWPSStageFlowMock
+  getNWPSStageFlow: getNWPSStageFlowMock,
+  getNWPSGauge: getNWPSGaugeMock
 } as never;
 
 beforeEach(() => {
