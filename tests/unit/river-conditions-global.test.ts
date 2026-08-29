@@ -44,6 +44,15 @@ const MEMPHIS = { latitude: 35.15, longitude: -90.05 };
 const TORONTO = { latitude: 43.65, longitude: -79.38 };
 /** San Juan, Puerto Rico — NWPS-covered territory. */
 const PUERTO_RICO_POINT = { latitude: 18.4655, longitude: -66.1057 };
+/**
+ * Punta Agujereada — the northwest tip of Puerto Rico's main island, and its
+ * northernmost land at 18.5208 N. Above the `isInUS` Puerto Rico box's original
+ * 18.5 N edge, so it is the point that proved the box had to be widened once the
+ * box began deciding a rendered coverage claim (diff-review MAJOR-1).
+ */
+const PUERTO_RICO_NORTHWEST_TIP = { latitude: 18.5208, longitude: -67.15 };
+/** Mona Island, Puerto Rico — west of the box's original −67.3 edge. */
+const MONA_ISLAND = { latitude: 18.09, longitude: -67.89 };
 /** St. Croix, US Virgin Islands — NIFC-covered but NOT NWPS-covered (D4). */
 const VIRGIN_ISLANDS_POINT = { latitude: 17.7333, longitude: -64.7833 };
 /** Hagåtña, Guam — NIFC-covered but NOT NWPS-covered (D4). */
@@ -779,6 +788,39 @@ describe('handleGetRiverConditions — territory disclosure at the live-reachabl
 
     expect(fakes.nominatim.reverseCountry).not.toHaveBeenCalled();
     expect(text).toContain('United States and Puerto Rico only');
+  });
+
+  it('renders the advice, not the disclosure, at the northwest tip of Puerto Rico (18.5208 N)', async () => {
+    // Regression lock for diff-review MAJOR-1. The both-signals predicate made `isInUS`
+    // decide a rendered claim, and the Puerto Rico box used to stop at 18.5 N — short of
+    // Punta Agujereada at 18.5208 N. A forced `noaa` call with a radius smaller than the
+    // nearest gauge (live: 14.0 km) then told a caller standing in Puerto Rico that
+    // Puerto Rico "appears to be outside that coverage", and pointed them at Open-Meteo
+    // instead of at the widened radius that would have worked.
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'us');
+
+    const result = await callRiverConditions(
+      { ...PUERTO_RICO_NORTHWEST_TIP, radius: 10, source: 'noaa' },
+      fakes
+    );
+    const text = textOf(result);
+
+    expect(text).toContain('ℹ️ **No river gauges found within 10 km**');
+    expect(text).toContain('Try expanding the search radius');
+    expect(text).not.toContain('United States and Puerto Rico only');
+    expect(text).not.toContain('not an all-clear');
+  });
+
+  it('renders the advice at Mona Island, Puerto Rico (west of the old −67.3 box edge)', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'us');
+
+    const result = await callRiverConditions({ ...MONA_ISLAND, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('Try expanding the search radius');
+    expect(text).not.toContain('United States and Puerto Rico only');
   });
 
   it('positive control: reaches the reverse-country lookup exactly once at Memphis (inside the CONUS box)', async () => {

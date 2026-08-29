@@ -324,7 +324,15 @@ export function isInUS(latitude: number, longitude: number): boolean {
   const inContinentalUS = latitude >= 24.5 && latitude <= 49.4 && longitude >= -125 && longitude <= -66.9;
   const inAlaska = latitude >= 51 && latitude <= 71.4 && longitude >= -180 && longitude <= -129.9;
   const inHawaii = latitude >= 18.9 && latitude <= 28.5 && longitude >= -178.4 && longitude <= -154.8;
-  const inPuertoRico = latitude >= 17.9 && latitude <= 18.5 && longitude >= -67.3 && longitude <= -65.2;
+  // Puerto Rico, to the Commonwealth's real extent rather than the main island's populated
+  // middle. The earlier 17.9–18.5 N / −67.3 W box cut off the northwest tip (Punta Agujereada
+  // reaches 18.5208 N), Isla Caja de Muertos in the south (17.88 N), and both offshore islands
+  // (Mona −67.89, Desecheo −67.48). That was tolerable while this predicate only *routed*, but
+  // get_river_conditions now renders a coverage disclosure naming Puerto Rico from it, and a
+  // point in Puerto Rico must never be told it is outside a service that gauges Puerto Rico.
+  // The west edge stops at −67.95, ~39 km east of the Dominican Republic's −68.32 extreme; the
+  // east edge stays at −65.2 so St Croix (−64.78) and the BVI remain correctly excluded.
+  const inPuertoRico = latitude >= 17.85 && latitude <= 18.55 && longitude >= -67.95 && longitude <= -65.2;
 
   return inContinentalUS || inAlaska || inHawaii || inPuertoRico;
 }

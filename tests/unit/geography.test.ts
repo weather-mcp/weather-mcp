@@ -179,6 +179,41 @@ describe('Geography Utilities', () => {
       expect(isInUS(18.4655, -66.1057)).toBe(true);
     });
 
+    // The Commonwealth's extremes, not just its populated middle. get_river_conditions
+    // renders a disclosure naming Puerto Rico from this predicate, so a box that stops
+    // short of the island tells a caller in Puerto Rico that Puerto Rico is not covered.
+    it('should detect the northwest tip of Puerto Rico (Punta Agujereada, 18.5208 N)', () => {
+      // Northernmost land of the main island — above the old 18.5 N edge. NWPS has 13
+      // gauges within 50 km of here, nearest at 14.0 km.
+      expect(isInUS(18.5208, -67.15)).toBe(true);
+    });
+
+    it('should detect Mona Island, Puerto Rico (−67.89 W)', () => {
+      // West of the old −67.3 edge, and still well east of the Dominican Republic.
+      expect(isInUS(18.09, -67.89)).toBe(true);
+    });
+
+    it('should detect Isla Caja de Muertos, Puerto Rico (17.88 N)', () => {
+      // South of the old 17.9 N edge.
+      expect(isInUS(17.88, -66.52)).toBe(true);
+    });
+
+    it('should still exclude St Croix, US Virgin Islands (−64.78 W)', () => {
+      // The widened Puerto Rico box must not swallow the USVI: NWPS gauges 0 rivers
+      // there, so it has to keep reaching the coverage disclosure (issue #86).
+      expect(isInUS(17.7333, -64.7833)).toBe(false);
+    });
+
+    it('should still exclude the British Virgin Islands (Tortola)', () => {
+      // Not US at all; east of the unchanged −65.2 edge.
+      expect(isInUS(18.4207, -64.64)).toBe(false);
+    });
+
+    it('should still exclude the eastern Dominican Republic (Punta Cana)', () => {
+      // −68.37 is west of the widened −67.95 edge, so the Mona Passage is not crossed.
+      expect(isInUS(18.582, -68.4055)).toBe(false);
+    });
+
     it('should return false for London, UK', () => {
       expect(isInUS(51.5074, -0.1278)).toBe(false);
     });

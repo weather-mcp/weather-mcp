@@ -23,16 +23,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **Coverage now requires both signals**: the country set and the same
   `isInUS` bounding boxes the tool already used to route `source: "auto"`.
-  Puerto Rico and the mainland are unaffected — San Juan still returns its
-  56 NWPS gauges, and Toronto/Vancouver's routing to NWPS is untouched, so
-  they still reach the disclosure exactly as before. As a side effect, the
-  Nominatim reverse-country lookup is now skipped entirely for a point
-  outside every box, since the outcome there no longer depends on what
-  country it resolves to — one fewer rate-limited request per
-  forced-`noaa` query at a non-US point.
+  The mainland is unaffected, San Juan still returns its 56 NWPS gauges,
+  and Toronto/Vancouver's routing to NWPS is untouched, so they still
+  reach the disclosure exactly as before. As a side effect, the Nominatim
+  reverse-country lookup is now skipped entirely for a point outside every
+  box, since the outcome there no longer depends on what country it
+  resolves to — one fewer rate-limited request per forced-`noaa` query at
+  a non-US point.
 
   Files: `src/handlers/riverConditionsHandler.ts`.
   ([#86](https://github.com/weather-mcp/weather-mcp/issues/86))
+
+- **Puerto Rico's outlying coast and islands are recognized as US again.**
+  Making the `isInUS` bounding boxes decide the river disclosure above
+  promoted them from a routing hint to a rendered claim, and the Puerto
+  Rico box covered only the island's populated middle. A forced
+  `source: "noaa"` query at Punta Agujereada — the northwest tip, 18.5208 N,
+  above the box's old 18.5 N edge — with a radius smaller than the nearest
+  gauge answered *"NWPS gauges rivers in the United States and Puerto Rico
+  only, and this location appears to be outside that coverage"*, at a point
+  in Puerto Rico with 13 NWPS gauges inside 50 km and the nearest at 14 km.
+  The box now spans the Commonwealth's real extent (17.85–18.55 N,
+  −67.95 to −65.2 W), taking in that tip, Isla Caja de Muertos in the
+  south, and Mona and Desecheo to the west.
+
+  Because `isInUS` is shared, `source: "auto"` at those same coordinates
+  now routes to NOAA rather than Open-Meteo for forecasts, current
+  conditions, historical weather, alerts, wildfire and climate normals —
+  the authority those points should have had all along. The east edge is
+  unchanged, so St Croix and the British Virgin Islands stay outside and
+  the territory disclosure above still renders there.
+
+  Files: `src/utils/geography.ts`. Pinned by
+  `tests/unit/geography.test.ts` (six box-edge cases) and
+  `tests/unit/river-conditions-global.test.ts` (Punta Agujereada and Mona
+  Island render the radius advice, not the disclosure).
 
 ## [1.25.11] - 2026-08-29
 
