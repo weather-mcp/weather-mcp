@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.12] - 2026-08-29
+
 ### Fixed
 
 - **A forced `source: "noaa"` river query at Guam or the US Virgin Islands
@@ -1550,7 +1552,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.11...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.12...HEAD
+[1.25.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.11...v1.25.12
 [1.25.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.10...v1.25.11
 [1.25.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.9...v1.25.10
 [1.25.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.8...v1.25.9
