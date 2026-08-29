@@ -858,7 +858,12 @@ function formatGaugeDetails(
       if (Number.isNaN(crestDate.getTime())) continue;
 
       let row = `- **${crestDate.getFullYear()}:** ${crest.stage.toFixed(2)} ${stageUnits}`;
-      if (isRealValue(crest.flow)) {
+      // NWPS encodes an unrecorded crest flow as BOTH -9999 and 0 — 20 of PRTO3's 26
+      // recent crests carry `flow: 0`, including the 1996 flood at 28.55 ft. A river
+      // crest is a peak, so a zero flow is never a real measurement, only a missing
+      // one. The pre-fix truthy check suppressed these by luck; `isRealValue` alone
+      // would un-suppress them and print `(0 cfs)` on two thirds of the rows.
+      if (isRealValue(crest.flow) && crest.flow !== 0) {
         row += ` (${crest.flow.toFixed(0)} ${flowUnits})`;
       }
       crestRows.push(row);
