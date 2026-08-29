@@ -18,10 +18,10 @@ import type { NCEIService } from '../services/ncei.js';
 import { logger } from './logger.js';
 import { isInUS } from './geography.js';
 /**
- * Open-Meteo's JSON `null`s (and a missing/short array) both read as "no
- * sample" through `finiteSampleAt` — `typeof`-narrowed rather than trusting
- * the declared `number[]` type, mirroring `modelComparison.ts`'s
- * `extractModelSeries` guard. This is the D2 fix: the prior compute
+ * The daily series are declared `(number | null)[]`, as Open-Meteo sends them.
+ * `finiteSampleAt` turns a published `null` — and a missing or short array —
+ * into "no sample", mirroring `modelComparison.ts`'s `extractModelSeries`
+ * guard. This is the D2 fix: the prior compute
  * (`computeNormalsFrom30YearData`) filtered on `!== undefined` only, so a JSON
  * `null` reached `reduce` and `sum + null` coerced to `+ 0`, dragging every
  * mean down.

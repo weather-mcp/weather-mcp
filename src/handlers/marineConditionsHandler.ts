@@ -349,10 +349,11 @@ function formatOpenMeteoMarineConditions(
     const daily = data.daily;
     const requestedDays = daily.time.length;
 
-    // The declared types say number[], but past the marine model's real
-    // horizon (~10 days) the API pads the arrays with nulls — which would
-    // render as "0 m (Calm)" days. Treat anything non-finite as missing;
-    // a day with no finite wave_height_max is a no-data day.
+    // The series are declared (number | null)[], because past the marine
+    // model's real horizon (~10 days) the API pads the arrays with nulls —
+    // which would render as "0 m (Calm)" days. finiteSampleAt turns a
+    // published null into "no sample"; a day with no finite wave_height_max
+    // is a no-data day.
 
     // Trim trailing no-data days (nulls past the model horizon)
     let lastIdx = requestedDays - 1;

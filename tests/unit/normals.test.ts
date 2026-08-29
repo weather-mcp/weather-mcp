@@ -24,9 +24,8 @@ import { METRIC_PREFERENCES } from '../../src/config/units.js';
  * row per array element, dated against a distinct fabricated year so the
  * function under test never sees duplicate dates.
  *
- * The declared `OpenMeteoDailyData` fields are typed `number[]`, but the
- * real API can return `null`s; the fixture is cast at the end (the
- * `marine-forecast.test.ts` precedent) so tests can express that directly.
+ * The `OpenMeteoDailyData` series are declared `(number | null)[]`, matching
+ * what the real API sends, so a null-bearing fixture needs no cast.
  */
 function buildNormalsFixture(
   entries: Record<string, { high: (number | null)[]; low: (number | null)[]; precip: (number | null)[] }>
@@ -63,7 +62,7 @@ function buildNormalsFixture(
       temperature_2m_min,
       precipitation_sum
     }
-  } as unknown as OpenMeteoHistoricalResponse;
+  };
 }
 
 /** Repeat a value `n` times into an array — shorthand for uniform fixtures. */
