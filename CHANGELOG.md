@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.11] - 2026-08-29
+
 ### Fixed
 
 - **A weather value the model did not publish is now omitted, instead of being
@@ -20,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   temperature line rather than the one missing half. Each value now stands or
   falls on its own — a present value renders exactly as before, and an absent
   one is simply left out.
+
+  **An ordinary forecast looks the same as it did.** Open-Meteo's default
+  forecast publishes every sample, so nothing changes for a plain
+  `get_forecast` request; the fix shows itself where nulls are actually
+  published — a single model past its horizon under `compare_models` or
+  `ensemble_spread`, and marine conditions at an inland or unmodelled point.
 
 ## [1.25.10] - 2026-08-28
 
@@ -1483,7 +1491,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.10...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.11...HEAD
+[1.25.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.10...v1.25.11
 [1.25.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.9...v1.25.10
 [1.25.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.8...v1.25.9
 [1.25.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.7...v1.25.8

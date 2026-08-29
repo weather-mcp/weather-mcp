@@ -182,6 +182,13 @@ reason it strips `compare_models`.
 - Snow and ice accumulation forecasts (when available)
 - All timestamps in local timezone
 
+A value the model did not publish is omitted rather than rendered as zero. On
+the Open-Meteo path a sample past a model's horizon or outside its coverage
+comes back as JSON `null`; that line is simply left out, and a High/Low pair
+missing one half still shows the half that exists. This is visible mainly under
+`compare_models` and `ensemble_spread`, where an individual model can drop out
+for a day — the default forecast publishes every sample.
+
 ### 2. get_current_conditions
 Get current weather conditions for a location (global).
 
