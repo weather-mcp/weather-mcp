@@ -22,6 +22,7 @@ import {
   type NOAAMarineConditions
 } from '../utils/marine.js';
 import { shouldUseNOAAMarine } from '../utils/geography.js';
+import { finiteSampleAt } from '../utils/finiteSample.js';
 import type { OpenMeteoMarineResponse } from '../types/openmeteo.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
@@ -352,14 +353,10 @@ function formatOpenMeteoMarineConditions(
     // horizon (~10 days) the API pads the arrays with nulls — which would
     // render as "0 m (Calm)" days. Treat anything non-finite as missing;
     // a day with no finite wave_height_max is a no-data day.
-    const finiteAt = (values: number[] | undefined, i: number): number | undefined => {
-      const value = values?.[i];
-      return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-    };
 
     // Trim trailing no-data days (nulls past the model horizon)
     let lastIdx = requestedDays - 1;
-    while (lastIdx >= 0 && finiteAt(daily.wave_height_max, lastIdx) === undefined) {
+    while (lastIdx >= 0 && finiteSampleAt(daily.wave_height_max, lastIdx) === undefined) {
       lastIdx--;
     }
 
@@ -375,7 +372,7 @@ function formatOpenMeteoMarineConditions(
 
         output += `**${dayName}:**\n`;
 
-        const maxWaveHeight = finiteAt(daily.wave_height_max, i);
+        const maxWaveHeight = finiteSampleAt(daily.wave_height_max, i);
         if (maxWaveHeight === undefined) {
           // Interior gap in the model data
           output += `  • No marine data available for this day\n\n`;
@@ -385,22 +382,22 @@ function formatOpenMeteoMarineConditions(
         const category = getWaveHeightCategory(maxWaveHeight);
         output += `  • Max Wave Height: ${formatWaveHeight(maxWaveHeight)} (${category.description})\n`;
 
-        const waveDirection = finiteAt(daily.wave_direction_dominant, i);
+        const waveDirection = finiteSampleAt(daily.wave_direction_dominant, i);
         if (waveDirection !== undefined) {
           output += `  • Wave Direction: ${formatDirection(waveDirection)}\n`;
         }
 
-        const wavePeriod = finiteAt(daily.wave_period_max, i);
+        const wavePeriod = finiteSampleAt(daily.wave_period_max, i);
         if (wavePeriod !== undefined) {
           output += `  • Max Wave Period: ${formatWavePeriod(wavePeriod)}\n`;
         }
 
         // Show swell info if significant
-        const swellHeight = finiteAt(daily.swell_wave_height_max, i);
+        const swellHeight = finiteSampleAt(daily.swell_wave_height_max, i);
         if (swellHeight !== undefined && swellHeight > 0.5) {
           output += `  • Swell Height: ${formatWaveHeight(swellHeight)}\n`;
 
-          const swellDirection = finiteAt(daily.swell_wave_direction_dominant, i);
+          const swellDirection = finiteSampleAt(daily.swell_wave_direction_dominant, i);
           if (swellDirection !== undefined) {
             output += `  • Swell Direction: ${formatDirection(swellDirection)}\n`;
           }
