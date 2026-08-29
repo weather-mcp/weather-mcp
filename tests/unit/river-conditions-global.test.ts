@@ -646,12 +646,24 @@ describe('handleGetRiverConditions — in-coverage empty result stays byte-ident
  * and at country zoom OpenStreetMap resolves every US territory to `us` — never `gu`,
  * `vi` or `pr` — on the reverse path and on the forward path that `city_name` /
  * `save_location` use (measured live 2026-08-28 by the issue-85 test drive, and again
- * 2026-08-29 for issue #86). So this block is kept as a **seam pin on the set's
- * contents** (G32) — proof `NWPS_COVERED_COUNTRIES` distinguishes `pr` from `vi`/`gu`
- * as written — and must not be read as a description of production. Production
- * behaviour for these same three points, injecting the value the resolver actually
- * returns there (`us`), is pinned by the "territory disclosure at the live-reachable
- * country value" block below.
+ * 2026-08-29 for issue #86). So this block must not be read as a description of
+ * production. Production behaviour for these same three points, injecting the value
+ * the resolver actually returns there (`us`), is pinned by the "territory disclosure
+ * at the live-reachable country value" block below.
+ *
+ * **Measure what this block still pins, and do not overstate it** (G32, G54). Under the
+ * both-signals predicate it pins the set's *inclusion* of `pr` and nothing else:
+ *
+ * - Drop `pr` from `NWPS_COVERED_COUNTRIES` → the `pr` case below goes red (1 red).
+ * - Widen the set to the wildfire tool's `{us, pr, vi, gu}` — the very alternative the
+ *   handler comment says it is "deliberately NOT" — and the whole file stays **green**.
+ *   `GUAM_POINT` and `VIRGIN_ISLANDS_POINT` sit outside every `isInUS` box, so
+ *   `!inUsBoxes` short-circuits and the set is never consulted there.
+ *
+ * So the exclusion of `vi`/`gu` is **not** pinned by anything, here or elsewhere; after
+ * the both-signals change those two members are simply dead. That is safe today only
+ * because the box check decides those coordinates first — which is exactly why the box
+ * has to stay correct (see the Punta Agujereada case below).
  *
  * `pr` stays in the set for the reason `NWPS_COVERED_COUNTRIES`'s own comment gives
  * (`src/handlers/riverConditionsHandler.ts:37-50`): OSM could start emitting it at

@@ -2307,9 +2307,22 @@ resolver actually emits); the three original seam cases injecting `'pr'`, `'vi'`
 and `'gu'` stayed **green**, because the mutation and those fixtures share the
 same false premise. A reviewer reading only the old block plus a green mutation
 row would still have concluded the behaviour was pinned. Both blocks are now kept
-deliberately: the injected-`pr`/`vi`/`gu` block as a seam pin on the set's
-contents, the injected-`us` block as the description of production, with a header
-comment saying which is which.
+deliberately: the injected-`us` block as the description of production, and the
+injected-`pr`/`vi`/`gu` block as a seam pin on the *inclusion* of `pr` — no more
+than that, with a header comment saying which is which.
+
+**Corrected 2026-08-29 by `/diff-review` (claude), MINOR-1.** This paragraph and
+the test header first claimed the injected-`pr`/`vi`/`gu` block was a seam pin on
+"the set's contents", i.e. proof the set distinguishes `pr` from `vi`/`gu`. A
+mutation disproved it: widening `NWPS_COVERED_COUNTRIES` to the wildfire tool's
+`{us, pr, vi, gu}` left `tests/unit/river-conditions-global.test.ts` all-green
+(**38 passed (38)** as measured at `938a8e0`), because the new `!inUsBoxes ||`
+term short-circuits at Guam and the USVI before the set is read. Dropping `pr` still goes red (1), so inclusion is
+pinned and exclusion is not. The lesson generalises past this entry and is filed as
+[G54]: **after adding a short-circuit in front of an existing condition, mutate the
+inner term and check the old block still goes red** — and where it does not, say
+which alternative became indistinguishable rather than describing the block as
+proof of the term it can no longer reach.
 
 **Status:** active — the rule, with its original instance closed. Related: [G45] (a mutation only goes red where the contract can
 reach it — this is the case where it goes red for the wrong reason), [G32] (mutating
@@ -2507,6 +2520,89 @@ construct — here the feed is healthy and the subject is fine, and it is the
 *axis* that is inert), [G47] (the numeric sibling), [G11] (reading the output is
 what exposed it). Partly lintable — a matrix helper that diffs sibling cells and
 refuses to count identical ones as separate rows would close it mechanically.
+
+## G53 — Promoting a routing heuristic to a rendered claim inherits every edge it was allowed to get wrong
+
+**Trigger:** a predicate that only ever *chose a data source* starts also deciding
+what the output *asserts* — a bounding box, a locale guess, a tier lookup that now
+selects between "here is your data" and "we do not cover you".
+
+**Rule:** re-audit the predicate's edges against the thing it is now claiming, not
+against the thing it used to route. A box that is 95% right is fine for "which
+upstream do I ask"; the wrong 5% costs one extra API call. The same box behind a
+sentence that names a jurisdiction is a false statement about that jurisdiction.
+Enumerate the extremes of every region the *rendered text* names by name, not only
+the ones the original routing cared about.
+
+**Why:** the promotion is invisible in the diff — the predicate is unchanged, only
+its consumer is new — so a reviewer checking "did `isInUS` change?" gets a clean
+answer and stops. And the plan's own safety argument reads as airtight ("this can
+only add disclosures, and only at points routing already refuses"), which is true
+and still permits a false claim, because "routed elsewhere" and "not covered" are
+different statements about the same coordinate.
+
+**Evidence:** 2026-08-29, issue-86 territory NWPS coverage, caught by
+`/diff-review` as MAJOR-1. `isInUS` (`src/utils/geography.ts`) became decisive for
+the NWPS coverage disclosure. Its Puerto Rico box stopped at `18.5 N` / `-67.3 W`;
+the island reaches `18.5208 N` (Punta Agujereada) and Mona Island sits at
+`-67.89 W`. So
+`{ latitude: 18.5208, longitude: -67.15, radius: 10, source: 'noaa' }` rendered
+"NWPS gauges rivers in the United States and **Puerto Rico** only, and this
+location appears to be outside that coverage" at a point in Puerto Rico with 13
+NWPS gauges inside 50 km and the nearest at 14.04 km — while `main` rendered the
+correct, actionable "Try expanding the search radius" for the identical call. The
+design plan checked the box edges against Key West, Eastport, Northwest Angle,
+Utqiaġvik and Adak — every CONUS and Alaska extreme — and never checked Puerto
+Rico's, the one place the sentence names. Fixed by widening the box to the
+Commonwealth's real extent (`17.85–18.55 N`, `-67.95` to `-65.2 W`).
+
+**Verify:** for each region the rendered string names, look up that region's true
+bounding extremes and evaluate the predicate at all four. Partly lintable: a
+coverage predicate and the place-names in the string it selects could be
+cross-checked against a gazetteer.
+
+**Status:** active. Related: [G48] (the same feature one level down — the resolver
+value the fixture could not produce), [G54] (the sibling from the same review —
+the short-circuit that predicate introduced), [G11] (reading the output is what
+exposes it), [G4] (empty vs not-covered are different claims).
+
+## G54 — A short-circuited term makes every test downstream of it degenerate, and the block still passes
+
+**Trigger:** adding a conjunct or disjunct in front of an existing condition —
+`!inBoxes || (existing)`, `if (!enabled) return; …` — where existing tests
+exercised the second term at inputs the first term now decides on its own.
+
+**Rule:** after adding the short-circuit, mutate the **second** term and check the
+old block still goes red. Where it does not, the old tests are no longer pinning
+what their names say; re-point them at inputs the short-circuit does not swallow,
+or relabel them for what they now cover. Do not describe them as proof of the inner
+term — write down which alternative became behaviourally indistinguishable, per
+[G32].
+
+**Why:** the block keeps passing, so nothing signals the loss. Its *comment* is
+usually rewritten in the same diff to explain why it still holds, which is the
+moment the false claim gets committed — and it is committed into a lock file, the
+artifact the next plan trusts most.
+
+**Evidence:** 2026-08-29, issue-86 territory NWPS coverage, caught by
+`/diff-review` as MINOR-1. After
+`outsideCoverage = !inUsBoxes || (countryCode !== null && !NWPS_COVERED_COUNTRIES.has(countryCode))`,
+mutating the set to `{us, pr, vi, gu}` — the NIFC set the handler comment says it
+is "deliberately NOT" — left `tests/unit/river-conditions-global.test.ts`
+all-green (**38 passed (38)** as measured at `938a8e0`), because `GUAM_POINT` and
+`VIRGIN_ISLANDS_POINT` are outside every box and never reach the set. Dropping `pr` still went red (1), so the block
+pins inclusion and not exclusion. The diff's rewritten header nevertheless called
+it "proof `NWPS_COVERED_COUNTRIES` distinguishes `pr` from `vi`/`gu` as written",
+and [G48] repeated the claim; both were corrected.
+
+**Verify:** mutate each term of the compound condition separately and record which
+tests go red per term. A term with no red is unpinned regardless of how many tests
+sit in the block.
+
+**Status:** active. Related: [G32] (mutate to every rejected implementation and
+report the divergence set), [G45] (a mutation only goes red where the contract
+reaches it), [G13] (a fixture degenerate along one axis), [G53] (the sibling from
+the same review — what the short-circuited predicate was deciding).
 
 ## Graveyard
 
