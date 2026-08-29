@@ -40,8 +40,14 @@ const NOAA_FALLBACK_NOTE =
  * Minimal Open-Meteo daily forecast response. formatOpenMeteoForecast only
  * dereferences fields that are present (all daily.* arrays are optional), so
  * a bare `time` array is enough to drive the daily branch end-to-end.
+ *
+ * `dailyOverrides` merges onto the default `daily` block (last write wins per
+ * key) so callers can inject null-bearing series without disturbing the
+ * defaults every pre-existing test relies on.
  */
-function buildOpenMeteoForecastResponse(): OpenMeteoForecastResponse {
+function buildOpenMeteoForecastResponse(
+  dailyOverrides: Partial<NonNullable<OpenMeteoForecastResponse['daily']>> = {}
+): OpenMeteoForecastResponse {
   return {
     latitude: 43.65,
     longitude: -79.38,
@@ -54,6 +60,7 @@ function buildOpenMeteoForecastResponse(): OpenMeteoForecastResponse {
       time: ['2024-01-01', '2024-01-02'],
       temperature_2m_max: [32, 30],
       temperature_2m_min: [20, 18],
+      ...dailyOverrides,
     },
   };
 }
@@ -178,5 +185,67 @@ describe('handleGetForecast — auto-mode NOAA -> Open-Meteo fallback (D2)', () 
       callForecast({ ...TORONTO, source: 'noaa' }, fakes)
     ).rejects.toThrow(DataNotFoundError);
     expect(fakes.openMeteo.getForecast).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T6 — Pin the omission behaviour of the daily series' null-guarded sites now
+// that OpenMeteoForecastDailyData declares every series `(number | null)[]`.
+// These fixtures inject nulls to exercise a guard, not because a default
+// getForecast() call was observed to produce one: probed live on 2026-08-28,
+// the default Open-Meteo forecast request (no `models=` parameter) returned
+// no null samples across the fields exercised below. `uv_index_max` is
+// provably nullable under `models=ecmwf_ifs025`, but `getForecast` never sets
+// `models=`, so a green test here proves the guard exists, not that a caller
+// hits it under default settings.
+// ---------------------------------------------------------------------------
+
+describe('handleGetForecast — daily series null-guard behaviour (T6)', () => {
+  it('renders UV Index only for the day it is present, and does not throw on a null sample', async () => {
+    const fakes = buildFakes();
+    fakes.openMeteo = buildOpenMeteoFake(
+      buildOpenMeteoForecastResponse({ uv_index_max: [4.2, null] })
+    );
+    fakes.noaa.getPointData.mockRejectedValue(
+      new DataNotFoundError('NOAA', 'Unable to provide data for requested point')
+    );
+
+    const result = await callForecast({ ...TORONTO }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('**UV Index:** 4.2');
+    const uvLines = text.split('\n').filter(l => l.startsWith('**UV Index:**'));
+    expect(uvLines).toEqual(['**UV Index:** 4.2']);
+  });
+
+  it('pins all four outcomes of the **Temperature:** compound line under null halves', async () => {
+    const fakes = buildFakes();
+    fakes.openMeteo = buildOpenMeteoFake(
+      buildOpenMeteoForecastResponse({
+        time: ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04'],
+        temperature_2m_max: [32, 30, null, null],
+        temperature_2m_min: [20, null, 18, null],
+      })
+    );
+    fakes.noaa.getPointData.mockRejectedValue(
+      new DataNotFoundError('NOAA', 'Unable to provide data for requested point')
+    );
+
+    const result = await callForecast({ ...TORONTO }, fakes);
+    const text = textOf(result);
+
+    const tempLines = text.split('\n').filter(l => l.startsWith('**Temperature:**'));
+    expect(tempLines).toEqual([
+      '**Temperature:** High 32°F / Low 20°F', // both halves present
+      '**Temperature:** High 30°F',            // high only
+      '**Temperature:** Low 18°F',             // low only
+      // day 4 (neither) contributes no line at all
+    ]);
+
+    // Explicit shape assertions beyond the array equality above.
+    for (const line of tempLines) {
+      expect(line).not.toBe('**Temperature:**');
+      expect(line.endsWith(' /')).toBe(false);
+    }
   });
 });
