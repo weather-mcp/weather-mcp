@@ -2604,6 +2604,48 @@ report the divergence set), [G45] (a mutation only goes red where the contract
 reaches it), [G13] (a fixture degenerate along one axis), [G53] (the sibling from
 the same review — what the short-circuited predicate was deciding).
 
+## G55 — The publish workflow reports failure after a successful publish, because its verification window is shorter than npm's own processing delay
+
+**Trigger:** reading the result of `publish.yml` after pushing a `vX.Y.Z` tag, or
+deciding what to do about a red release run.
+
+**Rule:** a red `publish.yml` is **not** evidence that nothing published. Read the
+**`Publish to npm` step** before reacting: if it ends `+ @dangahagan/weather-mcp@X.Y.Z`,
+the package is published and the tag is real. Confirm against the registry directly
+with `curl -s https://registry.npmjs.org/@dangahagan%2Fweather-mcp`, **not**
+`npm view` — this machine's npm config sets `min-release-age`, which returns a
+plain `E404` for a version published minutes ago and looks identical to "never
+published" ([G51]-family: a filtered read that reports as an absence). Never
+re-run the workflow and never `npm publish` by hand on the strength of the red
+alone; a second publish of the same version fails, and a second publish of a
+*bumped* version ships a release nobody asked for.
+
+**Why:** the `Verify publication` step polls `npm view` 10 times at 15 s, so it
+gives up after **150 s**, and npm answers the publish itself with *"Your package
+is being processed and may take a few minutes to become available."* The two
+numbers are simply not related, so the step is a race the registry is under no
+obligation to win. It has now lost twice in a row.
+
+**Verify:** `gh run view <id> --log | grep -a "Publish to npm" | tail -5` shows
+the `+ @dangahagan/weather-mcp@X.Y.Z` line and the Sigstore provenance entry on a
+run whose overall conclusion is `failure`.
+
+**Evidence:** v1.25.11 (run 33235201174, 2026-08-29) and v1.25.12 (run
+33270536961, same day) both concluded `failure` with **only** `Verify publication`
+red; both packages published normally and both became `latest`. v1.25.12 is the
+sharp case — the publish step logged `+ @dangahagan/weather-mcp@1.25.12` at
+19:20:19Z, the verify step exhausted its ten attempts at 19:22:57Z, and the
+registry's own `time` field records the version as available at **19:22:57.235Z**.
+It missed by under a second.
+
+**Status:** active. **Fixable at the source**, and should be: raise the loop past
+10 attempts, or drop the step and let the `Publish to npm` exit code stand — a
+verification that fails on a successful publish trains the reader to ignore a red
+release run, which is the one signal that must stay trustworthy. Related: [G28] (a
+probe that fails reports as a clean negative), [G4] (never trust the status alone —
+here the status is red and the outcome is success), [G47] (a control that proves
+the measurement happened at all).
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
