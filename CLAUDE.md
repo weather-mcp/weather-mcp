@@ -393,6 +393,7 @@ via `src/utils/unitFormat.ts`.
 - **Alerts:** 5 minutes (can change rapidly)
 - **Historical data (>1 day old):** Infinity (finalized)
 - **Recent historical (<1 day):** 1 hour (may be corrected)
+- **NWPS gauge detail (flood-stage thresholds):** 24 hours (gauge metadata, revised ~annually)
 - Newer entries (normals, Google pollen, FIRMS, tiles, composites) are documented inline in `CacheConfig`
 
 ### Cache Implementation

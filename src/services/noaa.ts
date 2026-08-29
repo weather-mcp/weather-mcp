@@ -649,8 +649,8 @@ export class NOAAService {
       const response = await this.nwpsClient.get<NWPSGauge>(`/gauges/${lid}`);
       const result = response.data;
 
-      // Cache for 1 hour (river conditions update hourly)
-      this.cache.set(cacheKey, result, 3600000);
+      // Flood-stage thresholds and crests are gauge metadata, revised ~annually.
+      this.cache.set(cacheKey, result, CacheConfig.ttl.nwpsGaugeDetail);
       return result;
     }
 
