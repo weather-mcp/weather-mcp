@@ -138,45 +138,55 @@ export async function handleGetHistoricalWeather(
           const time = new Date(weatherData.hourly.time[i]);
           output += `## ${time.toLocaleString()}\n`;
 
-          if (weatherData.hourly.temperature_2m?.[i] !== null && weatherData.hourly.temperature_2m?.[i] !== undefined) {
-            output += `- **Temperature:** ${Math.round(weatherData.hourly.temperature_2m[i])}${tempU}\n`;
+          const temperature = weatherData.hourly.temperature_2m?.[i];
+          if (temperature != null) {
+            output += `- **Temperature:** ${Math.round(temperature)}${tempU}\n`;
           }
 
-          if (weatherData.hourly.apparent_temperature?.[i] !== null && weatherData.hourly.apparent_temperature?.[i] !== undefined) {
-            output += `- **Feels Like:** ${Math.round(weatherData.hourly.apparent_temperature[i])}${tempU}\n`;
+          const apparentTemperature = weatherData.hourly.apparent_temperature?.[i];
+          if (apparentTemperature != null) {
+            output += `- **Feels Like:** ${Math.round(apparentTemperature)}${tempU}\n`;
           }
 
-          if (weatherData.hourly.weather_code?.[i] !== null && weatherData.hourly.weather_code?.[i] !== undefined) {
-            output += `- **Conditions:** ${openMeteoService.getWeatherDescription(weatherData.hourly.weather_code[i])}\n`;
+          const weatherCode = weatherData.hourly.weather_code?.[i];
+          if (weatherCode != null) {
+            output += `- **Conditions:** ${openMeteoService.getWeatherDescription(weatherCode)}\n`;
           }
 
-          if (weatherData.hourly.precipitation?.[i] !== null && weatherData.hourly.precipitation?.[i] !== undefined && weatherData.hourly.precipitation[i] > 0) {
-            output += `- **Precipitation:** ${weatherData.hourly.precipitation[i].toFixed(2)} ${precipU}\n`;
+          const precipitation = weatherData.hourly.precipitation?.[i];
+          if (precipitation != null && precipitation > 0) {
+            output += `- **Precipitation:** ${precipitation.toFixed(2)} ${precipU}\n`;
           }
 
-          if (weatherData.hourly.snowfall?.[i] !== null && weatherData.hourly.snowfall?.[i] !== undefined && weatherData.hourly.snowfall[i] > 0) {
-            output += `- **Snowfall:** ${snowfallToPrecipUnit(weatherData.hourly.snowfall[i], prefs).toFixed(1)} ${precipU}\n`;
+          const snowfall = weatherData.hourly.snowfall?.[i];
+          if (snowfall != null && snowfall > 0) {
+            output += `- **Snowfall:** ${snowfallToPrecipUnit(snowfall, prefs).toFixed(1)} ${precipU}\n`;
           }
 
-          if (weatherData.hourly.wind_speed_10m?.[i] !== null && weatherData.hourly.wind_speed_10m?.[i] !== undefined) {
-            output += `- **Wind:** ${Math.round(weatherData.hourly.wind_speed_10m[i])} ${windU}`;
-            if (weatherData.hourly.wind_direction_10m?.[i] !== null && weatherData.hourly.wind_direction_10m?.[i] !== undefined) {
-              output += ` from ${Math.round(weatherData.hourly.wind_direction_10m[i])}°`;
+          const windSpeed = weatherData.hourly.wind_speed_10m?.[i];
+          if (windSpeed != null) {
+            output += `- **Wind:** ${Math.round(windSpeed)} ${windU}`;
+            const windDirection = weatherData.hourly.wind_direction_10m?.[i];
+            if (windDirection != null) {
+              output += ` from ${Math.round(windDirection)}°`;
             }
             output += `\n`;
           }
 
-          if (weatherData.hourly.relative_humidity_2m?.[i] !== null && weatherData.hourly.relative_humidity_2m?.[i] !== undefined) {
-            output += `- **Humidity:** ${Math.round(weatherData.hourly.relative_humidity_2m[i])}%\n`;
+          const relativeHumidity = weatherData.hourly.relative_humidity_2m?.[i];
+          if (relativeHumidity != null) {
+            output += `- **Humidity:** ${Math.round(relativeHumidity)}%\n`;
           }
 
-          if (weatherData.hourly.pressure_msl?.[i] !== null && weatherData.hourly.pressure_msl?.[i] !== undefined) {
+          const pressureMsl = weatherData.hourly.pressure_msl?.[i];
+          if (pressureMsl != null) {
             // Open-Meteo returns pressure_msl in hPa regardless of unit params
-            output += `- **Pressure:** ${formatPressureFromPa(weatherData.hourly.pressure_msl[i] * 100, prefs)}\n`;
+            output += `- **Pressure:** ${formatPressureFromPa(pressureMsl * 100, prefs)}\n`;
           }
 
-          if (weatherData.hourly.cloud_cover?.[i] !== null && weatherData.hourly.cloud_cover?.[i] !== undefined) {
-            output += `- **Cloud Cover:** ${weatherData.hourly.cloud_cover[i]}%\n`;
+          const cloudCover = weatherData.hourly.cloud_cover?.[i];
+          if (cloudCover != null) {
+            output += `- **Cloud Cover:** ${cloudCover}%\n`;
           }
 
           output += `\n`;
@@ -202,32 +212,39 @@ export async function handleGetHistoricalWeather(
           const date = new Date(weatherData.daily.time[i]);
           output += `## ${date.toLocaleDateString()}\n`;
 
-          if (weatherData.daily.temperature_2m_max?.[i] !== null && weatherData.daily.temperature_2m_max?.[i] !== undefined) {
-            output += `- **High Temperature:** ${Math.round(weatherData.daily.temperature_2m_max[i])}${tempU}\n`;
+          const highTemp = weatherData.daily.temperature_2m_max?.[i];
+          if (highTemp != null) {
+            output += `- **High Temperature:** ${Math.round(highTemp)}${tempU}\n`;
           }
 
-          if (weatherData.daily.temperature_2m_min?.[i] !== null && weatherData.daily.temperature_2m_min?.[i] !== undefined) {
-            output += `- **Low Temperature:** ${Math.round(weatherData.daily.temperature_2m_min[i])}${tempU}\n`;
+          const lowTemp = weatherData.daily.temperature_2m_min?.[i];
+          if (lowTemp != null) {
+            output += `- **Low Temperature:** ${Math.round(lowTemp)}${tempU}\n`;
           }
 
-          if (weatherData.daily.temperature_2m_mean?.[i] !== null && weatherData.daily.temperature_2m_mean?.[i] !== undefined) {
-            output += `- **Average Temperature:** ${Math.round(weatherData.daily.temperature_2m_mean[i])}${tempU}\n`;
+          const meanTemp = weatherData.daily.temperature_2m_mean?.[i];
+          if (meanTemp != null) {
+            output += `- **Average Temperature:** ${Math.round(meanTemp)}${tempU}\n`;
           }
 
-          if (weatherData.daily.weather_code?.[i] !== null && weatherData.daily.weather_code?.[i] !== undefined) {
-            output += `- **Conditions:** ${openMeteoService.getWeatherDescription(weatherData.daily.weather_code[i])}\n`;
+          const dailyWeatherCode = weatherData.daily.weather_code?.[i];
+          if (dailyWeatherCode != null) {
+            output += `- **Conditions:** ${openMeteoService.getWeatherDescription(dailyWeatherCode)}\n`;
           }
 
-          if (weatherData.daily.precipitation_sum?.[i] !== null && weatherData.daily.precipitation_sum?.[i] !== undefined) {
-            output += `- **Precipitation:** ${weatherData.daily.precipitation_sum[i].toFixed(2)} ${precipU}\n`;
+          const precipitationSum = weatherData.daily.precipitation_sum?.[i];
+          if (precipitationSum != null) {
+            output += `- **Precipitation:** ${precipitationSum.toFixed(2)} ${precipU}\n`;
           }
 
-          if (weatherData.daily.snowfall_sum?.[i] !== null && weatherData.daily.snowfall_sum?.[i] !== undefined && weatherData.daily.snowfall_sum[i] > 0) {
-            output += `- **Snowfall:** ${snowfallToPrecipUnit(weatherData.daily.snowfall_sum[i], prefs).toFixed(1)} ${precipU}\n`;
+          const snowfallSum = weatherData.daily.snowfall_sum?.[i];
+          if (snowfallSum != null && snowfallSum > 0) {
+            output += `- **Snowfall:** ${snowfallToPrecipUnit(snowfallSum, prefs).toFixed(1)} ${precipU}\n`;
           }
 
-          if (weatherData.daily.wind_speed_10m_max?.[i] !== null && weatherData.daily.wind_speed_10m_max?.[i] !== undefined) {
-            output += `- **Max Wind Speed:** ${Math.round(weatherData.daily.wind_speed_10m_max[i])} ${windU}\n`;
+          const maxWindSpeed = weatherData.daily.wind_speed_10m_max?.[i];
+          if (maxWindSpeed != null) {
+            output += `- **Max Wind Speed:** ${Math.round(maxWindSpeed)} ${windU}\n`;
           }
 
           output += `\n`;
