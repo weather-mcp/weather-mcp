@@ -396,9 +396,9 @@ function formatHourlyForecast(
   const times = hourly.time;
   let output = '';
 
-  // The declared types say number[], but past the model's real horizon the
-  // API pads the arrays with nulls — which would coerce to 0 ("Good") in
-  // Math.min/max. Treat anything non-finite as missing.
+  // The series are declared (number | null)[], because past the model's real
+  // horizon the API pads the arrays with nulls — which would coerce to 0
+  // ("Good") in Math.min/max. Treat anything non-finite as missing.
   const aqiAt = (i: number): number | undefined => {
     const value = useUSAQI ? hourly.us_aqi?.[i] : hourly.european_aqi?.[i];
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;

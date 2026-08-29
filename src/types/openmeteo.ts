@@ -8,23 +8,23 @@
  */
 export interface OpenMeteoHourlyData {
   time: string[];
-  temperature_2m?: number[];
-  relative_humidity_2m?: number[];
-  dewpoint_2m?: number[];
-  apparent_temperature?: number[];
-  precipitation?: number[];
-  rain?: number[];
-  snowfall?: number[];
-  snow_depth?: number[];
-  weather_code?: number[];
-  pressure_msl?: number[];
-  surface_pressure?: number[];
-  cloud_cover?: number[];
-  wind_speed_10m?: number[];
-  wind_direction_10m?: number[];
-  wind_gusts_10m?: number[];
-  soil_temperature_0_to_7cm?: number[];
-  soil_moisture_0_to_7cm?: number[];
+  temperature_2m?: (number | null)[];
+  relative_humidity_2m?: (number | null)[];
+  dewpoint_2m?: (number | null)[];
+  apparent_temperature?: (number | null)[];
+  precipitation?: (number | null)[];
+  rain?: (number | null)[];
+  snowfall?: (number | null)[];
+  snow_depth?: (number | null)[];
+  weather_code?: (number | null)[];
+  pressure_msl?: (number | null)[];
+  surface_pressure?: (number | null)[];
+  cloud_cover?: (number | null)[];
+  wind_speed_10m?: (number | null)[];
+  wind_direction_10m?: (number | null)[];
+  wind_gusts_10m?: (number | null)[];
+  soil_temperature_0_to_7cm?: (number | null)[];
+  soil_moisture_0_to_7cm?: (number | null)[];
 }
 
 /**
@@ -32,23 +32,23 @@ export interface OpenMeteoHourlyData {
  */
 export interface OpenMeteoDailyData {
   time: string[];
-  temperature_2m_max?: number[];
-  temperature_2m_min?: number[];
-  temperature_2m_mean?: number[];
-  apparent_temperature_max?: number[];
-  apparent_temperature_min?: number[];
-  apparent_temperature_mean?: number[];
-  precipitation_sum?: number[];
-  rain_sum?: number[];
-  snowfall_sum?: number[];
-  precipitation_hours?: number[];
-  weather_code?: number[];
+  temperature_2m_max?: (number | null)[];
+  temperature_2m_min?: (number | null)[];
+  temperature_2m_mean?: (number | null)[];
+  apparent_temperature_max?: (number | null)[];
+  apparent_temperature_min?: (number | null)[];
+  apparent_temperature_mean?: (number | null)[];
+  precipitation_sum?: (number | null)[];
+  rain_sum?: (number | null)[];
+  snowfall_sum?: (number | null)[];
+  precipitation_hours?: (number | null)[];
+  weather_code?: (number | null)[];
   sunrise?: string[];
   sunset?: string[];
-  sunshine_duration?: number[];
-  wind_speed_10m_max?: number[];
-  wind_gusts_10m_max?: number[];
-  wind_direction_10m_dominant?: number[];
+  sunshine_duration?: (number | null)[];
+  wind_speed_10m_max?: (number | null)[];
+  wind_gusts_10m_max?: (number | null)[];
+  wind_direction_10m_dominant?: (number | null)[];
 }
 
 /**
@@ -160,29 +160,29 @@ export interface GeocodingResponse {
  */
 export interface OpenMeteoForecastHourlyData {
   time: string[];
-  temperature_2m?: number[];
-  relative_humidity_2m?: number[];
-  dewpoint_2m?: number[];
-  apparent_temperature?: number[];
-  precipitation_probability?: number[];
-  precipitation?: number[];
-  rain?: number[];
-  showers?: number[];
-  snowfall?: number[];
-  snow_depth?: number[];
-  weather_code?: number[];
-  pressure_msl?: number[];
-  surface_pressure?: number[];
-  cloud_cover?: number[];
-  cloud_cover_low?: number[];
-  cloud_cover_mid?: number[];
-  cloud_cover_high?: number[];
-  visibility?: number[];
-  wind_speed_10m?: number[];
-  wind_direction_10m?: number[];
-  wind_gusts_10m?: number[];
-  uv_index?: number[];
-  is_day?: number[];
+  temperature_2m?: (number | null)[];
+  relative_humidity_2m?: (number | null)[];
+  dewpoint_2m?: (number | null)[];
+  apparent_temperature?: (number | null)[];
+  precipitation_probability?: (number | null)[];
+  precipitation?: (number | null)[];
+  rain?: (number | null)[];
+  showers?: (number | null)[];
+  snowfall?: (number | null)[];
+  snow_depth?: (number | null)[];
+  weather_code?: (number | null)[];
+  pressure_msl?: (number | null)[];
+  surface_pressure?: (number | null)[];
+  cloud_cover?: (number | null)[];
+  cloud_cover_low?: (number | null)[];
+  cloud_cover_mid?: (number | null)[];
+  cloud_cover_high?: (number | null)[];
+  visibility?: (number | null)[];
+  wind_speed_10m?: (number | null)[];
+  wind_direction_10m?: (number | null)[];
+  wind_gusts_10m?: (number | null)[];
+  uv_index?: (number | null)[];
+  is_day?: (number | null)[];
 }
 
 /**
@@ -190,25 +190,25 @@ export interface OpenMeteoForecastHourlyData {
  */
 export interface OpenMeteoForecastDailyData {
   time: string[];
-  weather_code?: number[];
-  temperature_2m_max?: number[];
-  temperature_2m_min?: number[];
-  apparent_temperature_max?: number[];
-  apparent_temperature_min?: number[];
+  weather_code?: (number | null)[];
+  temperature_2m_max?: (number | null)[];
+  temperature_2m_min?: (number | null)[];
+  apparent_temperature_max?: (number | null)[];
+  apparent_temperature_min?: (number | null)[];
   sunrise?: string[];
   sunset?: string[];
-  daylight_duration?: number[];
-  sunshine_duration?: number[];
-  uv_index_max?: number[];
-  precipitation_sum?: number[];
-  rain_sum?: number[];
-  showers_sum?: number[];
-  snowfall_sum?: number[];
-  precipitation_hours?: number[];
-  precipitation_probability_max?: number[];
-  wind_speed_10m_max?: number[];
-  wind_gusts_10m_max?: number[];
-  wind_direction_10m_dominant?: number[];
+  daylight_duration?: (number | null)[];
+  sunshine_duration?: (number | null)[];
+  uv_index_max?: (number | null)[];
+  precipitation_sum?: (number | null)[];
+  rain_sum?: (number | null)[];
+  showers_sum?: (number | null)[];
+  snowfall_sum?: (number | null)[];
+  precipitation_hours?: (number | null)[];
+  precipitation_probability_max?: (number | null)[];
+  wind_speed_10m_max?: (number | null)[];
+  wind_gusts_10m_max?: (number | null)[];
+  wind_direction_10m_dominant?: (number | null)[];
 }
 
 /**
@@ -384,36 +384,36 @@ export interface OpenMeteoAirQualityCurrentData {
  */
 export interface OpenMeteoAirQualityHourlyData {
   time: string[];
-  pm10?: number[];
-  pm2_5?: number[];
-  carbon_monoxide?: number[];
-  nitrogen_dioxide?: number[];
-  sulphur_dioxide?: number[];
-  ozone?: number[];
-  aerosol_optical_depth?: number[];
-  dust?: number[];
-  uv_index?: number[];
-  uv_index_clear_sky?: number[];
-  ammonia?: number[];
-  alder_pollen?: number[];
-  birch_pollen?: number[];
-  grass_pollen?: number[];
-  mugwort_pollen?: number[];
-  olive_pollen?: number[];
-  ragweed_pollen?: number[];
-  european_aqi?: number[];
-  european_aqi_pm2_5?: number[];
-  european_aqi_pm10?: number[];
-  european_aqi_nitrogen_dioxide?: number[];
-  european_aqi_ozone?: number[];
-  european_aqi_sulphur_dioxide?: number[];
-  us_aqi?: number[];
-  us_aqi_pm2_5?: number[];
-  us_aqi_pm10?: number[];
-  us_aqi_nitrogen_dioxide?: number[];
-  us_aqi_ozone?: number[];
-  us_aqi_sulphur_dioxide?: number[];
-  us_aqi_carbon_monoxide?: number[];
+  pm10?: (number | null)[];
+  pm2_5?: (number | null)[];
+  carbon_monoxide?: (number | null)[];
+  nitrogen_dioxide?: (number | null)[];
+  sulphur_dioxide?: (number | null)[];
+  ozone?: (number | null)[];
+  aerosol_optical_depth?: (number | null)[];
+  dust?: (number | null)[];
+  uv_index?: (number | null)[];
+  uv_index_clear_sky?: (number | null)[];
+  ammonia?: (number | null)[];
+  alder_pollen?: (number | null)[];
+  birch_pollen?: (number | null)[];
+  grass_pollen?: (number | null)[];
+  mugwort_pollen?: (number | null)[];
+  olive_pollen?: (number | null)[];
+  ragweed_pollen?: (number | null)[];
+  european_aqi?: (number | null)[];
+  european_aqi_pm2_5?: (number | null)[];
+  european_aqi_pm10?: (number | null)[];
+  european_aqi_nitrogen_dioxide?: (number | null)[];
+  european_aqi_ozone?: (number | null)[];
+  european_aqi_sulphur_dioxide?: (number | null)[];
+  us_aqi?: (number | null)[];
+  us_aqi_pm2_5?: (number | null)[];
+  us_aqi_pm10?: (number | null)[];
+  us_aqi_nitrogen_dioxide?: (number | null)[];
+  us_aqi_ozone?: (number | null)[];
+  us_aqi_sulphur_dioxide?: (number | null)[];
+  us_aqi_carbon_monoxide?: (number | null)[];
 }
 
 /**
@@ -534,19 +534,19 @@ export interface OpenMeteoMarineCurrentData {
  */
 export interface OpenMeteoMarineHourlyData {
   time: string[];
-  wave_height?: number[];
-  wave_direction?: number[];
-  wave_period?: number[];
-  wind_wave_height?: number[];
-  wind_wave_direction?: number[];
-  wind_wave_period?: number[];
-  wind_wave_peak_period?: number[];
-  swell_wave_height?: number[];
-  swell_wave_direction?: number[];
-  swell_wave_period?: number[];
-  swell_wave_peak_period?: number[];
-  ocean_current_velocity?: number[];
-  ocean_current_direction?: number[];
+  wave_height?: (number | null)[];
+  wave_direction?: (number | null)[];
+  wave_period?: (number | null)[];
+  wind_wave_height?: (number | null)[];
+  wind_wave_direction?: (number | null)[];
+  wind_wave_period?: (number | null)[];
+  wind_wave_peak_period?: (number | null)[];
+  swell_wave_height?: (number | null)[];
+  swell_wave_direction?: (number | null)[];
+  swell_wave_period?: (number | null)[];
+  swell_wave_peak_period?: (number | null)[];
+  ocean_current_velocity?: (number | null)[];
+  ocean_current_direction?: (number | null)[];
 }
 
 /**
@@ -554,17 +554,17 @@ export interface OpenMeteoMarineHourlyData {
  */
 export interface OpenMeteoDailyMarineData {
   time: string[];
-  wave_height_max?: number[];
-  wave_direction_dominant?: number[];
-  wave_period_max?: number[];
-  wind_wave_height_max?: number[];
-  wind_wave_direction_dominant?: number[];
-  wind_wave_period_max?: number[];
-  wind_wave_peak_period_max?: number[];
-  swell_wave_height_max?: number[];
-  swell_wave_direction_dominant?: number[];
-  swell_wave_period_max?: number[];
-  swell_wave_peak_period_max?: number[];
+  wave_height_max?: (number | null)[];
+  wave_direction_dominant?: (number | null)[];
+  wave_period_max?: (number | null)[];
+  wind_wave_height_max?: (number | null)[];
+  wind_wave_direction_dominant?: (number | null)[];
+  wind_wave_period_max?: (number | null)[];
+  wind_wave_peak_period_max?: (number | null)[];
+  swell_wave_height_max?: (number | null)[];
+  swell_wave_direction_dominant?: (number | null)[];
+  swell_wave_period_max?: (number | null)[];
+  swell_wave_peak_period_max?: (number | null)[];
 }
 
 /**

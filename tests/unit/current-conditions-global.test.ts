@@ -117,7 +117,8 @@ function buildNoaaFake() {
 
 function buildOpenMeteoCurrentResponse(
   currentOverrides: Record<string, unknown> = {},
-  timezone = 'Europe/London'
+  timezone = 'Europe/London',
+  dailyOverrides: Record<string, unknown> = {}
 ): OpenMeteoForecastResponse {
   return {
     latitude: 51.5,
@@ -156,6 +157,7 @@ function buildOpenMeteoCurrentResponse(
       time: ['2024-01-01'],
       temperature_2m_max: [65],
       temperature_2m_min: [55],
+      ...dailyOverrides,
     },
   };
 }
@@ -1053,5 +1055,61 @@ describe('handleGetCurrentConditions — thermal stress (Open-Meteo path)', () =
 
       expect(text).not.toContain('🥵');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9. T6 — Pin the **Today's Range:** compound-line omission behaviour now
+// that OpenMeteoForecastDailyData declares temperature_2m_max/_min
+// `(number | null)[]`. These fixtures inject nulls to exercise the guard, not
+// because a default getCurrentConditions() call was observed to produce one:
+// probed live on 2026-08-28, the default Open-Meteo forecast request (no
+// `models=` parameter) returned no null daily-temperature samples. A green
+// test here proves the guard exists, not that a caller hits it by default.
+// ---------------------------------------------------------------------------
+
+describe("handleGetCurrentConditions — Today's Range null-guard behaviour (T6)", () => {
+  it('shows only the high when temperature_2m_min is null', async () => {
+    const response = buildOpenMeteoCurrentResponse({}, 'Europe/London', {
+      temperature_2m_max: [65],
+      temperature_2m_min: [null],
+    });
+    const result = await callCurrentConditions(
+      { ...LONDON, units: 'imperial' },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    const line = text.split('\n').find(l => l.startsWith("**Today's Range:**"));
+    expect(line).toBe("**Today's Range:** High 65°F");
+  });
+
+  it('shows only the low when temperature_2m_max is null', async () => {
+    const response = buildOpenMeteoCurrentResponse({}, 'Europe/London', {
+      temperature_2m_max: [null],
+      temperature_2m_min: [55],
+    });
+    const result = await callCurrentConditions(
+      { ...LONDON, units: 'imperial' },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    const line = text.split('\n').find(l => l.startsWith("**Today's Range:**"));
+    expect(line).toBe("**Today's Range:** Low 55°F");
+  });
+
+  it('omits the line entirely when both halves are null', async () => {
+    const response = buildOpenMeteoCurrentResponse({}, 'Europe/London', {
+      temperature_2m_max: [null],
+      temperature_2m_min: [null],
+    });
+    const result = await callCurrentConditions(
+      { ...LONDON, units: 'imperial' },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    expect(text).not.toContain("Today's Range");
   });
 });

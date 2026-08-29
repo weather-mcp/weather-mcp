@@ -17,6 +17,16 @@ import type { OpenMeteoService } from '../services/openmeteo.js';
 import type { NCEIService } from '../services/ncei.js';
 import { logger } from './logger.js';
 import { isInUS } from './geography.js';
+/**
+ * The daily series are declared `(number | null)[]`, as Open-Meteo sends them.
+ * `finiteSampleAt` turns a published `null` — and a missing or short array —
+ * into "no sample", mirroring `modelComparison.ts`'s `extractModelSeries`
+ * guard. This is the D2 fix: the prior compute
+ * (`computeNormalsFrom30YearData`) filtered on `!== undefined` only, so a JSON
+ * `null` reached `reduce` and `sum + null` coerced to `+ 0`, dragging every
+ * mean down.
+ */
+import { finiteSampleAt } from './finiteSample.js';
 
 /**
  * Climate normals are stored canonically in imperial units (°F, inches).
@@ -92,21 +102,6 @@ const LEAP_YEAR_FOR_CALENDAR = 2020;
 /** Sum of a numeric array; only ever called with a non-empty array in this module. */
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
-}
-
-/**
- * Extract a finite numeric sample at `index` from a possibly-absent,
- * possibly-null-padded daily array. Open-Meteo's JSON `null`s (and a
- * missing/short array) both read as "no sample" here — `typeof`-narrowed
- * rather than trusting the declared `number[]` type, mirroring
- * `modelComparison.ts`'s `extractModelSeries` guard. This is the D2 fix:
- * the prior compute (`computeNormalsFrom30YearData`) filtered on
- * `!== undefined` only, so a JSON `null` reached `reduce` and `sum + null`
- * coerced to `+ 0`, dragging every mean down.
- */
-function finiteSampleAt(series: number[] | undefined, index: number): number | undefined {
-  const value = series?.[index];
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 /** Build an empty table with all 366 `"MM-DD"` keys present and unavailable (`null`). */

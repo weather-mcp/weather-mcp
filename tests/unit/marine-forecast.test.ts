@@ -38,7 +38,7 @@ const LAKE_MICHIGAN_COORDS = { latitude: 43.0, longitude: -86.0 };
 /**
  * Build a daily marine fixture. `values[i]` may be `null` to simulate the
  * real API's null-padding past the model's ~10-day horizon; the declared
- * TypeScript types say `number[]`, so fixtures are cast where nulls appear.
+ * types are `(number | null)[]`, so a null-bearing fixture needs no cast.
  */
 function buildResponse(
   days: number,
@@ -80,7 +80,7 @@ function buildResponse(
       swell_wave_height_max: swellWaveHeightMax,
       swell_wave_direction_dominant: swellWaveDirectionDominant
     }
-  } as unknown as OpenMeteoMarineResponse;
+  };
 }
 
 function callHandler(args: Record<string, unknown>) {

@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.25.10 (Production Ready)
+- **Version:** 1.25.11 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -59,6 +59,7 @@ src/
 │   ├── validation.ts        # Input validation (all user inputs go through here)
 │   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
+│   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
 │   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing
 │   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates; shared country-code resolution
 │   ├── geography.ts         # isInUS and region helpers
@@ -191,7 +192,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 ### Upstream data hygiene
 
-- **Never trust the HTTP 200 alone.** Open-Meteo and others return 200 with all-null series for uncovered points (pollen outside Europe, flood at sea, ensemble probability). Guard with `!= null`, not `!== undefined` — JSON `null` survives `!== undefined` and then coerces to 0 in arithmetic/conversion (the v1.20.0 F1 and normals-averaging bugs).
+- **Never trust the HTTP 200 alone.** Open-Meteo and others return 200 with all-null series for uncovered points (pollen outside Europe, flood at sea, ensemble probability). Guard with `!= null`, not `!== undefined` — JSON `null` survives `!== undefined` and then coerces to 0 in arithmetic/conversion (the v1.20.0 F1 and normals-averaging bugs). The Open-Meteo series types declare this honestly (`field?: (number | null)[]`), so the compiler now enumerates the guard sites rather than certifying their absence; `finiteSampleAt` (`src/utils/finiteSample.ts`) is the shared accessor for reading one sample.
 - **Parse CSV/JSON by field name, never by position.** Two live shapes of the same feed have differed in column order and count.
 - **Verify documented shapes live before building on them.** Documented field names, enum casing, duration formats, and error codes have all been wrong upstream (Google Weather: six divergences; FIRMS Area API counts calendar UTC days while flat files are rolling 24 h). Record the verified shape in the plan doc.
 - **Bands and categories are computed from the rounded display value** — via `displayValue` (`src/utils/displayBanding.ts`), which mirrors the render site's `toFixed` rather than `Math.round`, because the two disagree on negative halves — so the displayed number and its category can never disagree.
@@ -579,15 +580,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.25.10 — Production Ready ✅
-- **Test Coverage:** 2,809 tests, 100% pass rate
+- **Version:** 1.25.11 — Production Ready ✅
+- **Test Coverage:** 2,815 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.25.11:** A weather value Open-Meteo did not publish is now omitted instead of rendered as zero
 - **New in v1.25.10:** A forced NOAA river query outside NWPS coverage now discloses the gap instead of advising a wider search
 - **New in v1.25.9:** A lightning feed outage now reports unknown and keeps buffered strikes, instead of a false cold start
-- **New in v1.25.8:** A lightning strike with no distance now reads as unavailable, not as zero kilometres
 
 ## Useful References
 
@@ -610,7 +611,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-08-28 (v1.25.10)
+**Last Updated:** 2026-08-29 (v1.25.11)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

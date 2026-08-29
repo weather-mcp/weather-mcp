@@ -992,11 +992,11 @@ async function formatOpenMeteoCurrentConditions(
   // Today's range from the single-day daily block
   const high = response.daily?.temperature_2m_max?.[0];
   const low = response.daily?.temperature_2m_min?.[0];
-  if (high !== undefined || low !== undefined) {
+  if (high != null || low != null) {
     let range = `**Today's Range:**`;
-    if (high !== undefined) range += ` High ${Math.round(high)}${tempU}`;
-    if (high !== undefined && low !== undefined) range += ` /`;
-    if (low !== undefined) range += ` Low ${Math.round(low)}${tempU}`;
+    if (high != null) range += ` High ${Math.round(high)}${tempU}`;
+    if (high != null && low != null) range += ` /`;
+    if (low != null) range += ` Low ${Math.round(low)}${tempU}`;
     output += `${range}\n`;
   }
 
@@ -1079,8 +1079,8 @@ async function formatOpenMeteoCurrentConditions(
 
     // Daily values are already in the caller's units — no conversion needed.
     const currentTemps = {
-      high: high !== undefined ? Math.round(high) : undefined,
-      low: low !== undefined ? Math.round(low) : undefined
+      high: high != null ? Math.round(high) : undefined,
+      low: low != null ? Math.round(low) : undefined
     };
 
     output += await renderNormalsSection(

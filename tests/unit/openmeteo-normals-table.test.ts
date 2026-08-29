@@ -81,9 +81,9 @@ function buildAllNullFixture(): OpenMeteoHistoricalResponse {
     utc_offset_seconds: 0,
     daily: {
       time: ['1991-01-15'],
-      temperature_2m_max: [null as unknown as number],
-      temperature_2m_min: [null as unknown as number],
-      precipitation_sum: [null as unknown as number]
+      temperature_2m_max: [null],
+      temperature_2m_min: [null],
+      precipitation_sum: [null]
     }
   };
 }

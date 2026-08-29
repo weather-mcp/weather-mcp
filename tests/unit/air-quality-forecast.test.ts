@@ -171,10 +171,10 @@ describe('get_air_quality forecast', () => {
       // Open-Meteo pads hourly arrays with nulls past the model's real
       // horizon; those must not appear as "AQI 0 (Good)".
       const response = buildResponse(7, '2026-07-16T00:00');
-      const hourly = response.hourly! as unknown as { us_aqi: (number | null)[] };
+      const hourly = response.hourly!;
       // Null out the last two days (hours 120-167)
       for (let i = 120; i < 168; i++) {
-        hourly.us_aqi[i] = null;
+        hourly.us_aqi![i] = null;
       }
       getAirQualityMock.mockResolvedValue(response);
 
@@ -190,14 +190,14 @@ describe('get_air_quality forecast', () => {
 
     it('excludes interior null values from period ranges', async () => {
       const response = buildResponse(1, '2026-07-16T00:00');
-      const hourly = response.hourly! as unknown as { us_aqi: (number | null)[] };
+      const hourly = response.hourly!;
       // Null out 6 PM - 9 PM, leaving 10 PM (90) and 11 PM (95) real
-      hourly.us_aqi[18] = null;
-      hourly.us_aqi[19] = null;
-      hourly.us_aqi[20] = null;
-      hourly.us_aqi[21] = null;
-      hourly.us_aqi[22] = 90;
-      hourly.us_aqi[23] = 95;
+      hourly.us_aqi![18] = null;
+      hourly.us_aqi![19] = null;
+      hourly.us_aqi![20] = null;
+      hourly.us_aqi![21] = null;
+      hourly.us_aqi![22] = 90;
+      hourly.us_aqi![23] = 95;
       getAirQualityMock.mockResolvedValue(response);
 
       const result = await callHandler({ ...COORDS, forecast: true, forecast_days: 1 });
@@ -208,8 +208,8 @@ describe('get_air_quality forecast', () => {
 
     it('reports no forecast data when every hour is null', async () => {
       const response = buildResponse(2, '2026-07-16T00:00');
-      const hourly = response.hourly! as unknown as { us_aqi: (number | null)[]; european_aqi: (number | null)[] };
-      hourly.us_aqi.fill(null);
+      const hourly = response.hourly!;
+      hourly.us_aqi!.fill(null);
       getAirQualityMock.mockResolvedValue(response);
 
       const result = await callHandler({ ...COORDS, forecast: true });
@@ -231,7 +231,7 @@ describe('get_air_quality forecast', () => {
   describe('peak UV in day headers', () => {
     it('shows the max UV over the day, not the first or last hour', async () => {
       const response = buildResponse(1, '2026-07-16T00:00');
-      const hourly = response.hourly! as unknown as { uv_index: number[] };
+      const hourly = response.hourly!;
       // Low at the boundaries, high in the middle — a first/last selection
       // would report 2 or 3 instead of the true peak of 9.
       hourly.uv_index = new Array(24).fill(0);
@@ -250,7 +250,7 @@ describe('get_air_quality forecast', () => {
 
     it('omits the UV clause for a day whose UV values are all null', async () => {
       const response = buildResponse(2, '2026-07-16T00:00');
-      const hourly = response.hourly! as unknown as { uv_index: (number | null)[] };
+      const hourly = response.hourly!;
       hourly.uv_index = new Array(48).fill(null);
       // Day two (hours 24-47) has real UV data; day one does not.
       for (let i = 24; i < 48; i++) {
@@ -285,7 +285,7 @@ describe('get_air_quality forecast', () => {
 
     it('renders the exact combined AQI + UV header format', async () => {
       const response = buildResponse(1, '2026-07-16T00:00');
-      const hourly = response.hourly! as unknown as { uv_index: number[] };
+      const hourly = response.hourly!;
       // Peak US AQI for this day is 40 + 23*5 = 155 (Unhealthy, see the
       // existing "labels each day" test above for the same ramp).
       hourly.uv_index = new Array(24).fill(1);
@@ -300,7 +300,7 @@ describe('get_air_quality forecast', () => {
 
     it('takes the max of only the real UV values when null and real values are mixed', async () => {
       const response = buildResponse(1, '2026-07-16T00:00');
-      const hourly = response.hourly! as unknown as { uv_index: (number | null)[] };
+      const hourly = response.hourly!;
       hourly.uv_index = new Array(24).fill(null);
       hourly.uv_index[10] = 6.7; // rounds to 7, High (6 <= 7 < 8)
       getAirQualityMock.mockResolvedValue(response);
