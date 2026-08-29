@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A weather value the model did not publish is now omitted, instead of being
+  rendered as `0` or failing the call.** Open-Meteo answers HTTP 200 with JSON
+  `null` for a sample past a model's horizon or outside its coverage, but the
+  series types declared plain number arrays, so those nulls slipped past an
+  `!== undefined` guard. Three user-visible consequences are fixed: a daily
+  forecast missing its UV index threw and failed the whole `get_forecast` call;
+  `get_current_conditions` rendered a fabricated zero in **Today's Range**; and
+  a forecast day missing one of its High/Low pair dropped the entire
+  temperature line rather than the one missing half. Each value now stands or
+  falls on its own — a present value renders exactly as before, and an absent
+  one is simply left out.
+
 ## [1.25.10] - 2026-08-28
 
 ### Fixed
