@@ -248,4 +248,37 @@ describe('handleGetForecast — daily series null-guard behaviour (T6)', () => {
       expect(line.endsWith(' /')).toBe(false);
     }
   });
+
+  it('pins all four outcomes of the **Feels Like:** compound line under null halves', async () => {
+    const fakes = buildFakes();
+    fakes.openMeteo = buildOpenMeteoFake(
+      buildOpenMeteoForecastResponse({
+        time: ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04'],
+        temperature_2m_max: [32, 30, 28, 26],
+        temperature_2m_min: [20, 18, 16, 14],
+        apparent_temperature_max: [35, 33, null, null],
+        apparent_temperature_min: [22, null, 19, null],
+      })
+    );
+    fakes.noaa.getPointData.mockRejectedValue(
+      new DataNotFoundError('NOAA', 'Unable to provide data for requested point')
+    );
+
+    const result = await callForecast({ ...TORONTO }, fakes);
+    const text = textOf(result);
+
+    const feelsLines = text.split('\n').filter(l => l.startsWith('**Feels Like:**'));
+    expect(feelsLines).toEqual([
+      '**Feels Like:** High 35°F / Low 22°F', // both halves present
+      '**Feels Like:** High 33°F',            // high only
+      '**Feels Like:** Low 19°F',             // low only
+      // day 4 (neither) contributes no line at all
+    ]);
+
+    // Explicit shape assertions beyond the array equality above.
+    for (const line of feelsLines) {
+      expect(line).not.toBe('**Feels Like:**');
+      expect(line.endsWith(' /')).toBe(false);
+    }
+  });
 });
