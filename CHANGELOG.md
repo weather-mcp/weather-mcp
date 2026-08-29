@@ -47,12 +47,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   −67.95 to −65.2 W), taking in that tip, Isla Caja de Muertos in the
   south, and Mona and Desecheo to the west.
 
-  Because `isInUS` is shared, `source: "auto"` at those same coordinates
-  now routes to NOAA rather than Open-Meteo for forecasts, current
-  conditions, historical weather, alerts, wildfire and climate normals —
-  the authority those points should have had all along. The east edge is
-  unchanged, so St Croix and the British Virgin Islands stay outside and
-  the territory disclosure above still renders there.
+  Because `isInUS` is shared, `source: "auto"` at those coordinates also
+  reaches the US authority for current conditions, wildfire and climate
+  normals. Forecasts follow only where the NWS grid cell is land: verified
+  live, Mona Island (grid SJU 13,99) returns an NWS forecast, while the
+  cells at the northwest tip and Isla Caja de Muertos are classified marine
+  and answer *"Forecasts for marine areas are not yet supported by this
+  API"*, so `get_forecast` there falls back to Open-Meteo with its usual
+  note — the same data as before, correctly labelled. Alerts at Puerto Rico
+  land already routed to NOAA by country code, not by the box; what the box
+  adds for them is open water, so a point in the Mona Passage now gets NOAA
+  marine alerts instead of no coverage. The east edge is unchanged, so
+  St Croix and the British Virgin Islands stay outside and the territory
+  disclosure above still renders there.
 
   Files: `src/utils/geography.ts`. Pinned by
   `tests/unit/geography.test.ts` (six box-edge cases) and

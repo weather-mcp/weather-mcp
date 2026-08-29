@@ -183,8 +183,14 @@ describe('Geography Utilities', () => {
     // renders a disclosure naming Puerto Rico from this predicate, so a box that stops
     // short of the island tells a caller in Puerto Rico that Puerto Rico is not covered.
     it('should detect the northwest tip of Puerto Rico (Punta Agujereada, 18.5208 N)', () => {
-      // Northernmost land of the main island — above the old 18.5 N edge. NWPS has 13
-      // gauges within 50 km of here, nearest at 14.0 km.
+      // Just offshore of the northernmost land of the main island — above the old
+      // 18.5 N edge. NWPS has 13 gauges within 50 km of here, nearest at 14.0 km.
+      // The box must cover Puerto Rico's coastal water too, because the river
+      // disclosure must not deny Puerto Rico there either. Note this coordinate's NWS
+      // grid cell (SJU 74,136) is classified *marine*: `/gridpoints/.../forecast`
+      // answers 404 "Forecasts for marine areas are not yet supported by this API",
+      // so `get_forecast` here falls back to Open-Meteo (measured live 2026-08-29).
+      // `isInUS` is still correctly true — it gates coverage, not NWS forecast support.
       expect(isInUS(18.5208, -67.15)).toBe(true);
     });
 
@@ -194,7 +200,9 @@ describe('Geography Utilities', () => {
     });
 
     it('should detect Isla Caja de Muertos, Puerto Rico (17.88 N)', () => {
-      // South of the old 17.9 N edge.
+      // South of the old 17.9 N edge, just off the island itself. Like the tip above,
+      // this coordinate's grid cell (SJU 127,80) is a marine cell, so NWS serves no
+      // land forecast for it; that does not make it any less inside the Commonwealth.
       expect(isInUS(17.88, -66.52)).toBe(true);
     });
 
