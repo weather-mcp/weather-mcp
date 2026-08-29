@@ -15,7 +15,7 @@ import {
   formatStageTrend
 } from '../../src/handlers/riverConditionsHandler.js';
 import { RateLimitError } from '../../src/errors/ApiError.js';
-import type { GaugeStatus, NWPSGauge, HistoricCrest, StageFlowDataPoint } from '../../src/types/noaa.js';
+import type { GaugeStatus, NWPSGauge, HistoricCrest, StageFlowDataPoint, FloodCategories } from '../../src/types/noaa.js';
 
 function status(overrides: Partial<GaugeStatus> = {}): GaugeStatus {
   return {
@@ -607,5 +607,213 @@ describe('handleGetRiverConditions forecast series (detail="full")', () => {
     expect(text).toContain('### Forecast Series');
     expect(text).toContain('9.00 ft 🟡 ACTION');
     expect(text.indexOf('### Forecast\n')).toBeLessThan(text.indexOf('### Forecast Series'));
+  });
+});
+
+/**
+ * Handler-level tests for `### Flood Stages` and `### Recent Historic Crests` against
+ * the live NWPS shape landed by T1 (commit ad388fd): `flood.categories.<level>` is a
+ * `{ stage?, flow? }` object using -9999 as the "not published" sentinel, and crests
+ * carry `occurredTime`/`stage`/`flow` — not the old flat-number / `{ value, date,
+ * description }` shapes. See tests/unit/nwps-gauge-shape.test.ts for the same
+ * assertions driven off real captured bytes rather than these builders.
+ */
+describe('handleGetRiverConditions flood stages and crests (T2)', () => {
+  const BASE_LAT = 42.3601;
+  const BASE_LON = -71.0589;
+
+  const getNWPSGaugesInBoundingBoxMock = vi.fn();
+  const noaaService = { getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock } as never;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function buildGauge(overrides: Partial<NWPSGauge> = {}): NWPSGauge {
+    return {
+      lid: 'LID0',
+      name: 'Gauge 0',
+      latitude: BASE_LAT,
+      longitude: BASE_LON,
+      state: { abbreviation: 'MA', name: 'Massachusetts' },
+      status: {
+        observed: {
+          primary: 4.2,
+          secondary: 0.05,
+          floodCategory: null,
+          validTime: '2026-07-17T14:00:00Z'
+        }
+      },
+      ...overrides
+    };
+  }
+
+  function forecastPoint(validTime: string, primary: number | null): StageFlowDataPoint {
+    return { validTime, generatedTime: '2026-07-17T14:00:00Z', primary, secondary: null };
+  }
+
+  function callHandler(args: Record<string, unknown> = {}) {
+    return handleGetRiverConditions(
+      { latitude: BASE_LAT, longitude: BASE_LON, ...args },
+      noaaService,
+      {} as never,
+      {} as never,
+      {} as never
+    );
+  }
+
+  it('renders four rows in ascending severity, unrounded, when all four stages are real', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({
+        flood: {
+          stageUnits: 'ft',
+          categories: {
+            action: { stage: 7.5 },
+            minor: { stage: 10.2 },
+            moderate: { stage: 14.3 },
+            major: { stage: 18.7 }
+          }
+        }
+      })
+    ]);
+
+    const result = await callHandler({});
+    const text = (result.content[0] as { text: string }).text;
+
+    expect(text).toContain('### Flood Stages');
+    expect(text).toContain('**Action Stage:** 7.5 ft');
+    expect(text).toContain('**Minor Flood:** 10.2 ft');
+    expect(text).toContain('**Moderate Flood:** 14.3 ft');
+    expect(text).toContain('**Major Flood:** 18.7 ft');
+
+    const iAction = text.indexOf('**Action Stage:**');
+    const iMinor = text.indexOf('**Minor Flood:**');
+    const iModerate = text.indexOf('**Moderate Flood:**');
+    const iMajor = text.indexOf('**Major Flood:**');
+    expect(iAction).toBeLessThan(iMinor);
+    expect(iMinor).toBeLessThan(iModerate);
+    expect(iModerate).toBeLessThan(iMajor);
+  });
+
+  it('renders exactly two rows for an action+minor-only gauge, and labels a forecast point above minor MINOR (deriveFloodCategory skip)', async () => {
+    // G13: moderate/major are the genuine -9999 "not published" sentinel, not
+    // absent keys and not duplicates of action/minor — a fixture where every
+    // level shared a value could not exercise the skip.
+    const categories: FloodCategories = {
+      action: { stage: 8 },
+      minor: { stage: 10 },
+      moderate: { stage: -9999 },
+      major: { stage: -9999 }
+    };
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', categories } })
+    ]);
+
+    const stagesResult = await callHandler({});
+    const stagesText = (stagesResult.content[0] as { text: string }).text;
+    expect(stagesText).toContain('**Action Stage:** 8.0 ft');
+    expect(stagesText).toContain('**Minor Flood:** 10.0 ft');
+    expect(stagesText).not.toContain('**Moderate Flood:**');
+    expect(stagesText).not.toContain('**Major Flood:**');
+
+    // Now drive the same categories through the forecast-series path (the
+    // only call site of deriveFloodCategory) with a point above minor but
+    // nowhere near a real moderate/major threshold. Without the skip this
+    // falls through every unreal level and reads as no category at all.
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', categories } })
+    ]);
+    const getNWPSStageFlowMock = vi.fn().mockResolvedValue({
+      forecast: { data: [forecastPoint('2026-07-18T00:00:00Z', 12.0)] }
+    });
+    const noaaServiceWithStageFlow = {
+      getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+      getNWPSStageFlow: getNWPSStageFlowMock
+    } as never;
+
+    const seriesResult = await handleGetRiverConditions(
+      { latitude: BASE_LAT, longitude: BASE_LON, detail: 'full' },
+      noaaServiceWithStageFlow,
+      {} as never,
+      {} as never,
+      {} as never
+    );
+    const seriesText = (seriesResult.content[0] as { text: string }).text;
+    expect(seriesText).toContain('12.00 ft 🟠 MINOR');
+    expect(seriesText).not.toMatch(/12\.00 ft\n/); // must not fall through to "no category"
+  });
+
+  it('renders the no-thresholds line and no rows at both detail="standard" and detail="full" when all four stages are sentinel', async () => {
+    const categories: FloodCategories = {
+      action: { stage: -9999 },
+      minor: { stage: -9999 },
+      moderate: { stage: -9999 },
+      major: { stage: -9999 }
+    };
+    const gauge = buildGauge({ flood: { stageUnits: 'ft', categories } });
+
+    for (const detail of ['standard', 'full'] as const) {
+      getNWPSGaugesInBoundingBoxMock.mockResolvedValue([gauge]);
+      const result = await callHandler({ detail });
+      const text = (result.content[0] as { text: string }).text;
+
+      expect(text).toContain('### Flood Stages');
+      expect(text).toContain(
+        '*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published ' +
+          'thresholds, not an absence of flood risk — the **Flood Category:** line above comes from ' +
+          "NOAA's own status.*"
+      );
+      expect(text).not.toContain('**Action Stage:**');
+      expect(text).not.toContain('**Minor Flood:**');
+      expect(text).not.toContain('**Moderate Flood:**');
+      expect(text).not.toContain('**Major Flood:**');
+    }
+  });
+
+  it('renders no flow clause for a -9999 or 0 crest flow, and a clause for a real one — never printing NaN, undefined, or -9999', async () => {
+    // NWPS uses BOTH -9999 and 0 for an unrecorded crest flow (20 of PRTO3's 26
+    // recent crests are `flow: 0`). A crest is a peak, so zero flow is never a real
+    // measurement. `isRealValue` alone treats 0 as real, so the renderer excludes it
+    // explicitly rather than relying on the pre-fix truthy check that hid it by luck.
+    const recent: HistoricCrest[] = [
+      { stage: 12.5, occurredTime: '2020-03-15T00:00:00Z', flow: -9999 },
+      { stage: 13.1, occurredTime: '2021-03-15T00:00:00Z', flow: 4200 },
+      { stage: 11.9, occurredTime: '2022-03-15T00:00:00Z', flow: 0 }
+    ];
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', flowUnits: 'cfs', crests: { recent } } })
+    ]);
+
+    const result = await callHandler({});
+    const text = (result.content[0] as { text: string }).text;
+
+    expect(text).toContain('### Recent Historic Crests');
+    expect(text).toContain('**2020:** 12.50 ft');
+    expect(text).not.toMatch(/\*\*2020:\*\* 12\.50 ft \(/); // no flow clause on the sentinel
+    expect(text).toContain('**2021:** 13.10 ft (4200 cfs)');
+    expect(text).toContain('**2022:** 11.90 ft');
+    expect(text).not.toMatch(/\*\*2022:\*\* 11\.90 ft \(/); // zero flow is unrecorded, not a measurement
+    expect(text).not.toContain('(0 cfs)');
+
+    expect(text).not.toContain('NaN');
+    expect(text).not.toContain('undefined');
+    expect(text).not.toContain('-9999');
+  });
+
+  it('skips a crest whose stage is -9999 entirely, rendering only the real ones', async () => {
+    const recent: HistoricCrest[] = [
+      { stage: -9999, occurredTime: '2019-03-15T00:00:00Z', flow: 500 },
+      { stage: 10.4, occurredTime: '2020-03-15T00:00:00Z', flow: 900 }
+    ];
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', flowUnits: 'cfs', crests: { recent } } })
+    ]);
+
+    const result = await callHandler({});
+    const text = (result.content[0] as { text: string }).text;
+
+    expect(text).toContain('### Recent Historic Crests');
+    expect(text).not.toContain('**2019:**');
+    expect(text).toContain('**2020:** 10.40 ft (900 cfs)');
   });
 });

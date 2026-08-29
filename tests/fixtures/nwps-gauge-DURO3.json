@@ -1,0 +1,280 @@
+{
+  "lid":  "DURO3",
+  "usgsId":  "14206950",
+  "reachId":  "23805270",
+  "name":  "Fanno Creek at Durham",
+  "description":  "FANNO CR AT DURHAM",
+  "rfc":  {
+    "abbreviation":  "NWRFC",
+    "name":  "Northwest River Forecast Center"
+  },
+  "wfo":  {
+    "abbreviation":  "PQR",
+    "name":  "Portland"
+  },
+  "state":  {
+    "abbreviation":  "OR",
+    "name":  "Oregon"
+  },
+  "county":  "Washington",
+  "timeZone":  "PST8PDT",
+  "latitude":  45.403452,
+  "longitude":  -122.754819,
+  "pedts":  {
+    "observed":  "HGIRG",
+    "forecast":  "HGIFZ"
+  },
+  "status":  {
+    "observed":  {
+      "primary":  1.81,
+      "primaryUnit":  "ft",
+      "secondary":  0.002,
+      "secondaryUnit":  "kcfs",
+      "floodCategory":  "no_flooding",
+      "validTime":  "2026-08-29T21:45:00Z"
+    },
+    "forecast":  {
+      "primary":  -999,
+      "primaryUnit":  "",
+      "secondary":  -999,
+      "secondaryUnit":  "",
+      "floodCategory":  "fcst_not_current",
+      "validTime":  "0001-01-01T00:00:00Z"
+    }
+  },
+  "flood":  {
+    "stageUnits":  "ft",
+    "flowUnits":  "cfs",
+    "categories":  {
+      "major":  {
+        "stage":  -9999,
+        "flow":  -9999
+      },
+      "moderate":  {
+        "stage":  -9999,
+        "flow":  -9999
+      },
+      "minor":  {
+        "stage":  9.1,
+        "flow":  1050
+      },
+      "action":  {
+        "stage":  7.4,
+        "flow":  700
+      }
+    },
+    "lro":  null,
+    "crests":  {
+      "historic":  [
+        {
+          "occurredTime":  "2015-12-07T16:30:00Z",
+          "stage":  11.78,
+          "flow":  1680,
+          "preliminary":  "O",
+          "olddatum":  false
+        },
+        {
+          "occurredTime":  "2017-02-06T01:00:00Z",
+          "stage":  11.23,
+          "flow":  1540,
+          "preliminary":  "O",
+          "olddatum":  false
+        },
+        {
+          "occurredTime":  "2016-11-25T12:00:00Z",
+          "stage":  10.69,
+          "flow":  1413,
+          "preliminary":  "O",
+          "olddatum":  false
+        },
+        {
+          "occurredTime":  "2015-12-18T02:30:00Z",
+          "stage":  10.27,
+          "flow":  1310,
+          "preliminary":  "O",
+          "olddatum":  false
+        },
+        {
+          "occurredTime":  "2025-12-19T08:00:00Z",
+          "stage":  9.21,
+          "flow":  1065,
+          "preliminary":  "P",
+          "olddatum":  false
+        }
+      ],
+      "recent":  [
+        {
+          "occurredTime":  "2025-12-19T08:00:00Z",
+          "stage":  9.21,
+          "flow":  1065,
+          "preliminary":  "P",
+          "olddatum":  false
+        },
+        {
+          "occurredTime":  "2017-02-06T01:00:00Z",
+          "stage":  11.23,
+          "flow":  1540,
+          "preliminary":  "O",
+          "olddatum":  false
+        },
+        {
+          "occurredTime":  "2016-11-25T12:00:00Z",
+          "stage":  10.69,
+          "flow":  1413,
+          "preliminary":  "O",
+          "olddatum":  false
+        },
+        {
+          "occurredTime":  "2015-12-18T02:30:00Z",
+          "stage":  10.27,
+          "flow":  1310,
+          "preliminary":  "O",
+          "olddatum":  false
+        },
+        {
+          "occurredTime":  "2015-12-07T16:30:00Z",
+          "stage":  11.78,
+          "flow":  1680,
+          "preliminary":  "O",
+          "olddatum":  false
+        }
+      ]
+    },
+    "lowWaters":  {
+      "historic":  []
+    },
+    "impacts":  [
+      {
+        "stage":  9.1,
+        "statement":  ""
+      }
+    ]
+  },
+  "images":  {
+    "probability":  {
+      "weekint":  {
+        "stage":  "",
+        "flow":  "",
+        "volume":  ""
+      },
+      "entperiod":  {
+        "stage":  "",
+        "flow":  "",
+        "volume":  ""
+      },
+      "shortrange":  ""
+    },
+    "hydrograph":  {
+      "default":  "https://water.noaa.gov/resources/hydrographs/duro3_hg.png",
+      "floodcat":  "https://water.noaa.gov/resources/hydrographs/duro3_record.png"
+    },
+    "photos":  [
+      {
+        "id":  "874714091350266350",
+        "type":  "Feature",
+        "geometry":  {
+          "type":  "Point",
+          "coordinates":  [
+            45.403452,
+            -122.754819
+          ]
+        },
+        "properties":  {
+          "image":  "https://water.noaa.gov/resources/photos/duro3/874714091350266350.jpeg",
+          "caption":  "USGS gage equipment"
+        }
+      },
+      {
+        "id":  "993518487394980334",
+        "type":  "Feature",
+        "geometry":  {
+          "type":  "Point",
+          "coordinates":  [
+            45.403452,
+            -122.754819
+          ]
+        },
+        "properties":  {
+          "image":  "https://water.noaa.gov/resources/photos/duro3/993518487394980334.jpeg",
+          "caption":  "downstream view from Durham Road bridge"
+        }
+      },
+      {
+        "id":  "1109079676325073390",
+        "type":  "Feature",
+        "geometry":  {
+          "type":  "Point",
+          "coordinates":  [
+            45.403452,
+            -122.754819
+          ]
+        },
+        "properties":  {
+          "image":  "https://water.noaa.gov/resources/photos/duro3/1109079676325073390.jpeg",
+          "caption":  "upstream view from Durham Road bridge"
+        }
+      }
+    ]
+  },
+  "dataAttribution":  [
+    {
+      "abbrev":  "US Geological Survey",
+      "text":  "USGS--Water Resources of the United States",
+      "title":  "US Geological Survey",
+      "url":  "https://waterdata.usgs.gov/nwis"
+    },
+    {
+      "abbrev":  "USGS",
+      "text":  "14206950",
+      "title":  "Observations courtesy of U.S. Geological Survey",
+      "url":  "https://waterdata.usgs.gov/nwis/inventory/?site_no=14206950"
+    }
+  ],
+  "impactsLowWaters":  [],
+  "normalThreshold":  null,
+  "hydronotes":  [
+    {
+      "statement":  "Preliminary flood stage.  For informational purposes only.",
+      "effective":  "0101",
+      "expiration":  "1231"
+    }
+  ],
+  "datums":  {
+    "vertical":  {
+      "value":  [
+        {
+          "label":  "North American Vertical Datum of 1988",
+          "abbrev":  "NAVD88",
+          "description":  "A fixed reference for elevations determined by geodetic leveling. The datum was derived from a general adjustment of the first-order terrestrial leveling nets of the United States, Canada, and Mexico. In the adjustment, only the height of the primary tidal bench mark, referenced to the International Great Lakes Datum of 1985 (IGLD 85) local mean sea level height value, at Father Point, Rimouski, Quebec, Canada was held fixed, thus providing minimum constraint. NAVD 88 and IGLD 85 are identical. However, NAVD 88 bench mark values are given in Helmert orthometric height units while IGLD 85 values are in dynamic heights. See International Great Lakes Datum of 1985, National Geodetic Vertical Datum of 1929, and geopotential difference. NAVD 88 should not be used as Mean Sea Level.",
+          "value":  115.78
+        }
+      ]
+    },
+    "horizontal":  {
+      "value":  []
+    },
+    "notes":  {
+      "value":  []
+    }
+  },
+  "inundation":  {
+    "enabled":  false,
+    "url":  "",
+    "zeroDatum":  null,
+    "downloads":  null,
+    "siteSpecificInfo":  "",
+    "dataAttribution":  []
+  },
+  "upstreamLid":  "FNNO3",
+  "downstreamLid":  "TUAO3",
+  "inService":  {
+    "enabled":  true,
+    "message":  ""
+  },
+  "lowThreshold":  null,
+  "forecastReliability":  "Forecasts are not available. Only observed stages are available for this point.",
+  "TruncateObs":  "-1",
+  "TruncateFcst":  "0",
+  "ObservedFloodCategory":  "no_flooding",
+  "ForecastFloodCategory":  "fcst_not_current"
+}

@@ -1,0 +1,153 @@
+{
+  "lid":  "KCMO3",
+  "usgsId":  "",
+  "reachId":  "23815512",
+  "name":  "Kellogg Creek near Milwaukie",
+  "description":  "",
+  "rfc":  {
+    "abbreviation":  "NWRFC",
+    "name":  "Northwest River Forecast Center"
+  },
+  "wfo":  {
+    "abbreviation":  "PQR",
+    "name":  "Portland"
+  },
+  "state":  {
+    "abbreviation":  "OR",
+    "name":  "Oregon"
+  },
+  "county":  "Clackamas",
+  "timeZone":  "GMT0GMT",
+  "latitude":  45.4317,
+  "longitude":  -122.6275,
+  "pedts":  {
+    "observed":  "HGIRG",
+    "forecast":  ""
+  },
+  "status":  {
+    "observed":  {
+      "primary":  3.53,
+      "primaryUnit":  "ft",
+      "secondary":  -999,
+      "secondaryUnit":  "kcfs",
+      "floodCategory":  "not_defined",
+      "validTime":  "2026-08-29T22:15:00Z"
+    },
+    "forecast":  {
+      "primary":  -999,
+      "primaryUnit":  "",
+      "secondary":  -999,
+      "secondaryUnit":  "",
+      "floodCategory":  "fcst_not_current",
+      "validTime":  "0001-01-01T00:00:00Z"
+    }
+  },
+  "flood":  {
+    "stageUnits":  "ft",
+    "flowUnits":  "cfs",
+    "categories":  {
+      "major":  {
+        "stage":  -9999,
+        "flow":  -9999
+      },
+      "moderate":  {
+        "stage":  -9999,
+        "flow":  -9999
+      },
+      "minor":  {
+        "stage":  -9999,
+        "flow":  -9999
+      },
+      "action":  {
+        "stage":  -9999,
+        "flow":  -9999
+      }
+    },
+    "lro":  null,
+    "crests":  {
+      "historic":  [
+        {
+          "occurredTime":  "2023-12-06T18:30:00Z",
+          "stage":  7.44,
+          "flow":  500,
+          "preliminary":  "P",
+          "olddatum":  false
+        }
+      ],
+      "recent":  [
+        {
+          "occurredTime":  "2023-12-06T18:30:00Z",
+          "stage":  7.44,
+          "flow":  500,
+          "preliminary":  "P",
+          "olddatum":  false
+        }
+      ]
+    },
+    "lowWaters":  {
+      "historic":  []
+    },
+    "impacts":  []
+  },
+  "images":  {
+    "probability":  {
+      "weekint":  {
+        "stage":  "",
+        "flow":  "",
+        "volume":  ""
+      },
+      "entperiod":  {
+        "stage":  "",
+        "flow":  "",
+        "volume":  ""
+      },
+      "shortrange":  ""
+    },
+    "hydrograph":  {
+      "default":  "https://water.noaa.gov/resources/hydrographs/kcmo3_hg.png",
+      "floodcat":  "https://water.noaa.gov/resources/hydrographs/kcmo3_record.png"
+    },
+    "photos":  []
+  },
+  "dataAttribution":  [],
+  "impactsLowWaters":  [],
+  "normalThreshold":  {
+    "value":  0,
+    "units":  "ft"
+  },
+  "hydronotes":  [],
+  "datums":  {
+    "vertical":  {
+      "value":  []
+    },
+    "horizontal":  {
+      "value":  []
+    },
+    "notes":  {
+      "value":  []
+    }
+  },
+  "inundation":  {
+    "enabled":  false,
+    "url":  "",
+    "zeroDatum":  null,
+    "downloads":  null,
+    "siteSpecificInfo":  "",
+    "dataAttribution":  []
+  },
+  "upstreamLid":  "",
+  "downstreamLid":  "",
+  "inService":  {
+    "enabled":  true,
+    "message":  ""
+  },
+  "lowThreshold":  {
+    "units":  "ft",
+    "value":  0
+  },
+  "forecastReliability":  "Graphical forecasts are not available during times of high water, forecast crest information can be found in the local WFO web page.",
+  "TruncateObs":  "-1",
+  "TruncateFcst":  "0",
+  "ObservedFloodCategory":  "not_defined",
+  "ForecastFloodCategory":  "fcst_not_current"
+}
