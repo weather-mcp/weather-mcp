@@ -632,14 +632,29 @@ describe('handleGetRiverConditions — in-coverage empty result stays byte-ident
  * These cases pin the *predicate* — that `NWPS_COVERED_COUNTRIES` is `{us, pr}` and
  * not the wildfire tool's `{us, pr, vi, gu}`.
  *
- * They do **not** describe production behaviour, and must not be read as proof that
- * Guam or the USVI receive the disclosure. Nominatim is queried at `zoom=3`
- * (`src/services/nominatim.ts:378-383`), and at country zoom OpenStreetMap resolves
- * every US territory to `us` — never `gu`, `vi` or `pr` — on the reverse path and on
- * the forward path that `city_name` / `save_location` use. So the three codes injected
- * below are values the live resolver cannot emit for these coordinates: in production
- * all three points match `us`, are treated as covered, and render the in-coverage
- * advice. Measured live 2026-08-28 by the issue-85 test drive; tracked in #86.
+ * `pr`, `vi` and `gu` remain values the live resolver cannot emit for these
+ * coordinates: Nominatim is queried at `zoom=3` (`src/services/nominatim.ts:378-383`),
+ * and at country zoom OpenStreetMap resolves every US territory to `us` — never `gu`,
+ * `vi` or `pr` — on the reverse path and on the forward path that `city_name` /
+ * `save_location` use (measured live 2026-08-28 by the issue-85 test drive, and again
+ * 2026-08-29 for issue #86). So this block is kept as a **seam pin on the set's
+ * contents** (G32) — proof `NWPS_COVERED_COUNTRIES` distinguishes `pr` from `vi`/`gu`
+ * as written — and must not be read as a description of production. Production
+ * behaviour for these same three points, injecting the value the resolver actually
+ * returns there (`us`), is pinned by the "territory disclosure at the live-reachable
+ * country value" block below.
+ *
+ * `pr` stays in the set for the reason `NWPS_COVERED_COUNTRIES`'s own comment gives
+ * (`src/handlers/riverConditionsHandler.ts:37-50`): OSM could start emitting it at
+ * country zoom some day, and Puerto Rico is covered today only because it resolves to
+ * `us`, not because `pr` is reachable.
+ *
+ * Under the both-signals predicate (design D1) these three cases still hold, but for a
+ * *second*, independent reason each: injected `pr` at `PUERTO_RICO_POINT` is inside the
+ * PR box, so `isInUS` alone already selects coverage; injected `vi`/`gu` at their points
+ * are outside every box, so `isInUS` alone already selects the disclosure. The set
+ * membership these cases pin is no longer what decides the outcome at these
+ * coordinates — the box check is.
  */
 describe('handleGetRiverConditions — the NWPS coverage seam: pr/vi/gu (T3, G32)', () => {
   it('covers Puerto Rico (pr): renders the in-coverage advice, not the disclosure', async () => {
@@ -673,6 +688,108 @@ describe('handleGetRiverConditions — the NWPS coverage seam: pr/vi/gu (T3, G32
 
     expect(text).toContain('United States and Puerto Rico only');
     expect(text).not.toContain('ℹ️ **No river gauges found');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 11b. Territory disclosure at the live-reachable country value (T2, G48, issue-86)
+// — deliberately adjacent to the seam block above, which redirects here for
+// production truth. The resolver injected below is 'us' at every point, because
+// that is the only value production ever produces for a US territory (measured
+// live 2026-08-29, #86). Section 11's remaining issue-85 blocks continue after it.
+// ---------------------------------------------------------------------------
+
+describe('handleGetRiverConditions — territory disclosure at the live-reachable country value (T2, G48)', () => {
+  it('discloses at Guam when the resolver answers \'us\' (the only value production emits there)', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'us');
+
+    const result = await callRiverConditions({ ...GUAM_POINT, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('United States and Puerto Rico only');
+    expect(text).toContain('not an all-clear');
+    expect(text).not.toContain('ℹ️');
+    expect(text).not.toContain('Try expanding the search radius');
+    expect(text).not.toContain('River gauges are typically');
+    expect(fakes.openMeteo.getRiverDischarge).not.toHaveBeenCalled();
+  });
+
+  it('discloses at the US Virgin Islands when the resolver answers \'us\'', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'us');
+
+    const result = await callRiverConditions({ ...VIRGIN_ISLANDS_POINT, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('United States and Puerto Rico only');
+    expect(text).toContain('not an all-clear');
+    expect(text).not.toContain('ℹ️');
+    expect(text).not.toContain('Try expanding the search radius');
+    expect(text).not.toContain('River gauges are typically');
+    expect(fakes.openMeteo.getRiverDischarge).not.toHaveBeenCalled();
+  });
+
+  it('renders the three today-standard lines verbatim at Puerto Rico (us, inside the PR box)', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'us');
+
+    const result = await callRiverConditions({ ...PUERTO_RICO_POINT, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain(
+      'ℹ️ **No river gauges found within 50 km**\n\n' +
+        'Try expanding the search radius or choosing a location closer to rivers or streams.\n\n' +
+        '**Tip:** River gauges are typically located along major rivers and waterways.\n'
+    );
+    expect(text).not.toContain('not an all-clear');
+  });
+
+  it('renders a returned gauge at Guam instead of the disclosure — the flag can never suppress data', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'us');
+    fakes.noaa.getNWPSGaugesInBoundingBox.mockResolvedValue([
+      buildGauge(GUAM_POINT.latitude, GUAM_POINT.longitude)
+    ]);
+
+    const result = await callRiverConditions({ ...GUAM_POINT, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(text).toContain('Test Gauge');
+    expect(text).not.toContain('United States and Puerto Rico only');
+  });
+
+  it('skips the reverse-country lookup at Guam (outside every box) and still discloses (D2)', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'us');
+
+    const result = await callRiverConditions({ ...GUAM_POINT, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(fakes.nominatim.reverseCountry).not.toHaveBeenCalled();
+    expect(text).toContain('United States and Puerto Rico only');
+  });
+
+  it('skips the reverse-country lookup at Rotterdam (outside every box) and still discloses (D2)', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'nl');
+
+    const result = await callRiverConditions({ ...ROTTERDAM, source: 'noaa' }, fakes);
+    const text = textOf(result);
+
+    expect(fakes.nominatim.reverseCountry).not.toHaveBeenCalled();
+    expect(text).toContain('United States and Puerto Rico only');
+  });
+
+  it('positive control: reaches the reverse-country lookup exactly once at Memphis (inside the CONUS box)', async () => {
+    const fakes = buildFakes([]);
+    fakes.nominatim = makeNominatimFake(async () => 'us');
+
+    const result = await callRiverConditions({ ...MEMPHIS }, fakes);
+    const text = textOf(result);
+
+    expect(fakes.nominatim.reverseCountry).toHaveBeenCalledTimes(1);
+    expect(text).toContain('ℹ️ **No river gauges found within 50 km**');
   });
 });
 
