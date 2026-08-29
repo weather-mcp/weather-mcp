@@ -118,11 +118,11 @@ describe('handleGetRiverConditions', () => {
 
       if (crestsPerGauge > 0) {
         const recent: HistoricCrest[] = Array.from({ length: crestsPerGauge }, (_, c) => ({
-          value: 10 + c,
-          date: `20${20 + c}-03-15T00:00:00Z`
+          stage: 10 + c,
+          occurredTime: `20${20 + c}-03-15T00:00:00Z`
         }));
         gauge.flood = {
-          categories: { action: 8, minor: 10, moderate: 14, major: 18 },
+          categories: { action: { stage: 8 }, minor: { stage: 10 }, moderate: { stage: 14 }, major: { stage: 18 } },
           crests: { recent }
         };
       }
@@ -472,7 +472,7 @@ describe('handleGetRiverConditions forecast series (detail="full")', () => {
         }
       },
       flood: {
-        categories: { action: 8, minor: 10, moderate: 14, major: 18 }
+        categories: { action: { stage: 8 }, minor: { stage: 10 }, moderate: { stage: 14 }, major: { stage: 18 } }
       }
     };
   }

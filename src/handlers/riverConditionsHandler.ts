@@ -104,6 +104,18 @@ const TREND_FETCH_BATCH = 5;
  */
 const FORECAST_SERIES_CAP = 80;
 
+/**
+ * The flood-category levels, in ascending severity, paired with their rendered
+ * labels. Ordering is the render order for `### Flood Stages`; `deriveFloodCategory`
+ * walks the same set in the opposite direction.
+ */
+const FLOOD_LEVEL_LABELS: ReadonlyArray<readonly [keyof FloodCategories, string]> = [
+  ['action', 'Action Stage'],
+  ['minor', 'Minor Flood'],
+  ['moderate', 'Moderate Flood'],
+  ['major', 'Major Flood']
+];
+
 export interface StageTrend {
   direction: 'rising' | 'falling' | 'steady';
   delta: number; // ft, latest minus baseline
@@ -744,20 +756,44 @@ function formatGaugeDetails(
     output += `\n`;
   }
 
-  // Flood stages
-  if (gauge.flood?.categories) {
+  // Flood stages. The section is gated on having a per-gauge detail response at all
+  // (`gauge.flood`), not on the thresholds being real: a gauge NOAA publishes nothing
+  // for gets an explicit line (D5), while a gauge whose detail fetch failed or was
+  // rate-limited has no `flood` and renders no section at all (D6). Those are
+  // different statements and a reader on a rising river needs to tell them apart.
+  if (gauge.flood) {
     const cat = gauge.flood.categories;
-    output += `### Flood Stages\n`;
-    output += `**Action Stage:** ${cat.action.toFixed(1)} ft\n`;
-    output += `**Minor Flood:** ${cat.minor.toFixed(1)} ft\n`;
-    output += `**Moderate Flood:** ${cat.moderate.toFixed(1)} ft\n`;
-    output += `**Major Flood:** ${cat.major.toFixed(1)} ft\n\n`;
+    const stageUnits = gauge.flood.stageUnits ?? 'ft';
 
-    // Show stage relative to flood levels if we have current stage
-    if (isRealValue(gauge.status.observed?.primary)) {
-      const currentStage = gauge.status.observed.primary;
-      const pctToAction = ((currentStage / cat.action) * 100).toFixed(0);
-      output += `**Current stage is ${pctToAction}% of action stage**\n\n`;
+    // One row per level NOAA actually publishes, in ascending severity. Thresholds
+    // print unrounded — they are NOAA's published gauge metadata at NOAA's own
+    // precision (the v1.25.6 contract rounds the *reading*, never the threshold).
+    const publishedLevels: Array<{ label: string; stage: number }> = [];
+    for (const [key, label] of FLOOD_LEVEL_LABELS) {
+      const levelStage = cat?.[key]?.stage;
+      if (isRealValue(levelStage)) {
+        publishedLevels.push({ label, stage: levelStage });
+      }
+    }
+
+    output += `### Flood Stages\n`;
+    if (publishedLevels.length > 0) {
+      for (const level of publishedLevels) {
+        output += `**${level.label}:** ${level.stage.toFixed(1)} ${stageUnits}\n`;
+      }
+      output += `\n`;
+
+      // Show stage relative to flood levels if we have both a current stage and a
+      // real action stage to measure it against. A sentinel action stage yields no
+      // line rather than `NaN%`.
+      const actionStage = cat?.action?.stage;
+      if (isRealValue(gauge.status.observed?.primary) && isRealValue(actionStage)) {
+        const currentStage = gauge.status.observed.primary;
+        const pctToAction = ((currentStage / actionStage) * 100).toFixed(0);
+        output += `**Current stage is ${pctToAction}% of action stage**\n\n`;
+      }
+    } else {
+      output += `*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published thresholds, not an absence of flood risk — the **Flood Category:** line above comes from NOAA's own status.*\n\n`;
     }
   }
 
@@ -805,22 +841,32 @@ function formatGaugeDetails(
     }
   }
 
-  // Historic crests (if available and significant)
+  // Historic crests (if available and significant). A crest with no real stage, or
+  // with an unparseable date, is skipped rather than rendered as a row with a
+  // missing number — the cap counts rows actually printed. The flow clause is
+  // guarded by `isRealValue`, not by truthiness: live crest flows include -9999,
+  // which is truthy and would otherwise print as `(-9999 cfs)`.
   if (gauge.flood?.crests?.recent && gauge.flood.crests.recent.length > 0) {
-    output += `### Recent Historic Crests\n`;
-    const recentCrests = gauge.flood.crests.recent.slice(0, crestCap);
-    for (const crest of recentCrests) {
-      const crestDate = new Date(crest.date);
-      output += `- **${crestDate.getFullYear()}:** ${crest.value.toFixed(2)} ft`;
-      if (crest.flow) {
-        output += ` (${crest.flow.toFixed(0)} cfs)`;
+    const stageUnits = gauge.flood.stageUnits ?? 'ft';
+    const flowUnits = gauge.flood.flowUnits ?? 'cfs';
+    const crestRows: string[] = [];
+    for (const crest of gauge.flood.crests.recent) {
+      if (crestRows.length >= crestCap) break;
+      if (!isRealValue(crest.stage)) continue;
+      if (!crest.occurredTime) continue;
+      const crestDate = new Date(crest.occurredTime);
+      if (Number.isNaN(crestDate.getTime())) continue;
+
+      let row = `- **${crestDate.getFullYear()}:** ${crest.stage.toFixed(2)} ${stageUnits}`;
+      if (isRealValue(crest.flow)) {
+        row += ` (${crest.flow.toFixed(0)} ${flowUnits})`;
       }
-      if (crest.description) {
-        output += ` - ${crest.description}`;
-      }
-      output += `\n`;
+      crestRows.push(row);
     }
-    output += `\n`;
+    if (crestRows.length > 0) {
+      output += `### Recent Historic Crests\n`;
+      output += `${crestRows.join('\n')}\n\n`;
+    }
   }
 
   output += `---\n\n`;
@@ -839,10 +885,17 @@ function deriveFloodCategory(stage: number, categories: FloodCategories): 'major
   // action stage.
   const shown = displayValue(stage, 2);
 
-  if (shown >= categories.major) return 'major';
-  if (shown >= categories.moderate) return 'moderate';
-  if (shown >= categories.minor) return 'minor';
-  if (shown >= categories.action) return 'action';
+  // Skip any level NOAA does not publish and keep descending. The skip is
+  // load-bearing: on an action+minor-only gauge a stage above minor must label
+  // MINOR rather than falling through to null.
+  const major = categories.major?.stage;
+  if (isRealValue(major) && shown >= major) return 'major';
+  const moderate = categories.moderate?.stage;
+  if (isRealValue(moderate) && shown >= moderate) return 'moderate';
+  const minor = categories.minor?.stage;
+  if (isRealValue(minor) && shown >= minor) return 'minor';
+  const action = categories.action?.stage;
+  if (isRealValue(action) && shown >= action) return 'action';
   return null;
 }
 
