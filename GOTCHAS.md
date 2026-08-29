@@ -1745,10 +1745,18 @@ failure — which is the dangerous half: a red publish run reads as "not shipped
 to anyone glancing at the Actions tab, and a later release cut on that
 misreading would be the real damage.
 
+**Second occurrence:** 2026-08-29, v1.25.11 (run `33235201174`). Same shape,
+wider margin: the publish step ended `+ @dangahagan/weather-mcp@1.25.11` at
+`05:03:47Z` with provenance in the sigstore log (`logIndex=2633268167`), the
+verifier gave up at `06:20Z`, and `latest` moved to 1.25.11 roughly **five
+minutes** after the publish — twice the verifier's whole budget. Two occurrences
+in three days, and the lag is growing, so this is npm's steady-state behaviour
+rather than a bad day.
+
 **Status:** active. The fix is in the workflow, not in the reader: widen the poll
 (30 attempts at 15s, or 10 at 60s) and, on exhaustion, distinguish "publish step
-failed" from "still propagating" rather than emitting a bare error. Filed as a
-follow-up. Related: [G9] and [G14] (release tooling that runs more than it
+failed" from "still propagating" rather than emitting a bare error. Filed as
+[weather-mcp#90](https://github.com/weather-mcp/weather-mcp/issues/90). Related: [G9] and [G14] (release tooling that runs more than it
 appears to), [G38] (the sibling case — a release check that reports a confident
 failure it never actually measured).
 
