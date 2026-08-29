@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.25.11 (Production Ready)
+- **Version:** 1.25.12 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -92,6 +92,7 @@ src/
 5. **Error Hierarchy:** Custom error classes for different failure scenarios
 6. **Three-layer split for computed features:** service fetches → pure zero-I/O util computes → handler renders. The pure module owns constants; the service imports them from the util, never the reverse (e.g. `COMPARISON_MODELS`, `ENSEMBLE_MODEL`)
 7. **Route by country, not by bounding box, for jurisdictional data** (alerts, wildfire): `NominatimService.reverseCountry` resolves the country once; saved/geocoded locations carry `country_code` through `ResolvedLocation` and skip the lookup (alerts also route to the national CAP feeds ahead of Google)
+8. **A rendered coverage claim needs both signals — country *and* geography.** OSM resolves every US territory to `us` at country zoom, so a country set alone cannot tell Puerto Rico (gauged) from Guam (not), and `isInUS` alone cannot tell the US from Toronto. `get_river_conditions` requires both. Promoting a routing heuristic to a claim the user reads also inherits every edge it was previously allowed to get wrong, so widen the boxes to the jurisdiction's real extent when you do it (`src/utils/geography.ts`, GOTCHAS G53)
 
 ## Key Features (17 MCP Tools)
 
@@ -580,15 +581,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.25.11 — Production Ready ✅
-- **Test Coverage:** 2,815 tests, 100% pass rate
+- **Version:** 1.25.12 — Production Ready ✅
+- **Test Coverage:** 2,830 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.25.12:** A forced NOAA river query in a US territory now discloses the NWPS coverage gap, and Puerto Rico is never denied
 - **New in v1.25.11:** A weather value Open-Meteo did not publish is now omitted instead of rendered as zero
 - **New in v1.25.10:** A forced NOAA river query outside NWPS coverage now discloses the gap instead of advising a wider search
-- **New in v1.25.9:** A lightning feed outage now reports unknown and keeps buffered strikes, instead of a false cold start
 
 ## Useful References
 
@@ -611,7 +612,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-08-29 (v1.25.11)
+**Last Updated:** 2026-08-29 (v1.25.12)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

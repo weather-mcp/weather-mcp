@@ -36,9 +36,22 @@ import type { DetailLevel } from '../utils/validation.js';
 
 /**
  * Countries NWPS actually gauges. Measured live 2026-08-28 against
- * api.water.noaa.gov/nwps/v1/gauges: Puerto Rico 116 gauges, US Virgin Islands 0,
- * Guam 0 — so this is deliberately NOT NIFC_COVERED_COUNTRIES {us, pr, vi, gu},
- * which would misreport two territories (design D4).
+ * api.water.noaa.gov/nwps/v1/gauges (with a known-non-zero control in the same
+ * batch): Puerto Rico 116 gauges, US Virgin Islands 0, Guam 0.
+ *
+ * This set alone cannot separate a territory from the mainland, and `pr` is
+ * currently unreachable. The live resolver — Nominatim `reverseCountry` at
+ * `zoom: 3`, and the forward path's `country_code` on a saved or geocoded
+ * location — emits `us` for **every** US territory, because OpenStreetMap's
+ * `country_code` is the admin-level-2 relation (measured 2026-08-29 at Guam,
+ * St Croix, San Juan and Pago Pago: `us` at both zoom 3 and zoom 5; the
+ * territory is visible only as `ISO3166-2-lvl4` at zoom ≥ 5). So `pr` never
+ * matches in production and is kept only against OSM ever emitting it at
+ * country zoom — Puerto Rico is covered today because it resolves to `us`.
+ *
+ * What actually separates Guam, the USVI, American Samoa and the Northern
+ * Marianas from the mainland and Puerto Rico is the `isInUS` box check below
+ * (design D1, issue #86). Coverage requires **both** signals.
  */
 const NWPS_COVERED_COUNTRIES = new Set(['us', 'pr']);
 
@@ -260,16 +273,21 @@ async function formatNOAARiverConditions(
       .sort((a, b) => a.distance - b.distance); // Sort by nearest first
 
     if (gaugesWithDistance.length === 0) {
-      // Lazy, and only here: the answer only ever chooses between two renderings of an
-      // empty result, and Nominatim is rate-limited to 1 req/sec server-wide (design D2).
-      // `lookupFailed` is deliberately discarded — the fallback is `isInUS`, exactly what
-      // this code did before, so a note would describe a non-event (design D7).
-      const { countryCode } = await resolveCountryCode(
-        resolvedCountryCode, latitude, longitude, nominatimService
-      );
-      const outsideCoverage = countryCode
-        ? !NWPS_COVERED_COUNTRIES.has(countryCode)
-        : !isInUS(latitude, longitude);
+      // Coverage needs both signals: the country set cannot tell a US territory from the
+      // mainland (see NWPS_COVERED_COUNTRIES above), and the boxes cannot tell Toronto
+      // from Detroit. Outside the boxes the answer is already decided whatever the country
+      // says, so the lookup is skipped there entirely — Nominatim is rate-limited to
+      // 1 req/sec server-wide (design D2, issue #86). Inside the boxes it stays lazy and
+      // local to this branch: the answer only ever chooses between two renderings of an
+      // empty result. `lookupFailed` is deliberately discarded at the one place the call
+      // is still made — the fallback is `isInUS`, exactly what this code did before, so a
+      // note would describe a non-event (design D7).
+      const inUsBoxes = isInUS(latitude, longitude);
+      const countryCode = inUsBoxes
+        ? (await resolveCountryCode(resolvedCountryCode, latitude, longitude, nominatimService)).countryCode
+        : null;
+      const outsideCoverage = !inUsBoxes
+        || (countryCode !== null && !NWPS_COVERED_COUNTRIES.has(countryCode));
 
       if (outsideCoverage) {
         // A successful-but-empty NWPS response outside its coverage. "No gauges" here means

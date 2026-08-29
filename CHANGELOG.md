@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.12] - 2026-08-29
+
+### Fixed
+
+- **A forced `source: "noaa"` river query at Guam or the US Virgin Islands
+  now renders the NWPS coverage disclosure instead of advice that cannot
+  work.** `get_river_conditions` decided NWPS coverage from a country-code
+  set alone (`{us, pr}`), but OpenStreetMap's `reverseCountry` lookup
+  resolves every US territory to `us` at country zoom — the same code
+  Puerto Rico gets — so the set matched and the tool advised expanding the
+  search radius, even though NWPS has no gauges to find there at any
+  radius. Guam and the US Virgin Islands (verified live at St Croix) now
+  render the same "United States and Puerto Rico only" disclosure Toronto
+  and Vancouver already got in v1.25.10, naming `source: "openmeteo"` as
+  the global alternative.
+
+  **Coverage now requires both signals**: the country set and the same
+  `isInUS` bounding boxes the tool already used to route `source: "auto"`.
+  The mainland is unaffected, San Juan still returns its 56 NWPS gauges,
+  and Toronto/Vancouver's routing to NWPS is untouched, so they still
+  reach the disclosure exactly as before. As a side effect, the Nominatim
+  reverse-country lookup is now skipped entirely for a point outside every
+  box, since the outcome there no longer depends on what country it
+  resolves to — one fewer rate-limited request per forced-`noaa` query at
+  a non-US point.
+
+  Files: `src/handlers/riverConditionsHandler.ts`.
+  ([#86](https://github.com/weather-mcp/weather-mcp/issues/86))
+
+- **Puerto Rico's outlying coast and islands are recognized as US again.**
+  Making the `isInUS` bounding boxes decide the river disclosure above
+  promoted them from a routing hint to a rendered claim, and the Puerto
+  Rico box covered only the island's populated middle. A forced
+  `source: "noaa"` query at Punta Agujereada — the northwest tip, 18.5208 N,
+  above the box's old 18.5 N edge — with a radius smaller than the nearest
+  gauge answered *"NWPS gauges rivers in the United States and Puerto Rico
+  only, and this location appears to be outside that coverage"*, at a point
+  in Puerto Rico with 13 NWPS gauges inside 50 km and the nearest at 14 km.
+  The box now spans the Commonwealth's real extent (17.85–18.55 N,
+  −67.95 to −65.2 W), taking in that tip, Isla Caja de Muertos in the
+  south, and Mona and Desecheo to the west.
+
+  Because `isInUS` is shared, `source: "auto"` at those coordinates also
+  reaches the US authority for current conditions, wildfire and climate
+  normals. Forecasts follow only where the NWS grid cell is land: verified
+  live, Mona Island (grid SJU 13,99) returns an NWS forecast, while the
+  cells at the northwest tip and Isla Caja de Muertos are classified marine
+  and answer *"Forecasts for marine areas are not yet supported by this
+  API"*, so `get_forecast` there falls back to Open-Meteo with its usual
+  note — the same data as before, correctly labelled. Alerts at Puerto Rico
+  land already routed to NOAA by country code, not by the box; what the box
+  adds for them is open water, so a point in the Mona Passage now gets NOAA
+  marine alerts instead of no coverage. The east edge is unchanged, so
+  St Croix and the British Virgin Islands stay outside and the territory
+  disclosure above still renders there.
+
+  Files: `src/utils/geography.ts`. Pinned by
+  `tests/unit/geography.test.ts` (six box-edge cases) and
+  `tests/unit/river-conditions-global.test.ts` (Punta Agujereada and Mona
+  Island render the radius advice, not the disclosure).
+
 ## [1.25.11] - 2026-08-29
 
 ### Fixed
@@ -1491,7 +1552,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.11...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.12...HEAD
+[1.25.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.11...v1.25.12
 [1.25.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.10...v1.25.11
 [1.25.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.9...v1.25.10
 [1.25.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.8...v1.25.9

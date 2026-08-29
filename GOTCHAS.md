@@ -430,8 +430,21 @@ same day with **both** unvalidated sites set to `9,999`, and
 `./scripts/check-doc-versions.sh` still reported `✅ All documentation checks
 passed!`.
 
+**A plan can also get this wrong one level up, 2026-08-29** (`17b2699`, issue-86
+territory NWPS coverage T4): the implementation plan reasoned that *"no
+version/tool/test-count string changes"* occurred because *"the test-count anchors
+are rewritten only by `/release`"*, and so tasked no doc update at all — while its
+own T4 acceptance required `check-doc-versions.sh` to pass. The test task then
+added seven tests (2,815 → 2,822) and left the checker **red on the branch**. The
+anchors are not `/release`'s alone: the immediately preceding commit on `main`,
+`90041f1` (a `test:` commit), moved the README badge 2,814 → 2,815 by hand. **The
+commit that moves the count moves the five sites with it**; `/release` rewrites
+them again, but it is not the first or only writer. A plan that adds or removes a
+test must task the doc update, and a plan asserting the count does not move should
+be tested against the suite rather than believed.
+
 **Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
-2026-08-25**, **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
+2026-08-25**, **extended 2026-08-29**, **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
 band-rounding T2 — the count moved 2,611 → 2,660 and all five sites were edited
 by content; with both unvalidated sites then set to `9,999` against the real
 `2,660`, `./scripts/check-doc-versions.sh` still printed `✅ README.md test
@@ -449,7 +462,7 @@ to `9,999` against the real `2,742`, `env -u FORCE_COLOR
 ./scripts/check-doc-versions.sh` still printed `✅ README.md test count`,
 `✅ CLAUDE.md test count` and `✅ All documentation checks passed!`, never once
 naming the two it does not read — the trap is intact and both gaps are still
-exactly the two this entry names). **Verify line re-run again 2026-08-28** (`b4d8722`, issue-83 absent-strike-distance T2 — the count moved 2,759 → 2,772 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,772`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count`, `✅ CLAUDE.md test count` and `✅ All documentation checks passed!`, never once naming the two it does not read — the trap is intact and both gaps are still exactly the two this entry names). Match every site by
+exactly the two this entry names). **Verify line re-run again 2026-08-28** (`b4d8722`, issue-83 absent-strike-distance T2 — the count moved 2,759 → 2,772 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,772`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count`, `✅ CLAUDE.md test count` and `✅ All documentation checks passed!`, never once naming the two it does not read — the trap is intact and both gaps are still exactly the two this entry names). **Verify line re-run again 2026-08-29** (`17b2699`, issue-86 territory NWPS coverage T4 — the count moved 2,815 → 2,822 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,822`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2822`, `✅ CLAUDE.md test count: 2822`, `✅ README.md tests badge: 2822` and `✅ All documentation checks passed!`, never once naming the two it does not read — the trap is intact and both gaps are still exactly the two this entry names). Match every site by
 content, never by line number — the `npm test`
 comment has moved twice (346 → 381). Lint candidate — anchoring a check on
 `Run all [0-9,]+ tests` and one on `docs/README.md`'s count would close both gaps
@@ -1024,7 +1037,21 @@ temp directory — and compare `tools/list` counts. 17 vs 6 is the trap.
 first summary probe reported `tools exposed: 17 | get_lightning_activity present:
 true` while claiming to test the `basic` preset, in which that tool is absent.
 
-**Status:** active. **Verify line re-run 2026-08-27** (wildfire band-rounding
+**The cheapest fix is often to not import the importer at all, 2026-08-29**
+(`17b2699`, issue-86 T3). `dotenv/config` has exactly **one** importer in this
+tree — `src/index.ts:9` — so a verification driver that imports a *handler* and
+its services directly (`dist/handlers/riverConditionsHandler.js`) never loads
+`.env` on either side, whatever cwd it runs from. That closes this entry and
+[G10]'s key-propagation half **by construction** rather than by remembering to
+scrub or forward the child environment, and it lets per-call parameters carry the
+axis under test (`units` as an argument, not `WEATHER_UNITS` in the environment).
+The technique only applies when the entry point you need is reachable below
+`src/index.ts`; a probe of the **server's** own defaults — the tool preset, the
+`tools/list` count — still has to spawn `dist/index.js` and still needs the
+temp-cwd discipline above. Check the importer set (`grep -rn dotenv src/`) rather
+than assuming it is still one file.
+
+**Status:** active, **extended 2026-08-29**. **Verify line re-run 2026-08-27** (wildfire band-rounding
 T3): the live probe spawned the built dist from a temp cwd with `ENABLED_TOOLS`
 **unset** and got **6 tools, `get_wildfire_info` absent**, against the 17 a
 repo-root spawn reports — run as an explicit control *before* the keyed and
@@ -2204,12 +2231,28 @@ exactly: Nebraska **60**, Puerto Rico **116**, USVI **0**, Guam **0**. The same
 run's T2 probes had hit the identical limit and rendered the handler's `catch`
 block at all four points; they were discarded and re-run for the same reason.
 
-**Status:** active. Related: [G10] (prove the hash is not vacuous — the same
+**Budget the batch by requests, not by probes, 2026-08-29** (`17b2699`, issue-86
+T3). The 10-per-5-minutes ceiling is easy to blow through while counting
+correctly-but-wrongly: a river probe is **not one request**. An empty-branch
+probe costs 1 (`/gauges` bbox), but a gauge-bearing probe costs **1 + up to 5**,
+because `riverConditionsHandler.ts:327-331` fetches `getNWPSStageFlow` for every
+shown gauge and the display cap is 5 (25 at `detail: "full"`). The issue-86 plan
+budgeted *"≤ 9 `/gauges` calls"* for a batch whose gauge-bearing rows alone would
+have issued 24, and a base-vs-branch pair of one such probe is 12 requests inside
+20 seconds — self-inflicted 429s on the very rows the sweep exists to compare,
+which then degrade to no-trend output and hash *identically* on both sides.
+**Two levers, both used there:** split the batch into windows of ≤ 9 requests
+with a ≥ 330 s gap, and shrink the gauge rows with a small `radius` (4 km at
+Omaha returned 1 gauge, ~2 requests, and still expressed the `📊 **Found`
+construct). Count the fan-out per probe before planning the windows.
+
+**Status:** active, **extended 2026-08-29**. Related: [G10] (prove the hash is not vacuous — the same
 failure with a number in place of rendered text), [G28] (a probe that fails
 validation reports as a clean negative), [G4] (never trust the HTTP 200 alone —
 here the status is 429 and the body is still well-formed JSON), [G48] (the
 sibling from the same feature, where the unreal thing is an injected domain
-*value* rather than a measured count). Partly lintable: a measurement helper
+*value* rather than a measured count), [G52] (a matrix axis the path ignores —
+the same "this row is not evidence" family). Partly lintable: a measurement helper
 that refuses to report unless a named control row is non-zero would close it
 mechanically.
 
@@ -2253,12 +2296,41 @@ the advice the issue was filed to remove — futile at Guam, which returns 0 gau
 the maximum `radius: 500`. The `'pr'` member is unreachable; Puerto Rico is covered
 because it resolves to `us`. Tracked in #86.
 
-**Status:** active. Related: [G45] (a mutation only goes red where the contract can
+**The defect this entry recorded is fixed, and the entry's prediction was
+confirmed under mutation, 2026-08-29** (`e2622f5` + `9447710`, issue #86).
+Coverage now requires the `isInUS` boxes as well as the country set, so Guam and
+the USVI render the disclosure live. The rule stands unchanged — what closed is
+the instance, not the trap — and the run produced the cleanest demonstration of
+it yet. Mutating the predicate back to the pre-fix form turned **exactly four**
+tests red, all of them from the new block that injects `'us'` (the value the live
+resolver actually emits); the three original seam cases injecting `'pr'`, `'vi'`
+and `'gu'` stayed **green**, because the mutation and those fixtures share the
+same false premise. A reviewer reading only the old block plus a green mutation
+row would still have concluded the behaviour was pinned. Both blocks are now kept
+deliberately: the injected-`us` block as the description of production, and the
+injected-`pr`/`vi`/`gu` block as a seam pin on the *inclusion* of `pr` — no more
+than that, with a header comment saying which is which.
+
+**Corrected 2026-08-29 by `/diff-review` (claude), MINOR-1.** This paragraph and
+the test header first claimed the injected-`pr`/`vi`/`gu` block was a seam pin on
+"the set's contents", i.e. proof the set distinguishes `pr` from `vi`/`gu`. A
+mutation disproved it: widening `NWPS_COVERED_COUNTRIES` to the wildfire tool's
+`{us, pr, vi, gu}` left `tests/unit/river-conditions-global.test.ts` all-green
+(**38 passed (38)** as measured at `938a8e0`), because the new `!inUsBoxes ||`
+term short-circuits at Guam and the USVI before the set is read. Dropping `pr` still goes red (1), so inclusion is
+pinned and exclusion is not. The lesson generalises past this entry and is filed as
+[G54]: **after adding a short-circuit in front of an existing condition, mutate the
+inner term and check the old block still goes red** — and where it does not, say
+which alternative became indistinguishable rather than describing the block as
+proof of the term it can no longer reach.
+
+**Status:** active — the rule, with its original instance closed. Related: [G45] (a mutation only goes red where the contract can
 reach it — this is the case where it goes red for the wrong reason), [G32] (mutating
 to the rejected implementation, which shares the fixture's premise and so cannot
 expose it), [G11] (read the real output — the only check that caught this), [G47]
 (the sibling from the same branch, where the *number* rather than the *value* was
-unreal). Not lintable: nothing in the type system distinguishes a reachable domain
+unreal), [G51] (this entry read backwards — the wire produces a value the *type*
+denies). Not lintable: nothing in the type system distinguishes a reachable domain
 value from an unreachable one.
 
 ## G49 — A re-based line citation computed by arithmetic is wrong twice over: the diff's line count is not the file's growth, and the cited line is often not the construct
@@ -2395,6 +2467,142 @@ never what the wire sends.
 resolver never produces — this is that entry read backwards: the live resolver
 produces a value the *type* denies), [G11] (read the real output). Not
 lintable — it is a claim about the upstream, not about the code.
+
+## G52 — A probe-matrix axis the code under test never reads produces duplicate rows that look like independent coverage
+
+**Trigger:** reporting a verification matrix with more than one axis — the
+bindings' standing **unit system × provider path** matrix, a detail-level sweep,
+a locale or preset axis — where each cell is presented as its own row of
+evidence.
+
+**Rule:** before reporting the matrix, confirm the **render path under test
+actually reads that axis**. Grep the formatter for the resolver
+(`resolveUnitPreferences`, the detail parameter, the preset lookup) and check it
+is called *on the path you probed*, not merely somewhere in the file. An axis
+the path ignores yields N identical rows, and N identical rows are one probe
+reported N times. Say which axis was real and which collapsed, rather than
+publishing a cell count that overstates what was exercised.
+
+**Why:** the arithmetic is silently flattering and every row looks healthy. The
+rows are not vacuous in [G10]'s sense — the construct is present, the feed is up,
+the hashes match for the right reason — so the construct grep, the positive
+control and the byte-identity comparison all pass while the matrix proves a
+fraction of what its shape claims. The failure compounds with a base-vs-branch
+sweep: identical hashes *across* trees are the result you want, and identical
+hashes *across the axis* sit in the same table looking equally like success. It
+also mis-aims future work, because the matrix is the record a later plan reads
+to decide what is already covered.
+
+**Verify:** take any two cells of the matrix that differ only in the axis and
+`diff` their raw outputs. Identical bytes mean the axis collapsed; then grep the
+formatter that produced them for the axis's resolver and confirm whether the call
+exists on that path at all.
+
+**Evidence:** 2026-08-29 (`17b2699`, issue-86 territory NWPS coverage T3). The
+byte-identity sweep ran four subjects in **imperial and metric**, eight rows, all
+identical across trees with non-zero construct counts. Four of those rows were
+duplicates: `resolveUnitPreferences` is called at
+`riverConditionsHandler.ts:463`, inside `formatOpenMeteoRiverConditions`
+(`:446`–), and **`formatNOAARiverConditions` (`:227`–`:397`) never calls it** —
+the NOAA path renders distances dual unconditionally (`50 km (31.1 miles)`,
+`1.4 km (0.9 mi)`) and gauge stage in NWPS's native feet. So `units: "metric"` is
+a no-op there and `omaha-imp` hashed identically to `omaha-met` for a reason that
+had nothing to do with the change under test. Caught by diffing the two branch
+outputs against each other rather than only against their base counterparts. The
+real metric evidence came from the Open-Meteo path, which does honour the
+preference (`3.6 m³/s (127 ft³/s)`). Recorded as an observation rather than
+fixed: it is pre-existing, `units` is undocumented for `get_river_conditions`,
+and the plan was scoped to one predicate in an F1 file.
+
+**Status:** active. Related: [G10] (the same "this row proves nothing" family,
+where the cause is a failing feed or a subject that cannot express the
+construct — here the feed is healthy and the subject is fine, and it is the
+*axis* that is inert), [G47] (the numeric sibling), [G11] (reading the output is
+what exposed it). Partly lintable — a matrix helper that diffs sibling cells and
+refuses to count identical ones as separate rows would close it mechanically.
+
+## G53 — Promoting a routing heuristic to a rendered claim inherits every edge it was allowed to get wrong
+
+**Trigger:** a predicate that only ever *chose a data source* starts also deciding
+what the output *asserts* — a bounding box, a locale guess, a tier lookup that now
+selects between "here is your data" and "we do not cover you".
+
+**Rule:** re-audit the predicate's edges against the thing it is now claiming, not
+against the thing it used to route. A box that is 95% right is fine for "which
+upstream do I ask"; the wrong 5% costs one extra API call. The same box behind a
+sentence that names a jurisdiction is a false statement about that jurisdiction.
+Enumerate the extremes of every region the *rendered text* names by name, not only
+the ones the original routing cared about.
+
+**Why:** the promotion is invisible in the diff — the predicate is unchanged, only
+its consumer is new — so a reviewer checking "did `isInUS` change?" gets a clean
+answer and stops. And the plan's own safety argument reads as airtight ("this can
+only add disclosures, and only at points routing already refuses"), which is true
+and still permits a false claim, because "routed elsewhere" and "not covered" are
+different statements about the same coordinate.
+
+**Evidence:** 2026-08-29, issue-86 territory NWPS coverage, caught by
+`/diff-review` as MAJOR-1. `isInUS` (`src/utils/geography.ts`) became decisive for
+the NWPS coverage disclosure. Its Puerto Rico box stopped at `18.5 N` / `-67.3 W`;
+the island reaches `18.5208 N` (Punta Agujereada) and Mona Island sits at
+`-67.89 W`. So
+`{ latitude: 18.5208, longitude: -67.15, radius: 10, source: 'noaa' }` rendered
+"NWPS gauges rivers in the United States and **Puerto Rico** only, and this
+location appears to be outside that coverage" at a point in Puerto Rico with 13
+NWPS gauges inside 50 km and the nearest at 14.04 km — while `main` rendered the
+correct, actionable "Try expanding the search radius" for the identical call. The
+design plan checked the box edges against Key West, Eastport, Northwest Angle,
+Utqiaġvik and Adak — every CONUS and Alaska extreme — and never checked Puerto
+Rico's, the one place the sentence names. Fixed by widening the box to the
+Commonwealth's real extent (`17.85–18.55 N`, `-67.95` to `-65.2 W`).
+
+**Verify:** for each region the rendered string names, look up that region's true
+bounding extremes and evaluate the predicate at all four. Partly lintable: a
+coverage predicate and the place-names in the string it selects could be
+cross-checked against a gazetteer.
+
+**Status:** active. Related: [G48] (the same feature one level down — the resolver
+value the fixture could not produce), [G54] (the sibling from the same review —
+the short-circuit that predicate introduced), [G11] (reading the output is what
+exposes it), [G4] (empty vs not-covered are different claims).
+
+## G54 — A short-circuited term makes every test downstream of it degenerate, and the block still passes
+
+**Trigger:** adding a conjunct or disjunct in front of an existing condition —
+`!inBoxes || (existing)`, `if (!enabled) return; …` — where existing tests
+exercised the second term at inputs the first term now decides on its own.
+
+**Rule:** after adding the short-circuit, mutate the **second** term and check the
+old block still goes red. Where it does not, the old tests are no longer pinning
+what their names say; re-point them at inputs the short-circuit does not swallow,
+or relabel them for what they now cover. Do not describe them as proof of the inner
+term — write down which alternative became behaviourally indistinguishable, per
+[G32].
+
+**Why:** the block keeps passing, so nothing signals the loss. Its *comment* is
+usually rewritten in the same diff to explain why it still holds, which is the
+moment the false claim gets committed — and it is committed into a lock file, the
+artifact the next plan trusts most.
+
+**Evidence:** 2026-08-29, issue-86 territory NWPS coverage, caught by
+`/diff-review` as MINOR-1. After
+`outsideCoverage = !inUsBoxes || (countryCode !== null && !NWPS_COVERED_COUNTRIES.has(countryCode))`,
+mutating the set to `{us, pr, vi, gu}` — the NIFC set the handler comment says it
+is "deliberately NOT" — left `tests/unit/river-conditions-global.test.ts`
+all-green (**38 passed (38)** as measured at `938a8e0`), because `GUAM_POINT` and
+`VIRGIN_ISLANDS_POINT` are outside every box and never reach the set. Dropping `pr` still went red (1), so the block
+pins inclusion and not exclusion. The diff's rewritten header nevertheless called
+it "proof `NWPS_COVERED_COUNTRIES` distinguishes `pr` from `vi`/`gu` as written",
+and [G48] repeated the claim; both were corrected.
+
+**Verify:** mutate each term of the compound condition separately and record which
+tests go red per term. A term with no red is unpinned regardless of how many tests
+sit in the block.
+
+**Status:** active. Related: [G32] (mutate to every rejected implementation and
+report the divergence set), [G45] (a mutation only goes red where the contract
+reaches it), [G13] (a fixture degenerate along one axis), [G53] (the sibling from
+the same review — what the short-circuited predicate was deciding).
 
 ## Graveyard
 
