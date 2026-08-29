@@ -711,39 +711,48 @@ async function formatOpenMeteoForecast(
     for (let i = 0; i < numHours; i++) {
       output += `## ${formatInTimezone(hourly.time[i], forecast.timezone, 'short', prefs.timeFormat)}\n`;
 
-      if (hourly.temperature_2m?.[i] !== undefined) {
-        output += `**Temperature:** ${Math.round(hourly.temperature_2m[i])}${tempU}`;
-        if (hourly.apparent_temperature?.[i] !== undefined) {
-          output += ` (feels like ${Math.round(hourly.apparent_temperature[i])}${tempU})`;
+      const temperature = hourly.temperature_2m?.[i];
+      if (temperature != null) {
+        output += `**Temperature:** ${Math.round(temperature)}${tempU}`;
+        const apparentTemperature = hourly.apparent_temperature?.[i];
+        if (apparentTemperature != null) {
+          output += ` (feels like ${Math.round(apparentTemperature)}${tempU})`;
         }
         output += `\n`;
       }
 
-      if (include_precipitation_probability && hourly.precipitation_probability?.[i] !== undefined) {
-        output += `**Precipitation Chance:** ${hourly.precipitation_probability[i]}%\n`;
+      const precipitationProbability = hourly.precipitation_probability?.[i];
+      if (include_precipitation_probability && precipitationProbability != null) {
+        output += `**Precipitation Chance:** ${precipitationProbability}%\n`;
       }
 
-      if (hourly.precipitation?.[i] !== undefined && hourly.precipitation[i] > 0) {
-        output += `**Precipitation:** ${hourly.precipitation[i].toFixed(2)} ${precipU}\n`;
+      const precipitation = hourly.precipitation?.[i];
+      if (precipitation != null && precipitation > 0) {
+        output += `**Precipitation:** ${precipitation.toFixed(2)} ${precipU}\n`;
       }
 
-      if (hourly.wind_speed_10m?.[i] !== undefined) {
-        const windDir = hourly.wind_direction_10m?.[i] !== undefined
-          ? ` ${getWindDirection(hourly.wind_direction_10m[i])}`
+      const windSpeed = hourly.wind_speed_10m?.[i];
+      if (windSpeed != null) {
+        const windDirection = hourly.wind_direction_10m?.[i];
+        const windDir = windDirection != null
+          ? ` ${getWindDirection(windDirection)}`
           : '';
-        output += `**Wind:** ${Math.round(hourly.wind_speed_10m[i])} ${windU}${windDir}\n`;
+        output += `**Wind:** ${Math.round(windSpeed)} ${windU}${windDir}\n`;
 
-        if (hourly.wind_gusts_10m?.[i] !== undefined && hourly.wind_gusts_10m[i] > hourly.wind_speed_10m[i] * 1.2) {
-          output += `**Wind Gusts:** ${Math.round(hourly.wind_gusts_10m[i])} ${windU}\n`;
+        const windGusts = hourly.wind_gusts_10m?.[i];
+        if (windGusts != null && windGusts > windSpeed * 1.2) {
+          output += `**Wind Gusts:** ${Math.round(windGusts)} ${windU}\n`;
         }
       }
 
-      if (hourly.relative_humidity_2m?.[i] !== undefined) {
-        output += `**Humidity:** ${hourly.relative_humidity_2m[i]}%\n`;
+      const relativeHumidity = hourly.relative_humidity_2m?.[i];
+      if (relativeHumidity != null) {
+        output += `**Humidity:** ${relativeHumidity}%\n`;
       }
 
-      if (hourly.weather_code?.[i] !== undefined) {
-        output += `**Conditions:** ${openMeteoService.getWeatherDescription(hourly.weather_code[i])}\n`;
+      const weatherCode = hourly.weather_code?.[i];
+      if (weatherCode != null) {
+        output += `**Conditions:** ${openMeteoService.getWeatherDescription(weatherCode)}\n`;
       }
 
       output += `\n`;
@@ -759,12 +768,26 @@ async function formatOpenMeteoForecast(
       const dt = DateTime.fromISO(daily.time[i], { zone: forecast.timezone });
       output += `## ${dt.toLocaleString({ weekday: 'long', month: 'long', day: 'numeric' })}\n`;
 
-      if (daily.temperature_2m_max?.[i] !== undefined && daily.temperature_2m_min?.[i] !== undefined) {
-        output += `**Temperature:** High ${Math.round(daily.temperature_2m_max[i])}${tempU} / Low ${Math.round(daily.temperature_2m_min[i])}${tempU}\n`;
+      // A day the model did not publish drops only its own half; the survivor
+      // still renders, and the separator appears only when both are present.
+      const tempHigh = daily.temperature_2m_max?.[i];
+      const tempLow = daily.temperature_2m_min?.[i];
+      if (tempHigh != null || tempLow != null) {
+        let line = `**Temperature:**`;
+        if (tempHigh != null) line += ` High ${Math.round(tempHigh)}${tempU}`;
+        if (tempHigh != null && tempLow != null) line += ` /`;
+        if (tempLow != null) line += ` Low ${Math.round(tempLow)}${tempU}`;
+        output += `${line}\n`;
       }
 
-      if (daily.apparent_temperature_max?.[i] !== undefined && daily.apparent_temperature_min?.[i] !== undefined) {
-        output += `**Feels Like:** High ${Math.round(daily.apparent_temperature_max[i])}${tempU} / Low ${Math.round(daily.apparent_temperature_min[i])}${tempU}\n`;
+      const feelsHigh = daily.apparent_temperature_max?.[i];
+      const feelsLow = daily.apparent_temperature_min?.[i];
+      if (feelsHigh != null || feelsLow != null) {
+        let line = `**Feels Like:**`;
+        if (feelsHigh != null) line += ` High ${Math.round(feelsHigh)}${tempU}`;
+        if (feelsHigh != null && feelsLow != null) line += ` /`;
+        if (feelsLow != null) line += ` Low ${Math.round(feelsLow)}${tempU}`;
+        output += `${line}\n`;
       }
 
       // Include sunrise/sunset data with timezone
@@ -783,37 +806,45 @@ async function formatOpenMeteoForecast(
         output += formatAstronomyBlock(computeDayAstronomy(latitude, longitude, dt), prefs);
       }
 
-      if (daily.daylight_duration?.[i] !== undefined) {
-        const hours = Math.floor(daily.daylight_duration[i] / 3600);
-        const minutes = Math.floor((daily.daylight_duration[i] % 3600) / 60);
+      const daylightDuration = daily.daylight_duration?.[i];
+      if (daylightDuration != null) {
+        const hours = Math.floor(daylightDuration / 3600);
+        const minutes = Math.floor((daylightDuration % 3600) / 60);
         output += `**Daylight Duration:** ${hours}h ${minutes}m\n`;
       }
 
-      if (include_precipitation_probability && daily.precipitation_probability_max?.[i] !== undefined) {
-        output += `**Precipitation Chance:** ${daily.precipitation_probability_max[i]}%\n`;
+      const precipitationProbabilityMax = daily.precipitation_probability_max?.[i];
+      if (include_precipitation_probability && precipitationProbabilityMax != null) {
+        output += `**Precipitation Chance:** ${precipitationProbabilityMax}%\n`;
       }
 
-      if (daily.precipitation_sum?.[i] !== undefined && daily.precipitation_sum[i] > 0) {
-        output += `**Precipitation:** ${daily.precipitation_sum[i].toFixed(2)} ${precipU}\n`;
+      const precipitationSum = daily.precipitation_sum?.[i];
+      if (precipitationSum != null && precipitationSum > 0) {
+        output += `**Precipitation:** ${precipitationSum.toFixed(2)} ${precipU}\n`;
       }
 
-      if (daily.wind_speed_10m_max?.[i] !== undefined) {
-        const windDir = daily.wind_direction_10m_dominant?.[i] !== undefined
-          ? ` ${getWindDirection(daily.wind_direction_10m_dominant[i])}`
+      const maxWindSpeed = daily.wind_speed_10m_max?.[i];
+      if (maxWindSpeed != null) {
+        const dominantWindDirection = daily.wind_direction_10m_dominant?.[i];
+        const windDir = dominantWindDirection != null
+          ? ` ${getWindDirection(dominantWindDirection)}`
           : '';
-        output += `**Wind:** ${Math.round(daily.wind_speed_10m_max[i])} ${windU}${windDir}\n`;
+        output += `**Wind:** ${Math.round(maxWindSpeed)} ${windU}${windDir}\n`;
 
-        if (daily.wind_gusts_10m_max?.[i] !== undefined && daily.wind_gusts_10m_max[i] > daily.wind_speed_10m_max[i] * 1.2) {
-          output += `**Wind Gusts:** ${Math.round(daily.wind_gusts_10m_max[i])} ${windU}\n`;
+        const maxWindGusts = daily.wind_gusts_10m_max?.[i];
+        if (maxWindGusts != null && maxWindGusts > maxWindSpeed * 1.2) {
+          output += `**Wind Gusts:** ${Math.round(maxWindGusts)} ${windU}\n`;
         }
       }
 
-      if (daily.weather_code?.[i] !== undefined) {
-        output += `**Conditions:** ${openMeteoService.getWeatherDescription(daily.weather_code[i])}\n`;
+      const dailyWeatherCode = daily.weather_code?.[i];
+      if (dailyWeatherCode != null) {
+        output += `**Conditions:** ${openMeteoService.getWeatherDescription(dailyWeatherCode)}\n`;
       }
 
-      if (daily.uv_index_max?.[i] !== undefined) {
-        output += `**UV Index:** ${daily.uv_index_max[i].toFixed(1)}\n`;
+      const uvIndexMax = daily.uv_index_max?.[i];
+      if (uvIndexMax != null) {
+        output += `**UV Index:** ${uvIndexMax.toFixed(1)}\n`;
       }
 
       output += `\n`;
@@ -838,13 +869,11 @@ async function formatOpenMeteoForecast(
       const { month, day } = getDateComponents(firstDay);
 
       // Get forecasted high/low for comparison (first day)
+      const firstDayHigh = forecast.daily.temperature_2m_max?.[0];
+      const firstDayLow = forecast.daily.temperature_2m_min?.[0];
       const currentTemps = {
-        high: forecast.daily.temperature_2m_max?.[0] !== undefined
-          ? Math.round(forecast.daily.temperature_2m_max[0])
-          : undefined,
-        low: forecast.daily.temperature_2m_min?.[0] !== undefined
-          ? Math.round(forecast.daily.temperature_2m_min[0])
-          : undefined
+        high: firstDayHigh != null ? Math.round(firstDayHigh) : undefined,
+        low: firstDayLow != null ? Math.round(firstDayLow) : undefined
       };
 
       output += await renderNormalsSection(
