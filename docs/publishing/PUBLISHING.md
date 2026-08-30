@@ -14,7 +14,7 @@ For experienced users, here's the recommended publishing workflow:
 6. **Tag & create GitHub release** → `git tag vX.Y.Z && git push origin vX.Y.Z`, then `gh release create vX.Y.Z`
 7. **npm publish (automated)** → Pushing the `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which verifies versions match, builds, tests, and publishes to npm with provenance. Auth is via npm Trusted Publishing (OIDC) — configured on npmjs.com under the package's Settings → Trusted Publisher (repo `weather-mcp/weather-mcp`, workflow `publish.yml`); no token or secret needed. Manual fallback: `npm publish --access public`.
 8. **Publish to MCP registry (manual)** → Run `./mcp-publisher login github` then `./mcp-publisher publish`. This cannot be automated in CI: GitHub Actions OIDC authenticates the `io.github.weather-mcp/*` namespace (the repo owner), but this server is registered as `io.github.dgahagan/*`, which requires interactive login as the `dgahagan` GitHub user.
-9. **Verify** → Check npm, GitHub releases, MCP registry, and documentation consistency (`./scripts/check-doc-versions.sh`)
+9. **Verify** → Check npm, GitHub releases, MCP registry, and documentation consistency (`./scripts/check-doc-versions.sh`). A **⚠ warning on an otherwise green publish run** is not a problem: it means npm accepted and signed the tarball but was still not serving it when the `Verify publication` step finished polling at ~10 minutes. The release shipped and is propagating. Confirm with `curl -s https://registry.npmjs.org/@dangahagan/weather-mcp | jq -r '.["dist-tags"].latest'` — do not re-run the workflow and do not `npm publish` by hand, because the version already exists.
 
 See detailed instructions below for each step.
 
