@@ -2811,6 +2811,42 @@ in that file's capture blocks would catch this class outright.
 
 ---
 
+## G59 — A guard whose only observable case is a *combination* of two optional inputs needs a test that supplies both
+
+**Trigger:** adding a validity guard (`isRealValue`, a `NaN` check, a null
+check) to a renderer whose output depends on two independently-optional upstream
+objects — here a gauge's flood thresholds and its forecast series.
+
+**Rule:** when a plan enumerates classes of upstream response (all thresholds /
+some / none), **cross them against the other optional the renderer reads, and
+write the cell that is empty.** Mutation is what finds these: a guard that no
+test turns red is not covered, whatever line coverage says.
+
+**Why:** partial coverage of a guard set reads as adequate. Three of
+`deriveFloodCategory`'s four sentinel guards were pinned by the
+action+minor-only fixture, so the suite looked complete; the fourth was
+observable only where *both* optionals took their unusual value at once, and the
+existing fixture set paired thresholds with a forecast series but never paired
+*absent* thresholds with one.
+
+**Verify:** mutate each guard individually and run the subject's suite. Any
+mutation that stays green names an uncovered cell in the cross-product.
+
+**Evidence:** 2026-08-29 (issue-84 flood thresholds, `/diff-review` MAJOR-1 and
+MINOR-1; fixed in `539d31b`). Removing the `isRealValue(action)` guard left all
+110 river tests green while the render put a **🟡 ACTION label on a gauge NOAA
+publishes no thresholds for**, three lines below the sentence saying exactly the
+opposite — a fabricated safety claim on an F1 surface. The crest path had the
+same shape: `occurredTime` present but unparseable is its two-optional corner,
+and dropping that guard printed `**NaN:**` with the suite still green.
+
+**Status:** active. Related: [G54] (a short-circuited term makes everything
+downstream degenerate and the block still passes), [G48] (a fixture can supply a
+value the live resolver never produces), [G11] (read the rendered output).
+Lintable: no — this is a mutation-testing result, not a grep.
+
+---
+
 ## Graveyard
 
 *(No retired entries yet. When an entry's trap is refactored away, move it here
