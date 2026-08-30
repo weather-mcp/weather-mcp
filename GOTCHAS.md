@@ -1786,6 +1786,15 @@ of these same three occurrences as "two in three days, so the lag is growing" is
 wrong, and a budget built on a slope would have kept missing the tail. The right
 budget clears the tail, not a trajectory.
 
+**Verify:** on the next release, `gh run view <id> --json conclusion` reads
+`success` while the run still carries a warning annotation, and the
+`Verify publication` job step is itself green. Compare
+`npm view @dangahagan/weather-mcp --json | jq -r '.time["X.Y.Z"]'` against that
+step's `completed_at` to get the release's lag and place it in the distribution
+above. **A red `Verify publication` after `79ea177` is a different bug** — the
+step can now only fail on a fault in its own script — so do not read it as this
+entry.
+
 **Status:** fixed in `79ea177` (T1, [weather-mcp#90](https://github.com/weather-mcp/weather-mcp/issues/90)).
 The poll is now 40 attempts at 15 s (last probe ~597 s, 2.4× the 250 s worst
 observed lag), the trailing sleep is skipped, and exhaustion now emits
@@ -2158,10 +2167,11 @@ it produces a different value at the fixtures in play, not just different source
 
 ## G46 — A docs task writes the plan's promise, not the code's behaviour
 
-**Trigger:** a task whose deliverable is user-facing prose — `docs/TOOLS.md`,
-`docs/ERROR_HANDLING.md`, `README.md`, or a `CHANGELOG.md` `[Unreleased]` entry —
-written from the design plan's own wording, on a plan whose earlier tasks are
-already green.
+**Trigger:** a task whose deliverable is prose describing behaviour —
+`docs/TOOLS.md`, `docs/ERROR_HANDLING.md`, `README.md`, a `CHANGELOG.md`
+`[Unreleased]` entry, **or a `GOTCHAS.md` entry's `Trigger:` line rewritten for a
+signal a sibling task just changed** — written from the design plan's own wording,
+on a plan whose earlier tasks are already green.
 
 **Rule:** every behavioural sentence a docs task publishes must name the test or
 the live probe that proves it. A claim traced only to the design plan is a claim
@@ -2200,9 +2210,25 @@ code that read as live. It surfaced only when a drive stood up a fake broker,
 buffered a 5 km strike, killed the broker between queries, and read the rendered
 report. The fix was one line.
 
-**Status:** active. Related: [G11] (read the real output), [G41] (test the
-acceptance check before obeying it), [G45] (a contract that cannot reach its
-subject). Not lintable — the check is a human walking claims against proofs.
+**A literal string a reader will grep for is the sharpest case, 2026-08-30**
+(`a93fb48`, issue-90 T2). Rewriting [G39]'s `Trigger:` for the warning that
+`79ea177` had introduced one commit earlier, the curation task wrote the
+annotation as `⚠ published, not yet visible on npm` — a fair paraphrase of the
+plan's description and **a string the workflow does not emit**. The shipped text
+begins `vX.Y.Z was accepted by npm but is not retrievable yet after 40 probes
+over 600s`. A trigger line exists to be matched against a real signal, so a
+plausible paraphrase is worse than a vague description: someone searching the run
+log for the quoted words finds nothing and concludes the entry does not apply.
+The source of truth was one `grep` away in the same branch. **When a rewritten
+claim quotes a string, copy it from the artifact that emits it**, not from the
+plan that specified it — and this holds for `GOTCHAS.md` itself, which is
+otherwise easy to treat as notes rather than as published prose.
+
+**Status:** active, **extended 2026-08-30**. Related: [G11] (read the real
+output), [G41] (test the acceptance check before obeying it), [G45] (a contract
+that cannot reach its subject), [G60] (proving a workflow step's behaviour
+outside CI — the harness that would have supplied the string). Not lintable —
+the check is a human walking claims against proofs.
 
 ---
 
@@ -2810,6 +2836,70 @@ and dropping that guard printed `**NaN:**` with the suite still green.
 downstream degenerate and the block still passes), [G48] (a fixture can supply a
 value the live resolver never produces), [G11] (read the rendered output).
 Lintable: no — this is a mutation-testing result, not a grep.
+
+---
+
+## G60 — A workflow step's script is unreachable by the gate, and the obvious harness for it passes without ever running the thing under test
+
+**Trigger:** needing to prove that a `run:` block in `.github/workflows/*.yml`
+behaves — a retry loop, an exit code, a gate that must block — when there is no
+`actionlint` and no `act` on this machine and `npm run build && npm test &&
+npm audit` cannot see the file at all.
+
+**Rule:** four parts, and the fourth is the one that gets skipped.
+
+1. **Extract the script from the YAML with a parser**, not by hand:
+   `yaml.safe_load(...)` then pick the step by `name` and take its `run`. A
+   hand-copied or `sed`-mutated extract tests a file that will never run.
+2. **Run it under `bash --noprofile --norc -e -o pipefail`** — that is the shell
+   GitHub Actions gives a `run:` block on Linux. Plain `bash script.sh` has
+   neither `-e` nor `pipefail` and will pass where CI fails.
+3. **Parameterise the loop's constants with env defaults in the shipped file**
+   (`ATTEMPTS="${NPM_VERIFY_ATTEMPTS:-40}"`), so the exercise shortens a
+   ten-minute budget to four seconds **without mutating the script**. Set nothing
+   in the workflow and CI still gets the defaults. This is a deliberate trade: a
+   reader may reasonably ask why a constant is an env var, and the answer is that
+   the alternative is testing bytes that do not ship.
+4. **Stub the external binary on `PATH` and make it log every call.** The
+   *success* case will pass whether or not the stub was ever consulted, because
+   the real binary answers identically — a stub `npm` serving `1.25.13` and the
+   real `npm` serving an already-published `1.25.13` produce the same
+   `npm now serves: 1.25.13`. **The call count is the only positive control.**
+
+**Why:** the whole reason a workflow defect survives is that nothing in the
+standing gate reads the file, so the harness is the only evidence there will be
+before a real release — and an assertion that passes for the wrong reason is
+worse than no assertion, because it is recorded as proof. Point 4 is [G47]'s
+shape moved from a measured count to an exercised code path: the observation is
+real, plausible, and about something other than what you meant to test.
+
+**Verify:** delete the stub's directory from `PATH` and re-run the *found* case.
+If it still prints the found message and still passes, the harness was never
+testing the stub — restore `PATH` and assert on the call log instead. Then run
+the exhaustion case and check the log length equals `ATTEMPTS`.
+
+**Evidence:** 2026-08-30 (`79ea177`, issue-90 T1). `publish.yml`'s
+`Verify publication` step was rewritten to poll 40×15 s and, on exhaustion, emit
+`::warning::` and **exit 0** instead of `::error::` and exit 1. Exit 0 on
+exhaustion is the entire point of the change and is the one behaviour a reader
+assumes rather than checks, so both exits were exercised against a stub `npm`
+under `NPM_VERIFY_ATTEMPTS=4 NPM_VERIFY_INTERVAL_S=1`: found-on-call-3 exited 0
+with no annotation and **3** logged calls; never-yielding exited 0 with one
+`::warning::` naming the version and `registry.npmjs.org`, the same text in
+`$GITHUB_STEP_SUMMARY`, and **4** logged calls. Timing confirmed the elided
+trailing sleep independently — 4 attempts at 1 s took 3051 ms, three sleeps not
+four. `shellcheck` 0.11.0 was clean on the extract and PyYAML parsed the
+workflow; **neither is a workflow linter**, and saying so in the commit is part
+of the rule.
+
+**Status:** active. `.github/workflows/publish.yml` is due a second edit from
+`plan-release-governance-gates.md`, which arms
+an audit gate in the same file and will need exactly this harness to prove the
+gate blocks. Related: [G47] (a control that proves the measurement
+happened at all — the same failure with a count in place of a code path), [G38]
+(a release check reporting a confident failure it never measured), [G4] (never
+trust the status alone), [G11] (read the real output), [G46] (quote the string
+the artifact emits, not the one the plan describes).
 
 ---
 
