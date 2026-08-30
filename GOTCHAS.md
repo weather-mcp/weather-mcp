@@ -2133,10 +2133,20 @@ be caught by an A-fails/B-succeeds contract at all, because only the failing sid
 touches the degraded-return path — catching it needed a new case where *both*
 queries fail, asserting object identity.
 
-**Status:** active. Related: [G13] (a fixture that cannot discriminate),
+**Extended 2026-08-29** (`1eec0c4`, issue-84 T3) — **a mutation also has to
+*diverge*, not merely differ.** Checking that a newly-wired fetch was load-bearing,
+the obvious mutation was to prefer the pre-existing value over the fetched one
+(`gauge.flood ?? fetched`). It passed the entire suite — because the test helper
+hands back the same object the other mock produced, so both branches evaluate to
+the same value and the mutation is a no-op at every fixture. The mutation that
+works is the one that removes the value entirely (never record the fetch): **20
+tests red across four files.** Before recording a mutation as uncaught, check that
+it produces a different value at the fixtures in play, not just different source.
+
+**Status:** active, **extended 2026-08-29**. Related: [G13] (a fixture that cannot discriminate),
 [G32] (mutating to every *rejected implementation* — this entry is about the
-*entry point*, that one about the *alternative*), [G11] (read the real output).
-Not lintable.
+*entry point*, that one about the *alternative*), [G11] (read the real output),
+[G57] (the run that produced the extension). Not lintable.
 
 ## G46 — A docs task writes the plan's promise, not the code's behaviour
 
@@ -2323,6 +2333,22 @@ pinned and exclusion is not. The lesson generalises past this entry and is filed
 inner term and check the old block still goes red** — and where it does not, say
 which alternative became indistinguishable rather than describing the block as
 proof of the term it can no longer reach.
+
+**A second instance, found and closed 2026-08-29** (`b45aaba`, issue #84). This
+entry's own shape, in the fixture direction rather than the resolver direction:
+`riverConditions.test.ts` and `river-band-rounding.test.ts` injected
+`flood: { categories: { action: 8, minor: 10, ... } }` — flat numbers — and
+`HistoricCrest` fixtures with `{ value, date, description }`. **NWPS has never
+returned either shape**; the categories are `{ stage, flow }` objects and there is
+no `description` field upstream at all. Every one of those tests was green,
+mutation-checked, and describing a world that does not exist, which is why three
+renderers could sit in the tree for months rendering nothing. The closure is the
+mechanism this entry asks for, made permanent: three real `GET /gauges/{lid}`
+responses committed under `tests/fixtures/` and driven through the renderer
+offline (`tests/unit/nwps-gauge-shape.test.ts`), so a future divergence between
+what the fixtures assert and what NWPS sends fails a test instead of shipping.
+This established the repo's first committed-capture convention — there was no
+`tests/fixtures/` before it.
 
 **Status:** active — the rule, with its original instance closed. Related: [G45] (a mutation only goes red where the contract can
 reach it — this is the case where it goes red for the wrong reason), [G32] (mutating
@@ -2645,6 +2671,145 @@ release run, which is the one signal that must stay trustworthy. Related: [G28] 
 probe that fails reports as a clean negative), [G4] (never trust the status alone —
 here the status is red and the outcome is success), [G47] (a control that proves
 the measurement happened at all).
+
+## G56 — A missing-data sentinel can have more than one encoding, so swapping a truthy guard for a real-value guard un-suppresses the second one
+
+**Trigger:** replacing `if (value)` with `if (isRealValue(value))` (or any
+explicit sentinel guard) on a third-party numeric field, to fix a sentinel that
+was rendering literally.
+
+**Rule:** before swapping, enumerate **every** value the upstream uses for "not
+recorded" on that field, over a real capture — not just the one in the bug
+report. Truthiness suppresses `0`, `NaN`, `null`, `undefined` and `""` all at
+once; a sentinel guard suppresses exactly what you name and **admits everything
+else**, so the swap is a widening in the direction nobody is looking. Where `0`
+is a real reading for the field (a stage, a temperature) keep it; where `0` is
+physically impossible for the quantity (a flood crest's flow, a wind speed at a
+recorded gust), it is a second sentinel and must be excluded explicitly.
+
+**Why:** the old guard was wrong *and* was hiding the second encoding by
+accident, so the fix looks strictly like an improvement and is a regression on
+the majority of rows. It cannot be caught by the test that motivated the change,
+because that test asserts on the sentinel you already knew about. Nothing else
+in the suite is likely to assert on the field at all — a "no clause rendered" case
+is the assertion nobody writes.
+
+**Verify:** over a committed capture, count the field's distinct values and how
+many rows each guard admits. `flow` on PRTO3's 26 recent crests: 20 zeros, 1
+`-9999`, 5 real. Truthy admits 5; `isRealValue` alone admits 25; the correct
+guard admits 5.
+
+**Evidence:** 2026-08-29 (`1c4c052`, issue-84 flood thresholds, found during T2).
+`riverConditionsHandler`'s crest renderer used `if (crest.flow)`, which the design
+plan correctly identified as wrong — a live `-9999` is truthy and would print
+`(-9999 cfs)`. T1 replaced it with `isRealValue(crest.flow)`, whose sentinel
+cutoff is `-900`. But NWPS also encodes an unrecorded crest flow as **`0`**, and
+`isRealValue(0)` is true, so **20 of PRTO3's 26 recent crest rows started
+rendering `(0 cfs)`** — including the 1996 Willamette flood at 28.55 ft, a crest
+that self-evidently did not have zero flow. Caught by rendering the committed
+capture and reading it ([G11]); **no assertion in the suite covered a crest flow
+clause at all**, so both the old and new behaviour were green. The implementation
+plan's own acceptance bullet had specified the right answer ("one whose `flow` is
+`0` renders no clause") and the code did not match it — the plan was more correct
+than the code, which is the reverse of the usual direction and easy to miss.
+
+**Status:** active. Related: [G11] (read the rendered output — the only check
+that caught this), [G4] (never trust the HTTP 200 alone), [G51] (the wire sends
+what the type denies; here the wire sends two things where the guard names one),
+[G47] (the sibling where the unreal thing is a measured count). Partly lintable:
+a grep for `isRealValue(` on a field whose capture contains a `0` could flag
+candidates, but only a human can say whether `0` is meaningful for that quantity.
+
+---
+
+## G57 — A plan's per-file instruction is applied per *object*, and the object count moves while the run is in flight
+
+**Trigger:** a task says "add X to the mock/config/registration in these N files",
+or any acceptance check written as a per-file grep, on a plan whose earlier tasks
+create or extend those same files.
+
+**Rule:** enumerate and patch **every object literal**, not one per file, and
+write the acceptance as a per-object check that a partial application fails.
+Then **re-enumerate at execution time** rather than trusting the plan's count:
+a task that adds test files changes the denominator for every later task, and the
+plan was written before those files existed.
+
+**Why:** a per-file grep goes green on a partial application — it finds the one
+literal you did patch and says nothing about the three you did not. Where the
+call being wired sits inside `Promise.allSettled`, an unwired object throws
+`TypeError: not a function`, rejects, and is **swallowed by the very batch the
+task is adding**: the suite stays green while the new code path is never
+exercised. The number in the plan is the most confident-looking part of the
+instruction and the part most likely to be stale.
+
+**Verify:** `grep -c` the object-literal opener and the property in each affected
+file and compare the two counts per file. Then mutate the *feature* — not the
+mock — so that the wiring being real is what the suite depends on: dropping the
+fetched result on the floor should go red.
+
+**Evidence:** 2026-08-29 (`1eec0c4`, issue-84 flood thresholds T3). Raised by the
+Copilot `/plan-review` leg as R2 and applied as amendment **B2** before the run:
+the plan said "add `getNWPSGauge: vi.fn()` to the mock object in all three files",
+but `riverConditions.test.ts` alone held **three** `noaaService` literals, and the
+one at `:86` already omitted `getNWPSStageFlow` while passing — the swallow was
+already realised in the tree, not hypothetical. **The run then moved the count
+again:** T2 added two more literals to that file and created
+`nwps-gauge-shape.test.ts`, so execution found **eight** literals across four
+files where the reviewed plan named five across three. B2's per-object grep held;
+the per-file version it replaced would have passed at five of eight. Verified
+load-bearing by mutating the handler to never record the fetched detail — **20
+tests red across four files**. Note the weak mutation that does *not* work:
+preferring the pre-existing value over the fetched one passes everywhere, because
+the test helper hands back the same object the other mock produced, so both
+branches evaluate to the same value ([G45]).
+
+**Status:** active. Related: [G45] (a mutation only goes red where the contract
+reaches it — and the note above on choosing one that diverges at all), [G50] (a
+task's temporary write counts against `parallel-safe`), [G41] (test the
+acceptance check before obeying it — this is that rule applied to a grep that
+counts). Lintable in part: a check that every `const <service> = {` literal in a
+test file exposes the same method set would close the per-file half mechanically.
+
+---
+
+## G58 — Regenerating a capture does not regenerate the prose around it, and the two then disagree in public
+
+**Trigger:** running `npm run examples` (or any capture-refresh script) on a
+document that pairs generated output with a hand-written narrative.
+
+**Rule:** after regenerating, **read the prose against the new capture** and
+correct every number, direction and date it asserts. The capture is refreshed by
+the script; the sentences above it are not, and they are the part a reader
+believes first.
+
+**Why:** the script reports success, the diff is enormous and mechanical, and the
+narrative sits outside the capture markers the script rewrites — so nothing in
+the pipeline compares them. Staleness accumulates silently across releases, and
+the failure is invisible in review precisely because the regenerated block is too
+large to read line by line. It is also self-concealing: the freshly-dated capture
+makes the stale prose look freshly checked.
+
+**Verify:** for each generated example, extract every number in the narrative and
+grep for it inside the capture block beneath. A number that appears in the prose
+and nowhere in the capture is stale or was never true.
+
+**Evidence:** 2026-08-29 (`27d1219`, issue-84 flood thresholds T7).
+`examples/river-and-flood.md` opened with *"reads **1.55 ft and steady**"* and
+*"rising about 9 feet over the next week to a crest of 10.5 ft around August
+21"*. The capture committed beneath it **on `main`** already read `12.68 ft
+↘ falling`, so the prose was stale before this plan touched the file — no release
+had compared them. Regenerating for the new `### Flood Stages` sections produced
+`9.54 ft ↘ falling` with the series receding to `-2.30 ft`, which would have
+shipped the same contradiction under a fresh timestamp. Corrected in the same
+commit.
+
+**Status:** active. Related: [G46] (a docs task writes the plan's promise, not the
+code's behaviour — this is its sibling, where the docs describe an *older run* of
+the code), [G11] (read the rendered output), [G29] (sweep the whole doc set).
+Lintable: a check that every decimal in an example's narrative appears somewhere
+in that file's capture blocks would catch this class outright.
+
+---
 
 ## Graveyard
 
