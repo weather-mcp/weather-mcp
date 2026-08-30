@@ -178,6 +178,12 @@ function buildGrid(
 function buildNoaaFake() {
   return {
     getNWPSGaugesInBoundingBox: vi.fn().mockResolvedValue([]),
+    // The per-gauge detail fetch that carries flood thresholds. Rejecting is the
+    // right default for this file: it is the GloFAS lock, its US-path gauges exist
+    // only to reach the branch, and a rejected detail call renders each of them
+    // exactly as it rendered before the fetch existed (D6, garnish). No assertion
+    // here moves, and no non-US behaviour is touched.
+    getNWPSGauge: vi.fn().mockRejectedValue(new Error('detail unavailable')),
     getNWPSStageFlow: vi.fn()
   };
 }

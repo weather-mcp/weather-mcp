@@ -15,7 +15,26 @@ import {
   formatStageTrend
 } from '../../src/handlers/riverConditionsHandler.js';
 import { RateLimitError } from '../../src/errors/ApiError.js';
-import type { GaugeStatus, NWPSGauge, HistoricCrest, StageFlowDataPoint } from '../../src/types/noaa.js';
+import type { GaugeStatus, NWPSGauge, HistoricCrest, StageFlowDataPoint, FloodCategories } from '../../src/types/noaa.js';
+
+/**
+ * `flood` now reaches the renderer ONLY from the per-gauge detail endpoint
+ * (`getNWPSGauge`); the bounding-box response has never carried it. These builders
+ * put `flood` on the gauge they hand to the bbox mock, so the detail mock hands the
+ * same object back — the enriched path is then the one under test, rather than a
+ * silently inert call whose rejection `Promise.allSettled` would swallow.
+ */
+function detailFromBbox(bboxMock: ReturnType<typeof vi.fn>): ReturnType<typeof vi.fn> {
+  return vi.fn().mockImplementation(async (lid: string) => {
+    const lastCall = bboxMock.mock.results.at(-1);
+    const gauges = (lastCall ? await lastCall.value : []) as NWPSGauge[];
+    const found = gauges.find(g => g.lid === lid);
+    if (!found) {
+      throw new Error(`no detail response for ${lid}`);
+    }
+    return found;
+  });
+}
 
 function status(overrides: Partial<GaugeStatus> = {}): GaugeStatus {
   return {
@@ -83,7 +102,11 @@ describe('handleGetRiverConditions', () => {
   const BASE_LON = -71.0589;
 
   const getNWPSGaugesInBoundingBoxMock = vi.fn();
-  const noaaService = { getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock } as never;
+  const getNWPSGaugeMock = detailFromBbox(getNWPSGaugesInBoundingBoxMock);
+  const noaaService = {
+    getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+    getNWPSGauge: getNWPSGaugeMock
+  } as never;
   const locationStore = {} as never;
   const geocodingService = {} as never;
   // US coordinates route to NOAA, so the Open-Meteo service is never consulted here.
@@ -118,11 +141,11 @@ describe('handleGetRiverConditions', () => {
 
       if (crestsPerGauge > 0) {
         const recent: HistoricCrest[] = Array.from({ length: crestsPerGauge }, (_, c) => ({
-          value: 10 + c,
-          date: `20${20 + c}-03-15T00:00:00Z`
+          stage: 10 + c,
+          occurredTime: `20${20 + c}-03-15T00:00:00Z`
         }));
         gauge.flood = {
-          categories: { action: 8, minor: 10, moderate: 14, major: 18 },
+          categories: { action: { stage: 8 }, minor: { stage: 10 }, moderate: { stage: 14 }, major: { stage: 18 } },
           crests: { recent }
         };
       }
@@ -346,9 +369,11 @@ describe('handleGetRiverConditions observed trend', () => {
 
   const getNWPSGaugesInBoundingBoxMock = vi.fn();
   const getNWPSStageFlowMock = vi.fn();
+  const getNWPSGaugeMock = detailFromBbox(getNWPSGaugesInBoundingBoxMock);
   const noaaService = {
     getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
-    getNWPSStageFlow: getNWPSStageFlowMock
+    getNWPSStageFlow: getNWPSStageFlowMock,
+    getNWPSGauge: getNWPSGaugeMock
   } as never;
 
   beforeEach(() => {
@@ -447,9 +472,11 @@ describe('handleGetRiverConditions forecast series (detail="full")', () => {
 
   const getNWPSGaugesInBoundingBoxMock = vi.fn();
   const getNWPSStageFlowMock = vi.fn();
+  const getNWPSGaugeMock = detailFromBbox(getNWPSGaugesInBoundingBoxMock);
   const noaaService = {
     getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
-    getNWPSStageFlow: getNWPSStageFlowMock
+    getNWPSStageFlow: getNWPSStageFlowMock,
+    getNWPSGauge: getNWPSGaugeMock
   } as never;
 
   beforeEach(() => {
@@ -472,7 +499,7 @@ describe('handleGetRiverConditions forecast series (detail="full")', () => {
         }
       },
       flood: {
-        categories: { action: 8, minor: 10, moderate: 14, major: 18 }
+        categories: { action: { stage: 8 }, minor: { stage: 10 }, moderate: { stage: 14 }, major: { stage: 18 } }
       }
     };
   }
@@ -607,5 +634,506 @@ describe('handleGetRiverConditions forecast series (detail="full")', () => {
     expect(text).toContain('### Forecast Series');
     expect(text).toContain('9.00 ft 🟡 ACTION');
     expect(text.indexOf('### Forecast\n')).toBeLessThan(text.indexOf('### Forecast Series'));
+  });
+});
+
+/**
+ * Handler-level tests for `### Flood Stages` and `### Recent Historic Crests` against
+ * the live NWPS shape landed by T1 (commit ad388fd): `flood.categories.<level>` is a
+ * `{ stage?, flow? }` object using -9999 as the "not published" sentinel, and crests
+ * carry `occurredTime`/`stage`/`flow` — not the old flat-number / `{ value, date,
+ * description }` shapes. See tests/unit/nwps-gauge-shape.test.ts for the same
+ * assertions driven off real captured bytes rather than these builders.
+ */
+describe('handleGetRiverConditions flood stages and crests (T2)', () => {
+  const BASE_LAT = 42.3601;
+  const BASE_LON = -71.0589;
+
+  const getNWPSGaugesInBoundingBoxMock = vi.fn();
+  const getNWPSGaugeMock = detailFromBbox(getNWPSGaugesInBoundingBoxMock);
+  const noaaService = {
+    getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+    getNWPSGauge: getNWPSGaugeMock
+  } as never;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function buildGauge(overrides: Partial<NWPSGauge> = {}): NWPSGauge {
+    return {
+      lid: 'LID0',
+      name: 'Gauge 0',
+      latitude: BASE_LAT,
+      longitude: BASE_LON,
+      state: { abbreviation: 'MA', name: 'Massachusetts' },
+      status: {
+        observed: {
+          primary: 4.2,
+          secondary: 0.05,
+          floodCategory: null,
+          validTime: '2026-07-17T14:00:00Z'
+        }
+      },
+      ...overrides
+    };
+  }
+
+  function forecastPoint(validTime: string, primary: number | null): StageFlowDataPoint {
+    return { validTime, generatedTime: '2026-07-17T14:00:00Z', primary, secondary: null };
+  }
+
+  function callHandler(args: Record<string, unknown> = {}) {
+    return handleGetRiverConditions(
+      { latitude: BASE_LAT, longitude: BASE_LON, ...args },
+      noaaService,
+      {} as never,
+      {} as never,
+      {} as never
+    );
+  }
+
+  it('renders four rows in ascending severity, unrounded, when all four stages are real', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({
+        flood: {
+          stageUnits: 'ft',
+          categories: {
+            action: { stage: 7.5 },
+            minor: { stage: 10.2 },
+            moderate: { stage: 14.3 },
+            major: { stage: 18.7 }
+          }
+        }
+      })
+    ]);
+
+    const result = await callHandler({});
+    const text = (result.content[0] as { text: string }).text;
+
+    expect(text).toContain('### Flood Stages');
+    expect(text).toContain('**Action Stage:** 7.5 ft');
+    expect(text).toContain('**Minor Flood:** 10.2 ft');
+    expect(text).toContain('**Moderate Flood:** 14.3 ft');
+    expect(text).toContain('**Major Flood:** 18.7 ft');
+
+    const iAction = text.indexOf('**Action Stage:**');
+    const iMinor = text.indexOf('**Minor Flood:**');
+    const iModerate = text.indexOf('**Moderate Flood:**');
+    const iMajor = text.indexOf('**Major Flood:**');
+    expect(iAction).toBeLessThan(iMinor);
+    expect(iMinor).toBeLessThan(iModerate);
+    expect(iModerate).toBeLessThan(iMajor);
+  });
+
+  it('renders exactly two rows for an action+minor-only gauge, and labels a forecast point above minor MINOR (deriveFloodCategory skip)', async () => {
+    // G13: moderate/major are the genuine -9999 "not published" sentinel, not
+    // absent keys and not duplicates of action/minor — a fixture where every
+    // level shared a value could not exercise the skip.
+    const categories: FloodCategories = {
+      action: { stage: 8 },
+      minor: { stage: 10 },
+      moderate: { stage: -9999 },
+      major: { stage: -9999 }
+    };
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', categories } })
+    ]);
+
+    const stagesResult = await callHandler({});
+    const stagesText = (stagesResult.content[0] as { text: string }).text;
+    expect(stagesText).toContain('**Action Stage:** 8.0 ft');
+    expect(stagesText).toContain('**Minor Flood:** 10.0 ft');
+    expect(stagesText).not.toContain('**Moderate Flood:**');
+    expect(stagesText).not.toContain('**Major Flood:**');
+
+    // Now drive the same categories through the forecast-series path (the
+    // only call site of deriveFloodCategory) with a point above minor but
+    // nowhere near a real moderate/major threshold. Without the skip this
+    // falls through every unreal level and reads as no category at all.
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', categories } })
+    ]);
+    const getNWPSStageFlowMock = vi.fn().mockResolvedValue({
+      forecast: { data: [forecastPoint('2026-07-18T00:00:00Z', 12.0)] }
+    });
+    const noaaServiceWithStageFlow = {
+      getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+      getNWPSStageFlow: getNWPSStageFlowMock,
+      getNWPSGauge: detailFromBbox(getNWPSGaugesInBoundingBoxMock)
+    } as never;
+
+    const seriesResult = await handleGetRiverConditions(
+      { latitude: BASE_LAT, longitude: BASE_LON, detail: 'full' },
+      noaaServiceWithStageFlow,
+      {} as never,
+      {} as never,
+      {} as never
+    );
+    const seriesText = (seriesResult.content[0] as { text: string }).text;
+    expect(seriesText).toContain('12.00 ft 🟠 MINOR');
+    expect(seriesText).not.toMatch(/12\.00 ft\n/); // must not fall through to "no category"
+  });
+
+  it('renders the no-thresholds line and no rows at both detail="standard" and detail="full" when all four stages are sentinel', async () => {
+    const categories: FloodCategories = {
+      action: { stage: -9999 },
+      minor: { stage: -9999 },
+      moderate: { stage: -9999 },
+      major: { stage: -9999 }
+    };
+    const gauge = buildGauge({ flood: { stageUnits: 'ft', categories } });
+
+    for (const detail of ['standard', 'full'] as const) {
+      getNWPSGaugesInBoundingBoxMock.mockResolvedValue([gauge]);
+      const result = await callHandler({ detail });
+      const text = (result.content[0] as { text: string }).text;
+
+      expect(text).toContain('### Flood Stages');
+      expect(text).toContain(
+        '*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published ' +
+          'thresholds, not an absence of flood risk — the **Flood Category:** line above comes from ' +
+          "NOAA's own status.*"
+      );
+      expect(text).not.toContain('**Action Stage:**');
+      expect(text).not.toContain('**Minor Flood:**');
+      expect(text).not.toContain('**Moderate Flood:**');
+      expect(text).not.toContain('**Major Flood:**');
+    }
+  });
+
+  it('labels a forecast point with no category at all when every threshold is sentinel (deriveFloodCategory action guard)', async () => {
+    // The action+minor case above pins the `major` and `moderate` guards: with those
+    // two at -9999, dropping either makes an unreal level match and the expected
+    // MINOR label changes. The `action` guard was pinned by nothing, because it is
+    // observable only where EVERY level is sentinel — the one threshold class this
+    // suite never paired with a forecast series, which is `deriveFloodCategory`'s
+    // only call site. Without it, `shown >= -9999` matches any stage and the gauge
+    // renders a fabricated ACTION label three lines under the D5 sentence saying
+    // NOAA publishes no thresholds for it.
+    const categories: FloodCategories = {
+      action: { stage: -9999 },
+      minor: { stage: -9999 },
+      moderate: { stage: -9999 },
+      major: { stage: -9999 }
+    };
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', categories } })
+    ]);
+    const getNWPSStageFlowMock = vi.fn().mockResolvedValue({
+      forecast: { data: [forecastPoint('2026-07-18T00:00:00Z', 12.0)] }
+    });
+    const noaaServiceWithStageFlow = {
+      getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+      getNWPSStageFlow: getNWPSStageFlowMock,
+      getNWPSGauge: detailFromBbox(getNWPSGaugesInBoundingBoxMock)
+    } as never;
+
+    const result = await handleGetRiverConditions(
+      { latitude: BASE_LAT, longitude: BASE_LON, detail: 'full' },
+      noaaServiceWithStageFlow,
+      {} as never,
+      {} as never,
+      {} as never
+    );
+    const text = (result.content[0] as { text: string }).text;
+
+    // The forecast point renders bare: the line ends at the unit, with no emoji and
+    // no category word after it.
+    const pointLine = text.split('\n').find((line) => line.includes('12.00 ft'));
+    expect(pointLine).toBeDefined();
+    expect(pointLine).toMatch(/12\.00 ft$/);
+
+    // ...and the report still says, above it, that there are no published thresholds.
+    // The two statements must not contradict each other in one render.
+    expect(text).toContain('*NOAA publishes no flood-stage thresholds for this gauge.');
+  });
+
+  it('renders no flow clause for a -9999 or 0 crest flow, and a clause for a real one — never printing NaN, undefined, or -9999', async () => {
+    // NWPS uses BOTH -9999 and 0 for an unrecorded crest flow (20 of PRTO3's 26
+    // recent crests are `flow: 0`). A crest is a peak, so zero flow is never a real
+    // measurement. `isRealValue` alone treats 0 as real, so the renderer excludes it
+    // explicitly rather than relying on the pre-fix truthy check that hid it by luck.
+    const recent: HistoricCrest[] = [
+      { stage: 12.5, occurredTime: '2020-03-15T00:00:00Z', flow: -9999 },
+      { stage: 13.1, occurredTime: '2021-03-15T00:00:00Z', flow: 4200 },
+      { stage: 11.9, occurredTime: '2022-03-15T00:00:00Z', flow: 0 }
+    ];
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', flowUnits: 'cfs', crests: { recent } } })
+    ]);
+
+    const result = await callHandler({});
+    const text = (result.content[0] as { text: string }).text;
+
+    expect(text).toContain('### Recent Historic Crests');
+    expect(text).toContain('**2020:** 12.50 ft');
+    expect(text).not.toMatch(/\*\*2020:\*\* 12\.50 ft \(/); // no flow clause on the sentinel
+    expect(text).toContain('**2021:** 13.10 ft (4200 cfs)');
+    expect(text).toContain('**2022:** 11.90 ft');
+    expect(text).not.toMatch(/\*\*2022:\*\* 11\.90 ft \(/); // zero flow is unrecorded, not a measurement
+    expect(text).not.toContain('(0 cfs)');
+
+    expect(text).not.toContain('NaN');
+    expect(text).not.toContain('undefined');
+    expect(text).not.toContain('-9999');
+  });
+
+  it('skips a crest whose stage is -9999 entirely, rendering only the real ones', async () => {
+    const recent: HistoricCrest[] = [
+      { stage: -9999, occurredTime: '2019-03-15T00:00:00Z', flow: 500 },
+      { stage: 10.4, occurredTime: '2020-03-15T00:00:00Z', flow: 900 }
+    ];
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', flowUnits: 'cfs', crests: { recent } } })
+    ]);
+
+    const result = await callHandler({});
+    const text = (result.content[0] as { text: string }).text;
+
+    expect(text).toContain('### Recent Historic Crests');
+    expect(text).not.toContain('**2019:**');
+    expect(text).toContain('**2020:** 10.40 ft (900 cfs)');
+  });
+
+  it('skips a crest whose occurredTime is unparseable, and emits no section when that leaves no rows', async () => {
+    // `new Date('not-a-date')` is an Invalid Date whose getFullYear() is NaN, so
+    // without the guard the row renders as `- **NaN:** 12.34 ft (5000 cfs)` — one of
+    // the four classes (NaN, undefined, -9999, `**X** (X)`) this feature's live pass
+    // is required to read the rendered text for. The header is emitted only after a
+    // printable row exists, so a crest list that filters to nothing must leave no
+    // empty `### Recent Historic Crests` heading behind either.
+    const recent: HistoricCrest[] = [{ stage: 12.34, occurredTime: 'not-a-date', flow: 5000 }];
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', flowUnits: 'cfs', crests: { recent } } })
+    ]);
+
+    const result = await callHandler({});
+    const text = (result.content[0] as { text: string }).text;
+
+    expect(text).not.toContain('### Recent Historic Crests');
+    expect(text).not.toContain('NaN');
+    expect(text).not.toContain('12.34');
+  });
+
+  it('drops only the unparseable crest, keeping the real ones and the section', async () => {
+    // The skip is per row, not per section: a bad date beside a good one must cost
+    // the reader the bad row and nothing else.
+    const recent: HistoricCrest[] = [
+      { stage: 12.34, occurredTime: 'not-a-date', flow: 5000 },
+      { stage: 10.4, occurredTime: '2020-03-15T00:00:00Z', flow: 900 }
+    ];
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', flowUnits: 'cfs', crests: { recent } } })
+    ]);
+
+    const result = await callHandler({});
+    const text = (result.content[0] as { text: string }).text;
+
+    expect(text).toContain('### Recent Historic Crests');
+    expect(text).toContain('**2020:** 10.40 ft (900 cfs)');
+    expect(text).not.toContain('NaN');
+    expect(text).not.toContain('12.34');
+  });
+});
+
+/**
+ * Handler-level tests (T4) for the T3 batch loop's two-call-per-gauge shape: each
+ * shown gauge issues an independent `getNWPSStageFlow` (trend) and `getNWPSGauge`
+ * (flood thresholds/crests) call inside the same `Promise.allSettled`, tagged and
+ * settled independently, sharing one rate-limit flag. Thresholds are garnish (D6):
+ * a gauge whose detail call rejects renders exactly as it did before this feature
+ * existed — no `### Flood Stages`, no `### Recent Historic Crests`, and NOAA's own
+ * `**Flood Category:**` line (sourced from the bbox response, untouched by
+ * enrichment) intact. Per G45, every case here must be driven through
+ * `handleGetRiverConditions`, not through `formatGaugeDetails` directly, because
+ * the batch loop, the merge into `floodByLid`, and the rate-limit break all live
+ * one layer above the renderer.
+ */
+describe('handleGetRiverConditions per-gauge detail enrichment (T4)', () => {
+  const BASE_LAT = 42.3601;
+  const BASE_LON = -71.0589;
+
+  const getNWPSGaugesInBoundingBoxMock = vi.fn();
+  const getNWPSStageFlowMock = vi.fn();
+  const getNWPSGaugeMock = vi.fn();
+  const noaaService = {
+    getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+    getNWPSStageFlow: getNWPSStageFlowMock,
+    getNWPSGauge: getNWPSGaugeMock
+  } as never;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * A gauge with a real NOAA-published `floodCategory` on its bbox `status.observed`
+   * — this field lives on the gauge object the bbox call returns and is never
+   * touched by enrichment (`{ ...gauge, flood: floodByLid.get(lid) }` copies
+   * `status` by reference), so it must survive every detail-call outcome.
+   */
+  function buildGauge(i: number): NWPSGauge {
+    return {
+      lid: `LID${i}`,
+      name: `Gauge ${i}`,
+      latitude: BASE_LAT + i * 0.001,
+      longitude: BASE_LON,
+      state: { abbreviation: 'MA', name: 'Massachusetts' },
+      status: {
+        observed: {
+          primary: 4.2,
+          secondary: 0.05,
+          floodCategory: 'minor',
+          validTime: '2026-07-17T14:00:00Z'
+        }
+      }
+    };
+  }
+
+  function floodDetail(overrides: Partial<NWPSGauge> = {}): NWPSGauge {
+    return {
+      ...buildGauge(0),
+      flood: {
+        stageUnits: 'ft',
+        categories: {
+          action: { stage: 8 },
+          minor: { stage: 10 },
+          moderate: { stage: 14 },
+          major: { stage: 18 }
+        }
+      },
+      ...overrides
+    };
+  }
+
+  function callHandler(args: Record<string, unknown> = {}) {
+    return handleGetRiverConditions(
+      { latitude: BASE_LAT, longitude: BASE_LON, ...args },
+      noaaService,
+      {} as never,
+      {} as never,
+      {} as never
+    );
+  }
+
+  it('(1) a rejected detail call renders the gauge byte-identical to the no-threshold-data render, and does not fail the tool', async () => {
+    const gauge = buildGauge(0);
+
+    // Actual: bbox finds the gauge, but its detail call is rejected (simulating a
+    // 503/network failure on the per-gauge endpoint).
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([gauge]);
+    getNWPSGaugeMock.mockRejectedValue(new Error('503 detail unavailable'));
+    getNWPSStageFlowMock.mockResolvedValue({});
+
+    const actual = await callHandler({});
+    const actualText = actual.content[0].text;
+
+    // Expected: the same gauge, through the same handler, but via a service that
+    // has no per-gauge detail endpoint at all — i.e. exactly the shape this tool
+    // rendered before T3 introduced the detail fetch. `noaaService.getNWPSGauge`
+    // is undefined here, so the call throws synchronously inside the async
+    // wrapper, which the batch loop swallows the same way it swallows a real
+    // rejection (per the handler's own comment on this).
+    const noaaServiceNoDetail = {
+      getNWPSGaugesInBoundingBox: vi.fn().mockResolvedValue([gauge]),
+      getNWPSStageFlow: vi.fn().mockResolvedValue({})
+    } as never;
+    const expected = await handleGetRiverConditions(
+      { latitude: BASE_LAT, longitude: BASE_LON },
+      noaaServiceNoDetail,
+      {} as never,
+      {} as never,
+      {} as never
+    );
+    const expectedText = expected.content[0].text;
+
+    expect(actualText).toBe(expectedText);
+    expect(actualText).toContain('Gauge 0');
+    expect(actualText).toContain('**Distance:**');
+    expect(actualText).toContain('**River Stage:** 4.20 ft');
+    expect(actualText).toContain('**Flood Category:** 🟠 MINOR');
+    expect(actualText).not.toContain('### Flood Stages');
+    expect(actualText).not.toContain('### Recent Historic Crests');
+    expect(actualText).not.toContain('❌ **Error retrieving river gauge data**');
+  });
+
+  it('(2) a rejected detail call does not suppress the same gauge\'s stageflow trend', async () => {
+    const gauge = buildGauge(0);
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([gauge]);
+    getNWPSGaugeMock.mockRejectedValue(new Error('503 detail unavailable'));
+    getNWPSStageFlowMock.mockResolvedValue({ observed: { data: buildSeries(6, 3.7, 4.2) } });
+
+    const result = await callHandler({});
+    const text = result.content[0].text;
+
+    expect(getNWPSStageFlowMock).toHaveBeenCalledWith('LID0');
+    expect(getNWPSGaugeMock).toHaveBeenCalledWith('LID0');
+    expect(text).toContain('**River Stage:** 4.20 ft  ↗ rising (+0.5 ft / 6h)');
+    expect(text).not.toContain('### Flood Stages');
+  });
+
+  it('(3) a RateLimitError from the detail call stops further batches', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => buildGauge(i))
+    );
+    getNWPSGaugeMock.mockRejectedValue(new RateLimitError('NOAA'));
+    getNWPSStageFlowMock.mockResolvedValue({ observed: { data: buildSeries(6, 3.7, 4.2) } });
+
+    const result = await callHandler({ detail: 'full' });
+    const text = result.content[0].text;
+
+    // First batch of 5 attempted, rate-limited on the detail call; the remaining
+    // 7 of 12 shown gauges never get a detail (or stageflow) request.
+    expect(getNWPSGaugeMock).toHaveBeenCalledTimes(5);
+    expect(getNWPSStageFlowMock).toHaveBeenCalledTimes(5);
+    expect(text).toContain('Gauge 11'); // all 12 gauges still render
+    expect(text).not.toContain('### Flood Stages');
+  });
+
+  it('(4) a RateLimitError from the stageflow call stops further batches', async () => {
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => buildGauge(i))
+    );
+    getNWPSStageFlowMock.mockRejectedValue(new RateLimitError('NOAA'));
+    getNWPSGaugeMock.mockResolvedValue(floodDetail());
+
+    const result = await callHandler({ detail: 'full' });
+    const text = result.content[0].text;
+
+    // Same shape as (3), rate-limiting the other call in the pair.
+    expect(getNWPSStageFlowMock).toHaveBeenCalledTimes(5);
+    expect(getNWPSGaugeMock).toHaveBeenCalledTimes(5);
+    expect(text).toContain('Gauge 11'); // all 12 gauges still render
+    expect(text).not.toContain('rising');
+    expect(text).not.toContain('falling');
+  });
+
+  it('(5) a mixed batch enriches one gauge and leaves the other un-enriched, with no error string', async () => {
+    const gaugeGood = buildGauge(0);
+    const gaugeBad = buildGauge(1);
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([gaugeGood, gaugeBad]);
+    getNWPSGaugeMock.mockImplementation(async (lid: string) => {
+      if (lid === gaugeGood.lid) {
+        return floodDetail();
+      }
+      throw new Error('503 detail unavailable');
+    });
+    getNWPSStageFlowMock.mockResolvedValue({});
+
+    const result = await callHandler({});
+    const text = result.content[0].text;
+
+    const goodIndex = text.indexOf('## Gauge 0');
+    const badIndex = text.indexOf('## Gauge 1');
+    expect(goodIndex).toBeGreaterThanOrEqual(0);
+    expect(badIndex).toBeGreaterThan(goodIndex);
+
+    const goodBlock = text.slice(goodIndex, badIndex);
+    const badBlock = text.slice(badIndex);
+
+    expect(goodBlock).toContain('### Flood Stages');
+    expect(badBlock).not.toContain('### Flood Stages');
+    expect(text).not.toContain('❌ **Error retrieving river gauge data**');
   });
 });

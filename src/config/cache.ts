@@ -117,6 +117,13 @@ export const CacheConfig = {
     // grid cells in one request, so caching keeps repeat queries cheap).
     floodDischarge: 6 * HOUR,
 
+    // NWPS per-gauge detail (GET /gauges/{lid}) — read only for its flood-stage
+    // thresholds and crests, which are gauge metadata NOAA revises on the order
+    // of once a year. 24h keeps the ~31 KB mean payload a cold-start cost rather
+    // than an hourly one. The per-refresh status on the same payload is
+    // deliberately not read (see riverConditionsHandler's fresh-copy merge).
+    nwpsGaugeDetail: 24 * HOUR,
+
     // Google Pollen API (optional global pollen fallback)
     // Pollen models update ~daily; 6h matches the daily-model posture and
     // shields the 5,000/month free-tier quota once the 1h air-quality cache

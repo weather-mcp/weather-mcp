@@ -787,12 +787,12 @@ Monitor river levels and flood status worldwide — NOAA gauge observations in t
 **Returns (US path):**
 - Nearest river gauges with current water levels
 - Observed trend per gauge (rising/falling/steady with magnitude and window)
-- Flood stage thresholds (action, minor, moderate, major) — **only for gauges that publish them.** Many NWPS gauges return no threshold set at all, and those reports carry no flood-stage section and no threshold-derived labels; the `**Flood Category:**` line you see on most gauges comes from NOAA's own published status string, not from these thresholds. Where thresholds are published, forecast-series points are labelled against them using the stage **as displayed** (two decimals), so a point printing at its action stage is labelled; the published thresholds themselves are NOAA's own values and are not rounded.
+- Flood stage thresholds (action, minor, moderate, major), one row per level NOAA actually publishes. A gauge that publishes all four shows four rows; a gauge that publishes only some shows only those, with no row for the levels NOAA leaves unset; and a gauge that publishes none **says so explicitly**, so an absence of published thresholds is distinguishable from a threshold lookup that failed. The published thresholds are NOAA's own values and are **not** rounded. The `**Flood Category:**` line comes from NOAA's own published status string, not from these thresholds, and is unaffected by whether the threshold lookup succeeds — a gauge whose lookup fails or is rate-limited renders without a flood-stage section and is otherwise unchanged. Where thresholds are published, forecast-series points are labelled against them using the stage **as displayed** (two decimals), so a point printing at its action stage is labelled.
 - Current flood status and forecast (multi-point forecast series at `detail="full"` for gauges that have one — mostly tidal and major-river gauges)
 - Streamflow data (cubic feet per second)
 - Distance to each gauge from query location
 - River and location names, safety assessment for recreation
-- Historical context (flood crests if available)
+- Recent historic crests, where NOAA records them — year and stage, plus the flow when NOAA recorded one (many older crests have no flow on record and show the stage alone)
 
 **Returns (global model path):**
 - Current modeled discharge with a rise/fall trend over the past 7 days (relative ±10% threshold)

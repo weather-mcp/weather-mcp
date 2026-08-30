@@ -37,9 +37,23 @@ const FORECAST_SERIES_CAP = 80;
 
 const getNWPSGaugesInBoundingBoxMock = vi.fn();
 const getNWPSStageFlowMock = vi.fn();
+// `flood` now reaches the renderer only from the per-gauge detail endpoint, so the
+// detail mock hands back the same gauge the bbox mock produced. Without it the
+// thresholds never arrive and every seam row in this file degenerates to "no
+// category" — which is exactly the silent inertness this wiring exists to prevent.
+const getNWPSGaugeMock = vi.fn().mockImplementation(async (lid: string) => {
+  const lastCall = getNWPSGaugesInBoundingBoxMock.mock.results.at(-1);
+  const gauges = (lastCall ? await lastCall.value : []) as NWPSGauge[];
+  const found = gauges.find(g => g.lid === lid);
+  if (!found) {
+    throw new Error(`no detail response for ${lid}`);
+  }
+  return found;
+});
 const noaaService = {
   getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
-  getNWPSStageFlow: getNWPSStageFlowMock
+  getNWPSStageFlow: getNWPSStageFlowMock,
+  getNWPSGauge: getNWPSGaugeMock
 } as never;
 
 beforeEach(() => {
@@ -150,15 +164,20 @@ function sweepStages(): number[] {
   return Array.from({ length: SWEEP_END_I - SWEEP_START_I + 1 }, (_, k) => (SWEEP_START_I + k) / SWEEP_DIVISOR);
 }
 
-const SWEEP_CATEGORIES: FloodCategories = { action: 8, minor: 10, moderate: 14, major: 18 };
+const SWEEP_CATEGORIES: FloodCategories = { action: { stage: 8 }, minor: { stage: 10 }, moderate: { stage: 14 }, major: { stage: 18 } };
 const CATEGORY_ORDER = ['none', 'action', 'minor', 'moderate', 'major'];
 
 /** The pre-fix rule: the same four thresholds, banded on the raw stage directly. */
 function oldRawCategory(stage: number, categories: FloodCategories): string {
-  if (stage >= categories.major) return 'major';
-  if (stage >= categories.moderate) return 'moderate';
-  if (stage >= categories.minor) return 'minor';
-  if (stage >= categories.action) return 'action';
+  // Shape migration only — this helper still encodes the *pre-fix* rule (band on the
+  // raw stage) and its behaviour must not change. `?? Infinity` rather than `?? 0`:
+  // an unpublished level must never band a stage *up*. Every fixture in this file is
+  // fully populated, so the fallback is unobservable here; it is specified because
+  // the other choice is silently wrong.
+  if (stage >= (categories.major?.stage ?? Infinity)) return 'major';
+  if (stage >= (categories.moderate?.stage ?? Infinity)) return 'moderate';
+  if (stage >= (categories.minor?.stage ?? Infinity)) return 'minor';
+  if (stage >= (categories.action?.stage ?? Infinity)) return 'action';
   return 'none';
 }
 
@@ -226,7 +245,7 @@ interface SeamRow {
   expectedCategory: string | null;
 }
 
-const DEFAULT_CATEGORIES: FloodCategories = { action: 8, minor: 10, moderate: 14, major: 18 };
+const DEFAULT_CATEGORIES: FloodCategories = { action: { stage: 8 }, minor: { stage: 10 }, moderate: { stage: 14 }, major: { stage: 18 } };
 
 const SEAM_ROWS: SeamRow[] = [
   { label: 'just below the action seam rounds up into ACTION', categories: DEFAULT_CATEGORIES, stage: 7.996, expectedPrinted: '8.00', expectedCategory: 'action' },
@@ -243,13 +262,13 @@ const SEAM_ROWS: SeamRow[] = [
   // alone does not distinguish "round stage only" from "round stage AND
   // threshold" (see mutation-check report) — it exists to prove the handler
   // doesn't assume integer thresholds.
-  { label: 'non-integer threshold: stage rounds to exactly the action threshold', categories: { action: 8.35, minor: 10, moderate: 14, major: 18 }, stage: 8.3451, expectedPrinted: '8.35', expectedCategory: 'action' },
+  { label: 'non-integer threshold: stage rounds to exactly the action threshold', categories: { action: { stage: 8.35 }, minor: { stage: 10 }, moderate: { stage: 14 }, major: { stage: 18 } }, stage: 8.3451, expectedPrinted: '8.35', expectedCategory: 'action' },
   // Threshold with 3 decimal places, deliberately NOT at 2-decimal precision:
   // shown=8.00 is below the raw 8.004 threshold, so this stays clear of
   // ACTION under the shipped rule. This is the row that catches the
   // "round the threshold too" rejected alternative (mutation check #2).
-  { label: 'threshold with 3 decimal places: shown stage stays below the raw (unrounded) threshold', categories: { action: 8.004, minor: 10, moderate: 14, major: 18 }, stage: 8.0, expectedPrinted: '8.00', expectedCategory: null },
-  { label: 'threshold with 3 decimal places: a clearly-above stage still reads ACTION (control)', categories: { action: 8.004, minor: 10, moderate: 14, major: 18 }, stage: 8.01, expectedPrinted: '8.01', expectedCategory: 'action' }
+  { label: 'threshold with 3 decimal places: shown stage stays below the raw (unrounded) threshold', categories: { action: { stage: 8.004 }, minor: { stage: 10 }, moderate: { stage: 14 }, major: { stage: 18 } }, stage: 8.0, expectedPrinted: '8.00', expectedCategory: null },
+  { label: 'threshold with 3 decimal places: a clearly-above stage still reads ACTION (control)', categories: { action: { stage: 8.004 }, minor: { stage: 10 }, moderate: { stage: 14 }, major: { stage: 18 } }, stage: 8.01, expectedPrinted: '8.01', expectedCategory: 'action' }
 ];
 
 describe('River band rounding — seam rows (contract 3)', () => {

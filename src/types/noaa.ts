@@ -395,23 +395,38 @@ export type GridpointResponse = NOAAResponse<GridpointProperties>;
  */
 
 /**
- * Flood category levels in feet for a river gauge
+ * One flood-category threshold, as published on the per-gauge detail endpoint.
+ * NWPS emits -9999 for "not published" rather than omitting the field, so
+ * presence of a key says nothing — `isRealValue` on the number is the guard.
  */
-export interface FloodCategories {
-  action: number; // Action stage in feet
-  minor: number; // Minor flood stage in feet
-  moderate: number; // Moderate flood stage in feet
-  major: number; // Major flood stage in feet
+export interface FloodThreshold {
+  stage?: number; // Stage, in the enclosing flood.stageUnits
+  flow?: number; // Flow, in the enclosing flood.flowUnits
 }
 
 /**
- * Historical crest data for a river gauge
+ * Flood category thresholds for a river gauge. All four keys are present on every
+ * gauge sampled live, but a gauge may publish thresholds for only some levels
+ * (3 of 14 sampled publish action+minor only, 2 publish none).
+ */
+export interface FloodCategories {
+  action?: FloodThreshold;
+  minor?: FloodThreshold;
+  moderate?: FloodThreshold;
+  major?: FloodThreshold;
+}
+
+/**
+ * Historical crest data for a river gauge, as returned by NWPS. There is no
+ * impact-description field on this shape; `preliminary` is "O" (observed) or
+ * "R" (recorded).
  */
 export interface HistoricCrest {
-  value: number; // Stage in feet
-  flow?: number; // Flow in cfs (optional)
-  date: string; // ISO 8601 datetime
-  description?: string; // Impact description
+  occurredTime?: string; // ISO 8601 datetime
+  stage?: number; // Stage, in flood.stageUnits
+  flow?: number; // Flow, in flood.flowUnits; both -9999 and 0 occur
+  preliminary?: string; // "O" observed | "R" recorded
+  olddatum?: boolean;
 }
 
 /**
@@ -463,7 +478,9 @@ export interface NWPSGauge {
   // Detailed flood/crest data is only present on the per-gauge detail endpoint,
   // not on the bounding-box list response.
   flood?: {
-    categories: FloodCategories;
+    stageUnits?: string; // e.g. "ft"
+    flowUnits?: string; // e.g. "cfs"
+    categories?: FloodCategories;
     crests?: {
       historic?: HistoricCrest[];
       recent?: HistoricCrest[];
