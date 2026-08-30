@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`get_river_conditions` now renders flood-stage thresholds and historic
+  crests for US gauges, which it has advertised since the NWPS integration
+  and never once produced.** Three renderers read `gauge.flood` — the
+  `### Flood Stages` block, `### Recent Historic Crests`, and the per-point
+  flood label on the `detail="full"` forecast series — but the handler's only
+  gauge source was the NWPS bounding-box list endpoint, which carries no
+  `flood` object at all. The per-gauge detail endpoint that does carry one
+  had a service method written for it that was **never called**. The
+  thresholds are now fetched from that endpoint, merged into the existing
+  per-gauge batch so the two calls overlap rather than doubling wall-clock,
+  and cached for 24 hours as the near-static gauge metadata they are.
+- **The types those renderers were written against described a shape NWPS
+  has never returned**, so wiring the fetch alone would have replaced every
+  US river report's gauge list with an error block rather than rendering
+  anything. `flood.categories.<level>` is a `{ stage, flow }` object, not a
+  bare number, and every field of a historic crest was misnamed — there is
+  no `description` field upstream at all. Both types are corrected against
+  captured live responses, which are now committed as fixtures so a future
+  divergence fails a test instead of shipping.
+- **A gauge publishing only some threshold levels renders only those**, with
+  no row for the levels NOAA leaves unset, and a stage above the highest
+  published level is still labelled against it rather than falling through to
+  no label. NWPS marks an unpublished level with a large negative sentinel,
+  which the previous code would have rendered literally.
+- **A gauge publishing no thresholds at all now says so**, naming NOAA as the
+  publisher, instead of silently omitting the section — so an absence of
+  published thresholds is distinguishable from a lookup that failed. A failed
+  or rate-limited lookup renders the gauge exactly as before: no threshold
+  section, and NOAA's own `**Flood Category:**` line intact.
+- **A historic crest with no recorded flow no longer prints one.** NWPS
+  encodes an unrecorded crest flow as both a large negative sentinel and as
+  zero; the previous truthy guard hid the zeros by accident and would have
+  printed the sentinel. Read against a live capture, two thirds of one
+  gauge's crest rows were affected, including a 28.55 ft flood.
+
 ## [1.25.12] - 2026-08-29
 
 ### Fixed
