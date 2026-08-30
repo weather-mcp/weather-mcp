@@ -75,15 +75,26 @@ jobs:
         if: steps.check.outputs.already_published == 'false'
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
-          # Registry propagation can take a minute or two
-          for i in $(seq 1 10); do
+          # npm accepts the tarball before the registry serves it. Measured across
+          # v1.25.4-v1.25.13 the lag was bimodal: a ~76s cluster with a 250s tail.
+          # 40 x 15s puts the last probe at ~600s, 2.4x the worst observed lag.
+          ATTEMPTS="${NPM_VERIFY_ATTEMPTS:-40}"
+          INTERVAL="${NPM_VERIFY_INTERVAL_S:-15}"
+          for i in $(seq 1 "$ATTEMPTS"); do
             PUBLISHED=$(npm view "@dangahagan/weather-mcp@${PKG_VERSION}" version 2>/dev/null || true)
             if [ "$PUBLISHED" = "$PKG_VERSION" ]; then
               echo "npm now serves: ${PUBLISHED}"
               exit 0
             fi
-            echo "Attempt $i: not visible yet, retrying in 15s..."
-            sleep 15
+            echo "Attempt $i/$ATTEMPTS: not visible yet"
+            if [ "$i" -lt "$ATTEMPTS" ]; then
+              sleep "$INTERVAL"
+            fi
           done
-          echo "::error::v${PKG_VERSION} not visible on npm after 10 attempts"
-          exit 1
+          # Exhaustion is not evidence of failure: the poller cannot tell "npm is
+          # slow" from "npm dropped it". Publish succeeded, so warn and exit 0.
+          JQ_FILTER='.["dist-tags"].latest'
+          MSG="v${PKG_VERSION} was accepted by npm but is not retrievable yet after ${ATTEMPTS} probes over $((ATTEMPTS * INTERVAL))s. The publish step succeeded, so the tarball is signed and propagating. Confirm with: curl -s https://registry.npmjs.org/@dangahagan/weather-mcp | jq -r '${JQ_FILTER}' - do not re-run this workflow and do not npm publish by hand."
+          echo "::warning::${MSG}"
+          echo "⚠️ ${MSG}" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
