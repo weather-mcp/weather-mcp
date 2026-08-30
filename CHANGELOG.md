@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.14] - 2026-08-30
+
+### Fixed
+
+- **A release that published successfully no longer reports as a failed release.** `.github/workflows/publish.yml`'s `Verify publication` step polled `npm view` ten times at 15-second intervals — putting its last probe at ~138 seconds — and then emitted a bare `::error::` and exited 1. `npm publish` returns as soon as the registry accepts the tarball and says so itself, *"Your package is being processed and may take a few minutes to become available"*, so the step's 2.5-minute budget was never related to the delay it was waiting on by anything but luck. Measured across the ten releases v1.25.4 through v1.25.13, propagation took 0, 0, 75, 75, 76, 77, 96, 158, 189 and 250 seconds — a tight cluster near 76 s with a heavy tail, **bimodal rather than a rising trend**, which matters because a correct budget has to clear the tail rather than track a slope. Every lag above the last probe failed and every lag below it passed, across all ten, with no exceptions: the budget was the whole defect. Three published, signed, `latest` releases — v1.25.6, v1.25.11 and v1.25.12 — were displayed as failures on that basis, and the consequence is the reason it mattered: a red publish run reads as "not shipped" to anyone glancing at the Actions tab, and every corrective action it invites (a workflow re-run, a hand `npm publish`, a version bump to route around a version that already exists) is worse than the false alarm. **The poll now runs 40 attempts at 15 seconds**, putting the last probe at ~597 s — 2.4 times the worst lag observed, and wide enough that none of the ten measured releases would have reached it — and the trailing sleep after the final probe, which bought nothing, is skipped. **On exhaustion the step now emits a `::warning::` and exits 0** rather than asserting a failure it never measured: the poller cannot distinguish "npm is slow" from "npm dropped it", and if `Publish to npm` had itself failed the job is already red from that step, so the demotion is unconditional and can mask nothing. `continue-on-error: true` was rejected as the mechanism, because it would also swallow a genuine fault in the step's own script — a bad substitution, a missing binary — and report it as the same benign yellow; the point is to stop asserting failures that were not measured, not to stop measuring. The warning names the version, states that the tarball is signed and propagating, and prints the exact confirmation — the **registry URL**, not `npm view`, so the human's check does not go through a package manager's resolution policy — and the same text is written to the run summary, where a release engineer already looks, rather than only to an annotation that is easy to scroll past. The automated probe deliberately still uses `npm view`: across all seven green releases it saw the version within one poll interval of the registry's own recorded time, so there is no client-side cache lag to remove. **Release tooling only — nothing in the published package changed**; no tool, parameter, output or environment variable moves, and the step above it that decides whether to publish at all is untouched. Recorded as **G39** in `GOTCHAS.md`, whose duplicate **G55** is retired alongside it. Reported by **@dgahagan** ([#90](https://github.com/weather-mcp/weather-mcp/issues/90)). (`.github/workflows/publish.yml`, `docs/publishing/PUBLISHING.md`)
+
 ## [1.25.13] - 2026-08-30
 
 ### Fixed
@@ -1591,7 +1597,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.13...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.14...HEAD
+[1.25.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.13...v1.25.14
 [1.25.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.12...v1.25.13
 [1.25.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.11...v1.25.12
 [1.25.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.10...v1.25.11
