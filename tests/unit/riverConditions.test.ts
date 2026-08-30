@@ -802,6 +802,53 @@ describe('handleGetRiverConditions flood stages and crests (T2)', () => {
     }
   });
 
+  it('labels a forecast point with no category at all when every threshold is sentinel (deriveFloodCategory action guard)', async () => {
+    // The action+minor case above pins the `major` and `moderate` guards: with those
+    // two at -9999, dropping either makes an unreal level match and the expected
+    // MINOR label changes. The `action` guard was pinned by nothing, because it is
+    // observable only where EVERY level is sentinel — the one threshold class this
+    // suite never paired with a forecast series, which is `deriveFloodCategory`'s
+    // only call site. Without it, `shown >= -9999` matches any stage and the gauge
+    // renders a fabricated ACTION label three lines under the D5 sentence saying
+    // NOAA publishes no thresholds for it.
+    const categories: FloodCategories = {
+      action: { stage: -9999 },
+      minor: { stage: -9999 },
+      moderate: { stage: -9999 },
+      major: { stage: -9999 }
+    };
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', categories } })
+    ]);
+    const getNWPSStageFlowMock = vi.fn().mockResolvedValue({
+      forecast: { data: [forecastPoint('2026-07-18T00:00:00Z', 12.0)] }
+    });
+    const noaaServiceWithStageFlow = {
+      getNWPSGaugesInBoundingBox: getNWPSGaugesInBoundingBoxMock,
+      getNWPSStageFlow: getNWPSStageFlowMock,
+      getNWPSGauge: detailFromBbox(getNWPSGaugesInBoundingBoxMock)
+    } as never;
+
+    const result = await handleGetRiverConditions(
+      { latitude: BASE_LAT, longitude: BASE_LON, detail: 'full' },
+      noaaServiceWithStageFlow,
+      {} as never,
+      {} as never,
+      {} as never
+    );
+    const text = (result.content[0] as { text: string }).text;
+
+    // The forecast point renders bare: the line ends at the unit, with no emoji and
+    // no category word after it.
+    const pointLine = text.split('\n').find((line) => line.includes('12.00 ft'));
+    expect(pointLine).toBeDefined();
+    expect(pointLine).toMatch(/12\.00 ft$/);
+
+    // ...and the report still says, above it, that there are no published thresholds.
+    // The two statements must not contradict each other in one render.
+    expect(text).toContain('*NOAA publishes no flood-stage thresholds for this gauge.');
+  });
+
   it('renders no flow clause for a -9999 or 0 crest flow, and a clause for a real one — never printing NaN, undefined, or -9999', async () => {
     // NWPS uses BOTH -9999 and 0 for an unrecorded crest flow (20 of PRTO3's 26
     // recent crests are `flow: 0`). A crest is a peak, so zero flow is never a real
@@ -847,6 +894,46 @@ describe('handleGetRiverConditions flood stages and crests (T2)', () => {
     expect(text).toContain('### Recent Historic Crests');
     expect(text).not.toContain('**2019:**');
     expect(text).toContain('**2020:** 10.40 ft (900 cfs)');
+  });
+
+  it('skips a crest whose occurredTime is unparseable, and emits no section when that leaves no rows', async () => {
+    // `new Date('not-a-date')` is an Invalid Date whose getFullYear() is NaN, so
+    // without the guard the row renders as `- **NaN:** 12.34 ft (5000 cfs)` — one of
+    // the four classes (NaN, undefined, -9999, `**X** (X)`) this feature's live pass
+    // is required to read the rendered text for. The header is emitted only after a
+    // printable row exists, so a crest list that filters to nothing must leave no
+    // empty `### Recent Historic Crests` heading behind either.
+    const recent: HistoricCrest[] = [{ stage: 12.34, occurredTime: 'not-a-date', flow: 5000 }];
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', flowUnits: 'cfs', crests: { recent } } })
+    ]);
+
+    const result = await callHandler({});
+    const text = (result.content[0] as { text: string }).text;
+
+    expect(text).not.toContain('### Recent Historic Crests');
+    expect(text).not.toContain('NaN');
+    expect(text).not.toContain('12.34');
+  });
+
+  it('drops only the unparseable crest, keeping the real ones and the section', async () => {
+    // The skip is per row, not per section: a bad date beside a good one must cost
+    // the reader the bad row and nothing else.
+    const recent: HistoricCrest[] = [
+      { stage: 12.34, occurredTime: 'not-a-date', flow: 5000 },
+      { stage: 10.4, occurredTime: '2020-03-15T00:00:00Z', flow: 900 }
+    ];
+    getNWPSGaugesInBoundingBoxMock.mockResolvedValue([
+      buildGauge({ flood: { stageUnits: 'ft', flowUnits: 'cfs', crests: { recent } } })
+    ]);
+
+    const result = await callHandler({});
+    const text = (result.content[0] as { text: string }).text;
+
+    expect(text).toContain('### Recent Historic Crests');
+    expect(text).toContain('**2020:** 10.40 ft (900 cfs)');
+    expect(text).not.toContain('NaN');
+    expect(text).not.toContain('12.34');
   });
 });
 
