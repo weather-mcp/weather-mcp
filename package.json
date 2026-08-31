@@ -73,7 +73,7 @@
     "astronomy-engine": "^2.1.19",
     "axios": "^1.19.0",
     "dotenv": "^17.2.3",
-    "fast-xml-parser": "^5.11.0",
+    "fast-xml-parser": "^5.11.1",
     "luxon": "^3.7.2",
     "ngeohash": "^0.6.4",
     "pngjs": "^7.0.0",
