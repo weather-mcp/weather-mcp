@@ -5,11 +5,11 @@
 **Claude Code answered** (using `get_marine_conditions`):
 
 <!-- answer -->
-Good news for tomorrow — conditions off the Heads are rated **Moderate, trending "Slight"** on the sea-state scale:
+Good news for tomorrow — conditions off the Heads are rated 🟢 **Slight** on the WMO sea-state scale, the top of the calm tier:
 
-- **Significant wave height 1.3 m**, dominated by a long-period southerly: 1.2 m of SSE swell against only 0.2 m of local wind wave. With an 8.5 s period, that reads as smooth, rolling seas rather than chop.
-- **Currents** are gentle — about 0.4 knots setting east.
-- Looking ahead: waves build slightly to **1.6 m Saturday and Sunday**, still in the "Slight" band.
+- **Significant wave height 1.0 m**, dominated by swell: 0.8 m of SSE swell against only 0.2 m of local wind wave. With an 8.8 s period, that reads as smooth, rolling seas rather than chop.
+- **Currents** are gentle — 0.58 knots setting south-east.
+- Looking ahead: waves hold at **1.0 m Wednesday and Thursday** and edge up to **1.1 m Friday**, still in the "Slight" band.
 
 Fine conditions for a well-found boat — just remember this is model data, not suitable for navigation; check the official coastal waters forecast before you cast off.
 <!-- /answer -->
@@ -39,36 +39,36 @@ get_marine_conditions({
 
 ⚠️ **DISCLAIMER:** This data is modeled and may have limited accuracy in coastal areas. **NOT suitable for coastal navigation.** Always consult official marine forecasts for safety-critical decisions.
 
-**Observation Time:** Aug 28, 2026, 7:45 AM
+**Observation Time:** Sep 2, 2026, 5:15 AM
 
-## 🟡 Current Conditions: Moderate
+## 🟢 Current Conditions: Slight
 
 Slight Conditions dominated by swell from distant systems.
 
 ## 🌊 Wave Conditions
 
-**Significant Wave Height:** 1.5m (4.9ft) (Slight)
-**Wave Direction:** SSE (152°)
-**Wave Period:** 10.1s
+**Significant Wave Height:** 1.0m (3.3ft) (Slight)
+**Wave Direction:** ESE (121°)
+**Wave Period:** 8.8s
 
 ### Wind Waves
 
-**Height:** 0.0m (0.1ft)
-**Direction:** WNW (286°)
-**Period:** 1.1s
+**Height:** 0.2m (0.7ft)
+**Direction:** NNW (339°)
+**Period:** 1.6s
 **Peak Period:** N/A
 
 ### Swell
 
-**Height:** 1.5m (4.8ft)
-**Direction:** SSE (156°)
-**Period:** 8.6s
+**Height:** 0.8m (2.5ft)
+**Direction:** SSE (161°)
+**Period:** 9.7s
 **Peak Period:** N/A
 
 ## 🌀 Ocean Currents
 
-**Velocity:** 0.20 m/s (0.39 knots)
-**Direction:** E (90°)
+**Velocity:** 0.30 m/s (0.58 knots)
+**Direction:** SE (135°)
 
 ---
 
@@ -76,26 +76,26 @@ Slight Conditions dominated by swell from distant systems.
 
 **Next 3 days:**
 
-**Fri, Aug 28:**
-  • Max Wave Height: 1.5m (5.1ft) (Slight)
-  • Wave Direction: SSE (153°)
-  • Max Wave Period: 10.2s
-  • Swell Height: 1.5m (4.8ft)
-  • Swell Direction: SSE (156°)
+**Wed, Sep 2:**
+  • Max Wave Height: 1.0m (3.3ft) (Slight)
+  • Wave Direction: SE (125°)
+  • Max Wave Period: 9.4s
+  • Swell Height: 0.8m (2.6ft)
+  • Swell Direction: SSE (160°)
 
-**Sat, Aug 29:**
-  • Max Wave Height: 1.5m (5.0ft) (Slight)
-  • Wave Direction: SSE (149°)
-  • Max Wave Period: 8.6s
-  • Swell Height: 1.3m (4.2ft)
-  • Swell Direction: SSE (151°)
-
-**Sun, Aug 30:**
-  • Max Wave Height: 1.2m (4.1ft) (Smooth)
-  • Wave Direction: SSE (155°)
+**Thu, Sep 3:**
+  • Max Wave Height: 1.0m (3.1ft) (Slight)
+  • Wave Direction: SE (136°)
   • Max Wave Period: 9.7s
-  • Swell Height: 1.0m (3.1ft)
-  • Swell Direction: SSE (156°)
+  • Swell Height: 0.6m (2.0ft)
+  • Swell Direction: SSE (160°)
+
+**Fri, Sep 4:**
+  • Max Wave Height: 1.1m (3.6ft) (Slight)
+  • Wave Direction: SSE (167°)
+  • Max Wave Period: 9.8s
+  • Swell Height: 1.0m (3.3ft)
+  • Swell Direction: SSE (166°)
 
 ---
 
@@ -106,11 +106,13 @@ Slight Conditions dominated by swell from distant systems.
 **Swell:** Long-period waves from distant weather systems (longer period)
 **Wave Period:** Time between successive wave crests (longer = more powerful)
 
-🟢 **Calm** (0-2m): Safe for most vessels
-🟡 **Moderate** (2-4m): Challenging for small craft
-🟠 **Rough** (4-6m): Hazardous for small vessels
-🔴 **Very Rough** (6-9m): Dangerous for most vessels
-🟤 **High** (>9m): Extremely dangerous
+🟢 **Calm / Smooth (wavelets) / Slight** (0–1.25 m): Safe for most vessels
+🟡 **Moderate** (1.25–2.5 m): Challenging for small craft
+🟠 **Rough** (2.5–4 m): Hazardous for small vessels
+🔴 **Very rough / High** (4–9 m): Dangerous for most vessels
+🟣 **Very high / Phenomenal** (≥9 m): Extremely dangerous
+
+⚪ marks a report with no wave-height data. Markers describe the sea state at the point, not a hazard forecast — consult official marine warnings.
 ````
 
 </details>
@@ -144,13 +146,13 @@ get_lightning_activity({
 
 **Location:** -33.8688, 151.2093
 **Search Radius:** 250 km
-**Time Window:** 60 minutes (2026-08-27T20:49:32.467Z to 2026-08-27T21:49:32.467Z)
+**Time Window:** 60 minutes (2026-09-01T18:26:12.068Z to 2026-09-01T19:26:12.068Z)
 
 ## 🟢 Safety Status: SAFE (LIMITED DATA)
 
 No lightning strikes observed during the limited monitoring period. This does NOT confirm the absence of lightning activity.
 
-⚠️ **Limited monitoring coverage:** Live strike collection for this area spans 1.1 of the requested 60 minutes (since 2026-08-27T21:48:26.775Z). An absence of strikes in this report does not confirm an absence of lightning. Re-check in a few minutes or consult official weather services before making safety decisions.
+⚠️ **Limited monitoring coverage:** Live strike collection for this area spans 1.1 of the requested 60 minutes (since 2026-09-01T19:25:06.770Z). An absence of strikes in this report does not confirm an absence of lightning. Re-check in a few minutes or consult official weather services before making safety decisions.
 
 *Why: lightning is monitored via a live feed that only begins buffering strikes once an area is first queried, so a location’s first lookup starts near zero coverage and builds over the following minutes. Saved locations are pre-warmed at startup. Historical strikes cannot be backfilled.*
 
@@ -172,7 +174,7 @@ No lightning strikes detected in the search area during the time window.
 ⚠️ **DISCLAIMER:** Lightning data from Blitzortung.org community network. Data may have 5-15 minute delay. For life-safety decisions, consult official weather services and local emergency management. When thunder roars, go indoors!
 
 ---
-*Generated: 2026-08-27T21:49:32.467Z*
+*Generated: 2026-09-01T19:26:12.068Z*
 *Data source: Blitzortung.org*
 ````
 
@@ -184,5 +186,5 @@ No lightning strikes detected in the search area during the time window.
 **Features shown:** `get_marine_conditions` with `forecast_days` (waves, swell, period, currents, safety assessment) · `get_lightning_activity` real-time strike detection with `radius`/`timeWindow` and a 4-level safety assessment · metric units for an Australian location.
 
 <!-- capture-stamp -->
-*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-01 with weather-mcp v1.25.15 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->
