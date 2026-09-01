@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.16] - 2026-09-01
+
 ### Fixed
 - **A 0.6 m sea no longer carries the marker its own legend defines as *Extremely dangerous*.** `get_marine_conditions` printed the coloured severity marker in its `Current Conditions` header from a four-arm ternary that knew four of the nine sea-state names and fell through to 🟤 for the rest — so a 0.6 m sea (the advice the scale attaches to it — printed as `**Safety:**` on the NOAA path — is *"Good conditions for most activities"*), a 20 m sea and a failed fetch all rendered 🟤, which the legend at the foot of the same report defined as `High (>9m): Extremely dangerous`. Rung by rung the markers ran 🟢 🟢 🟤 🟡 🟡 🟠 🔴 🟤 🟤. The legend's ranges (`Calm (0-2m)`, `Moderate (2-4m)`, …) matched no rung the code has ever had, it had no row for two of the rungs, and on three rungs the header word and the wave line beneath it named different sea states — `## 🟡 Current Conditions: Moderate` above `1.5m (4.9ft) (Slight)` was visible in the committed `examples/boating-and-marine.md`. Underneath, the rung names sat one row below WMO Code Table 3700 from 0.1 m up: 0.5–1.25 m was called `Smooth` where the table says `Slight`, and the ≥14 m rung was `Very High` where the table says `Phenomenal` — a name `docs/TOOLS.md` had promised and no code path produced. **One table now holds the scale**: nine rungs at the same nine thresholds, named with the code table's own terms (`Calm`, `Smooth (wavelets)`, `Slight`, `Moderate`, `Rough`, `Very rough`, `High`, `Very high`, `Phenomenal` — read from NOAA/NODC's transcription of table 3700 and the UK Met Office's coast-and-sea glossary, which agree on every name and bound) and grouped into five severity tiers, and the header marker, the header word, the wave-line category and the legend all derive from it. The legend's five rows are generated with the true combined range per tier (`🟢 Calm / Smooth (wavelets) / Slight (0–1.25 m)` … `🟣 Very high / Phenomenal (≥9 m)`); rung by rung the markers now run 🟢 🟢 🟢 🟡 🟠 🔴 🔴 🟣 🟣 — monotonic, driven against the built dist at every threshold and a band either side; a report with no wave-height data shows ⚪, a non-severity marker with its own legend line, instead of the top tier's colour; and 🟤 is retired, so an old report cannot be read against the new key. Adding a rung without a severity is now a build error rather than a silent colour: the sea-state `level` is a union derived from the table, and deleting the tier from one rung produces `TS2741`. **The thresholds and the advice attached to each threshold are unchanged** — a 0.6 m sea still carries *"Good conditions for most activities"* (printed as `**Safety:**` on the NOAA path; the Open-Meteo path has never printed the per-rung advice); only its name (`Slight`) and its marker (🟢) moved, and every seam locked in v1.25.6 still holds. The lowest rung covers WMO codes 0 and 1 together, because a height printed to one decimal cannot tell a glassy sea from a rippled one, and is named `Calm`. **The NOAA Great Lakes and coastal-bay path inherits the corrected name on its wave line** — `0.6m (2.0ft) (Slight)` where it printed `(Smooth)` — because both paths call the same band function; it gains no marker and no legend, and that parenthetical is the only line of its output that changed, confirmed byte-for-byte against the branch base. An exact boundary height (a printed `4.0 m`) stays in the higher rung, the cautious side, where WMO's coding rule assigns it to the lower code; `docs/TOOLS.md` now says so. (`src/utils/marine.ts`, `src/handlers/marineConditionsHandler.ts`, `tests/unit/marine-band-rounding.test.ts`, `tests/unit/marine-sea-state-taxonomy.test.ts`, `examples/boating-and-marine.md`, `docs/TOOLS.md`, `README.md`)
+
+### Changed
+- **Dependencies** — `axios` ^1.19 → ^1.20 and `fast-xml-parser` 5.11.0 → 5.11.1 (Dependabot #92, #93); development-only bumps to `@types/luxon` and `@types/node` (#91). No behaviour change.
 
 ## [1.25.15] - 2026-09-01
 
@@ -1606,7 +1611,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.15...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.16...HEAD
+[1.25.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.15...v1.25.16
 [1.25.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.14...v1.25.15
 [1.25.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.13...v1.25.14
 [1.25.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.12...v1.25.13
