@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.25.14 (Production Ready)
+- **Version:** 1.25.15 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -527,7 +527,11 @@ tools use to skip the reverse-geocode lookup.
 1. Create handler: `src/handlers/newFeatureHandler.ts`
 2. Define types: `src/types/<upstream>.ts`
 3. Add service method if needed: `src/services/`
-4. Register tool in `src/index.ts` (`TOOL_DEFINITIONS` + dispatch) and in `src/config/tools.ts` (`TOOL_NAMES`, presets)
+4. Register tool in `src/index.ts` (`TOOL_DEFINITIONS` + dispatch) and in `src/config/tools.ts` (`TOOL_NAMES`, presets).
+   `TOOL_NAMES` is the single source — `ToolName` is derived from it and cannot be edited — and
+   `tests/unit/tool-name-parity.test.ts` pins the registry and the dispatch to it. That test reads
+   the dispatch **as text**, so write the arm as `case 'your_tool':` on one line, single-quoted:
+   a reformatted label fails it (deliberately — a `switch` has no runtime representation to enumerate)
 5. Write tests: `tests/unit/` and `tests/integration/`
 6. Update documentation: `docs/TOOLS.md`, `README.md`, `CHANGELOG.md`
 
@@ -582,15 +586,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.25.14 — Production Ready ✅
+- **Version:** 1.25.15 — Production Ready ✅
 - **Test Coverage:** 2,900 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.25.15:** The seventeen tool names are declared once, so ENABLED_TOOLS can no longer silently fail to enable a real tool
 - **New in v1.25.14:** A publish run that succeeded is no longer reported as a failed release
 - **New in v1.25.13:** US river gauges now render the flood-stage thresholds and historic crests they have always advertised
-- **New in v1.25.12:** A forced NOAA river query in a US territory now discloses the NWPS coverage gap, and Puerto Rico is never denied
 
 ## Useful References
 
@@ -613,7 +617,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-08-30 (v1.25.14)
+**Last Updated:** 2026-09-01 (v1.25.15)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
