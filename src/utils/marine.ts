@@ -141,11 +141,112 @@ export function formatDirection(degrees: number | undefined): string {
 }
 
 /**
+ * Sea state — one ordered table, and everything that names a sea state derives from it.
+ *
+ * WMO Code Table 3700 (State of the sea; the Douglas sea scale), read 2026-09-01 from
+ * NOAA/NODC's GTSPP transcription and the UK Met Office coast-and-sea glossary, which agree
+ * on every term and bound. The rung names are the code table's terms in its capitalisation.
+ * The thresholds are the code table's bounds and are locked at every seam by
+ * tests/unit/marine-band-rounding.test.ts (v1.25.6) — do not move them.
+ *
+ * Codes 0 (Calm (glassy), 0 m) and 1 (Calm (rippled), 0–0.1 m) share the lowest rung: the
+ * band keys on the one-decimal display value, and `shown < 0.1` means the report prints
+ * `0.0m`, which both codes do. The rung carries the term the two codes share, `Calm`, rather
+ * than claiming either parenthetical for a sea the display cannot tell apart.
+ *
+ * Boundary convention: an exact bound bands into the HIGHER rung (`shown < upperBound`, the
+ * cautious side, as v1.25.6 locked it), whereas the code table's own coding rule assigns an
+ * exact bounding height to the lower code figure. docs/TOOLS.md states this.
+ *
+ * Recommendations belong to the threshold RANGE, not to the name — a rung renamed by this
+ * table keeps the advice its range always carried.
+ */
+export const SEA_STATE_TIERS = {
+  calm: { marker: '🟢', blurb: 'Safe for most vessels' },
+  moderate: { marker: '🟡', blurb: 'Challenging for small craft' },
+  rough: { marker: '🟠', blurb: 'Hazardous for small vessels' },
+  veryRough: { marker: '🔴', blurb: 'Dangerous for most vessels' },
+  extreme: { marker: '🟣', blurb: 'Extremely dangerous' }
+} as const;
+
+/** Severity tiers, in declaration order = severity order. */
+export type SeaStateTier = keyof typeof SEA_STATE_TIERS;
+
+interface SeaStateRung {
+  /** WMO 3700 code figure(s) the rung covers. */
+  wmoCode: string;
+  /** The code table's descriptive term. */
+  name: string;
+  /** Exclusive upper bound in metres on the displayed (one-decimal) value; `Infinity` for the top rung. */
+  upperBound: number;
+  /** Required on every rung: this is what makes a rung without a marker a build error. */
+  tier: SeaStateTier;
+  recommendation: string;
+}
+
+export const SEA_STATE_SCALE = [
+  { wmoCode: '0–1', name: 'Calm', upperBound: 0.1, tier: 'calm', recommendation: 'Ideal for all water activities' },
+  { wmoCode: '2', name: 'Smooth (wavelets)', upperBound: 0.5, tier: 'calm', recommendation: 'Excellent conditions for all vessels' },
+  { wmoCode: '3', name: 'Slight', upperBound: 1.25, tier: 'calm', recommendation: 'Good conditions for most activities' },
+  { wmoCode: '4', name: 'Moderate', upperBound: 2.5, tier: 'moderate', recommendation: 'Safe for experienced boaters' },
+  { wmoCode: '5', name: 'Rough', upperBound: 4.0, tier: 'rough', recommendation: 'Use caution, especially for small craft' },
+  { wmoCode: '6', name: 'Very rough', upperBound: 6.0, tier: 'veryRough', recommendation: 'Hazardous for small vessels, secure all gear' },
+  { wmoCode: '7', name: 'High', upperBound: 9.0, tier: 'veryRough', recommendation: 'Dangerous conditions, avoid non-essential travel' },
+  { wmoCode: '8', name: 'Very high', upperBound: 14.0, tier: 'extreme', recommendation: 'Very dangerous, only experienced vessels should be out' },
+  { wmoCode: '9', name: 'Phenomenal', upperBound: Infinity, tier: 'extreme', recommendation: 'Extremely dangerous, all vessels should seek shelter' }
+] as const satisfies readonly SeaStateRung[];
+
+/** The rung names, derived from the table — the only vocabulary a sea-state `level` can carry. */
+export type SeaStateLevel = (typeof SEA_STATE_SCALE)[number]['name'];
+
+/** The level a report carries when it has no wave-height data. Not a severity. */
+export const NO_DATA_LEVEL = 'Unknown' as const;
+/** The marker for `NO_DATA_LEVEL`. Appears in no severity row of the legend. */
+export const NO_DATA_MARKER = '⚪';
+
+/**
+ * The severity marker for a level. Found by name in the table, so the names are never
+ * copied; an unknown name is a thrown error, never a fallback colour.
+ */
+export function seaStateMarker(level: SeaStateLevel | typeof NO_DATA_LEVEL): string {
+  if (level === NO_DATA_LEVEL) {
+    return NO_DATA_MARKER;
+  }
+  const rung = SEA_STATE_SCALE.find((entry) => entry.name === level);
+  if (rung === undefined) {
+    throw new Error(`Sea-state level "${level}" is not in SEA_STATE_SCALE`);
+  }
+  return SEA_STATE_TIERS[rung.tier].marker;
+}
+
+/**
+ * The legend: one row per severity tier, generated from the table so the marker, the rung
+ * names and the range can never disagree with the header that used them. The ranges are the
+ * true union of each tier's rungs; the top row is open-ended.
+ */
+export function formatSeaStateLegend(): string {
+  let output = '';
+  let lowerBound = 0;
+  for (const tier of Object.keys(SEA_STATE_TIERS) as SeaStateTier[]) {
+    const rungs = SEA_STATE_SCALE.filter((entry) => entry.tier === tier);
+    const tierLower = lowerBound;
+    const tierUpper = rungs[rungs.length - 1].upperBound;
+    const range = tierUpper === Infinity ? `≥${tierLower} m` : `${tierLower}–${tierUpper} m`;
+    const names = rungs.map((entry) => entry.name).join(' / ');
+    output += `${SEA_STATE_TIERS[tier].marker} **${names}** (${range}): ${SEA_STATE_TIERS[tier].blurb}\n`;
+    lowerBound = tierUpper;
+  }
+  output += `\n${NO_DATA_MARKER} marks a report with no wave-height data. `;
+  output += `Markers describe the sea state at the point, not a hazard forecast — consult official marine warnings.\n`;
+  return output;
+}
+
+/**
  * Categorize wave height
  */
 export interface WaveHeightCategory {
   description: string;
-  level: string;
+  level: SeaStateLevel | typeof NO_DATA_LEVEL;
   recommendation: string;
 }
 
@@ -153,7 +254,7 @@ export function getWaveHeightCategory(meters: number | undefined): WaveHeightCat
   if (meters === undefined || meters === null) {
     return {
       description: 'Unknown',
-      level: 'Unknown',
+      level: NO_DATA_LEVEL,
       recommendation: 'No data available'
     };
   }
@@ -162,69 +263,24 @@ export function getWaveHeightCategory(meters: number | undefined): WaveHeightCat
   // never disagree with the number beside it.
   const shown = displayValue(meters, 1);
 
-  // Based on WMO Sea State Code and Douglas Sea Scale
-  if (shown < 0.1) {
-    return {
-      description: 'Calm (glassy)',
-      level: 'Calm',
-      recommendation: 'Ideal for all water activities'
-    };
-  } else if (shown < 0.5) {
-    return {
-      description: 'Calm (rippled)',
-      level: 'Calm',
-      recommendation: 'Excellent conditions for all vessels'
-    };
-  } else if (shown < 1.25) {
-    return {
-      description: 'Smooth',
-      level: 'Slight',
-      recommendation: 'Good conditions for most activities'
-    };
-  } else if (shown < 2.5) {
-    return {
-      description: 'Slight',
-      level: 'Moderate',
-      recommendation: 'Safe for experienced boaters'
-    };
-  } else if (shown < 4.0) {
-    return {
-      description: 'Moderate',
-      level: 'Moderate',
-      recommendation: 'Use caution, especially for small craft'
-    };
-  } else if (shown < 6.0) {
-    return {
-      description: 'Rough',
-      level: 'Rough',
-      recommendation: 'Hazardous for small vessels, secure all gear'
-    };
-  } else if (shown < 9.0) {
-    return {
-      description: 'Very Rough',
-      level: 'Very Rough',
-      recommendation: 'Dangerous conditions, avoid non-essential travel'
-    };
-  } else if (shown < 14.0) {
-    return {
-      description: 'High',
-      level: 'High',
-      recommendation: 'Very dangerous, only experienced vessels should be out'
-    };
-  } else {
-    return {
-      description: 'Very High',
-      level: 'Extreme',
-      recommendation: 'Extremely dangerous, all vessels should seek shelter'
-    };
+  // First rung whose exclusive upper bound the displayed value is under; the top rung's
+  // bound is Infinity, so every finite value lands somewhere.
+  const rung = SEA_STATE_SCALE.find((entry) => shown < entry.upperBound);
+  if (rung === undefined) {
+    throw new Error(`No sea-state rung for a displayed wave height of ${shown} m`);
   }
+  return {
+    description: rung.name,
+    level: rung.name,
+    recommendation: rung.recommendation
+  };
 }
 
 /**
  * Overall safety assessment based on multiple factors
  */
 export interface SafetyAssessment {
-  level: string;
+  level: SeaStateLevel | typeof NO_DATA_LEVEL;
   description: string;
   recommendation: string;
 }
@@ -237,7 +293,7 @@ export function getSafetyAssessment(
 ): SafetyAssessment {
   if (totalWaveHeight === undefined || totalWaveHeight === null) {
     return {
-      level: 'Unknown',
+      level: NO_DATA_LEVEL,
       description: 'Marine conditions data not available',
       recommendation: 'Consult local marine forecast'
     };
