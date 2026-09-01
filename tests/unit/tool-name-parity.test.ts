@@ -137,7 +137,7 @@ describe('Tool name parity', () => {
       expect(extraLabels, `case label(s) with no matching TOOL_NAMES member: ${extraLabels.join(', ')}`).toEqual([]);
     });
 
-    it.each(TOOL_NAMES)('the %s arm calls withAnalytics(\'%s\', ...)', (name) => {
+    it.each(TOOL_NAMES)('the %s arm records analytics under its own name', (name) => {
       const labelPattern = new RegExp(`^\\s*case '${name}':\\s*$`, 'm');
       const labelMatch = labelPattern.exec(dispatchRegion);
       expect(labelMatch, `case label for ${name} not found in dispatch region`).not.toBeNull();
