@@ -605,7 +605,7 @@ Get marine weather conditions including wave height, swell, ocean currents, and 
 **Description:**
 Provides comprehensive marine weather data with intelligent dual-source support:
 - **Great Lakes & Coastal Bays**: Automatically uses NOAA gridpoint data for all 5 Great Lakes (Superior, Michigan, Huron, Erie, Ontario) and major US coastal bays (Chesapeake Bay, San Francisco Bay, Tampa Bay, Puget Sound, Lake Okeechobee). Provides wave height, wave period, wave direction, and wind conditions.
-- **Ocean Coverage**: Uses Open-Meteo Marine API for global ocean coverage, including significant wave height with Douglas Sea Scale categorization, wind waves vs swell separation, wave period/direction, ocean currents, and safety assessment for maritime activities.
+- **Ocean Coverage**: Uses Open-Meteo Marine API for global ocean coverage, including significant wave height categorised on WMO Code Table 3700 (the Douglas sea scale), using the code table's own terms, wind waves vs swell separation, wave period/direction, ocean currents, and safety assessment for maritime activities.
 - **Automatic Selection**: Intelligent geographic detection automatically selects the best data source with zero configuration required.
 
 **Important:** Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation — always consult official marine forecasts.
@@ -622,7 +622,7 @@ Provides comprehensive marine weather data with intelligent dual-source support:
 - Wind waves (locally generated) height and direction
 - Swell height, period, and direction (from distant systems)
 - Ocean current velocity and direction
-- Sea state interpretation (Calm → Phenomenal based on Douglas Sea Scale). The sea-state category and the safety assessment are keyed on the wave height and period **as displayed** (metres and seconds, one decimal), so the label can never disagree with the number beside it.
+- Sea state interpretation on WMO Code Table 3700 (the Douglas sea scale), `Calm` → `Phenomenal`. The header's severity marker, the header word, the wave-line category and the legend all derive from one nine-rung table, so they cannot name different rungs; the legend's five severity rows (🟢 🟡 🟠 🔴 🟣) are generated from that table with the true combined range of each tier's rungs. ⚪ marks a report with no wave-height data — it is not a severity and appears in no legend row. The sea-state category and the safety assessment are keyed on the wave height and period **as displayed** (metres and seconds, one decimal), so the label can never disagree with the number beside it. An exact boundary height (a printed `4.0 m`) is placed in the higher rung — the cautious side — whereas WMO's own coding rule assigns it to the lower code figure. On the NOAA Great Lakes and coastal-bay path the wave line carries the same rung name; that path renders no marker and no legend.
 - Safety assessment for maritime activities
 - Wave period for planning and safety
 - Optional daily forecast up to 16 days (`forecast_days`, default 5; days past the marine model's ~10-day horizon are trimmed with a note)

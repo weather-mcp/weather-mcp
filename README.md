@@ -77,7 +77,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
 | `search_location` | Geocode place names to coordinates ("Paris" → 48.85, 2.35) | 🌍 Global |
 | `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance; current pollen levels for European locations (or worldwide with an optional key); optional day-grouped forecast up to 7 days with per-day peak AQI and UV | 🌍 Global |
-| `get_marine_conditions` | Wave height, swell, ocean currents, Douglas Sea Scale — includes Great Lakes and major US bays; forecast up to 16 days | 🌍 Global |
+| `get_marine_conditions` | Wave height, swell, ocean currents, sea state on WMO Code Table 3700 (Douglas sea scale) with a severity marker and legend — includes Great Lakes and major US bays; forecast up to 16 days | 🌍 Global |
 | `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery; `composite: true` returns a finished radar map over a base map as an image | 🌍 Global |
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
 | `get_river_conditions` | US: NWPS gauge levels, flood stages, streamflow, rise/fall trends, forecast series. Elsewhere: GloFAS modeled discharge snapped to the nearest river channel, with ensemble forecast | 🌍 Global |
