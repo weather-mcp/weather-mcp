@@ -14,24 +14,31 @@
 /**
  * Available tool names in the Weather MCP Server
  */
-export type ToolName =
-  | 'get_forecast'
-  | 'get_current_conditions'
-  | 'get_alerts'
-  | 'get_historical_weather'
-  | 'get_weather_summary'
-  | 'check_service_status'
-  | 'search_location'
-  | 'get_air_quality'
-  | 'get_marine_conditions'
-  | 'get_weather_imagery'
-  | 'get_lightning_activity'
-  | 'get_river_conditions'
-  | 'get_wildfire_info'
-  | 'save_location'
-  | 'list_saved_locations'
-  | 'get_saved_location'
-  | 'remove_saved_location';
+// The single source of truth for the tool-name set. TOOL_DEFINITIONS and the
+// CallToolRequestSchema dispatch in src/index.ts are pinned to this list by
+// tests/unit/tool-name-parity.test.ts — add a tool here and that test names
+// every other place you still have to edit.
+export const TOOL_NAMES = [
+  'get_forecast',
+  'get_current_conditions',
+  'get_alerts',
+  'get_historical_weather',
+  'get_weather_summary',
+  'check_service_status',
+  'search_location',
+  'get_air_quality',
+  'get_marine_conditions',
+  'get_weather_imagery',
+  'get_lightning_activity',
+  'get_river_conditions',
+  'get_wildfire_info',
+  'save_location',
+  'list_saved_locations',
+  'get_saved_location',
+  'remove_saved_location'
+] as const;
+
+export type ToolName = typeof TOOL_NAMES[number];
 
 /**
  * Tool presets for easy configuration
@@ -255,26 +262,7 @@ function resolveToolName(name: string): ToolName | undefined {
  * Type guard to check if a string is a valid ToolName
  */
 function isToolName(name: string): name is ToolName {
-  const validTools: ToolName[] = [
-    'get_forecast',
-    'get_current_conditions',
-    'get_alerts',
-    'get_historical_weather',
-    'get_weather_summary',
-    'check_service_status',
-    'search_location',
-    'get_air_quality',
-    'get_marine_conditions',
-    'get_weather_imagery',
-    'get_lightning_activity',
-    'get_river_conditions',
-    'get_wildfire_info',
-    'save_location',
-    'list_saved_locations',
-    'get_saved_location',
-    'remove_saved_location'
-  ];
-  return validTools.includes(name as ToolName);
+  return (TOOL_NAMES as readonly string[]).includes(name);
 }
 
 /**

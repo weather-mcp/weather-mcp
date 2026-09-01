@@ -319,7 +319,7 @@ const DETAIL_SCHEMA_PROPERTY = {
 /**
  * Tool definitions - each tool defined separately for conditional registration
  */
-const TOOL_DEFINITIONS = {
+export const TOOL_DEFINITIONS = {
   get_forecast: {
     name: 'get_forecast' as const,
     description: 'Get future weather forecast for a location (global coverage). Use this for upcoming weather predictions (e.g., "tomorrow", "this week", "next 7 days", "hourly forecast"). Returns forecast data including temperature, precipitation, wind, conditions, and sunrise/sunset times. Supports both daily and hourly granularity. Automatically selects best data source: NOAA for US locations (more detailed), Open-Meteo for international locations. For current weather, use get_current_conditions. For past weather, use get_historical_weather. Provide the location in ONE of three ways: coordinates (latitude+longitude), a saved location name (location_name="home"), or a free-text city name (city_name="Paris, France") which is geocoded automatically. Can compare multiple global weather models with compare_models=true to gauge forecast confidence, or ensemble_spread=true for one model\'s own spread. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',

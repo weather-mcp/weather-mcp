@@ -2160,10 +2160,27 @@ works is the one that removes the value entirely (never record the fetch): **20
 tests red across four files.** Before recording a mutation as uncaught, check that
 it produces a different value at the fixtures in play, not just different source.
 
-**Status:** active, **extended 2026-08-29**. Related: [G13] (a fixture that cannot discriminate),
+**Extended 2026-09-01** (`a4252ca`, tool-name-single-source T4) — **a contract can
+be one direction of a two-direction property, so the mutation that proves it is a
+different mutation.** The plan predicted that deleting a dispatch arm would redden
+both the "every name appears exactly once as a `case` label" contract *and* the
+"the set of labels equals the set of names" contract. It reddened only the first,
+because the second was implemented as *labels not in the name list* — and deleting
+an arm creates no such label. Nothing was wrong: set equality is the **conjunction**
+of the two contracts, one per direction, and a separate mutation (adding a bogus
+`case 'get_tides':` arm) reddened the second and only the second, proving it
+load-bearing rather than redundant. **Before concluding a contract is dead because
+the mutation you expected to redden it did not, check whether it covers the
+opposite direction and find the mutation that exercises that one.** The tempting
+wrong move is to widen the test until it matches the plan's prediction, which
+[G41] names directly: the plan's prediction of *which* contract fires is not the
+contract.
+
+**Status:** active, **extended 2026-08-29 and 2026-09-01**. Related: [G13] (a fixture that cannot discriminate),
 [G32] (mutating to every *rejected implementation* — this entry is about the
 *entry point*, that one about the *alternative*), [G11] (read the real output),
-[G57] (the run that produced the extension). Not lintable.
+[G41] (a plan's mechanical prediction is not the contract), [G57] (the run that
+produced the 2026-08-29 extension). Not lintable.
 
 ## G46 — A docs task writes the plan's promise, not the code's behaviour
 
@@ -2900,6 +2917,83 @@ happened at all — the same failure with a count in place of a code path), [G38
 (a release check reporting a confident failure it never measured), [G4] (never
 trust the status alone), [G11] (read the real output), [G46] (quote the string
 the artifact emits, not the one the plan describes).
+
+---
+
+## G61 — Importing anything from `src/index.ts` runs `main()`, because there is no `import.meta.url` guard
+
+**Trigger:** writing a unit test that imports any symbol from `src/index.ts` —
+`TOOL_DEFINITIONS`, a schema fragment, or anything else added to it later.
+
+**Rule:** `src/index.ts` calls `main()` unconditionally at module scope, so the
+import *is* a server start: it constructs a `StdioServerTransport`, calls
+`server.connect()`, and registers `SIGTERM`/`SIGINT` handlers. Four things, all
+required together:
+
+1. `vi.mock('@modelcontextprotocol/sdk/server/stdio.js', …)` with a stub class
+   exposing `start()`/`close()`/`send()`. The real transport attaches to the
+   **test worker's stdin**.
+2. `vi.hoisted(() => { process.env.WEATHER_LIGHTNING_PREWARM = 'false';
+   process.env.ANALYTICS_ENABLED = 'false';
+   process.env.ANALYTICS_SALT = '<any fixed string>'; })` — all three must be set
+   *before* the static import evaluates, which is what `vi.hoisted` buys over a
+   `beforeEach`. The first skips a live MQTT subscribe, the second keeps the
+   analytics client off its flush timer, and the third keeps the import off the
+   filesystem: `loadAnalyticsConfig()` builds the analytics singleton at module
+   load and calls `getOrGenerateAnalyticsSalt()` **regardless of
+   `ANALYTICS_ENABLED`**, which writes `~/.weather-mcp/analytics-salt` when it is
+   absent. A fixed salt returns at `src/analytics/config.ts:94` before any
+   filesystem access.
+3. **Import it exactly once, statically.** Never re-import it under
+   `vi.resetModules()` — that re-runs `main()` ([G21] point 3). If the same file
+   also needs fresh module state, re-import the *other* module
+   (`src/config/tools.js`) and leave `src/index.js` alone.
+4. Assert the absence of the failure, not just the presence of the pass — but
+   know which half the test file owns and which half is an acceptance check. The
+   `Fatal error in main()` half needs **no assertion**: a rejecting `main()`
+   reaches `main().catch` → `process.exit(1)`, and Vitest replaces `process.exit`
+   in the worker, so the rejection surfaces as an unhandled error and the run
+   exits 1 on its own. Never reach for a `process.stderr.write` spy to check it —
+   that spy records zero calls and passes vacuously ([G34]). The
+   `~/.weather-mcp/` half is checked **at acceptance**, and must be run CI-shaped
+   — `HOME=$(mktemp -d) DOTENV_CONFIG_PATH=/nonexistent npx vitest run <file>` —
+   because the repo `.env` masks the write ([G26]).
+
+**Why:** the import is silent when it works and confusing when it does not — a
+real transport reading the worker's stdin produces a hang or a protocol error
+attributed to whatever test happens to be running, not to the import. It is also
+easy to conclude the module is simply untestable and to relocate the symbol
+instead; that is a much larger diff than the four lines above, and unnecessary.
+Everything else in the module is already inert at import: the fifteen service
+constructors do no I/O (`LocationStore` resolves its path and touches nothing
+until a read or write) and `Cache` timers already run throughout the suite.
+Note that `import 'dotenv/config'` (`src/index.ts:9`) means the import **does**
+load the repo's own `.env` ([G26]), so nothing such a test asserts may depend on
+a key or on `ENABLED_TOOLS`.
+
+**Verify:** `tests/unit/tool-name-parity.test.ts` — the first test in the repo to
+import `src/index.ts`, whose header and import block document all four points.
+Delete the `vi.mock` and run it: the worker takes over stdin.
+
+**Evidence:** 2026-09-01 (`a4252ca`, tool-name-single-source T3). Until that
+commit **no test imported `src/index.ts` at all**, so the trap had never been
+hit — the implementation plan found it by reading the module rather than by
+failing, and pre-cleared the mock set. With the four points above the import is
+inert: `main()` ran to completion and stderr carried no `Fatal error in main()`.
+The home-directory half of that claim was wrong as first written.
+`~/.weather-mcp/{locations.json,analytics-salt}` were byte-identical on the dev
+machine **only because the repo `.env` was loaded** and its `ANALYTICS_ENDPOINT`
+tripped the fail-safe return ahead of the salt call. Run CI-shaped — no `.env`,
+temp `HOME` — the test created `analytics-salt` (64 bytes, mode 0600) on every
+run until the hoisted `ANALYTICS_SALT` of point 2 landed (diff-review copilot
+DR-1, 2026-09-01).
+
+**Status:** active. The standing alternative — relocating `TOOL_DEFINITIONS` into
+its own `src/toolDefinitions.ts` — was considered and rejected for tripling the
+diff and adding a module ([G31]); revisit it if a second test needs a second
+symbol from this file and the mock set has to grow. Related: [G21] (why point 3
+is not optional), [G26] (the `.env` the import loads), [G37] (a driver that
+constructs services and never exits).
 
 ---
 
