@@ -36,7 +36,7 @@ in `the alert's own polygon` terminated a single-quoted string in
 `src/index.ts`; `npm test` reported 101 files / 2,492 tests passing while
 `npm run build` emitted three TS1005/TS1128 errors.
 
-**Status:** active. **Verify line re-run 2026-08-28** (issue-83 absent-strike-distance curation): a `TS2322` and two `TS6133` errors planted in `src/handlers/lightningHandler.ts` — the file this plan changed — while `npm test` reported 114 files / 2,772 tests passing. The trap is intact. The same run also exercised this entry in the **load-bearing direction**: widening `LightningStatistics` to `number | null` *first* produced exactly two `TS18047` errors at the two render sites and no others, which is the only evidence that no other `src/` file consumes the field — a green suite says nothing about it. **Re-verified 2026-08-24** (optional-mqtt curation): two
+**Status:** active. **Verify line re-run 2026-09-01** (marine-sea-state-taxonomy curation): a `TS2322` planted in `src/utils/marine.ts` (2 errors) while `npm test` reported 118 files / 2,917 tests passing; the trap is intact. The same run met the load-bearing direction on its first task — see [G63]. **Re-run 2026-08-28** (issue-83 absent-strike-distance curation): a `TS2322` and two `TS6133` errors planted in `src/handlers/lightningHandler.ts` — the file this plan changed — while `npm test` reported 114 files / 2,772 tests passing. The trap is intact. The same run also exercised this entry in the **load-bearing direction**: widening `LightningStatistics` to `number | null` *first* produced exactly two `TS18047` errors at the two render sites and no others, which is the only evidence that no other `src/` file consumes the field — a green suite says nothing about it. **Re-verified 2026-08-24** (optional-mqtt curation): two
 deliberate `TS2322`/`TS6133` errors in `src/utils/version.ts` still left
 `npm test` reporting 103 files / 2,519 tests passing. **Re-verified 2026-08-26**
 (cap-disclosure-accuracy curation): the same two error codes in
@@ -444,7 +444,7 @@ test must task the doc update, and a plan asserting the count does not move shou
 be tested against the suite rather than believed.
 
 **Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
-2026-08-25**, **extended 2026-08-29**, **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
+2026-08-25**, **extended 2026-08-29**, **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
 band-rounding T2 — the count moved 2,611 → 2,660 and all five sites were edited
 by content; with both unvalidated sites then set to `9,999` against the real
 `2,660`, `./scripts/check-doc-versions.sh` still printed `✅ README.md test
@@ -1180,7 +1180,18 @@ sharing a first word stay distinguishable. Sharper than "assert the shape you
 expected": here the shape was asserted and the *parse* could not represent the
 difference the assertion was about.
 
-**Status:** active, **broadened 2026-08-26 and twice on 2026-08-27**. Same family as
+**Two parser slips of the same family, 2026-09-01** (`2e7de75`,
+marine-sea-state-taxonomy T5 driver), both of which reported *correct* output
+as disagreement: a character class of emoji markers written without the `u`
+flag (`/^[🟢🟡🟠🔴🟣] \*\*/`) matches half a surrogate pair and finds no legend
+row; and a greedy trailing capture `\((.+)\)$` on the wave line swallowed the
+rung's own parenthetical, yielding `wavelets` for `(Smooth (wavelets))`. Both
+are the multi-word-ladder lesson above in a new coat: this codebase's names
+contain parentheses as well as spaces, and its markers are astral-plane
+code points. Match names against the table's own name list, and `startsWith`
+the marker rather than classing it.
+
+**Status:** active, **broadened 2026-08-26, twice on 2026-08-27, and 2026-09-01**. Same family as
 [G10]'s vacuous-hash half — a failed or mis-scoped measurement that renders as a
 clean result — its mirror, a correct result that renders as a failure, and now a
 parse too coarse to represent the failure at all.
@@ -1234,7 +1245,7 @@ that hit was still "leave" — `docs/releases/CHANGELOG.md` is the frozen
 historical copy ending at 1.6.0 that the bindings say never to write to — so a
 missed hit here would have cost nothing; the next one may not be frozen.
 
-**Status:** active, **sharpened 2026-08-27**. Plans 2 and 3 of the band-rounding
+**Status:** active, **sharpened 2026-08-27**. **Re-run 2026-09-01** (`2e7de75`, marine-sea-state-taxonomy T5) on the marine legend table itself: four live classes edited or regenerated, four frozen (`CHANGELOG.md` v1.25.6 and v0.6.0 entries, `GOTCHAS.md:1392` — this file's own evidence text — and a different feature's `Extremely dangerous` string in `thermalStress.ts`) left alone; no unexpected live hit. Plans 2 and 3 of the band-rounding
 sequence have now landed (wildfire `cd0f317`; river/marine `028b750`). Plan 3's
 grep returned **no unexpected live hit**: two live `docs/TOOLS.md` lines edited,
 one live `README.md` row with no thresholds to correct, and four frozen
@@ -1612,9 +1623,9 @@ keep both a moving row and a non-moving control so the direction is visible
 ([G13]).
 
 **Status:** active, **broadened 2026-08-27** (measurement half), **extended
-2026-08-27** (threshold-side half). Immediately
+2026-08-27** (threshold-side half). **Verify line re-run 2026-09-01** (marine-sea-state-taxonomy curation): `5.0 25.1 50.0` and `50.0 50.1`, unchanged; the same run found the plan's "for every threshold" seam contract unsatisfiable at the one two-decimal threshold (1.25 — no one-decimal display lands on it), which the v1.25.6 lock already records as its non-moving control. Was immediately
 load-bearing — plans 3 and 4 of the
-band-rounding sequence both write seam tables next (river/marine thresholds at
+band-rounding sequence both wrote seam tables next (river/marine thresholds at
 0.1/0.5/1.25/2.5/4.0/6.0/9.0/14.0 m, and the non-safety sites of
 [#82](https://github.com/weather-mcp/weather-mcp/issues/82)), and the marine
 set is tenths-aligned, which is exactly where this bites. Related: [G13] (a
@@ -1946,7 +1957,20 @@ acceptance greps to code constructs, or to a phrase short enough to survive
 rewrapping, and re-run the check against a state you know should fail it — here,
 the un-rewritten comment.
 
-**Status:** active. Lint candidate on the vacuous half — a plan-authoring check
+**A fifth direction, found 2026-09-01** (`41475af`, marine-sea-state-taxonomy
+T3): **a line-granular diff filter is vacuous when the line carries both the
+literal the edit is allowed to change and the literal it must not.** The
+check was `git diff -U0 … | grep '^[-+]' | … | grep -vE "'[A-Za-z() ]+'"`
+printing nothing, to prove a rename touched only quoted rung names. Every
+`SEAM_ROWS` line is `[<number>, '<name>']`, so a mutated number beside an
+*unchanged* name is dropped by the last `grep -v` and the filter stays empty —
+the T3 subagent proved it by editing `0.06` → `0.07` next to `'Calm (glassy)'`
+and watching the check pass. The check that works strips every `'…'` to a
+placeholder on both sides and diffs the remainder whole; only comment lines
+should differ. Write "only X changed" filters per token, not per line, when
+the file puts X on the same line as the things that must not change.
+
+**Status:** active, **extended 2026-09-01**. Lint candidate on the vacuous half — a plan-authoring check
 could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
 contains a file marked **new**. Related: [G10] (prove the hash is not vacuous —
 same family, a check that cannot fail is not evidence), [G40] (a plan's claim
@@ -2176,7 +2200,25 @@ wrong move is to widen the test until it matches the plan's prediction, which
 [G41] names directly: the plan's prediction of *which* contract fires is not the
 contract.
 
-**Status:** active, **extended 2026-08-29 and 2026-09-01**. Related: [G13] (a fixture that cannot discriminate),
+**Extended again 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4) — **two
+more ways a reachable contract stays green, both caught by the subagent before
+commit.** (a) *The expectation was derived from the subject.* Contract 2
+("marker severity is monotonic") first mapped each marker back to a tier by
+reverse lookup through `SEA_STATE_TIERS` — the same table the mutation
+swapped two markers in — so forward and reverse both read the mutated table
+and the sequence was monotonic *after* the swap too. Fixed by pinning the five
+expected markers as a literal independent of the table. **A derivation test
+whose expected values come from the thing under test is self-consistent under
+any permutation of it.** (b) *The contract re-called the pure formatter instead
+of parsing what the handler rendered.* Contract 6 ("header, wave line and
+legend agree") first compared the header against `formatSeaStateLegend()`
+called inside the test, so a handler that hand-wrote a wrong legend row (the
+rejected alternative) was invisible — the contract never read the handler's
+legend at all. Fixed by parsing the legend rows out of the handler's returned
+text. Same family as this entry's rule: reaching the layer is necessary, and
+reading the layer's *output* rather than re-deriving it is the other half.
+
+**Status:** active, **extended 2026-08-29 and twice on 2026-09-01**. Related: [G13] (a fixture that cannot discriminate),
 [G32] (mutating to every *rejected implementation* — this entry is about the
 *entry point*, that one about the *alternative*), [G11] (read the real output),
 [G41] (a plan's mechanical prediction is not the contract), [G57] (the run that
@@ -2994,6 +3036,91 @@ diff and adding a module ([G31]); revisit it if a second test needs a second
 symbol from this file and the mock set has to grow. Related: [G21] (why point 3
 is not optional), [G26] (the `.env` the import loads), [G37] (a driver that
 constructs services and never exits).
+
+---
+
+## G62 — A lock written as `not.toContain(<vocabulary word>)` breaks the moment that vocabulary is rendered anywhere else in the report
+
+**Trigger:** writing or reading a test that asserts a rung name, category word
+or tier label is *absent* from rendered output as a proxy for some other
+property — "no 0.0 m day is rendered" pinned as `not.toContain('Calm (glassy)')`.
+
+**Rule:** assert the construct, not the vocabulary. The property "no zero
+forecast day" is `not.toContain('0.0m (0.0ft)')`; the property "no glassy
+band" is a match anchored on the line that would carry it (`Max Wave Height:
+… (Calm (glassy))`). A bare negative on a word that belongs to a published
+scale is a lock on the scale's *rendering footprint*, and any later feature
+that prints the scale — a legend, a glossary, a key, a `Calm → Phenomenal`
+range line — reddens it on a correct build. When you meet such a lock during a
+plan, treat it as an F12 trip to decide, not a defect to route around.
+
+**Why:** the proxy and the property agree only while the word has exactly one
+render site. The generated marine legend (D4 of the sea-state plan) prints
+every rung name in every Open-Meteo report by design, so
+`tests/unit/marine-forecast.test.ts:157` went red on the first T2 gate while
+the line above it — the real null-guard — stayed green. The plan had
+predicted this test would become *trivially true* if the lowest rung was
+renamed and accepted that; nobody predicted the legend would make it
+*trivially false*. The two ways out cost different things: an unplanned lock
+edit (a second F12 trip on a safety-surface plan) or a naming change whose
+reasoning had to stand on its own (the merged WMO 0–1 rung became `Calm`,
+which it arguably should have been anyway). Either way the run stopped.
+
+**Verify:** `grep -rn "not.toContain('" tests/unit/ | grep -iE "calm|slight|moderate|rough|high|good|unhealthy|safe|caution|extreme"` lists every negative-vocabulary lock; each is a candidate for this trap the next time its scale gains a render site.
+
+**Evidence:** 2026-09-01 (`df5b7a4`, marine-sea-state-taxonomy T2). The
+lowest rung was named `Calm (glassy)` at T1; the legend then carried it into
+every report and `marine-forecast.test.ts` reddened. Resolved by decision
+(rename to `Calm`) rather than by editing the lock; the lock is byte-identical
+to `main`.
+
+**Status:** active. Related: [G41] (a check that cannot fail / cannot pass —
+this is a lock that stops meaning what it says), [G29] (correcting a published
+table sweeps the doc set; this entry is the test-suite half of the same
+sweep). Partly lintable — the Verify grep enumerates candidates; only a human
+knows which are proxies.
+
+---
+
+## G63 — Deriving a union type from a table turns every consumer's stale literal comparison into `TS2367` in the same build, one task early
+
+**Trigger:** a plan that introduces a single-source table and derives a union
+from it (`SEA_STATE_SCALE` → `SeaStateLevel`, `TOOL_NAMES` → `ToolName`) and
+sequences "type the field as the union" in one task and "replace the consumer's
+comparisons" in a later one.
+
+**Rule:** the task that narrows the type owns every site that compares the
+field against a literal, or the plan sequences the two edits into one commit.
+Grep for `=== '` on the field's name before writing the task graph: each hit
+is a `TS2367 This comparison appears to be unintentional because the types …
+have no overlap` the moment the union lands, and the earlier task cannot
+build green without it. This is D2's guarantee doing its job on the first
+build rather than a defect — but a task whose acceptance is "0 errors" with
+the consumer file untouched is unsatisfiable as written.
+
+**Why:** the exhaustiveness guarantee is symmetric. It fails a *missing* case
+(a rung without a tier) and it equally fails an *impossible* case (a
+comparison against a value the union no longer contains), and the second one
+lives in files the type-introducing task was told not to touch. The marine
+plan's T1 was "the table, and everything that derives from it"; T2 was
+"render from the table". The handler's `safety.level === 'Calm'` ternary
+was T2's to replace, and it was T1's build that broke.
+
+**Verify:** on a branch with the table in place, revert the handler's marker
+call to the old ternary and run `npx tsc --noEmit` — two `TS2367` errors at
+the `'Calm'` and `'Very Rough'` arms.
+
+**Evidence:** 2026-09-01 (`3a9d230`, marine-sea-state-taxonomy T1). Build
+after T1's table edit alone: `src/handlers/marineConditionsHandler.ts(262,23):
+error TS2367` and `(265,23)`. The one-line ternary swap moved from T2 into
+T1's commit, noted in the commit body.
+
+**Status:** active. Lintable at plan-authoring time — a task list that narrows
+a field's type in file A while a later task edits `=== '` sites on that field
+in file B is a mechanical grep. Related: [G1] (read the build's own output —
+this is the build succeeding at its job), [G51] (widening a type does not make
+a value reachable; this is the mirror, narrowing making a comparison
+impossible).
 
 ---
 
