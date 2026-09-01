@@ -527,7 +527,7 @@ tools use to skip the reverse-geocode lookup.
 1. Create handler: `src/handlers/newFeatureHandler.ts`
 2. Define types: `src/types/<upstream>.ts`
 3. Add service method if needed: `src/services/`
-4. Register tool in `src/index.ts` (`TOOL_DEFINITIONS` + dispatch) and in `src/config/tools.ts` (`ToolName`, presets)
+4. Register tool in `src/index.ts` (`TOOL_DEFINITIONS` + dispatch) and in `src/config/tools.ts` (`TOOL_NAMES`, presets)
 5. Write tests: `tests/unit/` and `tests/integration/`
 6. Update documentation: `docs/TOOLS.md`, `README.md`, `CHANGELOG.md`
 
