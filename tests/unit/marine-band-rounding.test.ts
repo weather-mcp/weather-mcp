@@ -71,7 +71,7 @@ describe('Marine band rounding — the displayed value determines the band (cont
 // ---------------------------------------------------------------------------
 
 const SEA_STATE_ORDER = [
-  'Calm (glassy)',
+  'Calm',
   'Smooth (wavelets)',
   'Slight',
   'Moderate',
@@ -92,7 +92,7 @@ function rank(description: string): number {
 
 /** The pre-fix rule: the same eight thresholds, banded on raw `meters` directly. */
 function oldRawDescription(meters: number): string {
-  if (meters < 0.1) return 'Calm (glassy)';
+  if (meters < 0.1) return 'Calm';
   else if (meters < 0.5) return 'Smooth (wavelets)';
   else if (meters < 1.25) return 'Slight';
   else if (meters < 2.5) return 'Moderate';
@@ -138,7 +138,7 @@ describe('Marine band rounding — no case is less cautious than the old raw-met
 const SEAM_ROWS: Array<[number, string]> = [
   // t = 0.1
   [0.1 - 0.0001, 'Smooth (wavelets)'], // at/above 0.1
-  [0.1 - 0.06, 'Calm (glassy)'], // below 0.1
+  [0.1 - 0.06, 'Calm'], // below 0.1
   // t = 0.5
   [0.5 - 0.0001, 'Slight'], // at/above 0.5
   [0.5 - 0.06, 'Smooth (wavelets)'], // below 0.5

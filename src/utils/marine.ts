@@ -151,7 +151,8 @@ export function formatDirection(degrees: number | undefined): string {
  *
  * Codes 0 (Calm (glassy), 0 m) and 1 (Calm (rippled), 0–0.1 m) share the lowest rung: the
  * band keys on the one-decimal display value, and `shown < 0.1` means the report prints
- * `0.0m`, which is 0 m at render precision — code 0.
+ * `0.0m`, which both codes do. The rung carries the term the two codes share, `Calm`, rather
+ * than claiming either parenthetical for a sea the display cannot tell apart.
  *
  * Boundary convention: an exact bound bands into the HIGHER rung (`shown < upperBound`, the
  * cautious side, as v1.25.6 locked it), whereas the code table's own coding rule assigns an
@@ -184,7 +185,7 @@ interface SeaStateRung {
 }
 
 export const SEA_STATE_SCALE = [
-  { wmoCode: '0–1', name: 'Calm (glassy)', upperBound: 0.1, tier: 'calm', recommendation: 'Ideal for all water activities' },
+  { wmoCode: '0–1', name: 'Calm', upperBound: 0.1, tier: 'calm', recommendation: 'Ideal for all water activities' },
   { wmoCode: '2', name: 'Smooth (wavelets)', upperBound: 0.5, tier: 'calm', recommendation: 'Excellent conditions for all vessels' },
   { wmoCode: '3', name: 'Slight', upperBound: 1.25, tier: 'calm', recommendation: 'Good conditions for most activities' },
   { wmoCode: '4', name: 'Moderate', upperBound: 2.5, tier: 'moderate', recommendation: 'Safe for experienced boaters' },
