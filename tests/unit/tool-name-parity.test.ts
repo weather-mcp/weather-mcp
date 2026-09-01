@@ -39,13 +39,20 @@ vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
   }
 }));
 
-// Both must be set before the static import below evaluates: WEATHER_LIGHTNING_PREWARM
+// All three must be set before the static import below evaluates: WEATHER_LIGHTNING_PREWARM
 // skips main()'s fire-and-forget MQTT subscribe (which would otherwise open a live
-// connection during a unit test), and ANALYTICS_ENABLED keeps the analytics client from
-// doing anything beyond its in-memory no-op path.
+// connection during a unit test), ANALYTICS_ENABLED keeps the analytics client from
+// doing anything beyond its in-memory no-op path, and ANALYTICS_SALT keeps the import off
+// the filesystem: src/index.ts imports ./analytics/index.js, which builds the analytics
+// singleton at module load, and loadAnalyticsConfig() calls getOrGenerateAnalyticsSalt()
+// regardless of ANALYTICS_ENABLED — writing ~/.weather-mcp/analytics-salt when it is
+// absent. A fixed salt returns at src/analytics/config.ts:94 before any filesystem
+// access. The repo .env masks the write on a dev machine; CI and a fresh clone have no
+// .env and did create the file (G26).
 vi.hoisted(() => {
   process.env.WEATHER_LIGHTNING_PREWARM = 'false';
   process.env.ANALYTICS_ENABLED = 'false';
+  process.env.ANALYTICS_SALT = 'tool-name-parity-test';
 });
 
 // Import src/index.js exactly once, statically. Never re-import it under

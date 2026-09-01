@@ -2934,17 +2934,30 @@ required together:
    exposing `start()`/`close()`/`send()`. The real transport attaches to the
    **test worker's stdin**.
 2. `vi.hoisted(() => { process.env.WEATHER_LIGHTNING_PREWARM = 'false';
-   process.env.ANALYTICS_ENABLED = 'false'; })` — both must be set *before* the
-   static import evaluates, which is what `vi.hoisted` buys over a
+   process.env.ANALYTICS_ENABLED = 'false';
+   process.env.ANALYTICS_SALT = '<any fixed string>'; })` — all three must be set
+   *before* the static import evaluates, which is what `vi.hoisted` buys over a
    `beforeEach`. The first skips a live MQTT subscribe, the second keeps the
-   analytics client off its flush timer.
+   analytics client off its flush timer, and the third keeps the import off the
+   filesystem: `loadAnalyticsConfig()` builds the analytics singleton at module
+   load and calls `getOrGenerateAnalyticsSalt()` **regardless of
+   `ANALYTICS_ENABLED`**, which writes `~/.weather-mcp/analytics-salt` when it is
+   absent. A fixed salt returns at `src/analytics/config.ts:94` before any
+   filesystem access.
 3. **Import it exactly once, statically.** Never re-import it under
    `vi.resetModules()` — that re-runs `main()` ([G21] point 3). If the same file
    also needs fresh module state, re-import the *other* module
    (`src/config/tools.js`) and leave `src/index.js` alone.
-4. Assert the absence of the failure, not just the presence of the pass: check
-   stderr carries no `Fatal error in main()` line, and that
-   `~/.weather-mcp/` is unchanged.
+4. Assert the absence of the failure, not just the presence of the pass — but
+   know which half the test file owns and which half is an acceptance check. The
+   `Fatal error in main()` half needs **no assertion**: a rejecting `main()`
+   reaches `main().catch` → `process.exit(1)`, and Vitest replaces `process.exit`
+   in the worker, so the rejection surfaces as an unhandled error and the run
+   exits 1 on its own. Never reach for a `process.stderr.write` spy to check it —
+   that spy records zero calls and passes vacuously ([G34]). The
+   `~/.weather-mcp/` half is checked **at acceptance**, and must be run CI-shaped
+   — `HOME=$(mktemp -d) DOTENV_CONFIG_PATH=/nonexistent npx vitest run <file>` —
+   because the repo `.env` masks the write ([G26]).
 
 **Why:** the import is silent when it works and confusing when it does not — a
 real transport reading the worker's stdin produces a hang or a protocol error
@@ -2966,9 +2979,14 @@ Delete the `vi.mock` and run it: the worker takes over stdin.
 commit **no test imported `src/index.ts` at all**, so the trap had never been
 hit — the implementation plan found it by reading the module rather than by
 failing, and pre-cleared the mock set. With the four points above the import is
-inert: `main()` ran to completion, stderr carried no `Fatal error in main()`, and
-`~/.weather-mcp/{locations.json,analytics-salt}` were byte-identical before and
-after.
+inert: `main()` ran to completion and stderr carried no `Fatal error in main()`.
+The home-directory half of that claim was wrong as first written.
+`~/.weather-mcp/{locations.json,analytics-salt}` were byte-identical on the dev
+machine **only because the repo `.env` was loaded** and its `ANALYTICS_ENDPOINT`
+tripped the fail-safe return ahead of the salt call. Run CI-shaped — no `.env`,
+temp `HOME` — the test created `analytics-salt` (64 bytes, mode 0600) on every
+run until the hoisted `ANALYTICS_SALT` of point 2 landed (diff-review copilot
+DR-1, 2026-09-01).
 
 **Status:** active. The standing alternative — relocating `TOOL_DEFINITIONS` into
 its own `src/toolDefinitions.ts` — was considered and rejected for tripling the
