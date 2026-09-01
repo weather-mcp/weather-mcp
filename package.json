@@ -83,9 +83,9 @@
     "mqtt": "^5.14.1"
   },
   "devDependencies": {
-    "@types/luxon": "^3.7.4",
+    "@types/luxon": "^3.7.5",
     "@types/ngeohash": "^0.6.8",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@types/pngjs": "^6.0.5",
     "@types/tz-lookup": "^6.1.2",
     "@vitest/coverage-v8": "^4.1.11",
