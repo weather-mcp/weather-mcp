@@ -12,6 +12,11 @@
  * Model: tests/unit/wildfire-band-rounding.test.ts and
  * tests/unit/lightning-band-rounding.test.ts (structure, sweep/seam/mutation idioms),
  * adapted to call the pure functions directly instead of driving a handler.
+ *
+ * Rung names re-pointed at WMO Code Table 3700's terms by the
+ * marine-sea-state-taxonomy plan (2026-09-01): the old ladder's names sat one
+ * row low from 0.1 m up, so this file's expected strings follow that rename —
+ * the thresholds and seams themselves are unchanged.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -67,14 +72,14 @@ describe('Marine band rounding — the displayed value determines the band (cont
 
 const SEA_STATE_ORDER = [
   'Calm (glassy)',
-  'Calm (rippled)',
-  'Smooth',
+  'Smooth (wavelets)',
   'Slight',
   'Moderate',
   'Rough',
-  'Very Rough',
+  'Very rough',
   'High',
-  'Very High'
+  'Very high',
+  'Phenomenal'
 ];
 
 function rank(description: string): number {
@@ -88,14 +93,14 @@ function rank(description: string): number {
 /** The pre-fix rule: the same eight thresholds, banded on raw `meters` directly. */
 function oldRawDescription(meters: number): string {
   if (meters < 0.1) return 'Calm (glassy)';
-  else if (meters < 0.5) return 'Calm (rippled)';
-  else if (meters < 1.25) return 'Smooth';
-  else if (meters < 2.5) return 'Slight';
-  else if (meters < 4.0) return 'Moderate';
-  else if (meters < 6.0) return 'Rough';
-  else if (meters < 9.0) return 'Very Rough';
-  else if (meters < 14.0) return 'High';
-  else return 'Very High';
+  else if (meters < 0.5) return 'Smooth (wavelets)';
+  else if (meters < 1.25) return 'Slight';
+  else if (meters < 2.5) return 'Moderate';
+  else if (meters < 4.0) return 'Rough';
+  else if (meters < 6.0) return 'Very rough';
+  else if (meters < 9.0) return 'High';
+  else if (meters < 14.0) return 'Very high';
+  else return 'Phenomenal';
 }
 
 describe('Marine band rounding — no case is less cautious than the old raw-meters rule (contract 2)', () => {
@@ -132,30 +137,30 @@ describe('Marine band rounding — no case is less cautious than the old raw-met
 
 const SEAM_ROWS: Array<[number, string]> = [
   // t = 0.1
-  [0.1 - 0.0001, 'Calm (rippled)'], // at/above 0.1
+  [0.1 - 0.0001, 'Smooth (wavelets)'], // at/above 0.1
   [0.1 - 0.06, 'Calm (glassy)'], // below 0.1
   // t = 0.5
-  [0.5 - 0.0001, 'Smooth'], // at/above 0.5
-  [0.5 - 0.06, 'Calm (rippled)'], // below 0.5
+  [0.5 - 0.0001, 'Slight'], // at/above 0.5
+  [0.5 - 0.06, 'Smooth (wavelets)'], // below 0.5
   // t = 2.5
-  [2.5 - 0.0001, 'Moderate'], // at/above 2.5
-  [2.5 - 0.06, 'Slight'], // below 2.5
+  [2.5 - 0.0001, 'Rough'], // at/above 2.5
+  [2.5 - 0.06, 'Moderate'], // below 2.5
   // t = 4.0
-  [4.0 - 0.0001, 'Rough'], // at/above 4.0
-  [4.0 - 0.06, 'Moderate'], // below 4.0
+  [4.0 - 0.0001, 'Very rough'], // at/above 4.0
+  [4.0 - 0.06, 'Rough'], // below 4.0
   // t = 6.0
-  [6.0 - 0.0001, 'Very Rough'], // at/above 6.0
-  [6.0 - 0.06, 'Rough'], // below 6.0
+  [6.0 - 0.0001, 'High'], // at/above 6.0
+  [6.0 - 0.06, 'Very rough'], // below 6.0
   // t = 9.0
-  [9.0 - 0.0001, 'High'], // at/above 9.0
-  [9.0 - 0.06, 'Very Rough'], // below 9.0
+  [9.0 - 0.0001, 'Very high'], // at/above 9.0
+  [9.0 - 0.06, 'High'], // below 9.0
   // t = 14.0
-  [14.0 - 0.0001, 'Very High'], // at/above 14.0
-  [14.0 - 0.06, 'High'], // below 14.0
+  [14.0 - 0.0001, 'Phenomenal'], // at/above 14.0
+  [14.0 - 0.06, 'Very high'], // below 14.0
   // Unreachable threshold (1.25) proven unmoved: G13, a "pick" fixture needs
   // at least one non-moving row alongside the moving ones.
-  [1.2499, 'Smooth'],
-  [1.25, 'Slight'],
+  [1.2499, 'Slight'],
+  [1.25, 'Moderate'],
   // Exact-half literals at two of the seven thresholds (G36): a naive
   // "shift the threshold by 0.05" mutation (`meters < t - 0.05` in place of
   // `displayValue(meters, 1) < t`) is mathematically identical to the fixed
@@ -163,16 +168,16 @@ const SEAM_ROWS: Array<[number, string]> = [
   // `toFixed`'s floating-point rounding disagrees with the naive shift for
   // some thresholds and not others — verified in node:
   // `(8.95).toFixed(1) === '8.9'` and `(13.95).toFixed(1) === '13.9'`
-  // (round down), so `displayValue(8.95, 1) < 9` is true (stays "Very
-  // Rough") while a shifted `8.95 < 9 - 0.05` is false (would fall through
-  // to "High"). By contrast `(0.45).toFixed(1) === '0.5'`,
+  // (round down), so `displayValue(8.95, 1) < 9` is true (stays "High")
+  // while a shifted `8.95 < 9 - 0.05` is false (would fall through to "Very
+  // high"). By contrast `(0.45).toFixed(1) === '0.5'`,
   // `(2.45).toFixed(1) === '2.5'`, `(3.95).toFixed(1) === '4.0'`, and
   // `(5.95).toFixed(1) === '6.0'` (round up) — the naive shift is exactly
   // equivalent there, so those four thresholds cannot distinguish the two
   // rules at any point and are not asserted here (see the mutation-check
   // report for the full seven-threshold sweep that established this).
-  [8.95, 'Very Rough'],
-  [13.95, 'High']
+  [8.95, 'High'],
+  [13.95, 'Very high']
 ];
 
 describe('Marine band rounding — seam rows (contract 3)', () => {
