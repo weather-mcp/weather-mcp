@@ -18,6 +18,7 @@ import {
   formatWindSpeed,
   getWaveHeightCategory,
   getSafetyAssessment,
+  seaStateMarker,
   extractNOAAMarineConditions,
   type NOAAMarineConditions
 } from '../utils/marine.js';
@@ -259,10 +260,7 @@ function formatOpenMeteoMarineConditions(
     current.wave_period
   );
 
-  const safetyEmoji = safety.level === 'Calm' ? '🟢' :
-                      safety.level === 'Moderate' ? '🟡' :
-                      safety.level === 'Rough' ? '🟠' :
-                      safety.level === 'Very Rough' ? '🔴' : '🟤';
+  const safetyEmoji = seaStateMarker(safety.level);
 
   output += `## ${safetyEmoji} Current Conditions: ${safety.level}\n\n`;
   output += `${safety.description}\n\n`;
