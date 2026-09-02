@@ -3340,6 +3340,22 @@ back fully red and been reported as complete. Contracts 5 and 6 were tightened t
 pin the line whole (`showing 24 / 48 / 156 of the 168 hours requested`), and the
 new mutation then reddened exactly those two.
 
+**Second instance, 2026-09-02** (diff-review copilot F2 → triage `fix now`): the
+same shape one level lower — a lock that stops short on the *boundary* rather
+than on the *clause*. The hourly guard `deliveredHours < days * 24` had its
+`<` → `<=` mutation stay green, because no fixture sat on the equality: F-H is
+156 hours at `days` 6 and 7, F-H2 is 150 at `days` 7, all strictly off the
+boundary. The daily guard's boundary *was* covered (F-A, 7 daytime periods at
+`days` 7), so the two guards were locked asymmetrically and only the daily
+mutation went red. A `<=` regression would have rendered `showing 48 of the 144
+hours requested` over a response delivering all 144 — a false shortfall
+disclosure, [G11] again. Fixed by F-H3 (144 hours at `days` 6, all three detail
+levels, asserting no `*NOAA publishes ` and the *un*-reworded cap remedy); the
+`<=` mutation then reddened F-H3 and nothing else, which is the proof the older
+fixtures were degenerate along that axis. **The generalisation:** a comparison
+operator's mutation set needs a fixture *on* the boundary, not merely either
+side of it, and having one on one guard says nothing about its twin.
+
 **Status:** active. Related: [G32] (the rejected-alternative set — this entry is
 the gap *beside* it, for behaviour the design deliberately did not settle),
 [G45] (a mutation that cannot reach its layer; here it reaches the layer and no

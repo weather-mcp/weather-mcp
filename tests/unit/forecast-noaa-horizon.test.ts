@@ -422,6 +422,33 @@ describe('get_forecast — NOAA hourly horizon disclosure', () => {
     }
   });
 
+  // The equality boundary of the hourly guard (`deliveredHours < days * 24`).
+  // F-H above sits at 156 > 144 and F-H2 at 150 < 168, so both are strictly
+  // off the boundary and neither can tell `<` from `<=`: a `<=` regression
+  // stays green against them. Here `deliveredHours === days * 24` exactly, so
+  // `<=` would render a shortfall disclosure over a response that was not
+  // short — `showing 48 of the 144 hours requested` with all 144 delivered —
+  // and would reword the cap remedy with it. The daily side already carries
+  // its boundary case (F-A, 7 daytime periods at days 7); this is its hourly
+  // twin, so both guards are locked on the same axis.
+  // Source: diff-review copilot F2 (triage: fix now).
+  it('renders no horizon note, and keeps the pre-existing cap remedy, when the delivered hours exactly equal the request (F-H3, 144 hours at days 6, all detail levels)', async () => {
+    const F_H3 = buildHourlyPeriods(144);
+    for (const detail of ['summary', 'standard', 'full'] as const) {
+      const fakes = buildForecastFakes({ noaa: buildNoaaHourlyFake(F_H3) });
+      const result = await callForecast(
+        { ...US_COORDS, days: 6, granularity: 'hourly', detail },
+        fakes
+      );
+      const text = textOf(result);
+      expect(text).not.toContain('*NOAA publishes ');
+      if (detail === 'summary' || detail === 'standard') {
+        expect(text).toContain('Use detail="full" for the full 6-day hourly forecast.*');
+        expect(text).not.toContain('hours NOAA published.');
+      }
+    }
+  });
+
   it('names the delivered hours and day-equivalent, and switches the cap remedy, when hourly is short of the request (F-H, days 7, all detail levels)', async () => {
     const F_H = buildHourlyPeriods(156);
     const dayEquivalent = Number((156 / 24).toFixed(1));
