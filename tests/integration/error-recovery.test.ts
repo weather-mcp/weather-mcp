@@ -206,11 +206,14 @@ describe('Error Recovery - OpenMeteo Service', () => {
 
   describe('Service Status Checking', () => {
     it('should return operational status when service is up', async () => {
-      vi.spyOn(service as any, 'makeRequest').mockResolvedValue({
-        hourly: {
-          time: ['2024-01-01T00:00'],
-          temperature_2m: [20]
-        }
+      // Mock the client.get method (not makeRequest) since checkServiceStatus uses it
+      // directly, and assert on the shape it actually inspects: `response.status === 200
+      // && response.data`. Mocking makeRequest here is inert, which left this test making
+      // a real archive-API call inside the 5s test timeout — green when the network was
+      // fast, red otherwise, and never actually exercising the branch it names.
+      vi.spyOn((service as any).client, 'get').mockResolvedValue({
+        status: 200,
+        data: { daily: { time: ['2024-01-01'], temperature_2m_max: [20] } }
       });
 
       const status = await service.checkServiceStatus();
@@ -234,11 +237,10 @@ describe('Error Recovery - OpenMeteo Service', () => {
     });
 
     it('should include timestamp in status response', async () => {
-      vi.spyOn(service as any, 'makeRequest').mockResolvedValue({
-        hourly: {
-          time: ['2024-01-01T00:00'],
-          temperature_2m: [20]
-        }
+      // Same seam as above — client.get, not makeRequest.
+      vi.spyOn((service as any).client, 'get').mockResolvedValue({
+        status: 200,
+        data: { daily: { time: ['2024-01-01'], temperature_2m_max: [20] } }
       });
 
       const status = await service.checkServiceStatus();
