@@ -255,10 +255,10 @@ function formatOpenMeteoMarineConditions(
 
   // Overall safety assessment
   const safety = getSafetyAssessment(
-    current.wave_height,
-    current.wind_wave_height,
-    current.swell_wave_height,
-    current.wave_period
+    current.wave_height ?? undefined,
+    current.wind_wave_height ?? undefined,
+    current.swell_wave_height ?? undefined,
+    current.wave_period ?? undefined
   );
 
   const safetyEmoji = seaStateMarker(safety.level);
@@ -269,36 +269,36 @@ function formatOpenMeteoMarineConditions(
   // Wave Height Summary
   output += `## 🌊 Wave Conditions\n\n`;
 
-  if (current.wave_height !== undefined) {
+  if (current.wave_height != null) {
     const waveCategory = getWaveHeightCategory(current.wave_height);
     output += `**Significant Wave Height:** ${formatWaveHeight(current.wave_height)}`;
     output += ` (${waveCategory.description})\n`;
   }
 
-  if (current.wave_direction !== undefined) {
+  if (current.wave_direction != null) {
     output += `**Wave Direction:** ${formatDirection(current.wave_direction)}\n`;
   }
 
-  if (current.wave_period !== undefined) {
+  if (current.wave_period != null) {
     output += `**Wave Period:** ${formatWavePeriod(current.wave_period)}\n`;
   }
 
   output += `\n`;
 
   // Wind Waves (locally generated)
-  if (current.wind_wave_height !== undefined && current.wind_wave_height > 0) {
+  if (current.wind_wave_height != null && current.wind_wave_height > 0) {
     output += `### Wind Waves\n\n`;
     output += `**Height:** ${formatWaveHeight(current.wind_wave_height)}\n`;
 
-    if (current.wind_wave_direction !== undefined) {
+    if (current.wind_wave_direction != null) {
       output += `**Direction:** ${formatDirection(current.wind_wave_direction)}\n`;
     }
 
-    if (current.wind_wave_period !== undefined) {
+    if (current.wind_wave_period != null) {
       output += `**Period:** ${formatWavePeriod(current.wind_wave_period)}\n`;
     }
 
-    if (current.wind_wave_peak_period !== undefined) {
+    if (current.wind_wave_peak_period != null) {
       output += `**Peak Period:** ${formatWavePeriod(current.wind_wave_peak_period)}\n`;
     }
 
@@ -306,19 +306,19 @@ function formatOpenMeteoMarineConditions(
   }
 
   // Swell Waves (propagated from distant storms)
-  if (current.swell_wave_height !== undefined && current.swell_wave_height > 0) {
+  if (current.swell_wave_height != null && current.swell_wave_height > 0) {
     output += `### Swell\n\n`;
     output += `**Height:** ${formatWaveHeight(current.swell_wave_height)}\n`;
 
-    if (current.swell_wave_direction !== undefined) {
+    if (current.swell_wave_direction != null) {
       output += `**Direction:** ${formatDirection(current.swell_wave_direction)}\n`;
     }
 
-    if (current.swell_wave_period !== undefined) {
+    if (current.swell_wave_period != null) {
       output += `**Period:** ${formatWavePeriod(current.swell_wave_period)}\n`;
     }
 
-    if (current.swell_wave_peak_period !== undefined) {
+    if (current.swell_wave_peak_period != null) {
       output += `**Peak Period:** ${formatWavePeriod(current.swell_wave_peak_period)}\n`;
     }
 
@@ -326,14 +326,14 @@ function formatOpenMeteoMarineConditions(
   }
 
   // Ocean Currents
-  if (current.ocean_current_velocity !== undefined || current.ocean_current_direction !== undefined) {
+  if (current.ocean_current_velocity != null || current.ocean_current_direction != null) {
     output += `## 🌀 Ocean Currents\n\n`;
 
-    if (current.ocean_current_velocity !== undefined) {
+    if (current.ocean_current_velocity != null) {
       output += `**Velocity:** ${formatCurrentVelocity(current.ocean_current_velocity)}\n`;
     }
 
-    if (current.ocean_current_direction !== undefined) {
+    if (current.ocean_current_direction != null) {
       output += `**Direction:** ${formatDirection(current.ocean_current_direction)}\n`;
     }
 

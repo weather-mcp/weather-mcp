@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.25.16 (Production Ready)
+- **Version:** 1.25.17 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -193,7 +193,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 ### Upstream data hygiene
 
-- **Never trust the HTTP 200 alone.** Open-Meteo and others return 200 with all-null series for uncovered points (pollen outside Europe, flood at sea, ensemble probability). Guard with `!= null`, not `!== undefined` — JSON `null` survives `!== undefined` and then coerces to 0 in arithmetic/conversion (the v1.20.0 F1 and normals-averaging bugs). The Open-Meteo series types declare this honestly (`field?: (number | null)[]`), so the compiler now enumerates the guard sites rather than certifying their absence; `finiteSampleAt` (`src/utils/finiteSample.ts`) is the shared accessor for reading one sample.
+- **Never trust the HTTP 200 alone.** Open-Meteo and others return 200 with all-null series for uncovered points (pollen outside Europe, flood at sea, ensemble probability). Guard with `!= null`, not `!== undefined` — JSON `null` survives `!== undefined` and then coerces to 0 in arithmetic/conversion (the v1.20.0 F1 and normals-averaging bugs). The Open-Meteo series types declare this honestly (`field?: (number | null)[]`), and so do the `current.*` and geocoding scalars (`field?: number | null`), so the compiler now enumerates the guard sites rather than certifying their absence; `finiteSampleAt` (`src/utils/finiteSample.ts`) is the shared accessor for reading one sample.
 - **Parse CSV/JSON by field name, never by position.** Two live shapes of the same feed have differed in column order and count.
 - **Verify documented shapes live before building on them.** Documented field names, enum casing, duration formats, and error codes have all been wrong upstream (Google Weather: six divergences; FIRMS Area API counts calendar UTC days while flat files are rolling 24 h). Record the verified shape in the plan doc.
 - **Bands and categories are computed from the rounded display value** — via `displayValue` (`src/utils/displayBanding.ts`), which mirrors the render site's `toFixed` rather than `Math.round`, because the two disagree on negative halves — so the displayed number and its category can never disagree.
@@ -586,15 +586,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.25.16 — Production Ready ✅
-- **Test Coverage:** 2,917 tests, 100% pass rate
+- **Version:** 1.25.17 — Production Ready ✅
+- **Test Coverage:** 2,933 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.25.17:** A null Open-Meteo scalar no longer renders as a fabricated 0, N/A or nullm — the line is omitted
 - **New in v1.25.16:** Marine sea-state markers, names and legend now come from one WMO 3700 table
 - **New in v1.25.15:** The seventeen tool names are declared once, so ENABLED_TOOLS can no longer silently fail to enable a real tool
-- **New in v1.25.14:** A publish run that succeeded is no longer reported as a failed release
 
 ## Useful References
 
@@ -617,7 +617,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-01 (v1.25.16)
+**Last Updated:** 2026-09-01 (v1.25.17)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

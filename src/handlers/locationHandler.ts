@@ -84,12 +84,12 @@ export async function handleSearchLocation(
       output += `**Timezone:** ${location.timezone}\n`;
     }
 
-    if (location.elevation !== undefined) {
+    if (location.elevation != null) {
       const elevationFt = Math.round(location.elevation * 3.28084);
       output += `**Elevation:** ${location.elevation}m (${elevationFt}ft)\n`;
     }
 
-    if (location.population !== undefined && location.population > 0) {
+    if (location.population != null && location.population > 0) {
       output += `**Population:** ${location.population.toLocaleString()}\n`;
     }
 

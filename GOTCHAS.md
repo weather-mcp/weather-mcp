@@ -36,7 +36,7 @@ in `the alert's own polygon` terminated a single-quoted string in
 `src/index.ts`; `npm test` reported 101 files / 2,492 tests passing while
 `npm run build` emitted three TS1005/TS1128 errors.
 
-**Status:** active. **Verify line re-run 2026-09-01** (marine-sea-state-taxonomy curation): a `TS2322` planted in `src/utils/marine.ts` (2 errors) while `npm test` reported 118 files / 2,917 tests passing; the trap is intact. The same run met the load-bearing direction on its first task — see [G63]. **Re-run 2026-08-28** (issue-83 absent-strike-distance curation): a `TS2322` and two `TS6133` errors planted in `src/handlers/lightningHandler.ts` — the file this plan changed — while `npm test` reported 114 files / 2,772 tests passing. The trap is intact. The same run also exercised this entry in the **load-bearing direction**: widening `LightningStatistics` to `number | null` *first* produced exactly two `TS18047` errors at the two render sites and no others, which is the only evidence that no other `src/` file consumes the field — a green suite says nothing about it. **Re-verified 2026-08-24** (optional-mqtt curation): two
+**Status:** active. **Verify line re-run 2026-09-01, second time** (openmeteo-nullable-scalar-types curation): a `TS2322` planted in `src/utils/finiteSample.ts` (1 error) while `npm test` reported 120 files / 2,933 tests passing; the trap is intact. The same run leaned on the load-bearing direction as its keystone: widening 63 scalar declarations *after* the guards had landed produced **0** build errors, which is the only evidence that the four handlers were the complete consumer set (`824dc02`). **Verify line re-run 2026-09-01** (marine-sea-state-taxonomy curation): a `TS2322` planted in `src/utils/marine.ts` (2 errors) while `npm test` reported 118 files / 2,917 tests passing; the trap is intact. The same run met the load-bearing direction on its first task — see [G63]. **Re-run 2026-08-28** (issue-83 absent-strike-distance curation): a `TS2322` and two `TS6133` errors planted in `src/handlers/lightningHandler.ts` — the file this plan changed — while `npm test` reported 114 files / 2,772 tests passing. The trap is intact. The same run also exercised this entry in the **load-bearing direction**: widening `LightningStatistics` to `number | null` *first* produced exactly two `TS18047` errors at the two render sites and no others, which is the only evidence that no other `src/` file consumes the field — a green suite says nothing about it. **Re-verified 2026-08-24** (optional-mqtt curation): two
 deliberate `TS2322`/`TS6133` errors in `src/utils/version.ts` still left
 `npm test` reporting 103 files / 2,519 tests passing. **Re-verified 2026-08-26**
 (cap-disclosure-accuracy curation): the same two error codes in
@@ -326,7 +326,14 @@ tidal and major-river points and keep one whose gauges have a series — Portlan
 OR yielded 8), then assert the count, then compare hashes. Re-pointing there took
 the count from 0/0 to 16/16.
 
-**Status:** active, **extended 2026-08-27**, **re-confirmed 2026-08-28**
+**Status:** active, **extended 2026-08-27**, **re-run 2026-09-01**
+(openmeteo-nullable-scalar-types T1–T3: the plan told the sweep in advance that
+a probe landing on a wire null would differ from base by exactly the omitted
+line and to record that as the fix, not drift — Sydney Heads (two `Peak Period`
+lines) and Denver (one `Ammonia` line) did exactly that, while Paris and both
+summary paths hashed identical with the constructs present; classifying before
+comparing is what made a non-identical hash a pass rather than a retry),
+**re-confirmed 2026-08-28**
 (`95faae9`, issue-85 river coverage disclosure T2) — a second instance of the
 subject-vacuity half, found the cheap way. The plan called for "a US point with
 no gauge in radius"; the candidate picked for it, Nevada `39.00,-117.00`,
@@ -444,7 +451,7 @@ test must task the doc update, and a plan asserting the count does not move shou
 be tested against the suite rather than believed.
 
 **Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
-2026-08-25**, **extended 2026-08-29**, **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
+2026-08-25**, **extended 2026-08-29**, **Verify line re-run 2026-09-01, second time** (`f48eda3`, openmeteo-nullable-scalar-types T6 — the count moved 2,917 → 2,933 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,933`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2933`, `✅ CLAUDE.md test count: 2933`, `✅ README.md tests badge: 2933` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
 band-rounding T2 — the count moved 2,611 → 2,660 and all five sites were edited
 by content; with both unvalidated sites then set to `9,999` against the real
 `2,660`, `./scripts/check-doc-versions.sh` still printed `✅ README.md test
@@ -1426,7 +1433,18 @@ mutation go red in "both variants" of a two-part guard has usually mis-specified
 its own acceptance** — report which variant discriminates and why, rather than
 manufacturing a red for the variant that is redundantly covered.
 
-**Status:** active, **extended 2026-08-27 (twice) and 2026-08-28**. **Re-run 2026-08-26** (`07661a9`,
+**A fifth way, found 2026-09-01** (`f48eda3`, openmeteo-nullable-scalar-types T6):
+**the discriminator can be the compiler, not the suite.** Removing the
+`?? undefined` normalisation on `getSafetyAssessment`'s four arguments
+(`marineConditionsHandler.ts:258-261`) leaves every marine test green, because
+the callee already treats `null` and `undefined` alike (`marine.ts:294`) — the
+coalesce exists so the call typechecks against a `number | undefined`
+parameter, not to change what renders. `npm run build` is what goes red
+(`TS2345`). A mutation table that reports only vitest rows would list it as
+uncovered; the honest row says *green at runtime, red at `tsc`* and names the
+layer.
+
+**Status:** active, **extended 2026-08-27 (twice), 2026-08-28 and 2026-09-01**. **Re-run 2026-08-26** (`07661a9`,
 issue-78-log-level-numeric T2), where the design named three parsers and
 rejected two: the shipped bug turned 18/32 red, the issue's own
 `isNaN(Number(…))`-guard proposal 9/32 (all on the fail-loud contract), and bare
@@ -1862,7 +1880,14 @@ by the executing subagent as a Surprise after its first full-suite run went red
 on a test the task had told it did not exist. Confirmed by reading the file: two
 `it` blocks, identical titles, identical defect-naming comments, one per ladder.
 
-**Status:** active. Partly lintable — "two `it()` blocks with the same title in
+**Status:** active. **Re-confirmed 2026-09-01** (`f48eda3`,
+openmeteo-nullable-scalar-types T6): the executing subagent pinned
+`wind_wave_peak_period` and missed its `swell_wave_peak_period` twin twenty
+lines below — both cited together in the task's own live-observation note — and
+found it only because the twin's mutation stayed green during the step-6 check.
+The twin was caught by mutation rather than by a red suite this time; the grep
+the Rule names (`grep -n peak_period src/handlers/marineConditionsHandler.ts`)
+would have found it before a line of test was written. Partly lintable — "two `it()` blocks with the same title in
 one file" is a mechanical grep, and so is "a plan asserts absence for symbol X
 while `tests/` mentions X". Related: [G12] (an enumeration can be incomplete as
 easily as stale), [G13] (a test that pins the defect by name is not coverage),
@@ -1970,7 +1995,23 @@ placeholder on both sides and diffs the remainder whole; only comment lines
 should differ. Write "only X changed" filters per token, not per line, when
 the file puts X on the same line as the things that must not change.
 
-**Status:** active, **extended 2026-09-01**. Lint candidate on the vacuous half — a plan-authoring check
+**A sixth direction, found 2026-09-01** (`824dc02`, openmeteo-nullable-scalar-types
+T5): **a discriminating control can be un-failable because a different layer
+already admits the value.** The plan asked for the two pollen test files to be
+typechecked once with the type file *un*-widened, and to read the 14 `TS2322`
+errors from the bare-`null` fixtures before trusting the clean run. It reads 0
+both ways. The command is real — a scratch file with `const x: number = null`
+fails it — but both fixture builders take
+`pollen: Record<string, number | null | undefined>`, so a bare `null` had
+compiled under the narrow declaration all along and the 14
+`null as unknown as number` casts were dead code. The plan's "re-run against a
+state you know should fail" instruction was right; what it could not know was
+that the failing state did not exist. **When a control comes back green, first
+prove the check can fail at all with a planted defect, then look for the other
+layer that admits the value** — here a builder parameter widened by an earlier
+plan.
+
+**Status:** active, **extended twice on 2026-09-01**. Lint candidate on the vacuous half — a plan-authoring check
 could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
 contains a file marked **new**. Related: [G10] (prove the hash is not vacuous —
 same family, a check that cannot fail is not evidence), [G40] (a plan's claim
@@ -2582,7 +2623,14 @@ Open-Meteo answers HTTP 200 with JSON `null` past a model's horizon regardless
 of what `src/types/openmeteo.ts` says; T5 changed what the compiler permits,
 never what the wire sends.
 
-**Status:** active. Related: [G48] (a fixture can supply a value the live
+**Status:** active. **Re-confirmed live 2026-09-01** (`0e63f8c`, `3adc2d2`,
+openmeteo-nullable-scalar-types T1/T3): the raw Open-Meteo marine body carried
+`wind_wave_peak_period: null, swell_wave_peak_period: null` at Sydney Heads and
+at 30,-60, and the air-quality body carried `ammonia: null` at Denver, on the
+day the guards landed and five commits before the type widened; base rendered
+`N/A`, the guard commits omitted the line. The plan wrote this rule into every
+task ("do not describe these guards as not yet reachable") and no subagent
+repeated the 2026-08-28 inference. Related: [G48] (a fixture can supply a value the live
 resolver never produces — this is that entry read backwards: the live resolver
 produces a value the *type* denies), [G11] (read the real output). Not
 lintable — it is a claim about the upstream, not about the code.
@@ -2854,7 +2902,19 @@ had compared them. Regenerating for the new `### Flood Stages` sections produced
 shipped the same contradiction under a fresh timestamp. Corrected in the same
 commit.
 
-**Status:** active. Related: [G46] (a docs task writes the plan's promise, not the
+**Second instance, 2026-09-01** (`a0faa5c`, openmeteo-nullable-scalar-types T7):
+`examples/wildfire-awareness.md`'s narrative on `main` read AQI 59, UV 5.7, an
+11-detection / 8-cluster Athens result and a 205 ft mixing height against the
+capture committed beneath it, which read 54, 5.5, 9 / 7 and 108 ft — stale
+before this plan touched the file, exactly as the river example was.
+Regenerating for the retired `N/A` line would have shipped the same
+contradiction under a fresh date. The Verify line was run mechanically this
+time (extract every decimal in the answer blocks, grep the capture beneath):
+two of six blocks were clean, four needed rewriting, and the one residual miss
+was a deliberate rounding (`88 miles` for `87.9 mi`). It is cheap enough to run
+on every regeneration.
+
+**Status:** active, **second instance 2026-09-01**. Related: [G46] (a docs task writes the plan's promise, not the
 code's behaviour — this is its sibling, where the docs describe an *older run* of
 the code), [G11] (read the rendered output), [G29] (sweep the whole doc set).
 Lintable: a check that every decimal in an example's narrative appears somewhere

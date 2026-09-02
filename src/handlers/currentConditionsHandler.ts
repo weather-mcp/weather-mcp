@@ -949,7 +949,7 @@ async function formatOpenMeteoCurrentConditions(
   let output = `# Current Weather Conditions\n\n`;
   output += `**Time:** ${formatInTimezone(current.time, timezone, 'medium', prefs.timeFormat)}\n\n`;
 
-  if (current.weather_code !== undefined) {
+  if (current.weather_code != null) {
     output += `**Conditions:** ${openMeteoService.getWeatherDescription(current.weather_code)}\n`;
   }
 
@@ -958,7 +958,7 @@ async function formatOpenMeteoCurrentConditions(
 
     // Feels-like only earns a line when it diverges meaningfully from actual.
     // The gap is unit-keyed: these values are already in the caller's unit.
-    if (current.apparent_temperature !== undefined) {
+    if (current.apparent_temperature != null) {
       const gap = DisplayThresholds.temperature.feelsLikeGap[prefs.temperature];
       if (Math.abs(current.apparent_temperature - current.temperature_2m) > gap) {
         output += `**Feels Like:** ${Math.round(current.apparent_temperature)}${tempU}\n`;
@@ -1000,7 +1000,7 @@ async function formatOpenMeteoCurrentConditions(
     output += `${range}\n`;
   }
 
-  if (current.dew_point_2m !== undefined) {
+  if (current.dew_point_2m != null) {
     output += `**Dewpoint:** ${Math.round(current.dew_point_2m)}${tempU}\n`;
   }
 
@@ -1010,11 +1010,11 @@ async function formatOpenMeteoCurrentConditions(
 
   if (current.wind_speed_10m != null) {
     output += `**Wind:** ${Math.round(current.wind_speed_10m)} ${windU}`;
-    if (current.wind_direction_10m !== undefined) {
+    if (current.wind_direction_10m != null) {
       output += ` from ${Math.round(current.wind_direction_10m)}°`;
     }
     if (
-      current.wind_gusts_10m !== undefined &&
+      current.wind_gusts_10m != null &&
       current.wind_gusts_10m > current.wind_speed_10m * DisplayThresholds.wind.gustSignificanceRatio
     ) {
       output += `, gusting to ${Math.round(current.wind_gusts_10m)} ${windU}`;
@@ -1022,14 +1022,14 @@ async function formatOpenMeteoCurrentConditions(
     output += `\n`;
   }
 
-  if (current.pressure_msl !== undefined) {
+  if (current.pressure_msl != null) {
     // Pressure is the one field Open-Meteo does NOT convert: openMeteoUnitParams
     // only carries temperature/wind/precipitation, so pressure_msl always comes
     // back in hPa regardless of preference. Convert it here (hPa -> Pa -> prefs).
     output += `**Pressure:** ${formatPressureFromPa(current.pressure_msl * 100, prefs)}\n`;
   }
 
-  if (current.cloud_cover !== undefined) {
+  if (current.cloud_cover != null) {
     output += `**Cloud Cover:** ${Math.round(current.cloud_cover)}%\n`;
   }
 
@@ -1042,17 +1042,17 @@ async function formatOpenMeteoCurrentConditions(
   // not convert to the caller's precipitation unit — it reports cm unless
   // precipitation_unit=inch was requested. Convert before display/comparison
   // so the label and the trace-floor check both operate on the shown value.
-  const snowfall = current.snowfall !== undefined
+  const snowfall = current.snowfall != null
     ? snowfallToPrecipUnit(current.snowfall, prefs)
     : undefined;
-  if (current.precipitation !== undefined && current.precipitation >= traceFloor) {
+  if (current.precipitation != null && current.precipitation >= traceFloor) {
     output += `\n## Recent Precipitation\n`;
     output += `**Current:** ${withLabel(current.precipitation, precipU, precipDecimals)}\n`;
 
-    if (current.rain !== undefined && current.rain >= traceFloor) {
+    if (current.rain != null && current.rain >= traceFloor) {
       output += `**Rain:** ${withLabel(current.rain, precipU, precipDecimals)}\n`;
     }
-    if (current.showers !== undefined && current.showers >= traceFloor) {
+    if (current.showers != null && current.showers >= traceFloor) {
       output += `**Showers:** ${withLabel(current.showers, precipU, precipDecimals)}\n`;
     }
     if (snowfall !== undefined && snowfall >= traceFloor) {
