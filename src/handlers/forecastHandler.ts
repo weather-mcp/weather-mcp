@@ -104,7 +104,10 @@ interface ForecastArgs extends UnitArgs {
  * Cap the number of hourly forecast entries by verbosity level.
  * Hourly forecasts can emit up to days*24 entries (384 at 16 days), which is
  * expensive for assistant contexts. Unless the user asks for detail="full",
- * cap to a short horizon; the daily view still covers the full requested range.
+ * cap to a short horizon. On Open-Meteo the daily view still covers the full
+ * requested range; on NOAA it does not — NOAA's own daily and hourly horizons
+ * are shorter than `days` can ask for, and formatNOAAForecast discloses that
+ * from the response rather than relying on this cap note.
  *
  * @param detail - Requested verbosity
  * @param days - Number of forecast days requested
@@ -476,6 +479,16 @@ async function formatNOAAForecast(
     ? await noaaService.getHourlyForecast(gridId, gridX, gridY, noaaUnits)
     : await noaaService.getForecast(gridId, gridX, gridY, noaaUnits);
 
+  // Read what NOAA actually published from the *unsliced* response, before the
+  // display cap below narrows it. NOAA's daily product is fixed at 7 day/night
+  // pairs and its hourly product at ~156 hours, both shorter than the 16 days
+  // `days` accepts — so a request can exceed the source's horizon, and the
+  // disclosure line below reports that from the response rather than from a
+  // constant. `isDaytime` is required on ForecastPeriod, so no null guard.
+  const publishedPeriods = forecast.properties.periods;
+  const deliveredDays = publishedPeriods.filter(p => p.isDaytime).length;
+  const deliveredHours = publishedPeriods.length;
+
   // Determine how many periods to show
   let periods;
   if (granularity === 'hourly') {
@@ -494,8 +507,25 @@ async function formatNOAAForecast(
     output += `**Updated:** ${formatInTimezone(forecast.properties.updated, timezone, 'medium', prefs.timeFormat)}\n`;
   }
   output += `**Showing:** ${periods.length} ${granularity === 'hourly' ? 'hours' : 'periods'}\n\n`;
+  // Disclose NOAA's own horizon when the request asked for more than NOAA
+  // published. Not gated on `detail` — the horizon is a fact about the upstream
+  // product, invariant under verbosity — and every number comes from the
+  // response, so if NOAA ever extends either product the line says the new
+  // number with no code change.
+  const hourlyHorizonShort = granularity === 'hourly' && deliveredHours < days * 24;
+  if (granularity !== 'hourly' && deliveredDays < days) {
+    output += `*NOAA publishes a ${deliveredDays}-day forecast; showing all ${deliveredDays} of the ${days} days requested. For a longer horizon use source: "openmeteo".*\n\n`;
+  } else if (hourlyHorizonShort) {
+    const deliveredDayEquivalent = Number((deliveredHours / 24).toFixed(1));
+    output += `*NOAA publishes ${deliveredHours} hours (about ${deliveredDayEquivalent} days) of hourly forecast; showing ${periods.length} of the ${days * 24} hours requested. For a longer horizon use source: "openmeteo".*\n\n`;
+  }
   if (granularity === 'hourly' && detail !== 'full' && forecast.properties.periods.length > periods.length) {
-    output += `*Hourly output capped at ${periods.length} hours (detail="${detail}"). Use detail="full" for the full ${days}-day hourly forecast.*\n\n`;
+    // When the horizon line rendered, the cap note must not promise a full
+    // `days`-day hourly forecast NOAA never published.
+    const remedy = hourlyHorizonShort
+      ? `Use detail="full" for all ${deliveredHours} hours NOAA published.`
+      : `Use detail="full" for the full ${days}-day hourly forecast.`;
+    output += `*Hourly output capped at ${periods.length} hours (detail="${detail}"). ${remedy}*\n\n`;
   }
 
   // NOAA daily output renders day/night *periods* with no sun lines, so the
