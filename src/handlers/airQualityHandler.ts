@@ -60,7 +60,7 @@ function bandUv(raw: number, decimals: 0 | 1): { shown: number; category: UVInde
  */
 function finiteCamsPollen(
   current: OpenMeteoAirQualityCurrentData
-): Array<{ label: string; value: number | undefined }> {
+): Array<{ label: string; value: number }> {
   return [
     { label: 'Alder', value: current.alder_pollen },
     { label: 'Birch', value: current.birch_pollen },
@@ -68,7 +68,10 @@ function finiteCamsPollen(
     { label: 'Mugwort', value: current.mugwort_pollen },
     { label: 'Olive', value: current.olive_pollen },
     { label: 'Ragweed', value: current.ragweed_pollen }
-  ].filter(species => typeof species.value === 'number' && Number.isFinite(species.value));
+  ].filter(
+    (species): species is { label: string; value: number } =>
+      typeof species.value === 'number' && Number.isFinite(species.value)
+  );
 }
 
 export async function handleGetAirQuality(
@@ -187,7 +190,7 @@ function formatAirQuality(
   output += `**Observation Time:** ${currentTime.toLocaleString()}\n\n`;
 
   // Display primary AQI with health information
-  if (useUSAQI && current.us_aqi !== undefined) {
+  if (useUSAQI && current.us_aqi != null) {
     const { shown, category } = bandAqi(current.us_aqi, true);
     const emoji = category.level === 'Good' ? '🟢' :
                   category.level === 'Moderate' ? '🟡' :
@@ -202,7 +205,7 @@ function formatAirQuality(
     if (category.cautionaryStatement !== 'None') {
       output += `⚠️ **Caution:** ${category.cautionaryStatement}\n\n`;
     }
-  } else if (current.european_aqi !== undefined) {
+  } else if (current.european_aqi != null) {
     const { shown, category } = bandAqi(current.european_aqi, false);
     const emoji = category.level === 'Good' ? '🟢' :
                   category.level === 'Fair' ? '🟢' :
@@ -220,7 +223,7 @@ function formatAirQuality(
   }
 
   // UV Index
-  if (current.uv_index !== undefined) {
+  if (current.uv_index != null) {
     const { shown: uvShown, category: uvCategory } = bandUv(current.uv_index, 1);
     const uvEmoji = uvCategory.level === 'Low' ? '🟢' :
                     uvCategory.level === 'Moderate' ? '🟡' :
@@ -232,7 +235,7 @@ function formatAirQuality(
     output += `**Description:** ${uvCategory.description}\n`;
     output += `**Recommendation:** ${uvCategory.recommendation}\n\n`;
 
-    if (current.uv_index_clear_sky !== undefined && Math.abs(current.uv_index_clear_sky - current.uv_index) > 1) {
+    if (current.uv_index_clear_sky != null && Math.abs(current.uv_index_clear_sky - current.uv_index) > 1) {
       output += `*Note: UV index under clear sky would be ${current.uv_index_clear_sky.toFixed(1)}*\n\n`;
     }
   }
@@ -250,7 +253,7 @@ function formatAirQuality(
   ];
 
   for (const pollutant of pollutants) {
-    if (pollutant.value !== undefined) {
+    if (pollutant.value != null) {
       const info = getPollutantInfo(pollutant.key);
       const concentration = formatPollutantConcentration(pollutant.value, pollutant.units);
 
@@ -258,13 +261,13 @@ function formatAirQuality(
     }
   }
 
-  if (current.ammonia !== undefined && data.current_units?.ammonia) {
+  if (current.ammonia != null && data.current_units?.ammonia) {
     const info = getPollutantInfo('ammonia');
     const concentration = formatPollutantConcentration(current.ammonia, data.current_units.ammonia);
     output += `**${info.name}:** ${concentration}\n`;
   }
 
-  if (current.aerosol_optical_depth !== undefined) {
+  if (current.aerosol_optical_depth != null) {
     output += `**Aerosol Optical Depth:** ${current.aerosol_optical_depth.toFixed(3)} (atmospheric haze indicator)\n`;
   }
 
@@ -279,7 +282,7 @@ function formatAirQuality(
   if (pollenSpecies.length > 0) {
     output += `## 🌾 Pollen\n\n`;
     for (const species of pollenSpecies) {
-      const rounded = Math.round((species.value as number) * 10) / 10;
+      const rounded = Math.round(species.value * 10) / 10;
       output += `**${species.label}:** ${rounded} grains/m³\n`;
     }
     output += `\n*Pollen from the CAMS European forecast — available for European locations only.*\n\n`;
@@ -297,10 +300,10 @@ function formatAirQuality(
   }
 
   // Show secondary AQI for reference
-  if (useUSAQI && current.european_aqi !== undefined) {
+  if (useUSAQI && current.european_aqi != null) {
     const { shown, category } = bandAqi(current.european_aqi, false);
     output += `*European AQI: ${shown} (${category.level})*\n\n`;
-  } else if (!useUSAQI && current.us_aqi !== undefined) {
+  } else if (!useUSAQI && current.us_aqi != null) {
     const { shown, category } = bandAqi(current.us_aqi, true);
     output += `*US AQI: ${shown} (${category.level})*\n\n`;
   }
