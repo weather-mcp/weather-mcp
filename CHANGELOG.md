@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.17] - 2026-09-01
+
 ### Fixed
 
 - **A value Open-Meteo could not provide no longer renders as a number it never sent.** Open-Meteo returns JSON `null` for any current-conditions, air-quality, marine or geocoding scalar it cannot model at a point — ammonia over most of North America, the wave peak periods at Sydney Heads, elevation for some geocoder hits — and the render guards in four tools tested `!== undefined`, which a `null` passes. What a null became depended on which arithmetic it reached: `get_air_quality` printed **`US Air Quality Index: 0 (Good)`** — a fabricated all-clear — for a null US AQI, printed `**Ammonia (NH₃):** N/A` for a null ammonia reading, and **failed the whole call** on a null aerosol optical depth; `get_current_conditions` on the Open-Meteo path printed `**Dewpoint:** 0°F` and `**Pressure:** 0.00 inHg`; `get_marine_conditions` printed `**Peak Period:** N/A`; and `search_location` printed `**Elevation:** nullm (0ft)`. **Each of those lines is now omitted** — the report says nothing rather than something false — and the rest of the report is unchanged. Two of the null cases were observed live on the day of the fix (ammonia at Denver and Toronto; both peak periods at Sydney Heads and in the mid-Atlantic) and the committed `examples/boating-and-marine.md` and `examples/wildfire-awareness.md` captures were refreshed to show the line gone; the remaining cases are possible under Open-Meteo's null-for-absent contract and are pinned by unit tests rather than a live probe. The `get_weather_summary` composite goes through the same current-conditions and air-quality formatters, so it inherits the fix; the NOAA and METAR paths never read these fields and are byte-identical before and after. Underneath, every Open-Meteo `current.*` scalar and the geocoding `elevation`/`population` fields now declare `number | null` as the wire sends it, so the compiler enumerates the guard sites — widening the types alone produced 46 errors in exactly the four handlers above and 0 elsewhere, and the sweep was complete when that count reached 0. **A null does not print a placeholder** — no `N/A`, no `—`: for these optional readings an absent line already means "not reported", and a placeholder row would suggest the value was requested and refused, which is not what Open-Meteo's null means. (`src/types/openmeteo.ts`, `src/services/geocoding.ts`, `src/handlers/airQualityHandler.ts`, `src/handlers/currentConditionsHandler.ts`, `src/handlers/marineConditionsHandler.ts`, `src/handlers/locationHandler.ts`, `tests/unit/marine-null-scalars.test.ts`, `tests/unit/search-location-handler.test.ts`, `tests/unit/air-quality-forecast.test.ts`, `tests/unit/current-conditions-global.test.ts`)
@@ -1615,7 +1617,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.16...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.17...HEAD
+[1.25.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.16...v1.25.17
 [1.25.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.15...v1.25.16
 [1.25.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.14...v1.25.15
 [1.25.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.13...v1.25.14
