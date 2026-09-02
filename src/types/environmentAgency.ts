@@ -65,7 +65,7 @@ export interface EAMeasure {
   parameter?: string; // e.g. "level"
   parameterName?: string; // e.g. "Water Level"
   qualifier?: string; // e.g. "Stage", "Downstream Stage"
-  unitName?: string; // Observed live on L2402: "m", "mAOD", and the placeholder "---"
+  unitName?: string; // Live: "m", "mAOD", "mASD", and the placeholder "---"
   period?: number; // Publication interval, seconds (900 observed on every level measure)
   /**
    * A union, never the object shape alone. On the station list endpoint this
