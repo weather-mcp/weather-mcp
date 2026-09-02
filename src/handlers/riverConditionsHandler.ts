@@ -9,10 +9,10 @@ import { GeocodingService } from '../services/geocoding.js';
 import { resolveCountryCode, resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { NominatimService } from '../services/nominatim.js';
 import { validateDetail, validatePositiveInteger } from '../utils/validation.js';
-import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
+import { formatInTimezone, formatObservationAge, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { calculateDistance } from '../utils/distance.js';
 import { displayValue } from '../utils/displayBanding.js';
-import { isInUS } from '../utils/geography.js';
+import { isInUS, isInGreatBritain } from '../utils/geography.js';
 import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
 import { cubicMetersPerSecondToCubicFeetPerSecond } from '../utils/units.js';
 import { UnitPreferences } from '../config/units.js';
@@ -29,6 +29,12 @@ import {
   formatSnapNote,
   PROBE_GRID_CENTER_INDEX
 } from '../utils/riverDischarge.js';
+import { EnvironmentAgencyService } from '../services/environmentAgency.js';
+import {
+  filterStationsWithRiverName,
+  selectStageMeasure,
+  formatStageLevel
+} from '../utils/eaGauges.js';
 import { RateLimitError } from '../errors/ApiError.js';
 import type { NWPSGauge, GaugeStatus, NWPSStageFlowResponse, StageFlowDataPoint, FloodCategories } from '../types/noaa.js';
 import type { OpenMeteoFloodResponse } from '../types/openmeteo.js';
@@ -192,19 +198,37 @@ interface RiverConditionsArgs extends UnitArgs {
   city_name?: string;
   radius?: number; // search radius in km (default: 50) — NOAA path only
   detail?: 'summary' | 'standard' | 'full';
-  source?: 'auto' | 'noaa' | 'openmeteo';
+  source?: 'auto' | 'noaa' | 'openmeteo' | 'ea';
   forecast_days?: number; // 1-210, default 7 — Open-Meteo path only
 }
 
 /**
  * Route a river request to gauge observations or to the global discharge model.
  *
- * `auto` sends US coordinates to NOAA's NWPS gauge network (unchanged) and
- * everywhere else to the Open-Meteo Flood API. An explicit `source` forces the
- * branch. There is deliberately no cross-fallback: an observed river stage in
- * feet against official flood categories and a modeled discharge in m³/s
- * against its own history are different claims, and silently swapping one for
- * the other would misrepresent the data (design D1).
+ * `auto` sends US coordinates to NOAA's NWPS gauge network (unchanged), Great
+ * Britain to the Environment Agency's real gauge network, and everywhere else
+ * to the Open-Meteo Flood API. An explicit `source` forces the branch. There is
+ * deliberately no cross-fallback: an observed river stage in feet against
+ * official flood categories, an observed level in metres against a published
+ * typical range, and a modeled discharge in m³/s against its own history are
+ * three different claims, and silently swapping one for another would
+ * misrepresent the data (design D1).
+ *
+ * **Why the GB arm is gated on a box before a country lookup.** Routing Great
+ * Britain on a country code alone would fire a Nominatim reverse-geocode on
+ * every `auto` river request on Earth outside the US boxes, against a 1 req/sec
+ * server-wide limit, to answer `'gb'` for a fraction of a percent of them.
+ * `isInGreatBritain` is the cheap pre-gate that decides whether the lookup is
+ * worth making; the country code is what actually decides. The box routes and
+ * never renders — no sentence below is derived from it (G53).
+ *
+ * **The EA arm requires a positively-resolved `'gb'`, never a negative test.**
+ * With no country signal at all — no saved `country_code` and no Nominatim
+ * service — `resolveCountryCode` returns `{ countryCode: null }`, which is not
+ * `'gb'`, so `auto` falls to GloFAS. That is a required behaviour, not an
+ * accident: 19 existing tests in `tests/unit/river-conditions-global.test.ts`
+ * pass London on `auto` with no Nominatim fake wired and assert the Open-Meteo
+ * path, and this condition is the single thing keeping all of them green.
  */
 export async function handleGetRiverConditions(
   args: unknown,
@@ -212,7 +236,8 @@ export async function handleGetRiverConditions(
   locationStore: LocationStore,
   geocodingService: GeocodingService,
   openMeteoService?: OpenMeteoService,
-  nominatimService?: NominatimService
+  nominatimService?: NominatimService,
+  eaService?: EnvironmentAgencyService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as RiverConditionsArgs, locationStore, geocodingService);
@@ -222,13 +247,49 @@ export async function handleGetRiverConditions(
   const detail = validateDetail((args as RiverConditionsArgs)?.detail);
 
   const requestedSource = (args as RiverConditionsArgs)?.source || 'auto';
-  const useNOAA = requestedSource === 'auto'
-    ? isInUS(latitude, longitude)
-    : requestedSource === 'noaa';
 
-  const output = useNOAA
-    ? await formatNOAARiverConditions(noaaService, latitude, longitude, args, detail, resolved.country_code, nominatimService)
-    : await formatOpenMeteoRiverConditions(openMeteoService, latitude, longitude, args, detail);
+  // A three-way decision resolved before any request is made. An *unrecognized*
+  // source string must still land on Open-Meteo exactly as it did before this
+  // arm existed: the pre-existing `|| 'auto'` above catches only falsy values,
+  // so an unknown string fell through `=== 'noaa'` being false. The final
+  // `else` preserves that byte-for-byte. Deliberately not the coerce-to-`auto`
+  // shape used in `wildfireHandler.ts` — that would change existing behaviour
+  // on a path this change may not touch.
+  let route: 'noaa' | 'ea' | 'openmeteo';
+  if (requestedSource === 'noaa') {
+    route = 'noaa';
+  } else if (requestedSource === 'ea') {
+    // Honoured anywhere, with a coverage disclosure when it returns nothing.
+    route = 'ea';
+  } else if (requestedSource === 'auto') {
+    if (isInUS(latitude, longitude)) {
+      route = 'noaa';
+    } else if (isInGreatBritain(latitude, longitude)) {
+      // Only inside the box, and only on `auto`, is the lookup worth making.
+      // `resolveCountryCode` lowercases, and a saved location's stored
+      // `country_code` (documented as e.g. `"GB"`) short-circuits it entirely.
+      const { countryCode } = await resolveCountryCode(
+        resolved.country_code,
+        latitude,
+        longitude,
+        nominatimService
+      );
+      route = countryCode === 'gb' ? 'ea' : 'openmeteo';
+    } else {
+      route = 'openmeteo';
+    }
+  } else {
+    route = 'openmeteo';
+  }
+
+  let output: string;
+  if (route === 'noaa') {
+    output = await formatNOAARiverConditions(noaaService, latitude, longitude, args, detail, resolved.country_code, nominatimService);
+  } else if (route === 'ea') {
+    output = await formatEARiverConditions(eaService, latitude, longitude, args, detail);
+  } else {
+    output = await formatOpenMeteoRiverConditions(openMeteoService, latitude, longitude, args, detail);
+  }
 
   return prependLocationLine({
     content: [
@@ -433,6 +494,169 @@ async function formatNOAARiverConditions(
   output += `\n---\n`;
   output += `*Data source: NOAA National Water Prediction Service (NWPS)*\n`;
   output += `*River conditions are updated hourly. Always consult official sources for critical decisions.*\n`;
+
+  return output;
+}
+
+/** Header line naming the authority behind the Great Britain path. */
+const EA_SOURCE_LINE =
+  '**Source:** Environment Agency real-time river level gauges (observed, 15-minute)';
+
+/**
+ * Default search radius for the EA path, in km. Deliberately smaller than the
+ * NOAA path's 50: the EA network is dense, and a 25 km search at York returns
+ * 80 stations of which 68 are river gauges (measured live 2026-09-02).
+ */
+const EA_DEFAULT_RADIUS_KM = 25;
+
+/**
+ * What an EA level number is measured *from*, in words.
+ *
+ * This is not cosmetic. The EA publishes stage in more than one basis, and 21
+ * of the 68 river gauges around York publish theirs only in `mAOD` — metres
+ * Above Ordnance Datum, which is a water-surface **elevation above sea level**,
+ * not a river depth. Rendering "24.88 ft" for a gauge on the River Foss without
+ * saying so invites the reader to conclude the river is twenty-five feet deep.
+ * On a safety-critical surface that is the mislabelled-quantity defect this
+ * project has produced before, so the basis is always stated beside the number.
+ *
+ * `m` and `mASD` are heights above the gauge's own zero; `mAOD` is an absolute
+ * elevation. The published typical range is in the same basis as the station's
+ * own live stage measure, so the comparison stays coherent either way.
+ */
+function eaLevelBasis(unitName: string | undefined): string {
+  switch (unitName) {
+    case 'm':
+    case 'mASD':
+      return 'above the gauge datum';
+    case 'mAOD':
+      return 'above Ordnance Datum (a water-surface elevation, not river depth)';
+    default:
+      return '';
+  }
+}
+
+/**
+ * The Great Britain path: Environment Agency gauge observations.
+ *
+ * **Contract, not garnish.** A failed EA fetch propagates rather than
+ * degrading to an empty gauge list, because an empty gauge list reads as "no
+ * flooding here". This function therefore does not wrap the fetch in a
+ * catch-all that returns a successful-looking empty render.
+ *
+ * The coverage claim this renders is **the EA river-gauge network**, and it is
+ * made true by construction by the `riverName` filter, not by any geographic
+ * box. A station carrying `riverName` is a river gauge wherever it sits —
+ * Sprouston on the Tweed is in Scotland and is correctly included; Leith is a
+ * tide gauge and is correctly excluded (G53).
+ */
+async function formatEARiverConditions(
+  eaService: EnvironmentAgencyService | undefined,
+  latitude: number,
+  longitude: number,
+  args: unknown,
+  detail: DetailLevel
+): Promise<string> {
+  // A missing service is a wiring fault, not an empty result. Reporting "no
+  // gauges" here would be the fabricated all-clear this whole path is built to
+  // avoid, so it is a contract failure with a message that names the cause.
+  if (!eaService) {
+    throw new Error(
+      'Environment Agency river gauge data is unavailable: the service is not configured'
+    );
+  }
+
+  let radius = (args as RiverConditionsArgs)?.radius ?? EA_DEFAULT_RADIUS_KM;
+  if (typeof radius !== 'number' || isNaN(radius) || !isFinite(radius)) {
+    radius = EA_DEFAULT_RADIUS_KM;
+  }
+  radius = Math.max(1, Math.min(radius, 500));
+
+  const prefs = resolveUnitPreferences(args as UnitArgs);
+
+  let output = `# River Conditions Report\n\n`;
+  output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
+  output += `**Search Radius:** ${radius} km (${(radius * 0.621371).toFixed(1)} miles)\n`;
+  output += `${EA_SOURCE_LINE}\n\n`;
+
+  // Both fetches propagate on failure — see the contract note above.
+  const [stationsResult, readingsResult] = await Promise.all([
+    eaService.getStationsNear(latitude, longitude, radius),
+    eaService.getLatestLevelReadings()
+  ]);
+
+  // G6 — the list is cached unfiltered; the filter that establishes the
+  // coverage claim runs here, at read time, on every return.
+  const riverStations = filterStationsWithRiverName(stationsResult.stations);
+
+  const withReadings = riverStations
+    .map(station => ({
+      station,
+      selected: selectStageMeasure(station, readingsResult.readings),
+      distance:
+        station.lat != null && station.long != null
+          ? calculateDistance(latitude, longitude, station.lat, station.long)
+          : undefined
+    }))
+    .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+
+  if (withReadings.length === 0) {
+    // An empty result from the EA network means "this authority does not gauge
+    // rivers at this location", which is emphatically not an all-clear — so no
+    // ✅ and no "currently clear" sentence. Distinguished below from a point
+    // that is simply outside the network entirely.
+    output += `**No Environment Agency river gauges were found within ${radius} km.**\n\n`;
+    output += `That is an absence of coverage, not an all-clear. Rivers here may be in `;
+    output += `flood; the Environment Agency river-gauge network simply does not gauge `;
+    output += `them at this location.\n\n`;
+    output += `Use \`source: "openmeteo"\` for Open-Meteo Flood (GloFAS) modeled river `;
+    output += `discharge, which is global.\n`;
+    return output;
+  }
+
+  const maxGaugesToShow = detail === 'full' ? 25 : 5;
+  const gaugesToShow = withReadings.slice(0, maxGaugesToShow);
+
+  // G8 — the count is derived from the full filtered set, never from the
+  // display slice. A cap that changed the reported number would be a
+  // defensive limit quietly rewriting what the reader is told.
+  output += `📊 **Found ${withReadings.length} river gauge${withReadings.length > 1 ? 's' : ''}**\n\n`;
+
+  for (const { station, selected, distance } of gaugesToShow) {
+    const label = typeof station.label === 'string' ? station.label : station.riverName;
+    output += `### ${station.riverName}${label && label !== station.riverName ? ` — ${label}` : ''}\n`;
+    if (distance !== undefined) {
+      // Both units unconditionally, matching the NWPS gauge block below.
+      output += `- **Distance:** ${distance.toFixed(1)} km (${(distance * 0.621371).toFixed(1)} mi)\n`;
+    }
+
+    if (!selected) {
+      // Honest absence: the station exists and is a river gauge, but no
+      // qualifying level reading is currently published for it. Never a value.
+      output += `- **Level:** not currently reported by this gauge\n`;
+    } else {
+      const level = formatStageLevel(selected.value, prefs);
+      const basis = eaLevelBasis(selected.unitName);
+      output += `- **Level:** ${level.formatted}${basis ? ` ${basis}` : ''}\n`;
+      output += `- **Observed:** ${formatObservationAge(selected.ageMinutes)}\n`;
+    }
+    output += `\n`;
+  }
+
+  if (withReadings.length > maxGaugesToShow) {
+    const remaining = withReadings.length - maxGaugesToShow;
+    const plural = remaining > 1 ? 's' : '';
+    if (detail === 'full') {
+      output += `*Note: ${remaining} additional gauge${plural} found within radius (showing nearest ${maxGaugesToShow})*\n`;
+    } else {
+      output += `*Note: ${remaining} additional gauge${plural} found within radius (showing nearest ${maxGaugesToShow} only — use detail="full" for more)*\n`;
+    }
+  }
+
+  if (stationsResult.truncated || readingsResult.truncated) {
+    output += `\n*Note: the upstream response exceeded this server's processing limit and was `;
+    output += `trimmed, so this list may be incomplete.*\n`;
+  }
 
   return output;
 }
