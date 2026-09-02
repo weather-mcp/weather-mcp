@@ -646,8 +646,7 @@ async function formatEARiverConditions(
       output += `**No Environment Agency monitoring stations were found within ${radius} km.**\n\n`;
       output += `That is an absence of coverage, not an all-clear. Rivers here may be in `;
       output += `flood; the Environment Agency simply does not monitor them at this `;
-      output += `location. The Environment Agency network covers England and rivers `;
-      output += `crossing its borders.\n\n`;
+      output += `location.\n\n`;
       output += `Try a larger \`radius\`, or use \`source: "openmeteo"\` for Open-Meteo `;
       output += `Flood (GloFAS) modeled river discharge, which is global.\n`;
     } else {
