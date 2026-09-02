@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.18] - 2026-09-02
+
+### Fixed
+
+- **A forecast request longer than NOAA publishes no longer looks like it was answered in full.** `get_forecast` accepts `days` from 1 to 16, but NOAA's own products are shorter: at a US point it publishes 14 day/night periods — 7 daytime days — and 156 hourly periods, about 6.5 days. The handler sliced to what was asked and rendered what NOAA sent, with nothing marking the difference, so `days: 7`, `days: 10` and `days: 16` at Memphis produced **byte-identical output**. The observed harm was a model titling a 7-row table "the next ~10 days" because nothing in the response contradicted it, while the full 10 days were obtainable all along. The NOAA path now renders one line after `**Showing:**` when — and only when — the request exceeded what NOAA returned:
+
+      *NOAA publishes a 7-day forecast; showing all 7 of the 10 days requested. For a longer horizon use source: "openmeteo".*
+
+      *NOAA publishes 156 hours (about 6.5 days) of hourly forecast; showing 48 of the 168 hours requested. For a longer horizon use source: "openmeteo".*
+
+  Every number is read from the response rather than from a constant, so if NOAA ever extends either product the line reports the new figure with no code change, and the day count comes from `isDaytime` rather than from a period count or a calendar-date count — a "Tonight"-first response spans 8 dates while carrying 7 named days. **The hourly display-cap note has also stopped overpromising**: it used to end "Use detail="full" for the full 7-day hourly forecast", which the source cannot deliver for any `days` of 7 or more, and now reads "Use detail="full" for all 156 hours NOAA published" whenever the horizon line is also showing. Nothing else about the report moves: `**Showing:**`, the period blocks and the attribution footer are untouched, and the line is deliberately **not** gated on `detail`, because the horizon is a fact about the upstream product rather than a verbosity setting — so `get_weather_summary`'s forecast section discloses it identically at its own default detail and at an explicit `standard`. **The default hourly request on the NOAA path gains one line** (`days` unset means 7, and 168 hours is more than NOAA's 156); every Open-Meteo request, every NOAA daily request with `days` up to 7, and every NOAA hourly request with `days` up to 6 are byte-identical, confirmed md5-for-md5 against the previous release across 15 live probes. The server never routes around the shortfall — it does not silently switch you to Open-Meteo, reject the request, or stitch two providers into one table; it tells you what happened and names the parameter that gets you the rest. The `get_forecast` tool schema has disclosed `1-7 for US NOAA` since before this fix; the summary tool's schema and the user docs now say the same. (`src/handlers/forecastHandler.ts`, `src/index.ts`, `docs/TOOLS.md`, `README.md`, `tests/unit/forecast-noaa-horizon.test.ts`)
+
+### Security
+
+- **One moderate advisory is knowingly carried into this release, and it is not reachable from this server.** `npm audit` reports `qs` 6.15.3 — GHSA-x5fp-wj9c-mxmx (an array-limit bypass via bracket-key comma parsing) and GHSA-4mjr-xmp4-gh2g (a denial of service via an attacker-controlled `isBuffer`) — reached only as `@modelcontextprotocol/sdk` → `express` → `body-parser`. **Nothing in this package loads it.** The server speaks stdio and constructs `StdioServerTransport` and nothing else, so the SDK's HTTP transport, the only thing that would ever parse a query string, is never instantiated; `qs` is dead weight in the dependency tree rather than code on a request path. The patched `qs` 6.16.0 satisfies every version range in that chain, but it was published on 2026-08-29 and npm's seven-day `min-release-age` cooldown declines to install a package that young, so `npm audit fix` produces no lockfile change at all. The bump is deliberately **left for a follow-up `chore:` commit** once the cooldown clears, rather than forced in by switching off the guard that exists to catch exactly the freshly-published-and-compromised case. This project's release gate is "no high or critical vulnerabilities", which this release meets. Recorded here rather than left in a terminal so that anyone running `npm audit` against the published package finds the reasoning instead of a surprise.
+
 ## [1.25.17] - 2026-09-01
 
 ### Fixed
@@ -1617,7 +1633,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.17...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.18...HEAD
+[1.25.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.17...v1.25.18
 [1.25.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.16...v1.25.17
 [1.25.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.15...v1.25.16
 [1.25.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.14...v1.25.15

@@ -36,7 +36,7 @@ in `the alert's own polygon` terminated a single-quoted string in
 `src/index.ts`; `npm test` reported 101 files / 2,492 tests passing while
 `npm run build` emitted three TS1005/TS1128 errors.
 
-**Status:** active. **Verify line re-run 2026-09-01, second time** (openmeteo-nullable-scalar-types curation): a `TS2322` planted in `src/utils/finiteSample.ts` (1 error) while `npm test` reported 120 files / 2,933 tests passing; the trap is intact. The same run leaned on the load-bearing direction as its keystone: widening 63 scalar declarations *after* the guards had landed produced **0** build errors, which is the only evidence that the four handlers were the complete consumer set (`824dc02`). **Verify line re-run 2026-09-01** (marine-sea-state-taxonomy curation): a `TS2322` planted in `src/utils/marine.ts` (2 errors) while `npm test` reported 118 files / 2,917 tests passing; the trap is intact. The same run met the load-bearing direction on its first task — see [G63]. **Re-run 2026-08-28** (issue-83 absent-strike-distance curation): a `TS2322` and two `TS6133` errors planted in `src/handlers/lightningHandler.ts` — the file this plan changed — while `npm test` reported 114 files / 2,772 tests passing. The trap is intact. The same run also exercised this entry in the **load-bearing direction**: widening `LightningStatistics` to `number | null` *first* produced exactly two `TS18047` errors at the two render sites and no others, which is the only evidence that no other `src/` file consumes the field — a green suite says nothing about it. **Re-verified 2026-08-24** (optional-mqtt curation): two
+**Status:** active. **Verify line re-run 2026-09-02** (noaa-forecast-horizon-disclosure curation): typing `deliveredHours` as `string` in `src/handlers/forecastHandler.ts` — the file this plan changed — produced `TS2322`, `TS2365` and `TS2362` (the latter two at the two sites that consume it, which is the load-bearing direction) while `npm test` reported 121 files / 2,941 tests passing; the trap is intact. **Verify line re-run 2026-09-01, second time** (openmeteo-nullable-scalar-types curation): a `TS2322` planted in `src/utils/finiteSample.ts` (1 error) while `npm test` reported 120 files / 2,933 tests passing; the trap is intact. The same run leaned on the load-bearing direction as its keystone: widening 63 scalar declarations *after* the guards had landed produced **0** build errors, which is the only evidence that the four handlers were the complete consumer set (`824dc02`). **Verify line re-run 2026-09-01** (marine-sea-state-taxonomy curation): a `TS2322` planted in `src/utils/marine.ts` (2 errors) while `npm test` reported 118 files / 2,917 tests passing; the trap is intact. The same run met the load-bearing direction on its first task — see [G63]. **Re-run 2026-08-28** (issue-83 absent-strike-distance curation): a `TS2322` and two `TS6133` errors planted in `src/handlers/lightningHandler.ts` — the file this plan changed — while `npm test` reported 114 files / 2,772 tests passing. The trap is intact. The same run also exercised this entry in the **load-bearing direction**: widening `LightningStatistics` to `number | null` *first* produced exactly two `TS18047` errors at the two render sites and no others, which is the only evidence that no other `src/` file consumes the field — a green suite says nothing about it. **Re-verified 2026-08-24** (optional-mqtt curation): two
 deliberate `TS2322`/`TS6133` errors in `src/utils/version.ts` still left
 `npm test` reporting 103 files / 2,519 tests passing. **Re-verified 2026-08-26**
 (cap-disclosure-accuracy curation): the same two error codes in
@@ -326,7 +326,16 @@ tidal and major-river points and keep one whose gauges have a series — Portlan
 OR yielded 8), then assert the count, then compare hashes. Re-pointing there took
 the count from 0/0 to 16/16.
 
-**Status:** active, **extended 2026-08-27**, **re-run 2026-09-01**
+**The base column can be the defect's own proof, 2026-09-02** (`d40e309`,
+noaa-forecast-horizon-disclosure T3). Where the defect *is* "the output does not
+distinguish X from Y", the sweep's **base** hashes state it in one line: Memphis
+at `days: 7`, `days: 10` and `days: 16` all hashed to `11bb816c…` on base, and
+the two summary probes at `days: 7` and `days: 10` both to `8c88efa8…`. Two
+probes that *should* differ hashing identically is the bug, not drift — the
+opposite reading from this entry's usual one, and worth asserting deliberately
+when the plan's whole premise is that a distinction is missing.
+
+**Status:** active, **extended 2026-08-27 and 2026-09-02**, **re-run 2026-09-01**
 (openmeteo-nullable-scalar-types T1–T3: the plan told the sweep in advance that
 a probe landing on a wire null would differ from base by exactly the omitted
 line and to record that as the fix, not drift — Sydney Heads (two `Peak Period`
@@ -451,7 +460,7 @@ test must task the doc update, and a plan asserting the count does not move shou
 be tested against the suite rather than believed.
 
 **Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
-2026-08-25**, **extended 2026-08-29**, **Verify line re-run 2026-09-01, second time** (`f48eda3`, openmeteo-nullable-scalar-types T6 — the count moved 2,917 → 2,933 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,933`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2933`, `✅ CLAUDE.md test count: 2933`, `✅ README.md tests badge: 2933` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
+2026-08-25**, **extended 2026-08-29**, **Verify line re-run 2026-09-02** (`d65ef25`, noaa-forecast-horizon-disclosure T2 — the count moved 2,933 → 2,941 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,941`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01, second time** (`f48eda3`, openmeteo-nullable-scalar-types T6 — the count moved 2,917 → 2,933 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,933`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2933`, `✅ CLAUDE.md test count: 2933`, `✅ README.md tests badge: 2933` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
 band-rounding T2 — the count moved 2,611 → 2,660 and all five sites were edited
 by content; with both unvalidated sites then set to `9,999` against the real
 `2,660`, `./scripts/check-doc-versions.sh` still printed `✅ README.md test
@@ -787,6 +796,32 @@ ground that the statistics lines sit outside any `detail` gate — which is exac
 the inference the 2026-08-26 entry above records getting backwards for alerts.
 **A fixture-driven drive of the summary handler costs a minute and replaces the
 inference; "no live probe allowed" is not a reason to skip it.**
+
+**The second path exists in the *schema* too, 2026-09-02** (`b4b18a3`,
+noaa-forecast-horizon-disclosure T4) — **and a docs task that qualifies one
+tool's parameter leaves the summary's declaration contradicting it.** Every
+parameter the summary forwards is declared **twice** in `TOOL_DEFINITIONS`: once
+on the specialized tool and once on `get_weather_summary`. When the NOAA
+forecast-horizon plan corrected `docs/TOOLS.md`'s `days` entries for both tools,
+`src/index.ts:332` already read `1-16 for global, 1-7 for US NOAA` while `:478`
+read a bare `(1-16, default: 7)` — so the summary's pre-call contract said one
+thing and its own docs page said another, on a parameter whose post-call
+behaviour is identical through both tools. The plan had deferred `:478` on the
+reasoning that `:332` "is already accurate and `:478` is left with it"; accuracy
+is not inherited between two independent strings.
+
+Note the tier argument that made the deferral look principled and is wrong: a
+risk floor covering `TOOL_DEFINITIONS` **forbids `light`**, it does not forbid
+the edit. On a plan already at `standard` the floor is satisfied and touching one
+description string buys no extra ceremony. **Check whether the floor is actually
+costing anything before deferring on it.**
+
+**Verify:** for any parameter the summary forwards, `grep -n "description: '" src/index.ts`
+and read the specialized tool's declaration against the summary's. They should
+express the same constraint or say why they differ.
+
+**Evidence:** raised as `copilot-R1` in the plan review, re-rated to minor by
+triage, accepted by the owner at `/run-plan`'s opening and landed in T4.
 
 ---
 
@@ -1252,7 +1287,20 @@ that hit was still "leave" — `docs/releases/CHANGELOG.md` is the frozen
 historical copy ending at 1.6.0 that the bindings say never to write to — so a
 missed hit here would have cost nothing; the next one may not be frozen.
 
-**Status:** active, **sharpened 2026-08-27**. **Re-run 2026-09-01** (`2e7de75`, marine-sea-state-taxonomy T5) on the marine legend table itself: four live classes edited or regenerated, four frozen (`CHANGELOG.md` v1.25.6 and v0.6.0 entries, `GOTCHAS.md:1392` — this file's own evidence text — and a different feature's `Extremely dangerous` string in `thermalStress.ts`) left alone; no unexpected live hit. Plans 2 and 3 of the band-rounding
+**The plan's own classification table can be incomplete, 2026-09-02**
+(`b4b18a3`, noaa-forecast-horizon-disclosure T4) — [G12]'s lesson, on this
+entry's artifact. The plan enumerated seven classes for
+`16 ?days|1-16|up to 16|156 ?hours`; the post-edit re-run returned live hits the
+table never listed, including seven in `src/services/openmeteo.ts`, one in
+`src/config/displayThresholds.ts` and one in `src/handlers/marineConditionsHandler.ts`.
+Every one classified cleanly — they are **Open-Meteo-scoped**, and `1-16` is
+*true* of that path — so none was a stop-and-ask, but a builder trusting the
+table would have believed the sweep complete without ever running it. **Re-derive
+the classification from the grep's own output, not from the plan's table**, and
+note that a range string can be simultaneously a false claim on one provider path
+and a correct one on another: the class is per *hit*, not per *string*.
+
+**Status:** active, **sharpened 2026-08-27**, **extended 2026-09-02**. **Re-run 2026-09-01** (`2e7de75`, marine-sea-state-taxonomy T5) on the marine legend table itself: four live classes edited or regenerated, four frozen (`CHANGELOG.md` v1.25.6 and v0.6.0 entries, `GOTCHAS.md:1392` — this file's own evidence text — and a different feature's `Extremely dangerous` string in `thermalStress.ts`) left alone; no unexpected live hit. Plans 2 and 3 of the band-rounding
 sequence have now landed (wildfire `cd0f317`; river/marine `028b750`). Plan 3's
 grep returned **no unexpected live hit**: two live `docs/TOOLS.md` lines edited,
 one live `README.md` row with no thresholds to correct, and four frozen
@@ -2681,11 +2729,27 @@ preference (`3.6 m³/s (127 ft³/s)`). Recorded as an observation rather than
 fixed: it is pre-existing, `units` is undocumented for `get_river_conditions`,
 and the plan was scoped to one predicate in an F1 file.
 
-**Status:** active. Related: [G10] (the same "this row proves nothing" family,
+**The prediction runs the other way too, 2026-09-02** (`b4b18a3`,
+noaa-forecast-horizon-disclosure T3) — **a plan can assert an axis collapses when
+it does not, and instruct the run to report two real rows as one.** The plan told
+the sweep to expect `get_weather_summary` at its default `detail` and at an
+explicit `standard` to be *identical to each other* on the branch, citing this
+entry, and to "report as one probe with a note". Measured: 2,093 bytes against
+2,950. The forecast section **does** read `detail` — `summary` omits each
+period's `detailedForecast` prose that `standard` prints — and the same gap is
+present between the two **base** cells, so it is pre-existing rather than
+introduced. The error was in the safe direction (the matrix under-claimed), but
+the instruction would have discarded a genuine row. This is the [G19] 2026-08-27
+clause applied one step earlier: *check whether the section under test reads
+`detail`* before predicting either that the paths diverge **or** that they
+collapse. **The Verify line below decides it in one `diff`; do not settle it from
+the plan's prose in either direction.**
+
+**Status:** active, **extended 2026-09-02**. Related: [G10] (the same "this row proves nothing" family,
 where the cause is a failing feed or a subject that cannot express the
 construct — here the feed is healthy and the subject is fine, and it is the
 *axis* that is inert), [G47] (the numeric sibling), [G11] (reading the output is
-what exposed it). Partly lintable — a matrix helper that diffs sibling cells and
+what exposed it), [G19] (whether the section reads `detail` at all). Partly lintable — a matrix helper that diffs sibling cells and
 refuses to count identical ones as separate rows would close it mechanically.
 
 ## G53 — Promoting a routing heuristic to a rendered claim inherits every edge it was allowed to get wrong
@@ -3225,6 +3289,81 @@ separate non-blocking job, or excluding them from the publish gate — is a
 *after* a successful publish — the opposite half), [G9] (live smoke tests
 classify transport failures and skip; the river integration file does not,
 which is why a refusal becomes a timeout instead of a skip).
+
+---
+
+## G65 — The mutation set comes from the design's *rejected alternatives*, so a clause the design settled below its decision boundary gets no mutation row and no lock
+
+**Trigger:** building the mutation table for a plan whose design plan declares a
+**decision boundary** — "this plan settles that the line exists, where it sits
+and what it must contain; the exact sentence is the builder's" — and whose
+implementation plan then writes the exact sentence out in a "the copy, settled
+here" section.
+
+**Rule:** the mutation set is [G32]'s (every rejected implementation) **plus one
+row per number or sub-clause the implementation plan settled below the design's
+decision boundary**. Those clauses have no rejected alternative to mutate to, so
+[G32]'s procedure — grep the design for `**Rejected:` — cannot generate a row for
+them, and a `toContain` prefix that stops before the clause locks nothing after
+the truncation point. Pin such a line **whole**, not to a prefix.
+
+**Why:** the two mechanisms fail in the same place and neither notices. The
+design rejected three ways to count *delivered days* (distinct calendar dates,
+`periods.length / 2`, a hard-coded 7), so the mutation table had seven rows and
+every one went red. But the hourly line's **middle clause** — `showing
+${periods.length} of the ${days * 24} hours requested` — was settled one level
+down, in the implementation plan's copy section: the *shown* count, which the
+display cap may have bounded, against the *asked* count. No design alternative
+existed for it, so no mutation row covered it; and the test contract asserted
+only as far as `…of hourly forecast; showing `. Swapping `periods.length` for
+`deliveredHours` there — rendering `showing 156 of the 168 hours requested` at
+`detail="standard"`, where 48 hours were actually shown — passed **all eight
+contracts** on a fully mutation-checked, live-verified branch. The wrong number
+is beside the right one in the same sentence, which is exactly the internally
+contradictory rendering [G11] exists for.
+
+The prefix assertion is what makes it invisible rather than merely uncovered: it
+reads as a lock on the line and is a lock on the line's opening. A plan that
+prescribes the sentence and a test that pins its first half look like belt and
+braces and are one belt.
+
+**Verify:** for every contract asserting a rendered line, check the assertion
+reaches the line's **end** — the closing `.*` or the final token — and not merely
+a distinctive prefix. Then, for each interpolated expression in that line, mutate
+it to the nearest in-scope variable of the same type and confirm a contract goes
+red. `${periods.length}` beside an in-scope `deliveredHours` is the shape.
+
+**Evidence:** 2026-09-02 (`d65ef25`, noaa-forecast-horizon-disclosure T2). Found
+by the orchestrator reading the returned test file against the implementation
+plan's copy section, **after** the subagent's seven-row mutation table had come
+back fully red and been reported as complete. Contracts 5 and 6 were tightened to
+pin the line whole (`showing 24 / 48 / 156 of the 168 hours requested`), and the
+new mutation then reddened exactly those two.
+
+**Second instance, 2026-09-02** (diff-review copilot F2 → triage `fix now`): the
+same shape one level lower — a lock that stops short on the *boundary* rather
+than on the *clause*. The hourly guard `deliveredHours < days * 24` had its
+`<` → `<=` mutation stay green, because no fixture sat on the equality: F-H is
+156 hours at `days` 6 and 7, F-H2 is 150 at `days` 7, all strictly off the
+boundary. The daily guard's boundary *was* covered (F-A, 7 daytime periods at
+`days` 7), so the two guards were locked asymmetrically and only the daily
+mutation went red. A `<=` regression would have rendered `showing 48 of the 144
+hours requested` over a response delivering all 144 — a false shortfall
+disclosure, [G11] again. Fixed by F-H3 (144 hours at `days` 6, all three detail
+levels, asserting no `*NOAA publishes ` and the *un*-reworded cap remedy); the
+`<=` mutation then reddened F-H3 and nothing else, which is the proof the older
+fixtures were degenerate along that axis. **The generalisation:** a comparison
+operator's mutation set needs a fixture *on* the boundary, not merely either
+side of it, and having one on one guard says nothing about its twin.
+
+**Status:** active. Related: [G32] (the rejected-alternative set — this entry is
+the gap *beside* it, for behaviour the design deliberately did not settle),
+[G45] (a mutation that cannot reach its layer; here it reaches the layer and no
+assertion looks at the bytes it changed), [G13] (a fixture that cannot
+discriminate — here the fixture can and the assertion does not), [G11] (a number
+contradicting the words beside it). Partly lintable — "a `toContain` on a
+rendered line that stops before the line's terminator" is a mechanical grep once
+the terminator convention is fixed; deciding which prefixes are deliberate is not.
 
 ---
 

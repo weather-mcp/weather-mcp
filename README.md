@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-2%2C933%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-2%2C942%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Three optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 2,933 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 2,942 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -70,7 +70,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 | Tool | What it does | Coverage |
 |------|-------------|----------|
-| `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name; sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac, optional five-model agreement comparison | 🌍 Global |
+| `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name (NOAA publishes 7 days daily and ~6.5 days hourly in the US, and says so when you ask for more; `source="openmeteo"` reaches the full range); sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac, optional five-model agreement comparison | 🌍 Global |
 | `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional NOAA fire-weather indices), Open-Meteo model data elsewhere (with an optional computed Fosberg fire-weather index), or real airport station observations worldwide with `source="metar"`. Always states the observation's age, and automatically falls back to a fresher nearby station when the nearest one has gone dark. In extreme conditions automatically adds frostbite time-to-onset (computed wind chill) or heat-stress context (estimated WBGT) | 🌍 Global |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity; official national warnings for the US (NOAA), Canada (ECCC), 38 European countries (MeteoAlarm), India (NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG) | 🇺🇸 🇨🇦 🇪🇺 🇮🇳 🇵🇭 🇮🇩 |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
@@ -349,7 +349,7 @@ Being honest about what free public data can and can't do:
 
 | Capability | Global | US-only |
 |-----------|--------|---------|
-| Forecasts (up to 16 days) | ✅ | Richer detail via NOAA |
+| Forecasts (up to 16 days) | ✅ | Richer detail via NOAA, but NOAA publishes only 7 days daily / ~6.5 days hourly — a longer request is disclosed, not silently truncated |
 | Historical weather (1940+) | ✅ (>7 days old) | Station-level detail for last 7 days |
 | Air quality, marine, radar, lightning | ✅ | — |
 | Current conditions | ✅ (model data, or real station observations via `source="metar"`) | Station observations via NOAA (richer detail) |
@@ -378,7 +378,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 2,933 tests
+npm test               # Run all 2,942 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```
