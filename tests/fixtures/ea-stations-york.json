@@ -1,0 +1,296 @@
+{
+  "@context": "http://environment.data.gov.uk/flood-monitoring/meta/context.jsonld",
+  "meta": {
+    "publisher": "Environment Agency",
+    "licence": "http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+    "documentation": "http://environment.data.gov.uk/flood-monitoring/doc/reference",
+    "version": "0.9",
+    "comment": "Status: Beta service",
+    "hasFormat": [
+      "http://environment.data.gov.uk/flood-monitoring/id/stations.csv?lat=53.96&long=-1.08&dist=25&parameter=level",
+      "http://environment.data.gov.uk/flood-monitoring/id/stations.rdf?lat=53.96&long=-1.08&dist=25&parameter=level",
+      "http://environment.data.gov.uk/flood-monitoring/id/stations.ttl?lat=53.96&long=-1.08&dist=25&parameter=level",
+      "http://environment.data.gov.uk/flood-monitoring/id/stations.html?lat=53.96&long=-1.08&dist=25&parameter=level"
+    ]
+  },
+  "items": [
+    {
+      "@id": "http://environment.data.gov.uk/flood-monitoring/id/stations/F2102",
+      "RLOIid": "8186",
+      "catchmentName": "Swale, Ure, Nidd and Upper Ouse",
+      "dateOpened": "1979-05-01",
+      "easting": 448200,
+      "label": "Skip Bridge",
+      "lat": 53.998678,
+      "long": -1.266199,
+      "measures": [
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/F2102-level-stage-i-15_min----",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Stage",
+          "unitName": "---"
+        },
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/F2102-level-stage-i-15_min-m",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Stage",
+          "unitName": "m"
+        }
+      ],
+      "northing": 456100,
+      "notation": "F2102",
+      "riverName": "River Nidd",
+      "stageScale": "http://environment.data.gov.uk/flood-monitoring/id/stations/F2102/stageScale",
+      "stationReference": "F2102",
+      "status": "http://environment.data.gov.uk/flood-monitoring/def/core/statusActive",
+      "town": "Kirk Hammerton",
+      "wiskiID": "F2102"
+    },
+    {
+      "@id": "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402",
+      "RLOIid": "8145",
+      "catchmentName": "Wharfe and Lower Ouse",
+      "dateOpened": "1991-11-06",
+      "downstageScale": "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402/downstageScale",
+      "easting": 459400,
+      "label": "Naburn Lock",
+      "lat": 53.89327,
+      "long": -1.097619,
+      "measures": [
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-downstage-i-15_min----",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Downstream Stage",
+          "unitName": "---"
+        },
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-downstage-i-15_min-m",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Downstream Stage",
+          "unitName": "m"
+        },
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-downstage-i-15_min-mAOD",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Downstream Stage",
+          "unitName": "mAOD"
+        },
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-stage-i-15_min----",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Stage",
+          "unitName": "---"
+        },
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-stage-i-15_min-m",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Stage",
+          "unitName": "m"
+        }
+      ],
+      "northing": 444500,
+      "notation": "L2402",
+      "riverName": "River Ouse",
+      "stageScale": "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402/stageScale",
+      "stationReference": "L2402",
+      "status": "http://environment.data.gov.uk/flood-monitoring/def/core/statusActive",
+      "town": "Naburn",
+      "wiskiID": "L2402"
+    },
+    {
+      "@id": "http://environment.data.gov.uk/flood-monitoring/id/stations/L2404",
+      "RLOIid": "8081",
+      "catchmentName": "Swale, Ure, Nidd and Upper Ouse",
+      "dateOpened": "1996-03-31",
+      "easting": 460574,
+      "gridReference": "SE6057451084",
+      "label": "York Foss Barrier",
+      "lat": 53.952302,
+      "long": -1.078455,
+      "measures": [
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2404-level-stage-i-15_min-mAOD",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Stage",
+          "unitName": "mAOD"
+        }
+      ],
+      "northing": 451084,
+      "notation": "L2404",
+      "riverName": "River Ouse",
+      "stageScale": "http://environment.data.gov.uk/flood-monitoring/id/stations/L2404/stageScale",
+      "stationReference": "L2404",
+      "status": "http://environment.data.gov.uk/flood-monitoring/def/core/statusActive",
+      "town": "York",
+      "wiskiID": "L2404"
+    },
+    {
+      "@id": "http://environment.data.gov.uk/flood-monitoring/id/stations/F2302",
+      "RLOIid": "8059",
+      "catchmentName": "Swale, Ure, Nidd and Upper Ouse",
+      "dateOpened": "1980-05-29",
+      "easting": 442500,
+      "label": "Crakehill",
+      "lat": 54.153752,
+      "long": -1.350739,
+      "measures": [
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/F2302-level-stage-i-15_min----",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Stage",
+          "unitName": "---"
+        },
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/F2302-level-stage-i-15_min-m",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Stage",
+          "unitName": "m"
+        }
+      ],
+      "northing": 473300,
+      "notation": "F2302",
+      "riverName": "River Swale",
+      "stageScale": "http://environment.data.gov.uk/flood-monitoring/id/stations/F2302/stageScale",
+      "stationReference": "F2302",
+      "status": "http://environment.data.gov.uk/flood-monitoring/def/core/statusActive",
+      "town": "Cundall",
+      "wiskiID": "F2302"
+    },
+    {
+      "@id": "http://environment.data.gov.uk/flood-monitoring/id/stations/L2412",
+      "easting": 462754,
+      "gridReference": "SE6275434481",
+      "label": "Selby Wistow Sluices",
+      "lat": 53.802839,
+      "long": -1.048633,
+      "measures": [
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2412-level-stage-i-15_min-mAOD",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Stage",
+          "unitName": "mAOD"
+        }
+      ],
+      "northing": 434481,
+      "notation": "L2412",
+      "stationReference": "L2412"
+    },
+    {
+      "@id": "http://environment.data.gov.uk/flood-monitoring/id/stations/L2400",
+      "easting": 468067,
+      "gridReference": "SE6806728629",
+      "label": "Barmby",
+      "lat": 53.749583,
+      "long": -0.969265,
+      "measures": [
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2400-level-downstage-i-15_min-mAOD",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Downstream Stage",
+          "unitName": "mAOD"
+        }
+      ],
+      "northing": 428629,
+      "notation": "L2400",
+      "stationReference": "L2400"
+    },
+    {
+      "@id": "http://environment.data.gov.uk/flood-monitoring/id/stations/L2473",
+      "easting": 460996,
+      "gridReference": "SE6099651936",
+      "label": "York Foss Islands Penstocks",
+      "lat": 53.959909,
+      "long": -1.071856,
+      "measures": [
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2473-level-1-i-15_min-mAOD",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "1",
+          "unitName": "mAOD"
+        },
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2473-level-2-i-15_min-mAOD",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "2",
+          "unitName": "mAOD"
+        },
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2473-level-3-i-15_min-mAOD",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "3",
+          "unitName": "mAOD"
+        },
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2473-level-4-i-15_min-mAOD",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "4",
+          "unitName": "mAOD"
+        }
+      ],
+      "northing": 451936,
+      "notation": "L2473",
+      "stationReference": "L2473"
+    },
+    {
+      "@id": "http://environment.data.gov.uk/flood-monitoring/id/stations/L2809B",
+      "easting": 479093,
+      "gridReference": "SE7909371425",
+      "label": "Norton Mill Beck PS",
+      "lat": 54.132582,
+      "long": -0.791032,
+      "measures": [
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2809B-level-downstage-i-15_min-m",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Downstream Stage",
+          "unitName": "m"
+        },
+        {
+          "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/L2809B-level-stage-i-15_min-m",
+          "parameter": "level",
+          "parameterName": "Water Level",
+          "period": 900,
+          "qualifier": "Stage",
+          "unitName": "m"
+        }
+      ],
+      "northing": 471425,
+      "notation": "L2809B",
+      "stationReference": "L2809B"
+    }
+  ]
+}

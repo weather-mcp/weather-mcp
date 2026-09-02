@@ -1,0 +1,175 @@
+{ 
+  "@context" : "http://environment.data.gov.uk/flood-monitoring/meta/context.jsonld" ,
+  "meta" : { 
+    "publisher" : "Environment Agency" ,
+    "licence" : "http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" ,
+    "documentation" : "http://environment.data.gov.uk/flood-monitoring/doc/reference" ,
+    "version" : "0.9" ,
+    "comment" : "Status: Beta service" ,
+    "hasFormat" : [ "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402.rdf?_view=full", "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402.ttl?_view=full", "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402.html?_view=full" ]
+  }
+   ,
+  "items" : { 
+    "@id" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402" ,
+    "RLOIid" : "8145" ,
+    "catchmentName" : "Wharfe and Lower Ouse" ,
+    "dateOpened" : "1991-11-06" ,
+    "downstageScale" : { 
+      "@id" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402/downstageScale" ,
+      "datum" : -0.477 ,
+      "highestRecent" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402/downstageScale/highestRecent" ,
+      "maxOnRecord" : { 
+        "@id" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402/downstageScale/maxOnRecord" ,
+        "dateTime" : "1999-01-07T07:30:00" ,
+        "value" : 9.677
+      }
+       ,
+      "minOnRecord" : { 
+        "@id" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402/downstageScale/minOnRecord" ,
+        "dateTime" : "1992-06-14T05:15:00" ,
+        "value" : 1.159
+      }
+       ,
+      "scaleMax" : 4.5 ,
+      "typicalRangeHigh" : 6.6 ,
+      "typicalRangeLow" : 2.6
+    }
+     ,
+    "eaAreaName" : "North East - Yorkshire" ,
+    "eaRegionName" : "North East" ,
+    "easting" : 459400 ,
+    "label" : "Naburn Lock" ,
+    "lat" : 53.89327 ,
+    "long" : -1.097619 ,
+    "measures" : [ { 
+      "@id" : "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-downstage-i-15_min----" ,
+      "label" : "Naburn - level-downstage-i-15_min----" ,
+      "latestReading" : "http://environment.data.gov.uk/flood-monitoring/data/readings/L2402-level-downstage-i-15_min----/2018-02-12T10-00-00Z" ,
+      "notation" : "L2402-level-downstage-i-15_min----" ,
+      "parameter" : "level" ,
+      "parameterName" : "Water Level" ,
+      "period" : 900 ,
+      "qualifier" : "Downstream Stage" ,
+      "station" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402" ,
+      "stationReference" : "L2402" ,
+      "type" : [ "http://environment.data.gov.uk/flood-monitoring/def/core/Measure", "http://environment.data.gov.uk/flood-monitoring/def/core/WaterLevel" ] ,
+      "unitName" : "---" ,
+      "valueType" : "instantaneous"
+    }
+    , { 
+      "@id" : "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-downstage-i-15_min-m" ,
+      "label" : "Naburn - level-downstage-i-15_min-m" ,
+      "latestReading" : "http://environment.data.gov.uk/flood-monitoring/data/readings/L2402-level-downstage-i-15_min-m/2023-06-13T10-15-00Z" ,
+      "notation" : "L2402-level-downstage-i-15_min-m" ,
+      "parameter" : "level" ,
+      "parameterName" : "Water Level" ,
+      "period" : 900 ,
+      "qualifier" : "Downstream Stage" ,
+      "station" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402" ,
+      "stationReference" : "L2402" ,
+      "type" : [ "http://environment.data.gov.uk/flood-monitoring/def/core/Measure", "http://environment.data.gov.uk/flood-monitoring/def/core/WaterLevel" ] ,
+      "unit" : "http://qudt.org/1.1/vocab/unit#Meter" ,
+      "unitName" : "m" ,
+      "valueType" : "instantaneous"
+    }
+    , { 
+      "@id" : "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-downstage-i-15_min-mAOD" ,
+      "datumType" : "http://environment.data.gov.uk/flood-monitoring/def/core/datumAOD" ,
+      "label" : "Naburn - level-downstage-i-15_min-mAOD" ,
+      "latestReading" : { 
+        "@id" : "http://environment.data.gov.uk/flood-monitoring/data/readings/L2402-level-downstage-i-15_min-mAOD/2026-09-02T19-15-00Z" ,
+        "date" : "2026-09-02" ,
+        "dateTime" : "2026-09-02T19:15:00Z" ,
+        "measure" : "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-downstage-i-15_min-mAOD" ,
+        "value" : 2.438
+      }
+       ,
+      "notation" : "L2402-level-downstage-i-15_min-mAOD" ,
+      "parameter" : "level" ,
+      "parameterName" : "Water Level" ,
+      "period" : 900 ,
+      "qualifier" : "Downstream Stage" ,
+      "station" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402" ,
+      "stationReference" : "L2402" ,
+      "type" : [ "http://environment.data.gov.uk/flood-monitoring/def/core/Measure", "http://environment.data.gov.uk/flood-monitoring/def/core/WaterLevel" ] ,
+      "unit" : "http://qudt.org/1.1/vocab/unit#Meter" ,
+      "unitName" : "mAOD" ,
+      "valueType" : "instantaneous"
+    }
+    , { 
+      "@id" : "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-stage-i-15_min----" ,
+      "label" : "Naburn - level-stage-i-15_min----" ,
+      "latestReading" : "http://environment.data.gov.uk/flood-monitoring/data/readings/L2402-level-stage-i-15_min----/2018-02-12T10-00-00Z" ,
+      "notation" : "L2402-level-stage-i-15_min----" ,
+      "parameter" : "level" ,
+      "parameterName" : "Water Level" ,
+      "period" : 900 ,
+      "qualifier" : "Stage" ,
+      "station" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402" ,
+      "stationReference" : "L2402" ,
+      "type" : [ "http://environment.data.gov.uk/flood-monitoring/def/core/Measure", "http://environment.data.gov.uk/flood-monitoring/def/core/WaterLevel" ] ,
+      "unitName" : "---" ,
+      "valueType" : "instantaneous"
+    }
+    , { 
+      "@id" : "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-stage-i-15_min-m" ,
+      "label" : "Naburn - level-stage-i-15_min-m" ,
+      "latestReading" : { 
+        "@id" : "http://environment.data.gov.uk/flood-monitoring/data/readings/L2402-level-stage-i-15_min-m/2026-09-02T19-15-00Z" ,
+        "date" : "2026-09-02" ,
+        "dateTime" : "2026-09-02T19:15:00Z" ,
+        "measure" : "http://environment.data.gov.uk/flood-monitoring/id/measures/L2402-level-stage-i-15_min-m" ,
+        "value" : 0.562
+      }
+       ,
+      "notation" : "L2402-level-stage-i-15_min-m" ,
+      "parameter" : "level" ,
+      "parameterName" : "Water Level" ,
+      "period" : 900 ,
+      "qualifier" : "Stage" ,
+      "station" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402" ,
+      "stationReference" : "L2402" ,
+      "type" : [ "http://environment.data.gov.uk/flood-monitoring/def/core/Measure", "http://environment.data.gov.uk/flood-monitoring/def/core/WaterLevel" ] ,
+      "unit" : "http://qudt.org/1.1/vocab/unit#Meter" ,
+      "unitName" : "m" ,
+      "valueType" : "instantaneous"
+    }
+     ] ,
+    "northing" : 444500 ,
+    "notation" : "L2402" ,
+    "riverName" : "River Ouse" ,
+    "stageScale" : { 
+      "@id" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402/stageScale" ,
+      "datum" : 4.621 ,
+      "highestRecent" : { 
+        "@id" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402/stageScale/highestRecent" ,
+        "dateTime" : "2013-05-18T08:45:00" ,
+        "value" : 0.711
+      }
+       ,
+      "maxOnRecord" : { 
+        "@id" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402/stageScale/maxOnRecord" ,
+        "dateTime" : "2012-09-27T04:00:00" ,
+        "value" : 4.197
+      }
+       ,
+      "minOnRecord" : { 
+        "@id" : "http://environment.data.gov.uk/flood-monitoring/id/stations/L2402/stageScale/minOnRecord" ,
+        "dateTime" : "2001-08-01T04:45:00" ,
+        "value" : 0.235
+      }
+       ,
+      "scaleMax" : 4.5 ,
+      "typicalRangeHigh" : 2.247 ,
+      "typicalRangeLow" : 0.417
+    }
+     ,
+    "stationReference" : "L2402" ,
+    "status" : "http://environment.data.gov.uk/flood-monitoring/def/core/statusActive" ,
+    "statusDate" : "2020-03-19T14:56:00" ,
+    "town" : "Naburn" ,
+    "type" : [ "http://environment.data.gov.uk/flood-monitoring/def/core/MultiTraceLevel", "http://environment.data.gov.uk/flood-monitoring/def/core/Station" ] ,
+    "wiskiID" : "L2402"
+  }
+}
+
