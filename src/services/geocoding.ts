@@ -46,8 +46,8 @@ export interface GeocodingResult {
   admin1?: string;  // State/region
   admin2?: string;  // County/district
   timezone?: string;
-  elevation?: number;
-  population?: number;
+  elevation?: number | null;
+  population?: number | null;
   feature_code?: string;
   confidence: 'high' | 'medium' | 'low';
   source: 'census' | 'nominatim' | 'openmeteo';
