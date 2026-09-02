@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-2%2C942%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-3%2C011%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Three optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 2,942 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 3,011 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -80,7 +80,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_marine_conditions` | Wave height, swell, ocean currents, sea state on WMO Code Table 3700 (Douglas sea scale) with a severity marker and legend — includes Great Lakes and major US bays; forecast up to 16 days | 🌍 Global |
 | `get_weather_imagery` | Precipitation radar (static or 2-hour animated loops) + GOES satellite imagery; `composite: true` returns a finished radar map over a base map as an image | 🌍 Global |
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
-| `get_river_conditions` | US: NWPS gauge levels, flood stages, streamflow, rise/fall trends, forecast series. Elsewhere: GloFAS modeled discharge snapped to the nearest river channel, with ensemble forecast | 🌍 Global |
+| `get_river_conditions` | US: NWPS gauge levels, flood stages, streamflow, rise/fall trends, forecast series. Great Britain: Environment Agency observed river levels against each gauge's published typical range. Elsewhere: GloFAS modeled discharge snapped to the nearest river channel, with ensemble forecast | 🌍 Global |
 | `get_wildfire_info` | US: named incidents with containment, size, and safety guidance from the nearest *uncontained* fire. Elsewhere: NASA FIRMS satellite heat detections (VIIRS, near real-time), clustered with distance, bearing, and intensity | 🌍 Global |
 | `check_service_status` | Health checks for all upstream APIs plus cache statistics | — |
 | `save_location` | Save places as aliases ("home", "cabin") with optional activity tags | — |
@@ -120,6 +120,7 @@ All free, all public, no authentication required:
 | [NOAA Weather API](https://www.weather.gov/documentation/services-web-api) | US forecasts, current conditions, alerts, fire weather | US |
 | [Open-Meteo](https://open-meteo.com/) | Global forecasts, historical data (1940+), air quality, marine, geocoding, climate normals, fire-weather inputs | Global |
 | [NOAA NWPS](https://water.noaa.gov/) | River levels, streamflow, flood stages | US |
+| [Environment Agency](https://environment.data.gov.uk/flood-monitoring/doc/reference) | Observed river levels from the real-time gauge network, with published typical ranges — Open Government Licence v3 | Great Britain |
 | [RCC ACIS](https://www.rcc-acis.org/) | Daily record high/low temperatures | US |
 | [EUMETNET MeteoAlarm](https://meteoalarm.org/) | Official national weather warnings (38 European countries) | Europe |
 | [MSC GeoMet](https://api.weather.gc.ca/) | Environment and Climate Change Canada weather alerts | Canada |
@@ -250,7 +251,7 @@ Or per call — the AI can honor "in Celsius" on the fly:
 { "latitude": 47.6, "longitude": -122.3, "wind_speed_unit": "kn", "pressure_unit": "hPa" }
 ```
 
-Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weather`. Wind accepts `mph`/`kmh`/`ms`/`kn`; pressure `inHg`/`hPa`. Domain-specialized readings (fire-weather heights, river gauge stage, and the marine tool's dual-unit wave output) keep their conventional units.
+Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weather`. Wind accepts `mph`/`kmh`/`ms`/`kn`; pressure `inHg`/`hPa`. Domain-specialized readings (fire-weather heights, NWPS river gauge stage, and the marine tool's dual-unit wave output) keep their conventional units — NWPS stage is always feet. The Environment Agency river level is the exception: it is published in metres and follows the distance preference, so it renders in metres under `km` and feet under `mi`.
 
 ### Other settings
 
@@ -354,7 +355,7 @@ Being honest about what free public data can and can't do:
 | Air quality, marine, radar, lightning | ✅ | — |
 | Current conditions | ✅ (model data, or real station observations via `source="metar"`) | Station observations via NOAA (richer detail) |
 | Weather alerts | ✅ US, Canada, 38 European countries, India, the Philippines, and Indonesia keyless; ~45+ more territories with an optional key | NWS zone-level precision; Europe and India country-level; Philippines and Indonesia polygon-level |
-| River conditions | ✅ (GloFAS modeled discharge) | Gauge observations + official flood stages via NWPS |
+| River conditions | ✅ (GloFAS modeled discharge; Environment Agency gauge observations in Great Britain) | Gauge observations + official flood stages via NWPS |
 | Wildfires | ✅ (FIRMS satellite detections) | Named incidents with acreage + containment via NIFC |
 | Fire weather | ✅ (computed Fosberg index + dryness context) | NOAA-published Haines, grassland, red-flag indices |
 | Pollen | 🇪🇺 Europe keyless (CAMS, grains/m³); elsewhere needs an optional key | Universal Pollen Index with `GOOGLE_POLLEN_API_KEY` |
@@ -378,7 +379,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 2,942 tests
+npm test               # Run all 3,011 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

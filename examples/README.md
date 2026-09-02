@@ -12,7 +12,7 @@ Each file in this folder is a realistic session: a user prompt, the answer **Cla
 | [A hazardous-weather day](./severe-weather-day.md) | Oklahoma City | One-call weather summary, full alert text (`detail: "full"`), animated radar |
 | [A day on the water](./boating-and-marine.md) | Sydney | Marine forecast (waves, swell, currents), real-time lightning detection, metric units |
 | [Traveling abroad](./international-travel.md) | Paris | Real airport station observations anywhere on earth (`source: "metar"`), European pollen levels |
-| [River levels, two ways](./river-and-flood.md) | Memphis + Manaus | US flood-stage gauges vs. global modeled river discharge — same tool, honest about the difference |
+| [River levels, three ways](./river-and-flood.md) | Memphis + Manaus + York | US flood-stage gauges vs. Environment Agency observed levels in Great Britain vs. global modeled discharge — same tool, honest about the difference |
 | [Wildfire season check-in](./wildfire-awareness.md) | Denver + Athens | US named incidents (containment, distance) vs. global satellite hotspots — plus NOAA's published fire indices vs. a server-computed Fosberg index, each labeled for what it is |
 | [Reaching into the past](./historical-climate.md) | Berlin 1945 + Chicago | Historical archive back to 1940, climate normals & US record high/low for the date |
 | [Saving your places](./saved-locations-workflow.md) | Lake Tahoe | Save a location once ("cabin"), then ask about it by name |
@@ -34,7 +34,7 @@ All 17 tools appear across these examples:
 | `get_marine_conditions` | [boating](./boating-and-marine.md) |
 | `get_weather_imagery` | [trip planning](./weekend-trip-planning.md) (with snapshot), [severe weather](./severe-weather-day.md) |
 | `get_lightning_activity` | [boating](./boating-and-marine.md) |
-| `get_river_conditions` | [rivers & flood](./river-and-flood.md) (both US and global paths) |
+| `get_river_conditions` | [rivers & flood](./river-and-flood.md) (US, Great Britain and global paths) |
 | `get_wildfire_info` | [wildfire](./wildfire-awareness.md) (both the NIFC and FIRMS paths) |
 | `save_location`, `list_saved_locations`, `get_saved_location`, `remove_saved_location` | [saved locations](./saved-locations-workflow.md) |
 
@@ -57,11 +57,11 @@ check_service_status({})
 ````markdown
 # Weather API Service Status
 
-**Check Time:** 8/27/2026, 5:50:35 PM
+**Check Time:** 9/2/2026, 5:05:37 PM
 
 ## Server Version
 
-**Installed Version:** 1.25.6
+**Installed Version:** 1.25.18
 **Latest Release:** https://github.com/weather-mcp/weather-mcp/releases/latest
 **Changelog:** https://github.com/weather-mcp/weather-mcp/blob/main/CHANGELOG.md
 **Upgrade Instructions:** See README.md "Upgrading to Latest Version" section
@@ -125,5 +125,5 @@ npm run build && npm run examples
 **About imagery links:** the radar URLs inside captured output expire — RainViewer retains only ~2 hours of frames — and a tile over dry skies renders blank, since radar tiles are transparent precipitation overlays. So the imagery examples also commit a PNG snapshot (`images/`): the capture script downloads the radar tile and composites it onto an OpenStreetMap base layer (four z+1 tiles stitched, pure-JS via the `pngjs` devDependency) so the echoes have geography under them, and warns if the overlay looks echo-free so a rain-free snapshot never ships unnoticed. Verify the image visually after regenerating. Committed snapshots carry attribution: radar © RainViewer, base map © OpenStreetMap contributors. The server output itself now includes an **interactive map** link (RainViewer live map / NASA Worldview) for the layered, animated browser view.
 
 <!-- capture-stamp -->
-*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

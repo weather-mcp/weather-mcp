@@ -340,27 +340,29 @@ get_current_conditions({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KMDW
-**Time:** Aug 27, 2026, 4:30 PM (20 minutes ago)
+**Time:** Sep 2, 2026, 3:45 PM (20 minutes ago)
 
 **Conditions:** Partly Cloudy
-**Temperature:** 79°F
-**Dewpoint:** 61°F
-**Humidity:** 54%
-**Wind:** 10 mph from 80°
-**Pressure:** 30.01 inHg
+**Temperature:** 95°F
+**Feels Like (Heat Index):** 103°F
+🥵 **Heat stress (Extreme):** estimated WBGT 93°F — outdoor exertion is dangerous; rest often, hydrate, and seek shade. *Estimated from temperature and humidity assuming full sun; thresholds vary with acclimatization.*
+**Dewpoint:** 72°F
+**Humidity:** 47%
+**Wind:** 13 mph from 230°
+**Pressure:** 29.91 inHg
 **Visibility:** 10.0 miles (clear)
-**Cloud Cover:** Scattered clouds at 5000ft, Scattered clouds at 8000ft
+**Cloud Cover:** Scattered clouds at 10000ft
 
 ## 📊 Climate Context
 
-**Normal High:** 82°F
-**Normal Low:** 66°F
-**Normal Precipitation:** 0.12 in
+**Normal High:** 81°F
+**Normal Low:** 64°F
+**Normal Precipitation:** 0.1 in
 
 *Climate normals based on 1991-2020 data*
 *Source: NCEI*
 
-**Records for Aug 27:** High 99°F (2024) · Low 51°F (1968) — records since 1928
+**Records for Sep 2:** High 101°F (1953) · Low 44°F (1946) — records since 1928
 Records: NOAA Regional Climate Centers (ACIS)
 
 ---
@@ -375,5 +377,5 @@ Records: NOAA Regional Climate Centers (ACIS)
 **Features shown:** `get_historical_weather` — any date range back to 1940, anywhere (Open-Meteo archive) · `include_normals` — 30-year normal high/low with departure from normal, plus the US record high/low for the date and the year it was set (NOAA Regional Climate Centers).
 
 <!-- capture-stamp -->
-*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

@@ -142,6 +142,11 @@ const EXAMPLES = [
         tool: 'get_river_conditions',
         args: { latitude: -3.119, longitude: -60.0217, forecast_days: 10 },
       },
+      {
+        id: 'york-ea-gauges',
+        tool: 'get_river_conditions',
+        args: { latitude: 53.96, longitude: -1.08 },
+      },
     ],
   },
   {

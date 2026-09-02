@@ -153,7 +153,7 @@ list_saved_locations({})
 **Country:** US
 **Region:** California
 **Activities:** boating, fishing, hiking
-**Saved:** 8/27/2026
+**Saved:** 9/2/2026
 
 ---
 
@@ -202,36 +202,36 @@ get_forecast({
 **Showing:** 4 periods
 
 ## This Afternoon
-**Temperature:** 74°F
-**Precipitation Chance:** 5%
-**Wind:** 10 mph W
-**Forecast:** Partly Sunny
+**Temperature:** 56°F
+**Precipitation Chance:** 7%
+**Wind:** 15 mph SW
+**Forecast:** Mostly Sunny
 
-Partly sunny, with a high near 74. West wind around 10 mph, with gusts as high as 20 mph.
+Mostly sunny, with a high near 56. Southwest wind around 15 mph, with gusts as high as 30 mph.
 
 ## Tonight
-**Temperature:** 55°F
-**Precipitation Chance:** 61%
-**Wind:** 0 to 10 mph SW
-**Forecast:** Mostly Cloudy then Rain Showers Likely
+**Temperature:** 43°F
+**Precipitation Chance:** 7%
+**Wind:** 10 to 15 mph SW
+**Forecast:** Partly Cloudy
 
-Rain showers likely after 2am. Mostly cloudy, with a low around 55. Southwest wind 0 to 10 mph, with gusts as high as 20 mph. Chance of precipitation is 60%.
+Partly cloudy, with a low around 43. Southwest wind 10 to 15 mph, with gusts as high as 25 mph.
 
-## Friday
-**Temperature:** 63°F
-**Precipitation Chance:** 74%
-**Wind:** 0 to 5 mph SW
+## Thursday
+**Temperature:** 56°F
+**Precipitation Chance:** 47%
+**Wind:** 10 to 15 mph SW
+**Forecast:** Mostly Sunny then Chance Rain Showers
+
+A chance of rain showers after 2pm. Mostly sunny, with a high near 56. Southwest wind 10 to 15 mph, with gusts as high as 30 mph. Chance of precipitation is 50%.
+
+## Thursday Night
+**Temperature:** 44°F
+**Precipitation Chance:** 56%
+**Wind:** 10 to 20 mph SW
 **Forecast:** Rain Showers Likely
 
-Rain showers likely before 2pm, then showers and thunderstorms likely. Mostly cloudy, with a high near 63. Southwest wind 0 to 5 mph. Chance of precipitation is 70%.
-
-## Friday Night
-**Temperature:** 51°F
-**Precipitation Chance:** 50%
-**Wind:** 5 mph SW
-**Forecast:** Chance Rain Showers then Partly Cloudy
-
-A chance of rain showers before 8pm. Partly cloudy, with a low around 51. Southwest wind around 5 mph. Chance of precipitation is 50%.
+Rain showers likely. Mostly cloudy, with a low around 44. Southwest wind 10 to 20 mph, with gusts as high as 40 mph. Chance of precipitation is 60%.
 
 ---
 *Data source: NOAA National Weather Service (US)*
@@ -265,7 +265,7 @@ get_saved_location({
 **Region:** California
 **County:** Placer County
 **Activities:** boating, fishing, hiking
-**Saved:** 8/27/2026, 5:50:21 PM
+**Saved:** 9/2/2026, 5:05:23 PM
 
 ---
 
@@ -318,5 +318,5 @@ Use `save_location` to save new locations.
 *The activities you save travel with the location — ask "can we fish at the cabin Saturday?" and the assistant knows what and where "the cabin" is.*
 
 <!-- capture-stamp -->
-*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->
