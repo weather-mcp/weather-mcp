@@ -3560,6 +3560,58 @@ rather than contradicts.
 
 ---
 
+## G70 — A mock applied to the wrong seam is inert, so the test silently becomes a live-network test that passes while the network is fast
+
+**Trigger:** `vi.spyOn(service as any, '<privateMethod>')` where the method under
+test reaches the network by some *other* route — `this.client.get`, a second
+axios instance, a module-level helper — rather than through the mocked one.
+
+**Rule:** mock the seam the method under test actually calls, and make the mock
+supply the shape that method **inspects**, not the shape a neighbouring method
+returns. Confirm by mutation: break the branch the test names and check it goes
+red. A status test that cannot go red when the status flips is testing the
+network, not the code.
+
+**Why:** an inert mock fails open. Nothing errors, nothing warns, the spy
+records zero calls that nobody asserts on, and the real request underneath
+usually succeeds — so the test is green for years. What it is actually
+measuring is round-trip latency against the test timeout, so it converts into
+an intermittent failure the first time the network, the machine, or a parallel
+suite is slow, and the failure message names the timeout rather than the mock.
+The wrong-seam mock also means the branch the test claims to cover has never
+been executed once.
+
+The tell is a `vi.spyOn` on a private method whose name does not appear in the
+method under test. Grep it before trusting the mock.
+
+**Verify:** for each `vi.spyOn(x as any, 'm')`, grep the method under test for
+`m`; if it does not call it, the mock is inert. **Match the generic form** —
+these methods are called as `this.makeRequest<T>(...)`, so a `this\.m\(`
+pattern reports zero call sites for a method with five, and the sweep looks
+alarming for the wrong reason. Use `this\.m[<(]`. Run 2026-09-02 across
+`tests/`: the four spied methods (`makeRequest`, `makeRequestToEnsemble`,
+`makeRequestToFlood`, `makeRequestToForecast`) all have real call sites, and
+all three `checkServiceStatus` tests now mock `client.get` — **no inert mocks
+remain.** Mechanically checkable, so a strong lint candidate.
+
+**Evidence:** 2026-09-02 (`f9f6771`). Two tests in
+`tests/integration/error-recovery.test.ts` mocked `makeRequest` while
+`OpenMeteoService.checkServiceStatus` calls `this.client.get('/archive', …)`
+directly, so both made a real archive-API call inside a 5-second test timeout.
+They failed identically on `main` and on the feature branch while the live API
+was demonstrably healthy — HTTP 200 in ~0.45 s on three consecutive probes, and
+`checkServiceStatus()` itself returning `operational: true` in 474 ms. **The
+answer was already written in the file:** the passing sibling test sitting
+between the two failures carried the comment *"Mock the client.get method (not
+makeRequest) since checkServiceStatus uses it directly"* — someone hit this
+once, fixed the one test in front of them, and left its neighbours alone.
+
+**Status:** active. Lint candidate (see Verify). Related: [G45] (the mutation
+check that exposes it), [G21] (the other way a mock is not the thing you think
+it is), and the project's determinism rule — anything mockable is mocked.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
