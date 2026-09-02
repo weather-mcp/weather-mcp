@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A null Open-Meteo scalar no longer renders as a fabricated value. A null US AQI no longer prints `US Air Quality Index: 0 (Good)` (the European index renders instead), a null aerosol optical depth no longer fails the whole `get_air_quality` call, a null ammonia or marine peak period no longer prints `N/A`, a null elevation in `search_location` no longer prints `nullm (0ft)`, and a null dewpoint or pressure no longer prints `0`. Each line is omitted instead. The Open-Meteo `current.*` and geocoding scalar types now declare `number | null` as the wire sends it, so the compiler enumerates these guard sites rather than certifying their absence.
+
 ## [1.25.16] - 2026-09-01
 
 ### Fixed
