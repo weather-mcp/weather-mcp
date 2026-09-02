@@ -3367,6 +3367,66 @@ the terminator convention is fixed; deciding which prefixes are deliberate is no
 
 ---
 
+## G66 — `npm audit fix` reports "fix available" and then changes nothing, because the fixed version is inside npm's `min-release-age` cooldown
+
+**Trigger:** clearing an `npm audit` advisory during a release pre-flight — most
+sharply when a diff-triage deferred one here with "try `npm audit fix`, confirm
+the lockfile change, land it as `chore:`".
+
+**Rule:** `npm audit fix` making **no change to `package-lock.json`** is not
+evidence that no fix exists. Before concluding anything, read the fixed version's
+publish date against the cooldown:
+
+```bash
+npm config get min-release-age          # 7 on this machine
+npm view <pkg> time | tail -3           # when the patched version was published
+```
+
+A patched version younger than that window is invisible to resolution, so `npm
+audit fix` runs, prints the same advisory it started with, exits 1, and leaves the
+tree byte-identical. Nothing in its output mentions the cooldown. **Record the
+advisory as accepted with the date the cooldown clears** and take the bump in a
+later `chore:` commit; do **not** reach for `--min-release-age=0`, which switches
+off the guard that exists to catch a freshly published compromised package — the
+exact risk profile of a package three days old.
+
+**Why:** observed cutting v1.25.18 on 2026-09-02. `npm audit` reported one
+moderate in `qs` 6.15.3 (GHSA-x5fp-wj9c-mxmx, GHSA-4mjr-xmp4-gh2g) reached as
+`@modelcontextprotocol/sdk` → `express@5.2.1` → `body-parser@2.3.0`, and said
+`fix available via npm audit fix`. The fix genuinely existed and genuinely
+satisfied every range in the chain — `express` wants `qs ^6.14.0`, `body-parser`
+wants `^6.15.2`, and `qs@6.16.0` satisfies both — but it was published
+2026-08-29T23:50Z, 3.5 days before the release, against `min-release-age = 7`.
+`npm audit fix --package-lock-only` therefore produced an empty `git diff
+package-lock.json`. The failure reads exactly like an unfixable transitive pin,
+which invites the two wrong reactions: forcing a resolution override into
+`package.json`, or forcing the cooldown off.
+
+This is the same shape as the retired [G55]'s disproven half, and the distinction
+is the point: `min-release-age` gates **install and pack resolution, not `view`**.
+`npm view qs versions` lists 6.16.0 while `npm audit fix` will not install it, so
+the registry read and the resolver disagree by design, and a session that checks
+only one of them concludes the wrong thing. [G51]-family — a filtered read
+reported as an absence — except that here it is a filtered *resolution* reported
+as "no fix possible".
+
+The second half of the rule is the one that matters at release time: an advisory
+knowingly carried needs a **written disposition in the release notes**, not a note
+in a terminal. v1.25.18 carries a `### Security` bullet naming the advisory, the
+dependency path, why it is unreachable (the server constructs
+`StdioServerTransport` and nothing under `src/` imports express, so `qs` is never
+loaded), and the date the bump becomes possible. Reachability is checked, not
+asserted: `grep -rn 'StreamableHTTP\|express\|SSEServerTransport' src/` returning
+only prose hits is the evidence.
+
+**Verify:** whenever `npm audit fix` leaves the lockfile unchanged, print
+`npm config get min-release-age` and the patched version's publish time in the
+same breath. If the gap explains it, the disposition is "accepted until
+<date>" in the release notes plus a follow-up `chore:` — not a resolution
+override, and not silence.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
