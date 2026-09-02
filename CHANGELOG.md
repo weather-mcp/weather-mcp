@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-09-02
+
 ### Added
 
 - **`get_river_conditions` now answers Great Britain with observed river levels instead of modeled discharge.** A British caller previously got GloFAS v4 output — cubic metres per second on a ~5 km model grid, under an explicit caveat that it is *"not gauge observations"*. That is the honest best answer for most of the world and the wrong one here, because the Environment Agency publishes **observed 15-minute river levels** from a dense real gauge network, keyless, under the Open Government Licence v3. `source: "auto"` now routes Great Britain to that network, and a new `source: "ea"` forces it anywhere. NWPS and GloFAS output is **byte-identical** to before (verified base-versus-branch, both unit systems, back-to-back).
@@ -1649,7 +1651,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.18...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.26.0...HEAD
+[1.26.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.18...v1.26.0
 [1.25.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.17...v1.25.18
 [1.25.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.16...v1.25.17
 [1.25.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.15...v1.25.16
