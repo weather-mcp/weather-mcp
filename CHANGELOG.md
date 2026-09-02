@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **A high-severity advisory that appeared after v1.25.18 shipped is cleared, without disabling the cooldown guard.** `npm audit` began reporting `fast-uri` 3.1.5 as **high** — GHSA-5jgf-p345-68v8 (host confusion via skipped IDN canonicalization on scheme-relative references), GHSA-f65p-4m7j-42xc and GHSA-fph4-wmhf-6fwf (server-side request forgery via malformed IPv6 normalization and via repeated hostname percent-decoding), and GHSA-jqff-g426-hqxp (host confusion via percent-encoded scheme normalization) — reached as `@modelcontextprotocol/sdk` → `ajv` → `fast-uri`. This project's release gate is "no high or critical vulnerabilities", so the gate was red on `main` until this commit. **`fast-uri` is pinned to 3.1.6 through an `overrides` entry**, which is the first exact pin this package has carried. 3.1.6 was published on 2026-08-23, is ten days clear of npm's seven-day `min-release-age`, and sits outside the vulnerable range `3.0.0 - 3.1.5` — so the advisory clears today rather than waiting on 3.1.7, which was published on 2026-09-02 and which the cooldown declines until 2026-09-09. Taking 3.1.7 would have meant either waiting a week with a high open or switching off the guard that exists to catch the freshly-published-and-compromised case; pinning the older patched release needs neither. `npm ci` from the committed lockfile resolves 3.1.6, so the published build gets the fix. The one moderate `qs` advisory v1.25.18 documented is **unchanged and still carried**: `qs` 6.16.0 clears its own cooldown on 2026-09-05 and remains due as a separate `chore:` bump. (`package.json`, `package-lock.json`)
+
 ## [1.25.18] - 2026-09-02
 
 ### Fixed

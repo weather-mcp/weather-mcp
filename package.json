@@ -82,6 +82,9 @@
   "optionalDependencies": {
     "mqtt": "^5.14.1"
   },
+  "overrides": {
+    "fast-uri": "3.1.6"
+  },
   "devDependencies": {
     "@types/luxon": "^3.7.5",
     "@types/ngeohash": "^0.6.8",
