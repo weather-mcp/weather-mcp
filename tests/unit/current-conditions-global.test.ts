@@ -1113,3 +1113,68 @@ describe("handleGetCurrentConditions — Today's Range null-guard behaviour (T6)
     expect(text).not.toContain("Today's Range");
   });
 });
+
+// ---------------------------------------------------------------------------
+// 10. T6 (openmeteo-nullable-scalar-types) — a null Open-Meteo current-block
+// scalar omits its own line rather than rendering a false zero or throwing,
+// now that OpenMeteoForecastCurrentData declares these fields `number | null`
+// (T5). Every field mutated below is wire-possible under Open-Meteo's
+// documented null-for-absent contract; none was observed null live at a
+// default (no extra params) current-conditions request on 2026-09-01 — this
+// pins the guard, not an observed production shape.
+// ---------------------------------------------------------------------------
+
+describe('handleGetCurrentConditions — null current-block scalars omit their own line (T6)', () => {
+  it('omits Dewpoint/Cloud Cover/Pressure/Conditions/Feels Like/Recent Precipitation when their fields are null, keeping Temperature and Wind', async () => {
+    const response = buildOpenMeteoCurrentResponse({
+      dew_point_2m: null,
+      cloud_cover: null,
+      pressure_msl: null,
+      weather_code: null,
+      apparent_temperature: null,
+      precipitation: null,
+    });
+    const result = await callCurrentConditions(
+      { ...LONDON, units: 'imperial' },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    expect(text).not.toContain('**Dewpoint:**');
+    expect(text).not.toContain('**Cloud Cover:**');
+    expect(text).not.toContain('**Pressure:**');
+    expect(text).not.toContain('**Conditions:**');
+    expect(text).not.toContain('**Feels Like:**');
+    expect(text).not.toContain('## Recent Precipitation');
+    expect(text).toContain('**Temperature:**');
+    expect(text).toContain('**Wind:**');
+    expect(text).not.toMatch(/\bnull\b/);
+    expect(text).not.toContain('NaN');
+  });
+
+  // G59 pair: the gust clause reads both wind_gusts_10m and wind_speed_10m.
+  it('shows the Wind line without a gust clause when wind_gusts_10m is null but wind_speed_10m is present', async () => {
+    const response = buildOpenMeteoCurrentResponse({ wind_gusts_10m: null });
+    const result = await callCurrentConditions(
+      { ...LONDON, units: 'imperial' },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+
+    expect(text).toContain('**Wind:**');
+    expect(text).not.toContain('gusting to');
+  });
+
+  it('shows the Wind line without a direction clause when wind_direction_10m is null', async () => {
+    const response = buildOpenMeteoCurrentResponse({ wind_direction_10m: null });
+    const result = await callCurrentConditions(
+      { ...LONDON, units: 'imperial' },
+      buildFakes(response)
+    );
+    const text = textOf(result);
+    const windLine = text.split('\n').find(l => l.startsWith('**Wind:**'));
+
+    expect(windLine).toBeDefined();
+    expect(windLine).not.toContain(' from ');
+  });
+});

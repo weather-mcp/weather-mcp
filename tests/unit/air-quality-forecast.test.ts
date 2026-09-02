@@ -356,3 +356,97 @@ describe('OpenMeteoService.getAirQuality() hourly params', () => {
     expect(params.hourly).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// T6 (openmeteo-nullable-scalar-types) — a null Open-Meteo air-quality
+// current-block scalar omits its own line/section rather than banding as a
+// false "Good 0" or throwing, now that OpenMeteoAirQualityCurrentData
+// declares these fields `number | null` (T5).
+// ---------------------------------------------------------------------------
+
+function buildAQCurrentResponse(
+  currentOverrides: Record<string, unknown> = {},
+  unitOverrides: Record<string, string> = {}
+): OpenMeteoAirQualityResponse {
+  return {
+    latitude: 43.8195,
+    longitude: -84.7686,
+    generationtime_ms: 0.1,
+    utc_offset_seconds: -14400,
+    timezone: 'America/Detroit',
+    timezone_abbreviation: 'EDT',
+    elevation: 258,
+    current_units: { time: 'iso8601', interval: 'seconds', us_aqi: '', ...unitOverrides },
+    current: {
+      time: '2026-07-16T11:00',
+      interval: 3600,
+      us_aqi: 69,
+      european_aqi: 52,
+      ...currentOverrides
+    }
+  } as OpenMeteoAirQualityResponse;
+}
+
+describe('get_air_quality — null current-block scalars omit their own line (T6)', () => {
+  it('falls to the European AQI block when us_aqi is null at a US point, and never renders a fabricated Good 0', async () => {
+    // COORDS (43.8195, -84.7686, Michigan) is inside shouldUseUSAQI's
+    // contiguous-US box, so this exercises the useUSAQI-true side of the
+    // useUSAQI/us_aqi != null pair (G59).
+    getAirQualityMock.mockResolvedValue(buildAQCurrentResponse({ us_aqi: null, european_aqi: 42 }));
+
+    const result = await callHandler({ ...COORDS });
+    const text = result.content[0].text;
+
+    expect(text).toContain('European Air Quality Index: 42');
+    expect(text).not.toContain('US Air Quality Index');
+  });
+
+  it('omits the Aerosol Optical Depth line, and does not throw, when it is null', async () => {
+    getAirQualityMock.mockResolvedValue(buildAQCurrentResponse({ aerosol_optical_depth: null }));
+
+    const result = await callHandler({ ...COORDS });
+    const text = result.content[0].text;
+
+    expect(text).not.toContain('**Aerosol Optical Depth:**');
+  });
+
+  // Live-observed 2026-09-01: examples/wildfire-awareness.md:202 renders
+  // "**Ammonia (NH₃):** N/A" for a null ammonia at Denver 39.74,-104.99 —
+  // this pins the fixed guard against that live shape.
+  it('omits the Ammonia line when it is null, even though current_units carries an ammonia unit', async () => {
+    getAirQualityMock.mockResolvedValue(
+      buildAQCurrentResponse({ ammonia: null }, { ammonia: 'μg/m³' })
+    );
+
+    const result = await callHandler({ ...COORDS });
+    const text = result.content[0].text;
+
+    expect(text).not.toContain('Ammonia');
+  });
+
+  // G59 pair on the UV clear-sky note. Wire-possible under Open-Meteo's
+  // documented null-for-absent contract but not observed live in this exact
+  // combination on 2026-09-01.
+  it('shows the UV Index section without the clear-sky note when uv_index_clear_sky is null', async () => {
+    getAirQualityMock.mockResolvedValue(
+      buildAQCurrentResponse({ uv_index: 7.2, uv_index_clear_sky: null })
+    );
+
+    const result = await callHandler({ ...COORDS });
+    const text = result.content[0].text;
+
+    expect(text).toContain('UV Index: 7.2');
+    expect(text).not.toContain('*Note: UV index under clear sky');
+  });
+
+  it('omits the UV Index section entirely, without throwing, when uv_index is null', async () => {
+    getAirQualityMock.mockResolvedValue(
+      buildAQCurrentResponse({ uv_index: null, uv_index_clear_sky: 8 })
+    );
+
+    const result = await callHandler({ ...COORDS });
+    const text = result.content[0].text;
+
+    expect(text).not.toContain('UV Index');
+  });
+});
