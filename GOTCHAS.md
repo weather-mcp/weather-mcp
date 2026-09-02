@@ -3182,6 +3182,50 @@ this is the build succeeding at its job), [G51] (widening a type does not make
 a value reachable; this is the mirror, narrowing making a comparison
 impossible).
 
+## G64 — `publish.yml` runs the live-network integration files, so an upstream refusing GitHub's runner fails the publish after the tag and release page already exist
+
+**Trigger:** a red `publish.yml` whose failing step is `Test`, on a file under
+`tests/integration/` that makes live calls (`safety-hazards`, `global-rivers`,
+`visualization-lightning`, `almanac`, `error-recovery`), while the local gate
+passed on the same commit.
+
+**Rule:** read which step went red before deciding anything. If `Test` failed
+and the `Publish to npm` step never ran, nothing is published — confirm with
+`npm view @dangahagan/weather-mcp version` — and `gh run rerun <id>` on the
+**same run** is the safe recovery: it re-executes the same tag, and the
+workflow's `Skip if version already published` guard makes a duplicate
+harmless. Do not bump the version and do not `npm publish` by hand. If instead
+`Publish to npm` ran, this is [G39]'s territory, not this entry's. Expect to
+rerun more than once: an upstream refusing the runner's address range does not
+clear in five minutes.
+
+**Why:** the local gate and the CI gate are the same `npm test`, but they run
+from different networks. NOAA NWPS answered this machine in 0.26 s while
+refusing the GitHub runner (`NOAA API is currently unavailable` →
+`falling back to full gauge catalog download (heavy path)`), and the heavy
+fallback alone outlasts the 60 s per-test budget. The tag push is the publish
+trigger and `gh release create` had already run, so the visible artefacts of a
+release existed before the package did — the half-published state `/release`
+step 7 warns about.
+
+**Verify:** `gh run view <id> --log-failed | grep -E 'NWPS bounding box query
+failed|currently unavailable'` names the upstream; `npm view
+@dangahagan/weather-mcp version` still reports the previous version.
+
+**Evidence:** 2026-09-02, v1.25.17 (run `33589180098`). Attempts at 04:00Z and
+04:06Z both timed out at `tests/integration/safety-hazards.test.ts:146`
+(`should clamp radius to valid range`, a live St. Louis NWPS query) after the
+bbox call was refused; the third rerun at ~04:09Z passed and published
+`1.25.17` at 04:11:40Z. The release's diff touched neither
+`riverConditionsHandler.ts` nor `noaa.ts`.
+
+**Status:** active. The structural fix — running the live-network files in a
+separate non-blocking job, or excluding them from the publish gate — is a
+`publish.yml` change, not a test change; not planned. Related: [G39] (red
+*after* a successful publish — the opposite half), [G9] (live smoke tests
+classify transport failures and skip; the river integration file does not,
+which is why a refusal becomes a timeout instead of a skip).
+
 ---
 
 ## Graveyard
