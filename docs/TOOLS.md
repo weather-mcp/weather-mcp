@@ -49,7 +49,7 @@ Get weather forecast for any location worldwide.
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location (e.g., "home") — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode (e.g., "Paris, France", "Bend, Oregon") — use instead of coordinates when you only have a place name
-- `days` (optional): Number of days in forecast (1-16, default: 7)
+- `days` (optional): Number of days in forecast (1-16, default: 7). **NOAA's own horizon is shorter than the maximum:** in the US it publishes a 7-day daily forecast and about 6.5 days (156 hours) of hourly forecast. A larger `days` on the NOAA path renders everything NOAA published plus a line disclosing the shortfall; `source: "openmeteo"` gives the full 1-16 day range worldwide
 - `granularity` (optional): "daily" or "hourly" (default: "daily")
 - `include_precipitation_probability` (optional): Include rain chances (default: true)
 - `include_normals` (optional): Include climate normals for comparison (default: false). Normals are **global**: official NCEI station normals when an `NCEI_API_TOKEN` is configured and the point is in the US, and 1991-2020 normals computed from the Open-Meteo archive everywhere else — which, since the server ships keyless, is the default path. One full-year archive pull is made per location and reused for every date there. For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
@@ -63,7 +63,7 @@ Get weather forecast for any location worldwide.
 *Coordinates not required when `location_name` or `city_name` is provided. Precedence: coordinates > `location_name` > `city_name`.
 
 **Description:**
-Automatically selects the best data source: NOAA for US locations (more detailed) or Open-Meteo for international locations. Supports extended forecasts up to 16 days. Includes sunrise/sunset times, daylight duration, temperature, precipitation, wind, and UV index. When a location is resolved from `location_name` or `city_name`, the matched place is shown in a `**Location:**` header so ambiguous names are transparent.
+Automatically selects the best data source: NOAA for US locations (more detailed) or Open-Meteo for international locations. Supports extended forecasts up to 16 days on the Open-Meteo path — NOAA publishes 7 days daily and about 6.5 days hourly, and a request beyond that renders what NOAA has plus a disclosure line naming the delivered and requested counts. Includes sunrise/sunset times, daylight duration, temperature, precipitation, wind, and UV index. When a location is resolved from `location_name` or `city_name`, the matched place is shown in a `**Location:**` header so ambiguous names are transparent.
 
 **Model comparison (`compare_models=true`).**
 Answers "how confident is this forecast?" — a question a single deterministic
@@ -485,7 +485,7 @@ Get a combined weather overview for a location in a single call.
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `include` (optional): Array of sections to include — any of `current`, `forecast`, `alerts`, `air_quality`, `lightning` (default: `["current", "forecast", "alerts"]`)
-- `days` (optional): Forecast days when the forecast section is included (1-16, default: 7)
+- `days` (optional): Forecast days when the forecast section is included (1-16, default: 7). The forecast section renders through `get_forecast`, so it inherits the same NOAA horizon disclosure: at a US point, a `days` above 7 shows NOAA's 7 days plus a line saying so, and `source: "openmeteo"` reaches the full range
 - `detail` (optional): `summary` (default here), `standard`, or `full`
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 

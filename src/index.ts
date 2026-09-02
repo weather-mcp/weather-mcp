@@ -475,7 +475,7 @@ export const TOOL_DEFINITIONS = {
         },
         days: {
           type: 'number' as const,
-          description: 'Number of forecast days to include when the forecast section is requested (1-16, default: 7)',
+          description: 'Number of forecast days to include when the forecast section is requested (1-16 for global, 1-7 for US NOAA, default: 7)',
           minimum: 1,
           maximum: 16,
           default: 7

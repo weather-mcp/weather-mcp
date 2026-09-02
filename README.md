@@ -70,7 +70,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 | Tool | What it does | Coverage |
 |------|-------------|----------|
-| `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name; sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac, optional five-model agreement comparison | 🌍 Global |
+| `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name (NOAA publishes 7 days daily and ~6.5 days hourly in the US, and says so when you ask for more; `source="openmeteo"` reaches the full range); sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac, optional five-model agreement comparison | 🌍 Global |
 | `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional NOAA fire-weather indices), Open-Meteo model data elsewhere (with an optional computed Fosberg fire-weather index), or real airport station observations worldwide with `source="metar"`. Always states the observation's age, and automatically falls back to a fresher nearby station when the nearest one has gone dark. In extreme conditions automatically adds frostbite time-to-onset (computed wind chill) or heat-stress context (estimated WBGT) | 🌍 Global |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity; official national warnings for the US (NOAA), Canada (ECCC), 38 European countries (MeteoAlarm), India (NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG) | 🇺🇸 🇨🇦 🇪🇺 🇮🇳 🇵🇭 🇮🇩 |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
@@ -349,7 +349,7 @@ Being honest about what free public data can and can't do:
 
 | Capability | Global | US-only |
 |-----------|--------|---------|
-| Forecasts (up to 16 days) | ✅ | Richer detail via NOAA |
+| Forecasts (up to 16 days) | ✅ | Richer detail via NOAA, but NOAA publishes only 7 days daily / ~6.5 days hourly — a longer request is disclosed, not silently truncated |
 | Historical weather (1940+) | ✅ (>7 days old) | Station-level detail for last 7 days |
 | Air quality, marine, radar, lightning | ✅ | — |
 | Current conditions | ✅ (model data, or real station observations via `source="metar"`) | Station observations via NOAA (richer detail) |
