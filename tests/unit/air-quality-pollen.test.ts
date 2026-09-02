@@ -87,8 +87,8 @@ describe('get_air_quality — pollen section (Europe-only, CAMS)', () => {
   it('renders only the non-null species when the model covers a subset', async () => {
     getAirQualityMock.mockResolvedValue(buildResponse({
       grass_pollen: 30,
-      birch_pollen: null as unknown as number,
-      alder_pollen: null as unknown as number
+      birch_pollen: null,
+      alder_pollen: null
     }));
 
     const text = textOf(await callHandler());
@@ -101,12 +101,12 @@ describe('get_air_quality — pollen section (Europe-only, CAMS)', () => {
 
   it('renders no section when every species is null (non-European point, HTTP 200)', async () => {
     getAirQualityMock.mockResolvedValue(buildResponse({
-      alder_pollen: null as unknown as number,
-      birch_pollen: null as unknown as number,
-      grass_pollen: null as unknown as number,
-      mugwort_pollen: null as unknown as number,
-      olive_pollen: null as unknown as number,
-      ragweed_pollen: null as unknown as number
+      alder_pollen: null,
+      birch_pollen: null,
+      grass_pollen: null,
+      mugwort_pollen: null,
+      olive_pollen: null,
+      ragweed_pollen: null
     }));
 
     const text = textOf(await callHandler());

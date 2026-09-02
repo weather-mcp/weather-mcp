@@ -129,22 +129,22 @@ export interface GeocodingLocation {
   name: string;
   latitude: number;
   longitude: number;
-  elevation?: number;
+  elevation?: number | null;
   feature_code?: string;
   country_code?: string;
   country?: string;
-  country_id?: number;
+  country_id?: number | null;
   timezone?: string;
-  population?: number;
+  population?: number | null;
   postcodes?: string[];
   admin1?: string;
   admin2?: string;
   admin3?: string;
   admin4?: string;
-  admin1_id?: number;
-  admin2_id?: number;
-  admin3_id?: number;
-  admin4_id?: number;
+  admin1_id?: number | null;
+  admin2_id?: number | null;
+  admin3_id?: number | null;
+  admin4_id?: number | null;
 }
 
 /**
@@ -152,7 +152,7 @@ export interface GeocodingLocation {
  */
 export interface GeocodingResponse {
   results?: GeocodingLocation[];
-  generationtime_ms?: number;
+  generationtime_ms?: number | null;
 }
 
 /**
@@ -277,20 +277,20 @@ export interface OpenMeteoCurrentWeather {
   temperature_2m?: number | null;
   /** Fire-weather input (Fosberg index). Open-Meteo returns `null` when absent. */
   relative_humidity_2m?: number | null;
-  apparent_temperature?: number;
-  dew_point_2m?: number;
-  is_day?: number;
-  precipitation?: number;
-  rain?: number;
-  showers?: number;
-  snowfall?: number;
-  weather_code?: number;
-  cloud_cover?: number;
-  pressure_msl?: number;
+  apparent_temperature?: number | null;
+  dew_point_2m?: number | null;
+  is_day?: number | null;
+  precipitation?: number | null;
+  rain?: number | null;
+  showers?: number | null;
+  snowfall?: number | null;
+  weather_code?: number | null;
+  cloud_cover?: number | null;
+  pressure_msl?: number | null;
   /** Fire-weather input (Fosberg index). Open-Meteo returns `null` when absent. */
   wind_speed_10m?: number | null;
-  wind_direction_10m?: number;
-  wind_gusts_10m?: number;
+  wind_direction_10m?: number | null;
+  wind_gusts_10m?: number | null;
   /** Fire-weather input (Fosberg index). Fixed units (m³/m³), only present when requested. */
   soil_moisture_0_to_1cm?: number | null;
   /** Fire-weather input (Fosberg index). Fixed units (kPa), only present when requested. */
@@ -347,36 +347,36 @@ export interface OpenMeteoForecastResponse {
 export interface OpenMeteoAirQualityCurrentData {
   time: string;
   interval: number;
-  pm10?: number;
-  pm2_5?: number;
-  carbon_monoxide?: number;
-  nitrogen_dioxide?: number;
-  sulphur_dioxide?: number;
-  ozone?: number;
-  aerosol_optical_depth?: number;
-  dust?: number;
-  uv_index?: number;
-  uv_index_clear_sky?: number;
-  ammonia?: number;
-  alder_pollen?: number;
-  birch_pollen?: number;
-  grass_pollen?: number;
-  mugwort_pollen?: number;
-  olive_pollen?: number;
-  ragweed_pollen?: number;
-  european_aqi?: number;
-  european_aqi_pm2_5?: number;
-  european_aqi_pm10?: number;
-  european_aqi_nitrogen_dioxide?: number;
-  european_aqi_ozone?: number;
-  european_aqi_sulphur_dioxide?: number;
-  us_aqi?: number;
-  us_aqi_pm2_5?: number;
-  us_aqi_pm10?: number;
-  us_aqi_nitrogen_dioxide?: number;
-  us_aqi_ozone?: number;
-  us_aqi_sulphur_dioxide?: number;
-  us_aqi_carbon_monoxide?: number;
+  pm10?: number | null;
+  pm2_5?: number | null;
+  carbon_monoxide?: number | null;
+  nitrogen_dioxide?: number | null;
+  sulphur_dioxide?: number | null;
+  ozone?: number | null;
+  aerosol_optical_depth?: number | null;
+  dust?: number | null;
+  uv_index?: number | null;
+  uv_index_clear_sky?: number | null;
+  ammonia?: number | null;
+  alder_pollen?: number | null;
+  birch_pollen?: number | null;
+  grass_pollen?: number | null;
+  mugwort_pollen?: number | null;
+  olive_pollen?: number | null;
+  ragweed_pollen?: number | null;
+  european_aqi?: number | null;
+  european_aqi_pm2_5?: number | null;
+  european_aqi_pm10?: number | null;
+  european_aqi_nitrogen_dioxide?: number | null;
+  european_aqi_ozone?: number | null;
+  european_aqi_sulphur_dioxide?: number | null;
+  us_aqi?: number | null;
+  us_aqi_pm2_5?: number | null;
+  us_aqi_pm10?: number | null;
+  us_aqi_nitrogen_dioxide?: number | null;
+  us_aqi_ozone?: number | null;
+  us_aqi_sulphur_dioxide?: number | null;
+  us_aqi_carbon_monoxide?: number | null;
 }
 
 /**
@@ -514,19 +514,19 @@ export interface OpenMeteoAirQualityResponse {
 export interface OpenMeteoMarineCurrentData {
   time: string;
   interval: number;
-  wave_height?: number;
-  wave_direction?: number;
-  wave_period?: number;
-  wind_wave_height?: number;
-  wind_wave_direction?: number;
-  wind_wave_period?: number;
-  wind_wave_peak_period?: number;
-  swell_wave_height?: number;
-  swell_wave_direction?: number;
-  swell_wave_period?: number;
-  swell_wave_peak_period?: number;
-  ocean_current_velocity?: number;
-  ocean_current_direction?: number;
+  wave_height?: number | null;
+  wave_direction?: number | null;
+  wave_period?: number | null;
+  wind_wave_height?: number | null;
+  wind_wave_direction?: number | null;
+  wind_wave_period?: number | null;
+  wind_wave_peak_period?: number | null;
+  swell_wave_height?: number | null;
+  swell_wave_direction?: number | null;
+  swell_wave_period?: number | null;
+  swell_wave_peak_period?: number | null;
+  ocean_current_velocity?: number | null;
+  ocean_current_direction?: number | null;
 }
 
 /**

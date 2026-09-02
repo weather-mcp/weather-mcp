@@ -35,12 +35,12 @@ const googlePollenService = {
 const ATTRIBUTION = 'Source: Includes pollen data from Google';
 
 const ALL_NULL_CAMS = {
-  alder_pollen: null as unknown as number,
-  birch_pollen: null as unknown as number,
-  grass_pollen: null as unknown as number,
-  mugwort_pollen: null as unknown as number,
-  olive_pollen: null as unknown as number,
-  ragweed_pollen: null as unknown as number
+  alder_pollen: null,
+  birch_pollen: null,
+  grass_pollen: null,
+  mugwort_pollen: null,
+  olive_pollen: null,
+  ragweed_pollen: null
 };
 
 function buildResponse(
