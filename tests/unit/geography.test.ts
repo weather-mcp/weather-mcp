@@ -10,7 +10,8 @@ import {
   getMarineRegionDescription,
   getGreatLakesRegions,
   getMajorCoastalBayRegions,
-  isInUS
+  isInUS,
+  isInGreatBritain
 } from '../../src/utils/geography.js';
 
 describe('Geography Utilities', () => {
@@ -244,6 +245,62 @@ describe('Geography Utilities', () => {
       // lat 19.43 is well below the CONUS min (24.5); longitude keeps it out
       // of the Hawaii box despite the latitude overlap.
       expect(isInUS(19.4326, -99.1332)).toBe(false);
+    });
+  });
+
+  describe('isInGreatBritain', () => {
+    // This predicate is routing-only (see the doc comment on isInGreatBritain and
+    // GOTCHAS G53): it decides whether a Nominatim reverse-geocode call is worth
+    // making, never what a tool renders. These tests exercise the geographic
+    // extremes it must cover generously and the one neighbor (Ireland) it must
+    // exclude — they say nothing about EA coverage itself.
+
+    it('should detect London', () => {
+      expect(isInGreatBritain(51.5074, -0.1278)).toBe(true);
+    });
+
+    it('should detect York', () => {
+      expect(isInGreatBritain(53.96, -1.08)).toBe(true);
+    });
+
+    it('should detect Sprouston-on-Tweed, on the Scottish border (55.611 N, -2.395 W)', () => {
+      expect(isInGreatBritain(55.611, -2.395)).toBe(true);
+    });
+
+    it('should detect the Outer Hebrides (Stornoway)', () => {
+      expect(isInGreatBritain(58.2091, -6.3862)).toBe(true);
+    });
+
+    it("should detect Land's End, Cornwall", () => {
+      expect(isInGreatBritain(50.0657, -5.7132)).toBe(true);
+    });
+
+    it('should detect the Isles of Scilly', () => {
+      expect(isInGreatBritain(49.91, -6.32)).toBe(true);
+    });
+
+    it('should detect Shetland, past 60.85 N (Out Stack, the northernmost point of the UK)', () => {
+      // The edge most often clipped by an under-drawn GB box.
+      expect(isInGreatBritain(60.8607, -0.8935)).toBe(true);
+    });
+
+    it('should return false for Dublin, Ireland', () => {
+      // Dublin sits inside Ireland's latitude band (which Great Britain's own
+      // England/Wales/Scotland band overlaps), so exclusion here depends on the
+      // west edge of that middle band, not on latitude alone.
+      expect(isInGreatBritain(53.35, -6.26)).toBe(false);
+    });
+
+    it('should return false for Paris, France', () => {
+      expect(isInGreatBritain(48.85, 2.35)).toBe(false);
+    });
+
+    it('should return false for Reykjavik, Iceland', () => {
+      expect(isInGreatBritain(64.15, -21.94)).toBe(false);
+    });
+
+    it('should return false for a mid-Atlantic point', () => {
+      expect(isInGreatBritain(40.0, -40.0)).toBe(false);
     });
   });
 
