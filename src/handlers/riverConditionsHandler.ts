@@ -30,10 +30,12 @@ import {
   PROBE_GRID_CENTER_INDEX
 } from '../utils/riverDischarge.js';
 import { EnvironmentAgencyService } from '../services/environmentAgency.js';
+import type { EAStationThresholds } from '../services/environmentAgency.js';
 import {
   filterStationsWithRiverName,
   selectStageMeasure,
-  formatStageLevel
+  formatStageLevel,
+  bandRiverLevel
 } from '../utils/eaGauges.js';
 import { RateLimitError } from '../errors/ApiError.js';
 import type { NWPSGauge, GaugeStatus, NWPSStageFlowResponse, StageFlowDataPoint, FloodCategories } from '../types/noaa.js';
@@ -503,6 +505,35 @@ const EA_SOURCE_LINE =
   '**Source:** Environment Agency real-time river level gauges (observed, 15-minute)';
 
 /**
+ * The attribution the Open Government Licence requires for this API, quoted
+ * **exactly** as the Environment Agency publishes it at
+ * `environment.data.gov.uk/flood-monitoring/doc/reference` (fetched
+ * 2026-09-02): "If you make use of this data please acknowledge this with the
+ * following attribution statement".
+ *
+ * A licence-mandated string is not ours to reword, reflow, or capitalise
+ * differently. Copy it, do not retype it.
+ */
+const EA_ATTRIBUTION =
+  'this uses Environment Agency flood and river level data from the real-time data API (Beta)';
+
+/**
+ * How many gauges get their published typical range fetched, regardless of
+ * `detail`.
+ *
+ * Measured parallel fan-out for `/id/stations/{ref}?_view=full` is
+ * non-monotonic, with a local worst case at 8 concurrent requests (15.6 s) —
+ * not at the top of the sweep. So the bound is 5, and the remaining gauges
+ * render without a typical range rather than paying for it.
+ *
+ * **G8 — this is an enrichment bound and nothing else.** It must never change
+ * which gauges are listed, which are counted in the "found N gauges" line, or
+ * which are considered. A bound that trims a set used for exclusion is exactly
+ * how a defensive limit fabricates an all-clear.
+ */
+const EA_DETAIL_FAN_OUT = 5;
+
+/**
  * Default search radius for the EA path, in km. Deliberately smaller than the
  * NOAA path's 50: the EA network is dense, and a 25 km search at York returns
  * 80 stations of which 68 are river gauges (measured live 2026-09-02).
@@ -601,16 +632,37 @@ async function formatEARiverConditions(
     .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
 
   if (withReadings.length === 0) {
-    // An empty result from the EA network means "this authority does not gauge
-    // rivers at this location", which is emphatically not an all-clear — so no
-    // ✅ and no "currently clear" sentence. Distinguished below from a point
-    // that is simply outside the network entirely.
-    output += `**No Environment Agency river gauges were found within ${radius} km.**\n\n`;
-    output += `That is an absence of coverage, not an all-clear. Rivers here may be in `;
-    output += `flood; the Environment Agency river-gauge network simply does not gauge `;
-    output += `them at this location.\n\n`;
-    output += `Use \`source: "openmeteo"\` for Open-Meteo Flood (GloFAS) modeled river `;
-    output += `discharge, which is global.\n`;
+    // Two different empty results, told apart by the DATA rather than by any
+    // geographic box — the box routes and must never decide a rendered claim
+    // (G53). Zero stations of any kind means the network does not reach here;
+    // stations that are all tidal means it reaches here but publishes no river
+    // gauge. Those are different statements and a reader can act on the
+    // difference.
+    //
+    // G47 — a zero here is a real zero, not a throttled one: this service
+    // treats any non-2xx as a thrown error that propagates, so a rate-limited
+    // upstream can never arrive at this branch looking like an empty result.
+    if (stationsResult.stations.length === 0) {
+      output += `**No Environment Agency monitoring stations were found within ${radius} km.**\n\n`;
+      output += `That is an absence of coverage, not an all-clear. Rivers here may be in `;
+      output += `flood; the Environment Agency simply does not monitor them at this `;
+      output += `location. The Environment Agency network covers England and rivers `;
+      output += `crossing its borders.\n\n`;
+      output += `Try a larger \`radius\`, or use \`source: "openmeteo"\` for Open-Meteo `;
+      output += `Flood (GloFAS) modeled river discharge, which is global.\n`;
+    } else {
+      output += `**No Environment Agency river gauges were found within ${radius} km.**\n\n`;
+      output += `${stationsResult.stations.length} Environment Agency monitoring `;
+      output += `station${stationsResult.stations.length > 1 ? 's were' : ' was'} found nearby, but `;
+      output += `${stationsResult.stations.length > 1 ? 'none of them publish' : 'it does not publish'} `;
+      output += `a river name — they are tidal or coastal gauges, which this tool does not `;
+      output += `report as river levels.\n\n`;
+      output += `That is an absence of river gauging, not an all-clear. Try a larger `;
+      output += `\`radius\`, or use \`source: "openmeteo"\` for Open-Meteo Flood (GloFAS) `;
+      output += `modeled river discharge, which is global.\n`;
+    }
+    output += `\n---\n`;
+    output += `*${EA_ATTRIBUTION}*\n`;
     return output;
   }
 
@@ -618,9 +670,35 @@ async function formatEARiverConditions(
   const gaugesToShow = withReadings.slice(0, maxGaugesToShow);
 
   // G8 — the count is derived from the full filtered set, never from the
-  // display slice. A cap that changed the reported number would be a
-  // defensive limit quietly rewriting what the reader is told.
+  // display slice or the enrichment slice. A cap that changed the reported
+  // number would be a defensive limit quietly rewriting what the reader is
+  // told.
   output += `📊 **Found ${withReadings.length} river gauge${withReadings.length > 1 ? 's' : ''}**\n\n`;
+
+  // The typical range is GARNISH inside a contract. It is fetched for at most
+  // EA_DETAIL_FAN_OUT of the *displayed* gauges, in parallel, in one try/catch
+  // with no retries — a failure here must add no latency and must never fail
+  // the request. A gauge without a range renders its level and says nothing
+  // more; it is still listed and still counted.
+  const enrichTargets = gaugesToShow.slice(0, EA_DETAIL_FAN_OUT);
+  const thresholdsByRef = new Map<string, EAStationThresholds>();
+  await Promise.all(
+    enrichTargets.map(async ({ station }) => {
+      const ref = station.notation ?? station.stationReference;
+      if (!ref) {
+        return;
+      }
+      try {
+        const thresholds = await eaService.getStationDetail(ref);
+        if (thresholds) {
+          thresholdsByRef.set(ref, thresholds);
+        }
+      } catch {
+        // Garnish: degrade to no range for this gauge, silently and without
+        // retrying. The level itself is already in hand.
+      }
+    })
+  );
 
   for (const { station, selected, distance } of gaugesToShow) {
     const label = typeof station.label === 'string' ? station.label : station.riverName;
@@ -632,15 +710,63 @@ async function formatEARiverConditions(
 
     if (!selected) {
       // Honest absence: the station exists and is a river gauge, but no
-      // qualifying level reading is currently published for it. Never a value.
+      // qualifying level reading is currently published for it. Never a value,
+      // and never anything that could read as "the river is fine".
       output += `- **Level:** not currently reported by this gauge\n`;
-    } else {
-      const level = formatStageLevel(selected.value, prefs);
-      const basis = eaLevelBasis(selected.unitName);
-      output += `- **Level:** ${level.formatted}${basis ? ` ${basis}` : ''}\n`;
-      output += `- **Observed:** ${formatObservationAge(selected.ageMinutes)}\n`;
+      output += `\n`;
+      continue;
+    }
+
+    const level = formatStageLevel(selected.value, prefs);
+    const basis = eaLevelBasis(selected.unitName);
+    output += `- **Level:** ${level.formatted}${basis ? ` ${basis}` : ''}\n`;
+    output += `- **Observed:** ${formatObservationAge(selected.ageMinutes)}\n`;
+
+    const ref = station.notation ?? station.stationReference;
+    const thresholds = ref ? thresholdsByRef.get(ref) : undefined;
+
+    // Banded in display space with the same prefs used to print the level
+    // above, so the words and the figures cannot disagree at a rounding edge.
+    // A position report against the published range — never a flood category;
+    // the EA publishes no action/minor/moderate/major equivalent on this API
+    // and `typicalRangeHigh` is not a flood threshold.
+    const band = thresholds ? bandRiverLevel(selected, thresholds, prefs) : null;
+
+    // **The range is printed only when it is comparable to the level above it.**
+    // `bandRiverLevel` refuses a measure whose qualifier is not `Stage`, because
+    // `stageScale` belongs to the station's Stage measure — and some stations
+    // carry a `riverName` while publishing only a `Tidal Level` measure (the
+    // River Tweed at Berwick is one, live). Printing the range anyway and
+    // merely withholding our own verdict would be worse than useless: the two
+    // numbers sit adjacent and the reader makes the unsafe comparison instead
+    // of us. So when there is no band, there is no range either.
+    if (band && thresholds) {
+      const low =
+        thresholds.typicalRangeLow === undefined
+          ? undefined
+          : formatStageLevel(thresholds.typicalRangeLow, prefs);
+      const high =
+        thresholds.typicalRangeHigh === undefined
+          ? undefined
+          : formatStageLevel(thresholds.typicalRangeHigh, prefs);
+      if (low && high) {
+        output += `- **Typical range:** ${low.formatted} to ${high.formatted}\n`;
+      } else if (high) {
+        output += `- **Typical range:** up to ${high.formatted}\n`;
+      } else if (low) {
+        output += `- **Typical range:** from ${low.formatted}\n`;
+      }
+      output += `- **Against typical range:** ${band.description}\n`;
     }
     output += `\n`;
+  }
+
+  if (gaugesToShow.length > EA_DETAIL_FAN_OUT) {
+    // Say plainly why some gauges carry a range and others do not, so a
+    // missing range reads as "not fetched" rather than "none published".
+    const without = gaugesToShow.length - EA_DETAIL_FAN_OUT;
+    output += `*Note: typical ranges were fetched for the nearest ${EA_DETAIL_FAN_OUT} gauges only; `;
+    output += `the other ${without} are listed without one.*\n`;
   }
 
   if (withReadings.length > maxGaugesToShow) {
@@ -657,6 +783,15 @@ async function formatEARiverConditions(
     output += `\n*Note: the upstream response exceeded this server's processing limit and was `;
     output += `trimmed, so this list may be incomplete.*\n`;
   }
+
+  output += `\n---\n`;
+  output += `*${EA_ATTRIBUTION}*\n`;
+  // The flood-monitoring API publishes observations only — no forecast. Say so,
+  // rather than letting the absence of a forecast section imply one was checked.
+  output += `*These are observed levels, not a forecast. The Environment Agency publishes `;
+  output += `no flood-stage categories on this API, so the typical range is a normal-conditions `;
+  output += `reference and not a flood threshold. Always consult official flood warnings for `;
+  output += `critical decisions.*\n`;
 
   return output;
 }
