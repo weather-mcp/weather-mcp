@@ -149,12 +149,13 @@ export async function loadJmaAreas(): Promise<readonly JmaClass10Area[]> {
       // to record and no `error.code` worth classifying (G24).
       loadPromise = undefined;
 
-      // Rethrow our own error unchanged rather than double-wrapping the guard
-      // above, which routes its throw through this same handler.
-      if (error instanceof JmaAreaDataUnavailableError) {
-        throw error;
-      }
-
+      // `.then(onFulfilled, onRejected)` does not route a throw from
+      // `onFulfilled` into `onRejected` — that only happens with
+      // `.then(onFulfilled).catch(onRejected)`. So the empty/non-array guard's
+      // `JmaAreaDataUnavailableError` above propagates directly out of
+      // `onFulfilled` and never reaches this handler; this handler sees only a
+      // rejection of the `import()` itself.
+      //
       // The `Error` slot is left empty on purpose: the logger would serialise
       // the message and stack, and a module-resolution failure can carry a
       // `Require stack:` of absolute paths. Only the name and code are kept.
