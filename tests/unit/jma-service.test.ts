@@ -338,6 +338,60 @@ describe('JmaService', () => {
   });
 
   // ------------------------------------------------------------------
+  // 21b: an unreadable clock is its own caveat, never silent freshness
+  // ------------------------------------------------------------------
+  it('reports indexClockUnknown=true when the newest entry has an unparseable <updated>', async () => {
+    const href = docUrl('180000');
+    const indexXml = atomFeed([atomEntry({ href, updated: 'not-a-date' })]);
+    const doc = warningDoc({});
+
+    mockGet.mockImplementation((url: string) => {
+      if (url === JMA_INDEX_URL) return xmlResponse(indexXml);
+      if (url === href) return xmlResponse(doc);
+      return Promise.reject(new Error(`unexpected fetch in test: ${url}`));
+    });
+
+    const result = await makeService(() => Date.parse('2026-09-03T00:00:00Z')).getWarnings('180000');
+    // Not stale — we do not claim to know it is old — but not vouched for
+    // either. Before this, an unreadable clock read as fresh, which put a hole
+    // in the one positive control against a frozen feed (G72).
+    expect(result.indexClockUnknown).toBe(true);
+    expect(result.indexStale).toBe(false);
+  });
+
+  it('reports indexClockUnknown=true when the newest entry carries no <updated> at all', async () => {
+    const href = docUrl('180000');
+    const entry = `<entry><title>気象特別警報・警報・注意報</title><id>${href}</id><link type="application/xml" href="${href}"/></entry>`;
+    const indexXml = atomFeed([entry]);
+    const doc = warningDoc({});
+
+    mockGet.mockImplementation((url: string) => {
+      if (url === JMA_INDEX_URL) return xmlResponse(indexXml);
+      if (url === href) return xmlResponse(doc);
+      return Promise.reject(new Error(`unexpected fetch in test: ${url}`));
+    });
+
+    const result = await makeService(() => Date.parse('2026-09-03T00:00:00Z')).getWarnings('180000');
+    expect(result.indexClockUnknown).toBe(true);
+  });
+
+  it('reports indexClockUnknown=false when the clock is readable', async () => {
+    const href = docUrl('180000');
+    const updated = '2026-09-03T00:00:00Z';
+    const indexXml = atomFeed([atomEntry({ href, updated })]);
+    const doc = warningDoc({});
+
+    mockGet.mockImplementation((url: string) => {
+      if (url === JMA_INDEX_URL) return xmlResponse(indexXml);
+      if (url === href) return xmlResponse(doc);
+      return Promise.reject(new Error(`unexpected fetch in test: ${url}`));
+    });
+
+    const result = await makeService(() => Date.parse(updated) + 1000).getWarnings('180000');
+    expect(result.indexClockUnknown).toBe(false);
+  });
+
+  // ------------------------------------------------------------------
   // 22: failure propagation, no leaked URL, no raw error object logged
   // ------------------------------------------------------------------
   it('propagates a 500 as a fixed message with no URL, and never logs the raw error object', async () => {

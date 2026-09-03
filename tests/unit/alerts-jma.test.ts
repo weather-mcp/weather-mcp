@@ -146,6 +146,7 @@ function makeJmaFake(result: Partial<JmaWarningsResult> = {}, error?: Error): Jm
       return {
         officeCode,
         indexStale: false,
+        indexClockUnknown: false,
         indexTrimmed: false,
         indexUnparsedEntries: 0,
         ...result
@@ -723,7 +724,7 @@ describe('JMA attribution footer', () => {
 // ---------------------------------------------------------------------------
 
 describe('JMA index caveats', () => {
-  it('renders the indexTrimmed caveat', async () => {
+  it('renders the indexTrimmed caveat, and still earns its ✅', async () => {
     const jma = makeJmaFake({
       indexTrimmed: true,
       document: { publishingOffice: '気象庁', areas: [areaFixture(TOKYO_CODE, { kinds: [] })] }
@@ -731,9 +732,13 @@ describe('JMA index caveats', () => {
     const { text } = await callAlerts(TOKYO, { country: 'jp', jma });
 
     expect(text).toContain('the JMA feed listed more bulletins than could be scanned');
+    // The one caveat that does NOT contradict an all-clear: the scan is
+    // newest-first, so what the cap dropped is older than what was used and
+    // cannot be a newer bulletin for this office.
+    expect(text).toContain('✅');
   });
 
-  it('renders the indexUnparsedEntries caveat', async () => {
+  it('withholds the ✅ when entries could not be identified', async () => {
     const jma = makeJmaFake({
       indexUnparsedEntries: 2,
       document: { publishingOffice: '気象庁', areas: [areaFixture(TOKYO_CODE, { kinds: [] })] }
@@ -741,16 +746,54 @@ describe('JMA index caveats', () => {
     const { text } = await callAlerts(TOKYO, { country: 'jp', jma });
 
     expect(text).toContain('2 entries in the JMA feed could not be identified');
+    // An unidentified entry could be a newer bulletin for this very office.
+    expect(text).not.toContain('✅');
+    expect(text).toContain('this is not an all-clear');
   });
 
-  it('renders the indexStale caveat and says it is not an all-clear', async () => {
+  it('withholds the ✅ when the index is stale, keeping the disclosure alone', async () => {
     const jma = makeJmaFake({
       indexStale: true,
       document: { publishingOffice: '気象庁', areas: [areaFixture(TOKYO_CODE, { kinds: [] })] }
     });
     const { text } = await callAlerts(TOKYO, { country: 'jp', jma });
 
-    expect(text).toContain("most recent bulletin nationwide is unusually old");
+    expect(text).toContain('most recent bulletin nationwide is unusually old');
     expect(text).toContain('this is not an all-clear');
+    // The lock is the ABSENCE of the all-clear marker, not the presence of the
+    // caveat text: the contradiction this guards against was an output that
+    // carried both (G11).
+    expect(text).not.toContain('✅');
+  });
+
+  it('renders the indexClockUnknown caveat and withholds the ✅', async () => {
+    const jma = makeJmaFake({
+      indexClockUnknown: true,
+      document: { publishingOffice: '気象庁', areas: [areaFixture(TOKYO_CODE, { kinds: [] })] }
+    });
+    const { text } = await callAlerts(TOKYO, { country: 'jp', jma });
+
+    expect(text).toContain('carries no readable timestamp');
+    expect(text).toContain('this is not an all-clear');
+    expect(text).not.toContain('✅');
+  });
+
+  it('still renders active warnings beside a stale caveat, as ⚠️ not ℹ️', async () => {
+    // Suppressing the ✅ must not suppress a warning that IS in force — the
+    // caveat casts doubt on completeness, never on what was found.
+    const jma = makeJmaFake({
+      indexStale: true,
+      document: {
+        publishingOffice: '気象庁',
+        areas: [
+          areaFixture(TOKYO_CODE, { kinds: [kindFixture({ name: '大雨警報', status: '継続' })] })
+        ]
+      }
+    });
+    const { text } = await callAlerts(TOKYO, { country: 'jp', jma });
+
+    expect(text).toContain('most recent bulletin nationwide is unusually old');
+    expect(text).toContain('⚠️ **1 active warning for 東京地方 (Tokyo Region)**');
+    expect(text).toMatch(/^### 大雨警報/m);
   });
 });

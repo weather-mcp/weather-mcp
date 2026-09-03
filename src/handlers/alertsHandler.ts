@@ -904,6 +904,22 @@ async function handleJmaAlerts(
   if (result.indexStale) {
     output += `⚠️ *The JMA feed's most recent bulletin nationwide is unusually old, so this may not reflect current conditions — this is not an all-clear.*\n\n`;
   }
+  if (result.indexClockUnknown) {
+    output += `⚠️ *The JMA feed's most recent bulletin carries no readable timestamp, so how current this is could not be checked — this is not an all-clear.*\n\n`;
+  }
+
+  // Which of the caveats above, if any, contradict a ✅.
+  //
+  // A caveat saying "this may not be the current picture" and a ✅ saying "no
+  // warnings here" are two claims in one output, and the second is the one a
+  // reader acts on (G11). So where such a caveat is present and this area
+  // carries nothing, the empty is reported as *unconfirmed* rather than clear.
+  //
+  // `indexTrimmed` is deliberately NOT in this set: the scan is newest-first,
+  // so the entries the cap dropped are older than the one used, and a trimmed
+  // index cannot be hiding a newer bulletin for this office. `indexUnparsedEntries`
+  // is, because an entry whose filename could not be read might be exactly that.
+  const unconfirmed = result.indexStale || result.indexClockUnknown || result.indexUnparsedEntries > 0;
 
   // State 3. Every office publishes this bulletin type continuously, so an
   // office with no entry means the answer is unknown rather than negative.
@@ -948,9 +964,17 @@ async function handleJmaAlerts(
   // licence terms require its content to be reproduced unmodified.
   const issuedPhrase = issued ? ` at ${issued}` : '';
 
-  if (activeKinds.length === 0) {
-    // An honest empty: the bulletin was fetched, it names this area, and the
-    // area carries nothing in force. This is the one branch that earns a ✅.
+  if (activeKinds.length === 0 && unconfirmed) {
+    // State 5. The bulletin was fetched and names this area, and the area
+    // carries nothing — but a caveat above says the feed may not be the
+    // current picture. No ✅: an all-clear that its own output contradicts is
+    // worse than no answer.
+    output += `ℹ️ **No warnings are in force for ${label} in the bulletin that could be read.**\n\n`;
+    output += `*The bulletin from ${office}${issuedPhrase} carries nothing for this area, but the caveat above means it may not be the current picture, so this could not be confirmed — this is not an all-clear.*\n\n`;
+  } else if (activeKinds.length === 0) {
+    // An honest empty: the bulletin was fetched, it names this area, the area
+    // carries nothing in force, and nothing above casts doubt on the feed.
+    // This is the one branch that earns a ✅.
     output += `✅ **No active weather warnings for ${label}.**\n\n`;
     output += elsewhere > 0
       ? `*Checked against the current bulletin from ${office}${issuedPhrase} — ${elsewhere} warning${elsewhere > 1 ? 's' : ''} in force in other areas of that bulletin, none for this one.*\n\n`

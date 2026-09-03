@@ -70,6 +70,7 @@ function makeJmaFake(result: Partial<JmaWarningsResult> = {}, error?: Error): Jm
       return {
         officeCode,
         indexStale: false,
+        indexClockUnknown: false,
         indexTrimmed: false,
         indexUnparsedEntries: 0,
         ...result

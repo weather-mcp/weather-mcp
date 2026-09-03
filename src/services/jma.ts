@@ -148,6 +148,16 @@ export interface JmaWarningsResult {
   newestEntryUpdated?: string;
   /** True when the newest bulletin nationwide is older than `JMA_INDEX_STALE_AFTER_MS`. */
   indexStale: boolean;
+  /**
+   * True when the index's newest entry carries no parseable `<updated>`, so the
+   * feed's freshness could not be checked at all.
+   *
+   * Distinct from `indexStale` on purpose. Both mean "we cannot vouch for this
+   * being current", but only `indexStale` means "and we know it is old" — a
+   * feed that dropped or reformatted `<updated>` would otherwise read as fresh,
+   * which is the exact shape the staleness check exists to catch (G72).
+   */
+  indexClockUnknown: boolean;
   /** True when the entry cap trimmed the index. A caveat to disclose, never an exclusion (G8). */
   indexTrimmed: boolean;
   /** How many entries had an unreadable filename. Nonzero is worth disclosing; all of them is a fault. */
@@ -419,13 +429,20 @@ export class JmaService {
     const newest = warningEntries[0];
     const forOffice = warningEntries.find(entry => entry.officeCode === officeCode);
 
+    // A missing or unparseable `<updated>` is NOT evidence of freshness. The
+    // staleness check is the one positive control against a feed that answers
+    // 200 while frozen (G72), and reading an unreadable clock as "not stale"
+    // puts a hole in exactly the shape it guards — so it becomes its own
+    // disclosed caveat rather than silently passing.
     const newestUpdatedMs = newest?.updated ? Date.parse(newest.updated) : Number.NaN;
+    const indexClockUnknown = newest !== undefined && !Number.isFinite(newestUpdatedMs);
     const indexStale =
       Number.isFinite(newestUpdatedMs) && this.now() - newestUpdatedMs > JMA_INDEX_STALE_AFTER_MS;
 
     const base = {
       officeCode,
       indexStale,
+      indexClockUnknown,
       indexTrimmed: index.trimmed,
       indexUnparsedEntries: index.unparsedEntries,
       ...(newest?.updated ? { newestEntryUpdated: newest.updated } : {})
