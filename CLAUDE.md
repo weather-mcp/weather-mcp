@@ -45,6 +45,7 @@ src/
 │   ├── googleWeather.ts     # Google Weather publicAlerts — optional keyed global alerts fallback
 │   ├── googlePollen.ts      # Google Pollen API — optional keyed global pollen fallback
 │   ├── environmentAgency.ts # EA flood-monitoring — GB river gauges, levels, typical ranges (keyless, OGL v3)
+│   ├── jma.ts               # JMA disaster-prevention XML — Japanese warnings; conditional index revalidation
 │   ├── nifc.ts              # NIFC wildfire incidents (US)
 │   ├── firms.ts             # NASA FIRMS satellite fire detections (global)
 │   ├── acis.ts              # RCC ACIS — US daily temperature records
@@ -55,6 +56,9 @@ src/
 │   ├── gibs.ts / basemap.ts # NASA GIBS tiles; base-map fetch + stitch for composites
 │   └── locationStore.ts     # Saved locations persistence (~/.weather-mcp/locations.json)
 ├── types/                   # One file per upstream response shape (all optional fields for 3rd-party JSON)
+│   └── jma.ts               # JMA Atom index + VPWW53 warning document (JMA H27 schema, not CAP)
+├── data/                    # Generated, committed data artifacts — never hand-edited
+│   └── jmaAreas.ts          # JMA class10 warning-area geometry (143 areas), from scripts/generate-jma-areas.mjs
 ├── utils/                   # Shared utilities — prefer pure, I/O-free modules here
 │   ├── cache.ts             # LRU cache with TTL
 │   ├── validation.ts        # Input validation (all user inputs go through here)
@@ -71,6 +75,9 @@ src/
 │   ├── firmsHotspots.ts / metarStation.ts / riverDischarge.ts  # FIRMS parse+cluster; METAR picker; GloFAS cell snap (pure)
 │   ├── eaGauges.ts          # EA station filter, measure selection, level banding (pure)
 │   ├── capParse.ts / pointInPolygon.ts  # CAP 1.2 XML → records, active filter, feed-URL allowlist; ray-casting point-in-ring (pure)
+│   ├── jmaParse.ts          # JMA index + warning-document parsers; class10 level selection (pure)
+│   ├── jmaAreaResolver.ts   # Coordinate → class10 area (pure) + the artifact's one lazy load site
+│   ├── jmaWarningNames.ts   # JMA warning-name English gloss and tier classification (pure)
 │   ├── composite.ts         # PNG stitch/blend/marker/encode (pure)
 │   ├── airQuality.ts / marine.ts / snow.ts / distance.ts / geohash.ts
 │   └── version.ts
@@ -104,7 +111,7 @@ Full per-tool parameter reference: `docs/TOOLS.md`.
 
 1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only
 2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere, or worldwide METAR airport observations via `source="metar"`); `include_fire_weather` gives NOAA's published indices in the US and a server-computed Fosberg index on the Open-Meteo path (not on METAR); automatically adds a frostbite-risk or heat-stress (WBGT) line in extreme conditions — no parameter, gated so moderate output is unchanged
-3. **get_alerts** - Weather alerts/warnings routed by country: NOAA (US), MSC GeoMet/ECCC (Canada), EUMETNET MeteoAlarm (38 European countries), and the national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG) — matched by alert polygon where the feed publishes geometry inline (PH/ID), country-level with an explicit note otherwise (IN, whose geometry endpoint is not server-reachable); elsewhere the optional keyed Google Weather fallback (`GOOGLE_WEATHER_API_KEY`) or a clean not-covered message; `detail` output control
+3. **get_alerts** - Weather alerts/warnings routed by country: NOAA (US), MSC GeoMet/ECCC (Canada), EUMETNET MeteoAlarm (38 European countries), and the national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG) — matched by alert polygon where the feed publishes geometry inline (PH/ID), country-level with an explicit note otherwise (IN, whose geometry endpoint is not server-reachable) — and JMA (Japan), matched to the point by class10 warning area from a committed geometry artifact, with the Japanese name verbatim and an English gloss where known; elsewhere the optional keyed Google Weather fallback (`GOOGLE_WEATHER_API_KEY`) or a clean not-covered message; `detail` output control
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo archive, global; NOAA for recent US dates)
 5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning)
 6. **check_service_status** - API health check (all services)
@@ -369,7 +376,7 @@ WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
 # GOOGLE_WEATHER_API_KEY=...   # Also NOT a free registration (same billing requirement,
                                # separate key — a Pollen-restricted key will not work).
                                # Adds official alerts beyond US/Canada/Europe/India/
-                               # Philippines/Indonesia.
+                               # Philippines/Indonesia/Japan.
                                # docs/GOOGLE_WEATHER_KEY_SETUP.md
 
 # Logging
@@ -591,7 +598,7 @@ npm audit             # No critical vulnerabilities
 ## Project Status
 
 - **Version:** 1.26.0 — Production Ready ✅
-- **Test Coverage:** 3,011 tests, 100% pass rate
+- **Test Coverage:** 3,114 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
