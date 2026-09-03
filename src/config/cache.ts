@@ -184,6 +184,22 @@ export const CacheConfig = {
     // pinned with dead alerts.
     capDocument: 24 * HOUR,
 
+    // JMA Atom index (feed/extra_l.xml) — **retention**, not freshness.
+    //
+    // These are two different clocks and the entry needs both. Freshness is how
+    // long the server will answer without asking JMA at all, and that reuses
+    // `alerts` (5 minutes) as an interval checked *inside* the entry. Retention
+    // is how long the parsed index is kept so that a conditional revalidation
+    // has something to reuse — because a 304 carries zero bytes, and reusing a
+    // cached parse is the entire point of sending `If-None-Match`. Holding both
+    // on one 5-minute TTL would discard the parse at exactly the moment the
+    // ETag became useful, so the revalidation could never fire.
+    //
+    // An hour is safe at any age: a 304 means JMA itself says the parse is
+    // current. It bounds the LRU instead — the parsed index is ~8,600 small
+    // entry objects covering seven days of bulletins.
+    jmaIndex: 1 * HOUR,
+
     // UK Environment Agency bulk latest-readings pull (GET /data/readings?latest&
     // parameter=level). Every EA gauge measure publishes on a 15-minute period
     // (period: 900), so a shorter TTL buys nothing real — the value cannot
