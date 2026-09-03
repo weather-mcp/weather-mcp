@@ -3612,6 +3612,59 @@ it is), and the project's determinism rule — anything mockable is mocked.
 
 ---
 
+## G71 — `publish.yml` gates the npm publish on the *whole* suite, so a third-party outage fails a release that CI just certified green
+
+**Trigger:** pushing a `vX.Y.Z` tag and finding `publish.yml` red at the **Test**
+step, on a commit whose CI run passed.
+
+**Rule:** a red publish run is not evidence the diff is bad. Read *which step*
+failed, then check what that step actually runs. `ci.yml:33` runs
+`npx vitest run tests/unit` — 110 deterministic files. `publish.yml:54` runs
+`npm test`, which is bare `vitest run` and therefore includes
+`tests/integration/`, where several files open real network connections. The two
+gates are **not the same gate**, so "CI is green" says nothing about whether the
+publish will pass. Before reacting, confirm from the registry whether anything
+published ([G39], [G55]): if `latest` is still the previous version, nothing
+shipped and re-running the failed job is the correct recovery — `publish.yml`
+carries a `Skip if version already published` step, so a re-run after a *real*
+publish is refused rather than duplicating one.
+
+**Why:** the publish is gated on a GitHub runner completing a live MQTT
+connection to a third-party broker — `mqtt://blitzortung.ha.sed.pl:1883` — and
+receiving traffic inside a 15-second vitest timeout. Nothing about that is under
+this project's control, it is unrelated to whatever the release changes, and it
+gets a veto over shipping. The asymmetry is the trap: the workflow that decides
+whether code is correct is strictly weaker than the workflow that decides
+whether it ships, so the stronger gate is the one nobody watches until a release
+stalls on it.
+
+**Verify:** `grep -n 'run:' .github/workflows/ci.yml .github/workflows/publish.yml`
+and compare the two Test steps. They differ.
+
+**Evidence:** v1.26.0, 2026-09-03. Run 33698838722 failed at **Test** with two
+timeouts in `tests/integration/visualization-lightning.test.ts` (`:145`, `:168`),
+both `Error: Test timed out in 15000ms` after
+`Connecting to Blitzortung MQTT broker`. The CI run on the identical commit
+(`d2b0242`, 33698801825) had passed minutes earlier because it runs unit tests
+only. The merge commit's tree hash was byte-identical to the already-green branch
+tip (`30781b6d`), and `git diff v1.25.18..main` over
+`visualization-lightning.test.ts`, `lightningHandler.ts` and `blitzortung.ts` was
+**empty** — the release did not touch the lightning path at all. Locally the same
+suite ran green twice and red twice against that same tree. `npm view` confirmed
+`latest` was still `1.25.18`, so nothing had published; re-running the failed job
+alone published cleanly in 3m20s with no code change. `publish.yml` has failed
+this way before — v1.25.12, 2026-08-29.
+
+**Status:** active. The obvious fix — gate the publish on `tests/unit` like CI
+does, or mark the live-network integration files as non-gating — was deliberately
+**not** taken during the v1.26.0 release, because changing the release machinery
+mid-release is the kind of scope expansion `/release` forbids. Related: [G39] and
+the retired [G55] (both about reading a red publish run correctly, in the
+opposite direction — a *successful* publish reported red), and the standing
+flaky-live-network note in the test suite.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
