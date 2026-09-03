@@ -392,6 +392,25 @@ describe('JmaService', () => {
   });
 
   // ------------------------------------------------------------------
+  // 21c: every socket-level code maps to the named connect failure
+  //
+  // This file's live sibling (tests/integration/japan-alerts.test.ts) runs
+  // under `npm test`, which publish.yml runs — so a transport code that falls
+  // to the "Unknown error" residual is a failed publish after the tag exists
+  // (G64/G71). The mapping is what keeps that from happening quietly.
+  // ------------------------------------------------------------------
+  it.each(['ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'EAI_AGAIN', 'EPIPE'])(
+    'maps %s to the fixed connect-failure message',
+    async code => {
+      mockGet.mockImplementation(() => Promise.reject({ code }));
+
+      await expect(makeService().getWarnings('180000')).rejects.toThrow(
+        'Unable to connect to the JMA alert index'
+      );
+    }
+  );
+
+  // ------------------------------------------------------------------
   // 22: failure propagation, no leaked URL, no raw error object logged
   // ------------------------------------------------------------------
   it('propagates a 500 as a fixed message with no URL, and never logs the raw error object', async () => {

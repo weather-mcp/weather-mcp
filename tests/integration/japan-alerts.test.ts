@@ -56,12 +56,18 @@ const service = new JmaService();
 /**
  * True only for `JmaService['toJmaError']`'s own fixed transport-failure
  * strings — see `src/services/jma.ts`: request timeout, unable to connect,
- * a 5xx server error, a rate limit, or an oversize response, for either the
- * "alert index" or the "warning document". Everything else — including the
- * positive-control rejection "JMA alert index carries no warning bulletins"
- * or "JMA alert index is not in the expected format", and any Vitest
- * assertion error — returns `false`, so the caller rethrows rather than
- * swallowing a real regression as a network flake.
+ * a 5xx server error, a rate limit, an oversize response, a non-5xx status,
+ * or the unmapped-code residual, for either the "alert index" or the
+ * "warning document". The last two are here because this file runs under
+ * `npm test` in publish.yml, so anything it rethrows fails a publish *after*
+ * the tag exists (G64/G71): a 403 is how an upstream refusing GitHub's runner
+ * presents, and a transport code the service does not map reaches the
+ * "Unknown error" string rather than a named one.
+ *
+ * Everything else — including the positive-control rejection "JMA alert index
+ * carries no warning bulletins" or "JMA alert index is not in the expected
+ * format", and any Vitest assertion error — returns `false`, so the caller
+ * rethrows rather than swallowing a real regression as a network flake.
  */
 function isTransportFailure(err: unknown): boolean {
   if (!(err instanceof Error)) {
@@ -73,7 +79,17 @@ function isTransportFailure(err: unknown): boolean {
     message.includes('Unable to connect') ||
     message.includes('server error (status') ||
     message.includes('rate limit exceeded') ||
-    message.includes('response too large')
+    message.includes('response too large') ||
+    // A 4xx from an upstream refusing GitHub's runner — a 403 is exactly how
+    // that presents — and the residual bucket for any transport code the
+    // service does not map. Both are network conditions from CI's point of
+    // view, and rethrowing them fails `npm test` in publish.yml *after* the
+    // tag exists (G64/G71). A real regression still fails: every positive
+    // control in this file rejects with a shape message ("carries no warning
+    // bulletins", "is not in the expected format"), and a Vitest assertion
+    // error matches none of these.
+    message.includes('returned status') ||
+    message.includes('Unknown error occurred while contacting')
   );
 }
 

@@ -238,7 +238,18 @@ export class JmaService {
       ) {
         return new Error(`JMA ${what} request timed out`);
       }
-      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      // ECONNRESET / EPIPE (peer dropped the socket) and EAI_AGAIN (transient
+      // DNS failure) are connection failures like the two above. Left
+      // unmapped they fell to the "Unknown error" line, which reads as a
+      // defect rather than a network event — and CI's live smoke rethrows
+      // anything it cannot classify as transport (G64).
+      if (
+        error.code === 'ENOTFOUND' ||
+        error.code === 'ECONNREFUSED' ||
+        error.code === 'ECONNRESET' ||
+        error.code === 'EAI_AGAIN' ||
+        error.code === 'EPIPE'
+      ) {
         return new Error(`Unable to connect to the JMA ${what}`);
       }
     }
