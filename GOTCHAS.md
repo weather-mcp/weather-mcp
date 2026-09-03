@@ -3822,6 +3822,107 @@ to report unless a named sibling control is current would close it mechanically.
 
 ---
 
+## G73 — The docs task runs before the diff-review fixes land, so the shipped docs describe the pre-fix behaviour and no gate reads prose
+
+**Trigger:** a `/run-plan` whose docs task committed before `/diff-review`, and
+whose triage then landed a **fix-now** that changed a *rendered* behaviour —
+a new output state, a changed branch condition, a widened or narrowed guard.
+
+**Rule:** at `/release` step 4b, walk the fix commits that landed **after** the
+docs commit and check each one against the user doc for its area. Get the
+boundary from git, not from memory:
+
+```bash
+DOCS=$(git log --format=%H --diff-filter=M -1 <last-release-tag>..HEAD -- docs/ README.md)
+git log --oneline "$DOCS"..HEAD --  src/
+```
+
+Anything in that list that changed what the tool *renders* is a docs candidate.
+
+**Why:** the pipeline's order guarantees it. The docs task is inside
+`/run-plan`; `/diff-review` runs after `/run-plan` finishes; its fixes commit
+onto the same branch with the gate re-run — and the gate is build, tests and
+`check-doc-versions.sh`. All three pass. `check-doc-versions.sh` reads
+**version strings, tool counts and test counts**; it has no opinion about
+whether a sentence of prose is still true, and there is no check anywhere that
+does. The diff review reads the diff against the plan's contracts, not against
+the docs. So a behavioural fix landing after the docs commit is structurally
+invisible until a human reads the page.
+
+Observed in v1.27.0: `e29dc82` added a **fifth** Japanese not-an-all-clear
+state — a caveat already casting doubt on the feed turns an empty area into
+*unconfirmed* rather than clear — three commits after `9515bcd` wrote
+`docs/TOOLS.md`. The page shipped naming **three** of five, on the alerts
+surface, through a green gate, a three-leg diff review and a full test drive.
+Caught only by `/release` step 4b's per-bullet docs walk.
+
+The same shape hits the architecture map, and worse, because it has no
+changelog bullet to hang off: `CLAUDE.md` still described the alerts cascade as
+`… national CAP IN-PH-ID / Google fallback` after a whole branch was inserted
+ahead of Google. Related: [G31] (a new module under `src/` has no changelog
+bullet, so the architecture map must be named explicitly), [G35] (the release
+tooling passes its own check over text nothing read).
+
+**Verify:** the boundary command above lists a non-empty set on any branch whose
+review landed a render fix, and each entry resolves to a doc page or an explicit
+"none".
+
+---
+
+## G74 — An item can hold more than one row in the roadmap, and only one of them gets amended
+
+**Trigger:** `/release` step 8, or any read of `<roadmap>` status — especially
+for an item that was slotted, then **corrected** (weight, base, or route) in a
+later pass. The correction edits one row; a second row for the same item keeps
+the superseded text and the old status marker.
+
+**Rule:** before ticking a shipped item, count its rows. Match on the item's
+title, not on the plan-doc link — a stale row may point at the same plan:
+
+```bash
+grep -c '<item title>' <roadmap>          # expect 1 detail row + 1 run-order row
+grep -n 'plan-<name>.md' <roadmap>
+```
+
+Tick, strike and re-point **every** hit. Where a duplicate is the superseded
+copy, strike it and say so in place rather than deleting it — the double-entry
+is itself the finding, and deleting the row deletes the evidence that status
+was readable two ways.
+
+**Why:** the roadmap is the single source of truth for feature-idea status, and
+that only holds if an item has one row. Observed in v1.27.1: *Two JMA service
+residuals from the japan-alerts diff review* was written into **Hardening &
+fixes twice on 2026-09-03** — once when `/prioritize` slotted it, and the copy
+that `/quick-fix` later amended when it refused both items and moved the weight
+`quick-fix → standard` and the base `feat/japan-alerts@841f206 → main`. Only the
+amended copy carried the correction. For the rest of that day the file answered
+the same question two ways: one row said `standard`/`main`, the other said
+`quick-fix`/a branch that had already merged. Both said 📝 **planned** after the
+work shipped, until `/release` step 8 struck them.
+
+Nothing in the pipeline can catch this. `backlog-collide.sh` reads the plan
+files, not the roadmap's row count; `check-doc-versions.sh` never opens
+`<roadmap>` — it lives in the internal repo; and `/prioritize`'s legality check
+reads rows as the population it is checking, so a duplicated row is two
+population members, not an error. A status query that happens to land on the
+stale copy is wrong with no signal that it is.
+
+Related: [G35] (the release tooling passes its own check over text nothing
+read), [G73] (a doc that describes the pre-fix behaviour through a green gate).
+The family is the same: a written claim that no gate reads.
+
+**Also surfaced in the same release, not filed separately:** `/run-plan`
+archived the whole plan set but left the design plan stamped `Status: SETTLED`
+rather than `IMPLEMENTED`. `/release` step 8 asks for exactly that confirmation,
+which is what caught it — the stamp is the archive's only marker of a plan that
+actually shipped, and an archived `SETTLED` plan is indistinguishable from one
+promoted and then abandoned.
+
+**Verify:** `grep -c` on a shipped item's title in `<roadmap>` returns the
+expected row count, and every returned row carries the same status marker.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
@@ -3895,48 +3996,3 @@ no longer fails on a successful publish. Related: [G28] (a probe that fails
 reports as a clean negative), [G4] (never trust the status alone — here the
 status is red and the outcome is success), [G47] (a control that proves the
 measurement happened at all).
-
-## G73 — The docs task runs before the diff-review fixes land, so the shipped docs describe the pre-fix behaviour and no gate reads prose
-
-**Trigger:** a `/run-plan` whose docs task committed before `/diff-review`, and
-whose triage then landed a **fix-now** that changed a *rendered* behaviour —
-a new output state, a changed branch condition, a widened or narrowed guard.
-
-**Rule:** at `/release` step 4b, walk the fix commits that landed **after** the
-docs commit and check each one against the user doc for its area. Get the
-boundary from git, not from memory:
-
-```bash
-DOCS=$(git log --format=%H --diff-filter=M -1 <last-release-tag>..HEAD -- docs/ README.md)
-git log --oneline "$DOCS"..HEAD --  src/
-```
-
-Anything in that list that changed what the tool *renders* is a docs candidate.
-
-**Why:** the pipeline's order guarantees it. The docs task is inside
-`/run-plan`; `/diff-review` runs after `/run-plan` finishes; its fixes commit
-onto the same branch with the gate re-run — and the gate is build, tests and
-`check-doc-versions.sh`. All three pass. `check-doc-versions.sh` reads
-**version strings, tool counts and test counts**; it has no opinion about
-whether a sentence of prose is still true, and there is no check anywhere that
-does. The diff review reads the diff against the plan's contracts, not against
-the docs. So a behavioural fix landing after the docs commit is structurally
-invisible until a human reads the page.
-
-Observed in v1.27.0: `e29dc82` added a **fifth** Japanese not-an-all-clear
-state — a caveat already casting doubt on the feed turns an empty area into
-*unconfirmed* rather than clear — three commits after `9515bcd` wrote
-`docs/TOOLS.md`. The page shipped naming **three** of five, on the alerts
-surface, through a green gate, a three-leg diff review and a full test drive.
-Caught only by `/release` step 4b's per-bullet docs walk.
-
-The same shape hits the architecture map, and worse, because it has no
-changelog bullet to hang off: `CLAUDE.md` still described the alerts cascade as
-`… national CAP IN-PH-ID / Google fallback` after a whole branch was inserted
-ahead of Google. Related: [G31] (a new module under `src/` has no changelog
-bullet, so the architecture map must be named explicitly), [G35] (the release
-tooling passes its own check over text nothing read).
-
-**Verify:** the boundary command above lists a non-empty set on any branch whose
-review landed a render fix, and each entry resolves to a doc page or an explicit
-"none".
