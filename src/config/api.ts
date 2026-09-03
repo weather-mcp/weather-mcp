@@ -100,11 +100,11 @@ export function isGooglePollenKeyAvailable(): boolean {
  * The **Weather API** must be enabled on the project.
  *
  * Benefits of providing a key:
- * - Official weather alerts for ~45+ additional territories (Australia, Japan,
+ * - Official weather alerts for ~45+ additional territories (Australia,
  *   Brazil, Mexico, and others) via the Google Weather API
  *
  * If not provided:
- * - US, Canadian, European, Indian, Philippine, and Indonesian alerts
+ * - US, Canadian, European, Indian, Philippine, Indonesian and Japanese alerts
  *   continue to work keyless
  * - Alerts outside these regions are unavailable
  * - No setup required

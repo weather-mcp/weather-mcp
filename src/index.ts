@@ -27,6 +27,7 @@ import { FIRMSService } from './services/firms.js';
 import { GooglePollenService } from './services/googlePollen.js';
 import { GoogleWeatherService } from './services/googleWeather.js';
 import { NationalCapService } from './services/nationalCap.js';
+import { JmaService } from './services/jma.js';
 import { EnvironmentAgencyService } from './services/environmentAgency.js';
 import { GeocodingService } from './services/geocoding.js';
 import { LocationStore } from './services/locationStore.js';
@@ -202,11 +203,22 @@ const googlePollenService = new GooglePollenService();
 const nationalCapService = new NationalCapService();
 
 /**
+ * Initialize the JMA (Japan Meteorological Agency) warning service.
+ *
+ * Japan is a keyless jurisdictional authority like NOAA, ECCC, MeteoAlarm and
+ * the national CAP feeds, so it sits ahead of the Google branch in get_alerts
+ * routing; no API key required. Warnings are matched to the requested point
+ * through a committed class10 area geometry artifact (src/data/jmaAreas.ts).
+ */
+const jmaService = new JmaService();
+
+/**
  * Initialize the Google Weather API service for global alerts fallback.
  * Optional keyed alerts fallback for the "elsewhere" branch of get_alerts; without
  * GOOGLE_WEATHER_API_KEY the keyless authorities are entirely unaffected — NOAA,
- * ECCC, MeteoAlarm, and the national CAP feeds of India, the Philippines and
- * Indonesia — and the elsewhere branch returns the not-covered message unchanged.
+ * ECCC, MeteoAlarm, the national CAP feeds of India, the Philippines and
+ * Indonesia, and JMA in Japan — and the elsewhere branch returns the
+ * not-covered message unchanged.
  */
 const googleWeatherService = new GoogleWeatherService();
 
@@ -421,7 +433,7 @@ export const TOOL_DEFINITIONS = {
 
   get_alerts: {
     name: 'get_alerts' as const,
-    description: 'Get active weather alerts, watches, warnings, and advisories for a location. Coverage: the United States (NOAA), Canada (Environment and Climate Change Canada), European MeteoAlarm member countries (official national warnings, matched at country level — regional filtering within a European country is not yet available), and India (NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG) via their official national CAP feeds — matched to your exact point by the alert polygon in the Philippines and Indonesia, and listed at country level with an explicit note in India, whose geometry is published from a separate endpoint that is not reliably reachable. With an optional `GOOGLE_WEATHER_API_KEY`, official alerts are also available for ~45+ more territories (Australia, Japan, Brazil, Mexico, and others) via the Google Weather API. Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas where the source provides them. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get active weather alerts, watches, warnings, and advisories for a location. Coverage: the United States (NOAA), Canada (Environment and Climate Change Canada), European MeteoAlarm member countries (official national warnings, matched at country level — regional filtering within a European country is not yet available), and India (NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG) via their official national CAP feeds — matched to your exact point by the alert polygon in the Philippines and Indonesia, and listed at country level with an explicit note in India, whose geometry is published from a separate endpoint that is not reliably reachable — and Japan (JMA), matched to your exact point by warning area. All of the above are keyless. With an optional `GOOGLE_WEATHER_API_KEY`, official alerts are also available for ~45+ more territories (Australia, Brazil, Mexico, and others) via the Google Weather API. Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas where the source provides them. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -834,7 +846,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_alerts':
         return await withAnalytics('get_alerts', async () =>
-          handleGetAlerts(args, noaaService, locationStore, geocodingService, meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService)
+          handleGetAlerts(args, noaaService, locationStore, geocodingService, meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService, jmaService)
         );
 
       case 'get_historical_weather':
@@ -846,7 +858,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await withAnalytics('get_weather_summary', async () =>
           handleGetWeatherSummary(
             args, noaaService, openMeteoService, nceiService, locationStore, geocodingService,
-            meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService
+            meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService,
+            jmaService
           )
         );
 

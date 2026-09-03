@@ -24,6 +24,7 @@ import { logger } from '../utils/logger.js';
 import { handleGetCurrentConditions } from './currentConditionsHandler.js';
 import { handleGetForecast } from './forecastHandler.js';
 import { handleGetAlerts } from './alertsHandler.js';
+import { JmaService } from '../services/jma.js';
 import { handleGetAirQuality } from './airQualityHandler.js';
 import { handleGetLightningActivity } from './lightningHandler.js';
 
@@ -95,7 +96,16 @@ export async function handleGetWeatherSummary(
   geoMetService?: GeoMetService,
   nominatimService?: NominatimService,
   googleWeatherService?: GoogleWeatherService,
-  nationalCapService?: NationalCapService
+  nationalCapService?: NationalCapService,
+  // Trailing and optional, exactly as on `handleGetAlerts`, so every
+  // pre-existing 11-argument call site passes `undefined` and is unchanged.
+  //
+  // Routing reaches the summary automatically; the *dependency* does not. A new
+  // service parameter on `handleGetAlerts` arrives `undefined` from here unless
+  // it is threaded explicitly, which would silently render a Japanese point
+  // through Google or the not-covered sentence — a fabricated all-clear on
+  // safety data (G19, and both prep-review legs filed it).
+  jmaService?: JmaService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   const typedArgs = (args ?? {}) as WeatherSummaryArgs;
 
@@ -156,7 +166,7 @@ export async function handleGetWeatherSummary(
           sectionResult = await handleGetAlerts(
             subArgs, noaaService, locationStore, geocodingService,
             meteoAlarmService, geoMetService, nominatimService, googleWeatherService,
-            nationalCapService
+            nationalCapService, jmaService
           );
           break;
         case 'air_quality':

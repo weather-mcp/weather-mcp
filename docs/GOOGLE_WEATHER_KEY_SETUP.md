@@ -19,14 +19,15 @@ below walked in the console, then exercised against the live API)
 This key is **entirely optional**. Without it `get_alerts` still returns
 official warnings for the United States (NOAA), Canada (Environment and
 Climate Change Canada), the 38 European MeteoAlarm member countries, India
-(NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG) — all keyless —
-and every other tool works exactly as before. The key adds official alerts for
-roughly 45 more territories, including Australia, Japan, Brazil, and Mexico. See
+(NDMA SACHET), the Philippines (PAGASA), Indonesia (BMKG), and Japan (the
+Japan Meteorological Agency) — all keyless — and every other tool works
+exactly as before. The key adds official alerts for
+roughly 45 more territories, including Australia, Brazil, and Mexico. See
 [Google's coverage page](https://developers.google.com/maps/documentation/weather/coverage)
 for the current list; any list in this project's docs is representative, not
 exhaustive.
 
-**The US, Canada, Europe, India, the Philippines, and Indonesia never contact
+**The US, Canada, Europe, India, the Philippines, Indonesia, and Japan never contact
 Google, key or no key.** Those are jurisdictional authorities and stay first
 choice; the Google fallback fires only on the branch that would otherwise
 return "alerts are not yet available for this region".
@@ -49,7 +50,7 @@ same caveat as the Pollen key, and the same billing account serves both.
 
 If you'd rather not put a card on file, simply don't set the key. Nothing
 breaks — the elsewhere branch keeps today's not-covered message, whose coverage
-sentence now also names India, the Philippines, and Indonesia as keyless.
+sentence now also names India, the Philippines, Indonesia, and Japan as keyless.
 
 ## Already have the Pollen key? Read this first
 
@@ -156,7 +157,7 @@ variables:
 ## Verifying it works
 
 Ask for alerts somewhere outside the keyless authorities (the US, Canada,
-Europe, India, the Philippines, and Indonesia) — for example
+Europe, India, the Philippines, Indonesia, and Japan) — for example
 *"Any weather warnings in Sydney?"* — and `get_alerts` should return a
 `# Weather Alerts — Australia` section ending with the line
 `Source: Includes weather data from Google` (Google's attribution terms require

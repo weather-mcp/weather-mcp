@@ -19,6 +19,17 @@
  */
 
 /**
+ * One polygon ring: an ordered list of `[lat, lon]` pairs.
+ *
+ * Declared `readonly` throughout so a caller may pass a frozen or generated
+ * constant (e.g. `src/data/jmaAreas.ts`) without copying it. Nothing in this
+ * module writes to a ring, so this is a type-level widening only — a mutable
+ * `Array<[number, number]>` still satisfies it, and every existing caller is
+ * unchanged.
+ */
+export type Ring = ReadonlyArray<readonly [number, number]>;
+
+/**
  * Determine whether a point lies exactly on the closed segment [a, b],
  * inclusive of both endpoints (vertices).
  *
@@ -53,7 +64,7 @@ function isOnSegment(
  * Count of distinct `[lat, lon]` points in a ring, used to detect degenerate
  * rings (fewer than 3 distinct vertices can never enclose an area).
  */
-function distinctPointCount(ring: Array<[number, number]>): number {
+function distinctPointCount(ring: Ring): number {
   const seen = new Set<string>();
   for (const point of ring) {
     seen.add(`${point[0]},${point[1]}`);
@@ -83,7 +94,7 @@ function distinctPointCount(ring: Array<[number, number]>): number {
  * forbids. Malformed input is handled by the explicit guards above; a genuine
  * defect should surface loudly.
  */
-export function pointInRing(lat: number, lon: number, ring: Array<[number, number]>): boolean {
+export function pointInRing(lat: number, lon: number, ring: Ring): boolean {
   if (!ring || ring.length === 0) {
     return false;
   }
@@ -134,7 +145,7 @@ export function pointInRing(lat: number, lon: number, ring: Array<[number, numbe
  *
  * `rings` empty returns `false`. Never throws.
  */
-export function pointInAnyRing(lat: number, lon: number, rings: Array<Array<[number, number]>>): boolean {
+export function pointInAnyRing(lat: number, lon: number, rings: readonly Ring[]): boolean {
   if (!rings || rings.length === 0) {
     return false;
   }

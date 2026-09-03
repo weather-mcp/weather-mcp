@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-09-03
+
+### Added
+
+- **`get_alerts` now covers Japan without a key.** A Japanese location previously reached official warnings only through the optional `GOOGLE_WEATHER_API_KEY`, which needs a Google Cloud billing account with a card on file — the last tier-one jurisdiction where a free national authority publishes warnings and this server did not read them. Japan now routes to the **Japan Meteorological Agency's own disaster-prevention XML feed**, ahead of the Google branch, so a Japanese request never contacts Google, key or no key. Every other branch is unchanged: NOAA, MeteoAlarm and Google output is **byte-identical** to before (verified base-versus-branch, back-to-back, with the key injected into both sides).
+
+  Warnings are matched to your point by **JMA warning area**, not to the whole country. A committed geometry artifact holds the 143 class10 areas JMA publishes warnings for, generated from JMA's own map data by `npm run generate:jma-areas` and loaded lazily at one call site, so a server that never answers a Japanese request never pays for it. Each warning renders its **Japanese name exactly as published** with an English gloss beside it where the term is known, its JMA tier — Emergency Warning (特別警報) / Warning (警報) / Advisory (注意報) — and the qualifying condition where JMA supplies one. An unknown warning code degrades to "Japanese name, no English" and is never dropped.
+
+  **The documented endpoint every prior plan named is dead**, and finding that is why this works at all. `bosai/warning/data/warning/<office>.json` answers HTTP 200 and parses cleanly, which is why three earlier probes accepted it — but a sweep of all 58 offices found none updated since **May 2026**, while a sibling endpoint on the same host stayed current and the live XML feed carried 6,734 warning bulletins in the same seven days. The feed this ships against is the official one, and the index is revalidated with `If-None-Match`, which returns 304 with zero bytes.
+
+  **Nothing here reports an all-clear it cannot support.** Five states each render their own sentence and none of them shows a ✅: the point falls inside no published warning area; the area has no issuing office; no current bulletin was found for the office; and — the one this design is built around — the area resolved from the committed geometry does not appear in the office's own bulletin, meaning the artifact has drifted from the live feed. That check runs on every request at no cost, and it is the only mechanism here that would catch the feed going quiet while still answering 200. The fifth is coherence: where a caveat above the result already says the feed may not be the current picture — the newest bulletin nationwide is unusually old, its timestamp is unreadable, or entries in the index could not be identified and so might be newer bulletins for this very office — an area carrying nothing is reported as *unconfirmed* rather than clear. A caveat and a ✅ in one output are two claims, and the ✅ is the one a reader acts on. A trimmed index is deliberately not in that set: the scan is newest-first, so what the cap dropped is older than what was used and cannot be hiding a newer bulletin. Warnings that **are** in force still render as ⚠️ beside any caveat — the doubt is about completeness, never about what was found. A **lifted** warning (`解除`) and JMA's explicit quiet marker (`発表警報・注意報はなし` — how an office says an area currently carries nothing) are not rendered as active, and a status this server does not recognise is shown *with* its status text rather than silently dropped.
+
+  Verified live against all 58 offices: every office lists every one of its warning areas in its current bulletin, so the drift check cannot misfire on an area that simply has nothing in force. (`src/services/jma.ts`, `src/utils/jmaParse.ts`, `src/utils/jmaAreaResolver.ts`, `src/utils/jmaWarningNames.ts`, `src/types/jma.ts`, `src/data/jmaAreas.ts`, `scripts/generate-jma-areas.mjs`, `src/handlers/alertsHandler.ts`, `src/handlers/weatherSummaryHandler.ts`, `src/utils/pointInPolygon.ts`, `src/config/cache.ts`, `src/index.ts`)
+
+### Security
+
+- **The one moderate `qs` advisory carried since v1.25.18 is still carried, and still not reachable from this server.** `npm audit` reports `qs` 6.15.3 — GHSA-x5fp-wj9c-mxmx (array-limit bypass via bracket-key comma parsing) and GHSA-4mjr-xmp4-gh2g (denial of service via an attacker-controlled `isBuffer`) — reached only as `@modelcontextprotocol/sdk` → `express` → `body-parser`. This server speaks stdio and constructs `StdioServerTransport` and nothing else, so the SDK's HTTP transport — the only thing that would ever parse a query string — is never instantiated. **This release changes no dependency:** `package-lock.json` is byte-identical to v1.26.0, and `package.json` gains only the `generate:jma-areas` script. The patched `qs` 6.16.0 was published on 2026-08-29, so npm's seven-day `min-release-age` cooldown declines to install it until **2026-09-05**; `npm audit fix` produces no lockfile change at all until then. The bump remains a follow-up `chore:` commit rather than a reason to switch off the guard that exists to catch the freshly-published-and-compromised case. This project's release gate is "no high or critical vulnerabilities", which this release meets. (no files changed)
+
 ## [1.26.0] - 2026-09-02
 
 ### Added
@@ -1651,7 +1669,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.26.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.0...HEAD
+[1.27.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.26.0...v1.27.0
 [1.26.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.18...v1.26.0
 [1.25.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.17...v1.25.18
 [1.25.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.16...v1.25.17
