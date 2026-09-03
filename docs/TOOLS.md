@@ -411,7 +411,7 @@ Alerts from all sources are sorted most-critical-first; European, Canadian, and 
 - Effective/issued and expiration times (international times shown as published by the source)
 - Affected geographic areas
 - Recommended actions and safety information
-- Source attribution and, in Europe or for an alert without usable geometry in India/the Philippines/Indonesia, the country-level coverage note; in Japan, a disclosure when the point falls in no warning area, when no bulletin was found for its office, or when the resolved area is absent from the bulletin — none of which renders as an all-clear
+- Source attribution and, in Europe or for an alert without usable geometry in India/the Philippines/Indonesia, the country-level coverage note; in Japan, a disclosure when the point falls in no warning area, when that area has no issuing office, when no bulletin was found for its office, when the resolved area is absent from the office's own bulletin, or when a caveat above the result already casts doubt on the feed and the area carries nothing — none of those five renders as an all-clear
 - In India, the Philippines, and Indonesia, a matched-vs-country-level split
 
 ### 4. get_historical_weather
