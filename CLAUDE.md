@@ -650,8 +650,9 @@ the human promotes it to `.devdocs/` (SETTLED) →
 across vendors → `/plan-triage`) → `/run-plan` (interactive, in a session; it
 needs the Agent tool) → `.claude/scripts/post-run-pipeline.sh` (unattended
 diff reviews + diff triage) → `/test-drive` → `/release`. Beside the chain:
-`/quick-fix` for a change whose *risk* is trivial, and `/quota-route` for
-deciding where a piece of work should run and whether it should run now.
+`/quick-fix` for a change whose *risk* is trivial, `/quota-route` for
+deciding where a piece of work should run and whether it should run now, and
+occasionally `/converge` to find the item that makes the others cheap.
 
 **Before launching any script** (`plan-pipeline.sh`, `plan-review-multi.sh`,
 `post-run-pipeline.sh`):
@@ -669,8 +670,9 @@ deciding where a piece of work should run and whether it should run now.
   or pass the plan path and flags explicitly. Exit code **3** means the chain
   suspended itself on quota; its closing block carries the exact `--resume`
   command and the time to run it.
-- **Launch it with `run_in_background`, then wait once.** Launch the script
-  with `run_in_background`. Then run `.claude/scripts/plan-status.sh --wait` in
+- **A session launching one of the pipeline scripts launches it with
+  `run_in_background`, then waits once.** Launch the script with
+  `run_in_background`. Then run `.claude/scripts/plan-status.sh --wait` in
   the background and do nothing else for this run until it returns. Check on
   progress only with `.claude/scripts/plan-status.sh` — never `ps`, `pgrep`, a
   hand-written Monitor, or an `until` loop; the same script path runs for every
