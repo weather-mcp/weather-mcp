@@ -10,12 +10,15 @@
  *     listed at country level, because SACHET serves geometry from a separate
  *     endpoint that returns 403 to server-side clients
  *     (see .devdocs/archive/completed/plan-national-cap-alerts.md D1),
+ *   Japan → JMA's disaster-prevention XML feed, matched to the requested point
+ *     by a committed class10 area geometry artifact (src/data/jmaAreas.ts),
  *   elsewhere → the optional keyed Google Weather API fallback when a
  *     `GOOGLE_WEATHER_API_KEY` is configured, else a clean not-covered
  *     message (see .devdocs/archive/completed/global-alerts-fallback-plan.md D1).
  *
- * The branch order is the invariant: a US, Canadian, MeteoAlarm-country, or
- * national-CAP-country request never contacts Google, key or no key — those
+ * The branch order is the invariant: a US, Canadian, MeteoAlarm-country,
+ * national-CAP-country, or Japanese request never contacts Google, key or no
+ * key — those
  * are jurisdictional authorities and stay first-choice. Without a key the
  * elsewhere branch is byte-identical to before the fallback existed.
  *
@@ -47,6 +50,14 @@ import {
 import type { GoogleWeatherAlert } from '../types/googleWeather.js';
 import type { NationalCapWarning } from '../types/cap.js';
 import { pointInAnyRing } from '../utils/pointInPolygon.js';
+import { JmaService, JMA_SOURCE_URL } from '../services/jma.js';
+import { loadJmaAreas, resolveJmaArea } from '../utils/jmaAreaResolver.js';
+import {
+  classifyJmaTier,
+  glossJmaCondition,
+  glossJmaWarningName
+} from '../utils/jmaWarningNames.js';
+import type { JmaWarningArea, JmaWarningKind } from '../types/jma.js';
 import {
   resolveLocationAsync,
   prependLocationLine,
@@ -83,7 +94,10 @@ export async function handleGetAlerts(
   geoMetService?: GeoMetService,
   nominatimService?: NominatimService,
   googleWeatherService?: GoogleWeatherService,
-  nationalCapService?: NationalCapService
+  nationalCapService?: NationalCapService,
+  // Trailing and optional, so every pre-existing 9-argument call site passes
+  // `undefined` here and takes the old path by construction.
+  jmaService?: JmaService
 ): Promise<HandlerResult> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as AlertsArgs, locationStore, geocodingService);
@@ -143,6 +157,13 @@ export async function handleGetAlerts(
   //     so warnings are matched to the requested point.
   if (countryCode && isNationalCapCountry(countryCode) && nationalCapService) {
     return handleNationalCapAlerts(resolved, nationalCapService, countryCode, active_only, detail);
+  }
+
+  // 3c. Japan: JMA's own disaster-prevention feed. Keyless and jurisdictional,
+  //     so it sits ahead of Google exactly as NOAA/ECCC/MeteoAlarm/national-CAP
+  //     do — a Japanese request never reaches the branch below, key or no key.
+  if (countryCode === 'jp' && jmaService) {
+    return handleJmaAlerts(resolved, jmaService, active_only, detail);
   }
 
   // 4. Elsewhere (D1): the optional keyed Google Weather API fallback. No
@@ -671,6 +692,284 @@ async function handleNationalCapAlerts(
   return prependLocationLine({
     content: [{ type: 'text', text: output }]
   }, resolved);
+}
+
+
+/**
+ * JMA's three tiers, in the order a reader should see them. `解除` (lifted) is
+ * not a tier — a lifted kind is not an active warning at all and never reaches
+ * this ranking.
+ */
+const JMA_TIER_RANK: Record<string, number> = { emergency: 0, warning: 1, advisory: 2 };
+
+/**
+ * Statuses that mean a kind is **no longer in force**.
+ *
+ * Deliberately a list of what is *lifted* rather than a list of what is active,
+ * so the default for anything unrecognised is to **show** the warning. The
+ * observed vocabulary is `継続` (continuing), `発表` (newly issued),
+ * `警報から注意報` (downgraded to advisory) and `解除` (lifted); a status JMA
+ * adds later would be shown with its own text beside it rather than silently
+ * dropped. On safety data the safe direction is a warning we are unsure about,
+ * never a warning we quietly discarded.
+ */
+const JMA_LIFTED_STATUSES = new Set(['解除']);
+
+/**
+ * Statuses that mean "in force, nothing unusual about how it got there", and so
+ * need no status line of their own at `standard` detail. Everything else —
+ * including a downgrade and anything unrecognised — is shown.
+ */
+const JMA_PLAIN_ACTIVE_STATUSES = new Set(['継続', '発表']);
+
+function isJmaKindActive(kind: JmaWarningKind): boolean {
+  return !(kind.status !== undefined && JMA_LIFTED_STATUSES.has(kind.status));
+}
+
+/** A kind paired with the display severity `remainderNote` groups on. */
+interface JmaRenderableKind {
+  kind: JmaWarningKind;
+  severity: string;
+}
+
+const JMA_TIER_LABEL: Record<string, string> = {
+  emergency: 'Emergency Warning',
+  warning: 'Warning',
+  advisory: 'Advisory'
+};
+
+function toRenderable(kind: JmaWarningKind): JmaRenderableKind {
+  const tier = kind.name ? classifyJmaTier(kind.name) : undefined;
+  return { kind, severity: tier ? JMA_TIER_LABEL[tier] : 'Unknown' };
+}
+
+function byJmaTier(a: JmaRenderableKind, b: JmaRenderableKind): number {
+  const rank = (r: JmaRenderableKind): number => {
+    const tier = r.kind.name ? classifyJmaTier(r.kind.name) : undefined;
+    return tier ? JMA_TIER_RANK[tier] : 3;
+  };
+  return rank(a) - rank(b);
+}
+
+/**
+ * One warning line.
+ *
+ * The Japanese name renders **verbatim, always**, and the English gloss is
+ * added only where the table knows it — an unknown code degrades to "Japanese
+ * name, no English" and is never dropped. The status renders beside it, so a
+ * downgraded or unrecognised state is visible rather than flattened into
+ * "active".
+ */
+function renderJmaKind(kind: JmaWarningKind, detail: Detail): string {
+  const name = kind.name ?? '(unnamed warning)';
+  const gloss = kind.name ? glossJmaWarningName(kind.name) : undefined;
+  let output = gloss ? `### ${name} — ${gloss}\n` : `### ${name}\n`;
+
+  if (kind.condition) {
+    const conditionGloss = glossJmaCondition(kind.condition);
+    output += conditionGloss
+      ? `- **For:** ${kind.condition} (${conditionGloss})\n`
+      : `- **For:** ${kind.condition}\n`;
+  }
+  // At `full`, every status shows. At `standard`, only a status that is *not*
+  // one of the two plain in-force values does — so a downgrade, or a status
+  // this server does not recognise, is visible rather than flattened into
+  // "active", while an ordinary 継続 does not add a line to every warning.
+  const plainlyActive = kind.status !== undefined && JMA_PLAIN_ACTIVE_STATUSES.has(kind.status);
+  if (kind.status && (detail === 'full' || !plainlyActive)) {
+    output += `- **Status:** ${kind.status}\n`;
+  }
+  if (detail === 'full' && kind.code) {
+    output += `- **JMA code:** ${kind.code}\n`;
+  }
+  return output + '\n';
+}
+
+/**
+ * How a resolved area is named in prose.
+ *
+ * Always the Japanese name with its English beside it, and **always** the
+ * issuing office in the same sentence, because a class10 name is not unique:
+ * `北部` / "Northern Region" labels 17 different areas and `南部` / "Southern
+ * Region" 18. They are prefecture sub-region labels and mean nothing on their
+ * own, so this never returns a bare name.
+ */
+function jmaAreaLabel(area: { name: string; enName: string }): string {
+  return area.name === area.enName ? area.name : `${area.name} (${area.enName})`;
+}
+
+/** The licence-mandated attribution, reproduced exactly, plus its English gloss and the source URL. */
+function jmaAttribution(): string {
+  let output = `---\n`;
+  output += `*出典：気象庁ホームページ (Source: Japan Meteorological Agency Homepage) — ${JMA_SOURCE_URL}*\n`;
+  output += `*Warning names are shown as published; English glosses are added for convenience.*\n`;
+  return output;
+}
+
+/**
+ * Japan — JMA's disaster-prevention XML feed, matched to the requested point
+ * through the committed class10 geometry artifact.
+ *
+ * **Contract, not garnish.** Every upstream call below is a bare `await` with
+ * no try/catch, matching all five sibling renderers in this file: a failed
+ * geometry load, index fetch or document fetch **propagates**. A fabricated
+ * "no warnings" assembled from a failed fetch is the worst output this file can
+ * produce.
+ *
+ * There are four distinct not-an-all-clear states here, and each renders as its
+ * own sentence with **no ✅**, because they are different claims:
+ *
+ *   1. the point is in Japan but inside no published warning area (offshore);
+ *   2. the area has **no issuing office** — it resolves normally and simply has
+ *      nobody publishing warnings for it;
+ *   3. the office publishes no bulletin in the index at all;
+ *   4. the area resolved from our artifact does **not appear** in the office's
+ *      document, meaning the committed geometry has drifted from the live feed.
+ *
+ * State 4 is the per-request cross-check the design is built around: JMA's own
+ * documented `bosai` warning endpoint has been answering HTTP 200 with
+ * well-formed but frozen content since May 2026, and a check that the answer
+ * actually covers the point asked about is the only mechanism here that catches
+ * that class of failure.
+ */
+async function handleJmaAlerts(
+  resolved: ResolvedLocation,
+  jmaService: JmaService,
+  active_only: boolean,
+  detail: Detail
+): Promise<HandlerResult> {
+  const areas = await loadJmaAreas();
+  const area = resolveJmaArea(resolved.latitude, resolved.longitude, areas);
+
+  let output = `# Weather Alerts — Japan\n\n`;
+  output += `**Location:** ${resolved.latitude.toFixed(4)}, ${resolved.longitude.toFixed(4)}\n\n`;
+  if (!active_only) {
+    output += `*Note: historical alerts are not available for this region — showing current warnings only.*\n\n`;
+  }
+
+  // State 1. Inside Japan by country, outside every published warning area —
+  // coastal water just offshore is the usual cause. Not an all-clear: JMA
+  // publishes nothing for this point either way, so we cannot speak for it.
+  if (!area) {
+    output += `ℹ️ **This point is not inside any JMA warning area.**\n\n`;
+    output += `*JMA publishes warnings for named land areas; a point offshore or outside those areas has no warning area to check. This is not an all-clear.*\n\n`;
+    output += jmaAttribution();
+    return prependLocationLine({ content: [{ type: 'text', text: output }] }, resolved);
+  }
+
+  // State 2. The area resolves but no office issues warnings for it. Rendered
+  // without the area's name on purpose: this area's upstream map label is
+  // byte-identical to a *different*, real area that does have an office, so
+  // printing it here would state something false about that other area. The
+  // note says only what is true — that nobody publishes warnings for this
+  // point — and says nothing about why.
+  if (!area.officeCode) {
+    output += `ℹ️ **No JMA office issues weather warnings for this location.**\n\n`;
+    output += `*The location falls inside a mapped area that no Japan Meteorological Agency office publishes warnings for, so there is nothing to report — this is not an all-clear.*\n\n`;
+    output += jmaAttribution();
+    return prependLocationLine({ content: [{ type: 'text', text: output }] }, resolved);
+  }
+
+  const result = await jmaService.getWarnings(area.officeCode);
+  const label = jmaAreaLabel(area);
+
+  // A trimmed index is a caveat, never an exclusion (G8) — the office may well
+  // have a bulletin among the entries that were not scanned.
+  if (result.indexTrimmed) {
+    output += `*Note: the JMA feed listed more bulletins than could be scanned; only the most recent were checked. This may not be the complete picture.*\n\n`;
+  }
+  if (result.indexUnparsedEntries > 0) {
+    output += `*Note: ${result.indexUnparsedEntries} entr${result.indexUnparsedEntries > 1 ? 'ies' : 'y'} in the JMA feed could not be identified and ${result.indexUnparsedEntries > 1 ? 'were' : 'was'} not checked.*\n\n`;
+  }
+  if (result.indexStale) {
+    output += `⚠️ *The JMA feed's most recent bulletin nationwide is unusually old, so this may not reflect current conditions — this is not an all-clear.*\n\n`;
+  }
+
+  // State 3. Every office publishes this bulletin type continuously, so an
+  // office with no entry means the answer is unknown rather than negative.
+  if (!result.document) {
+    output += `ℹ️ **No current JMA warning bulletin was found for ${label}.**\n\n`;
+    output += `*The Japan Meteorological Agency publishes warnings for this area, but no current bulletin for it appeared in the feed, so its status could not be confirmed — this is not an all-clear.*\n\n`;
+    output += jmaAttribution();
+    return prependLocationLine({ content: [{ type: 'text', text: output }] }, resolved);
+  }
+
+  const office = result.document.publishingOffice ?? 'the Japan Meteorological Agency';
+  const matchedArea: JmaWarningArea | undefined = result.document.areas.find(
+    documentArea => documentArea.code === area.code
+  );
+
+  // State 4. The cross-check. Our committed geometry says this point is in area
+  // X; the office's own current bulletin does not mention X. Either the
+  // artifact has drifted from the live feed or the feed has changed shape, and
+  // in both cases we do not know this point's warning status.
+  if (!matchedArea) {
+    output += `ℹ️ **The warning area for this location could not be matched in ${office}'s current bulletin.**\n\n`;
+    output += `*This server resolved the location to ${label}, which does not appear in the bulletin that office published, so its warning status could not be confirmed — this is not an all-clear. The area list may have changed since this server's copy was generated.*\n\n`;
+    output += jmaAttribution();
+    return prependLocationLine({ content: [{ type: 'text', text: output }] }, resolved);
+  }
+
+  // `解除` means lifted. Rendering a lifted warning as active is a fabricated
+  // warning — the mirror image of a fabricated all-clear, and just as wrong.
+  // Anything unrecognised counts as active and shows its own status text.
+  const activeKinds = matchedArea.kinds.filter(isJmaKindActive).map(toRenderable);
+  activeKinds.sort(byJmaTier);
+
+  // Scope context: what else this office currently has in force, so the reader
+  // can tell "nothing anywhere" from "nothing here". Counted over the office's
+  // other areas in the same bulletin.
+  const elsewhere = result.document.areas
+    .filter(documentArea => documentArea.code !== area.code)
+    .reduce((total, documentArea) => total + documentArea.kinds.filter(isJmaKindActive).length, 0);
+
+  const issued = result.document.reportDateTime;
+  // Times render as published, like every other international branch — JMA's
+  // licence terms require its content to be reproduced unmodified.
+  const issuedPhrase = issued ? ` at ${issued}` : '';
+
+  if (activeKinds.length === 0) {
+    // An honest empty: the bulletin was fetched, it names this area, and the
+    // area carries nothing in force. This is the one branch that earns a ✅.
+    output += `✅ **No active weather warnings for ${label}.**\n\n`;
+    output += elsewhere > 0
+      ? `*Checked against the current bulletin from ${office}${issuedPhrase} — ${elsewhere} warning${elsewhere > 1 ? 's' : ''} in force in other areas of that bulletin, none for this one.*\n\n`
+      : `*Checked against the current bulletin from ${office}${issuedPhrase} — no warnings in force in any area of that bulletin.*\n\n`;
+  } else {
+    output += `⚠️ **${activeKinds.length} active warning${activeKinds.length > 1 ? 's' : ''} for ${label}**\n\n`;
+    output += `*Issued by ${office}${issuedPhrase}.*\n\n`;
+
+    if (detail === 'summary') {
+      const counts = new Map<string, number>();
+      for (const renderable of activeKinds) {
+        counts.set(renderable.severity, (counts.get(renderable.severity) ?? 0) + 1);
+      }
+      for (const [severity, count] of counts) {
+        output += `- **${severity}:** ${count}\n`;
+      }
+      output += `\n*Counts only at detail="summary". Use detail="standard" or detail="full" for the warnings themselves.*\n\n`;
+    } else {
+      const cap = detail === 'full' ? FULL_DISPLAY_CAP : STANDARD_DISPLAY_CAP;
+      const shown = activeKinds.slice(0, cap);
+      const remainder = activeKinds.slice(shown.length);
+
+      for (const renderable of shown) {
+        output += renderJmaKind(renderable.kind, detail);
+      }
+      if (remainder.length > 0) {
+        output += remainderNote(remainder, 'warning', detail);
+      }
+      if (elsewhere > 0) {
+        output += `*${elsewhere} further warning${elsewhere > 1 ? 's' : ''} in force in other areas of the same bulletin, not covering this location.*\n\n`;
+      }
+      if (detail !== 'full') {
+        output += `*Showing standard detail. Use detail="full" for warning status and JMA codes.*\n\n`;
+      }
+    }
+  }
+
+  output += jmaAttribution();
+  return prependLocationLine({ content: [{ type: 'text', text: output }] }, resolved);
 }
 
 /**
@@ -1245,7 +1544,8 @@ function notCoveredResult(
   output += `Canada (Environment and Climate Change Canada), the European MeteoAlarm `;
   output += `member countries (matched at country level), and — via their national CAP feeds — `;
   output += `the Philippines (PAGASA) and Indonesia (BMKG), matched by alert polygon, and `;
-  output += `India (NDMA SACHET), matched at country level.\n`;
+  output += `India (NDMA SACHET), matched at country level; and Japan (JMA), `;
+  output += `matched to your point by warning area.\n`;
 
   if (reverseLookupFailed) {
     output += `\n*Note: the country lookup service was unavailable, so routing fell back to coordinate checks.*\n`;
