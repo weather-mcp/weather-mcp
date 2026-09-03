@@ -363,6 +363,89 @@ describe('JMA rendering — lifted (解除) kinds', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Rendering — the explicit quiet marker (発表警報・注意報はなし)
+//
+// JMA encodes "this area currently carries nothing" as a Kind with no name, no
+// code, and the status 発表警報・注意報はなし. It is routine — over one week 65
+// of Tokyo's 132 area blocks carried it, 小笠原諸島 in all 33 of its bulletins
+// — and it must render as the honest empty, never as a warning. No fixture in
+// this file carried the marker before, which is why the branch shipped able to
+// print `⚠️ 1 active warning` / `### (unnamed warning)`.
+// ---------------------------------------------------------------------------
+
+const QUIET_MARKER: JmaWarningKind = { status: '発表警報・注意報はなし' };
+
+describe('JMA rendering — explicit quiet marker', () => {
+  it('renders the honest-empty ✅ for an area whose only kind is the quiet marker', async () => {
+    const jma = makeJmaFake({
+      document: {
+        publishingOffice: '気象庁',
+        areas: [areaFixture(TOKYO_CODE, { kinds: [{ ...QUIET_MARKER }] })]
+      }
+    });
+    const { text } = await callAlerts(TOKYO, { country: 'jp', jma });
+
+    expect(text).toContain('✅ **No active weather warnings for 東京地方 (Tokyo Region).**');
+    expect(text).not.toContain('⚠️');
+    // The construct, not the vocabulary (G62): no warning heading of any kind,
+    // and specifically never the placeholder the marker used to produce.
+    expect(text).not.toMatch(/^### /m);
+    expect(text).not.toContain('(unnamed warning)');
+  });
+
+  it('does not count the quiet marker beside a real kind in the same area', async () => {
+    const jma = makeJmaFake({
+      document: {
+        publishingOffice: '気象庁',
+        areas: [
+          areaFixture(TOKYO_CODE, {
+            kinds: [{ ...QUIET_MARKER }, kindFixture({ name: '洪水警報', status: '継続' })]
+          })
+        ]
+      }
+    });
+    const { text } = await callAlerts(TOKYO, { country: 'jp', jma });
+
+    expect(text).toContain('⚠️ **1 active warning for 東京地方 (Tokyo Region)**');
+    expect(text).toMatch(/^### 洪水警報/m);
+    expect(text).not.toContain('(unnamed warning)');
+  });
+
+  it('does not let a quiet marker in another area inflate the elsewhere count', async () => {
+    const jma = makeJmaFake({
+      document: {
+        publishingOffice: '気象庁',
+        areas: [
+          areaFixture(TOKYO_CODE, { kinds: [] }),
+          areaFixture('130040', { kinds: [{ ...QUIET_MARKER }] })
+        ]
+      }
+    });
+    const { text } = await callAlerts(TOKYO, { country: 'jp', jma });
+
+    expect(text).toContain('no warnings in force in any area of that bulletin');
+    expect(text).not.toContain('1 warning in force in other areas');
+  });
+
+  it('does not render a "Unknown: 1" severity count for the marker at detail="summary"', async () => {
+    const jma = makeJmaFake({
+      document: {
+        publishingOffice: '気象庁',
+        areas: [areaFixture(TOKYO_CODE, { kinds: [{ ...QUIET_MARKER }] })]
+      }
+    });
+    const { text } = await callAlerts(
+      { ...TOKYO, detail: 'summary' },
+      { country: 'jp', jma }
+    );
+
+    expect(text).not.toContain('⚠️');
+    expect(text).not.toContain('Unknown:');
+    expect(text).not.toContain('(unnamed warning)');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Rendering — unrecognised status
 // ---------------------------------------------------------------------------
 

@@ -247,6 +247,28 @@ describe('handleGetWeatherSummary — JMA pass-through (T11)', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Contract 5b — JMA's explicit quiet marker reaches the summary as an empty,
+  // not as a fabricated warning. The summary path renders alerts at its own
+  // default detail, so it is a second render site for the same document and
+  // needs its own lock.
+  // -------------------------------------------------------------------------
+
+  it('renders an area carrying only the quiet marker as empty, never as a warning', async () => {
+    const jma = makeJmaFake({
+      document: {
+        publishingOffice: '気象庁',
+        areas: [areaFixture(TOKYO_CODE, { kinds: [{ status: '発表警報・注意報はなし' }] })]
+      }
+    });
+
+    const text = await callSummary(TOKYO, { jma });
+
+    expect(text).not.toContain('⚠️');
+    expect(text).not.toContain('(unnamed warning)');
+    expect(text).toContain('出典：気象庁ホームページ');
+  });
+
+  // -------------------------------------------------------------------------
   // Contract 6 — mandated attribution survives into the summary
   // -------------------------------------------------------------------------
 

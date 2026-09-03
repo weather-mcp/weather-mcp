@@ -309,6 +309,28 @@ describe('parseJmaWarningDocument', () => {
     expect(doc.areas[0].kinds.map(k => k.status)).toEqual(['解除', '発表', '警報から注意報']);
   });
 
+  it('carries the bare quiet marker through as a name-less, code-less kind', () => {
+    // JMA encodes "nothing in force here" as a Kind with only a Status. The
+    // parser's job is to carry it verbatim — deciding it is not a warning is
+    // the handler's (see tests/unit/alerts-jma.test.ts). Pinned here so a
+    // future parser that drops name-less kinds cannot do it silently.
+    const xml = reportDoc({
+      warnings: [
+        warningBlock(CLASS10_TYPE, [
+          itemXml({
+            areaName: '小笠原諸島',
+            areaCode: '130040',
+            kinds: ['<Kind><Status>発表警報・注意報はなし</Status></Kind>']
+          })
+        ])
+      ]
+    });
+    const doc = parseJmaWarningDocument(xml);
+    expect(doc.areas[0].kinds).toEqual([
+      { name: undefined, code: undefined, status: '発表警報・注意報はなし', condition: undefined }
+    ]);
+  });
+
   it('captures Condition, including the compound 土砂災害、浸水害', () => {
     const xml = reportDoc({
       warnings: [

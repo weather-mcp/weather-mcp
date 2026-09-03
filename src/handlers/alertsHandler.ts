@@ -703,17 +703,24 @@ async function handleNationalCapAlerts(
 const JMA_TIER_RANK: Record<string, number> = { emergency: 0, warning: 1, advisory: 2 };
 
 /**
- * Statuses that mean a kind is **no longer in force**.
+ * Statuses that mean a kind is **not in force**.
  *
- * Deliberately a list of what is *lifted* rather than a list of what is active,
- * so the default for anything unrecognised is to **show** the warning. The
- * observed vocabulary is `継続` (continuing), `発表` (newly issued),
- * `警報から注意報` (downgraded to advisory) and `解除` (lifted); a status JMA
+ * Deliberately a list of what is *not in force* rather than a list of what is
+ * active, so the default for anything unrecognised is to **show** the warning.
+ * The observed vocabulary is `継続` (continuing), `発表` (newly issued),
+ * `警報から注意報` (downgraded to advisory), `解除` (lifted) and
+ * `発表警報・注意報はなし` (no warnings or advisories issued); a status JMA
  * adds later would be shown with its own text beside it rather than silently
  * dropped. On safety data the safe direction is a warning we are unsure about,
  * never a warning we quietly discarded.
+ *
+ * `発表警報・注意報はなし` is JMA's **explicit quiet marker**, not a
+ * warning: an office publishes it for an area that currently carries nothing.
+ * It is routine — over one week 65 of Tokyo's 132 area blocks carried it — and
+ * treating it as active rendered a fabricated `⚠️ 1 active warning`, the mirror
+ * image of the fabricated all-clear this branch exists to prevent.
  */
-const JMA_LIFTED_STATUSES = new Set(['解除']);
+const JMA_NOT_IN_FORCE_STATUSES = new Set(['解除', '発表警報・注意報はなし']);
 
 /**
  * Statuses that mean "in force, nothing unusual about how it got there", and so
@@ -722,8 +729,21 @@ const JMA_LIFTED_STATUSES = new Set(['解除']);
  */
 const JMA_PLAIN_ACTIVE_STATUSES = new Set(['継続', '発表']);
 
+/**
+ * Is this kind a warning that is currently in force?
+ *
+ * Two ways to be `false`, and both matter. The **status** test is the
+ * vocabulary one above. The **structural** test is that a kind carrying neither
+ * a name nor a code names no hazard at all — there is nothing a reader could
+ * act on and nothing to render but `(unnamed warning)`, so it is a marker
+ * however its status reads. Anything that names a hazard stays active, so an
+ * unrecognised status still shows.
+ */
 function isJmaKindActive(kind: JmaWarningKind): boolean {
-  return !(kind.status !== undefined && JMA_LIFTED_STATUSES.has(kind.status));
+  if (kind.status !== undefined && JMA_NOT_IN_FORCE_STATUSES.has(kind.status)) {
+    return false;
+  }
+  return kind.name !== undefined || kind.code !== undefined;
 }
 
 /** A kind paired with the display severity `remainderNote` groups on. */
