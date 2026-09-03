@@ -396,6 +396,8 @@ via `src/utils/unitFormat.ts`.
 - **Historical data (>1 day old):** Infinity (finalized)
 - **Recent historical (<1 day):** 1 hour (may be corrected)
 - **NWPS gauge detail (flood-stage thresholds):** 24 hours (gauge metadata, revised ~annually)
+- **EA bulk latest readings:** 15 minutes (every EA gauge measure publishes on a 15-minute period)
+- **EA station detail (typical-range thresholds):** 24 hours (gauge metadata; the threshold projection only — never a reading, see GOTCHAS G7)
 - Newer entries (normals, Google pollen, FIRMS, tiles, composites) are documented inline in `CacheConfig`
 
 ### Cache Implementation

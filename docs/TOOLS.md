@@ -774,6 +774,8 @@ Monitor river levels and flood status worldwide — NOAA gauge observations in t
 
 *US locations (NOAA NWPS):* Finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Each shown gauge also gets an observed rise/fall trend derived from its stage history (e.g. `↗ rising (+0.5 ft / 6h)`); gauges whose stage series can't be fetched simply omit the trend. Gauge IDs include the USGS site number where NWPS reports one, but streamflow data is not fetched from USGS Water Services.
 
+*Great Britain (Environment Agency):* Finds the nearest river gauges and reports their **observed** level, updated every 15 minutes, against each gauge's published typical range. A station is reported when the Environment Agency publishes a river name for it, so tide gauges are excluded and Scottish river gauges are included. There is no forecast and there are no flood categories — see **Returns** below.
+
 *Everywhere else (Open-Meteo Flood API, GloFAS v4):* Returns modeled river discharge in m³/s (with ft³/s under imperial units) on a ~5km grid. Because a grid cell that misses the river channel reports local runoff rather than the river, each request probes a 3×3 neighborhood in one call and selects the cell with the highest mean discharge over the past 31 days; when the selected cell is not the requested point, the output discloses it ("Nearest modeled river channel: ~5 km W of requested point"). GloFAS publishes no flood-stage thresholds, so discharge is presented against its own recent history and the forecast ensemble instead of flood categories. Points with no modeled channel — open ocean, arid regions — return a plain "no river data" result rather than an error.
 
 **Examples:**
