@@ -191,6 +191,42 @@ describe('JmaService', () => {
     expect(revalidationCall[1]?.headers?.['If-None-Match']).toBe('W/"first-etag"');
     expect(third).toEqual(first);
   });
+  // ------------------------------------------------------------------
+  // 16c: an unsolicited 304 on a COLD cache — nothing to revalidate against
+  // ------------------------------------------------------------------
+  it('reports an unsolicited cold-cache 304 as an empty revalidation, not as malformed XML', async () => {
+    // `validateStatus` admits 304 because a revalidation's success case is a
+    // 304 with zero bytes. On a cold pull there is no cached parse to serve
+    // and no `If-None-Match` was sent, so a conforming origin cannot produce
+    // this — an intermediary can. Without the guard the empty body reaches
+    // `parseJmaIndex('')`, which reports `JMA index is not well-formed XML`:
+    // an accurate description of our own empty string and a wrong one of what
+    // happened. Reverting only the src/services/jma.ts change turns this red
+    // with that message.
+    mockGet.mockImplementation((url: string) => {
+      if (url === JMA_INDEX_URL) return xmlResponse('', { status: 304 });
+      return Promise.reject(new Error(`unexpected fetch in test: ${url}`));
+    });
+
+    const service = makeService(() => Date.parse('2026-09-03T05:00:00Z'));
+
+    await expect(service.getWarnings('180000')).rejects.toThrow(
+      'JMA alert index revalidation returned no content'
+    );
+
+    // The assertion that makes this discriminate: the pre-fix code throws the
+    // XML-shape message here, and that message would send someone reading it
+    // to look at JMA's feed rather than at the intermediary in front of it.
+    await expect(service.getWarnings('180000')).rejects.not.toThrow(
+      'is not well-formed XML'
+    );
+
+    // Contract, not garnish: it propagated rather than degrading to an empty
+    // index, and no document was fetched off the back of one.
+    expect(callsTo(JMA_INDEX_URL).length).toBeGreaterThan(0);
+    expect(mockCalls().filter((c) => c[0] !== JMA_INDEX_URL)).toHaveLength(0);
+  });
+
 
   // ------------------------------------------------------------------
   // 17: concurrency — single-flight on both the index and the document

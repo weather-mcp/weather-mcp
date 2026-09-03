@@ -336,6 +336,29 @@ export class JmaService {
         throw this.toJmaError(error, 'alert index');
       }
 
+      // A 304 with nothing to serve. `validateStatus` admits 304 because a
+      // revalidation's success case *is* a 304 with zero bytes — but that
+      // depends on holding a cached parse to reuse, and here there is none.
+      // No `If-None-Match` was sent on this pull (the header above is
+      // conditional on `cached?.etag`), so a conforming origin cannot answer
+      // 304 at all; an intermediary can, and the message should point at the
+      // intermediary. Falling through would hand `''` to `parseJmaIndex` and
+      // report `JMA index is not well-formed XML` — a true description of our
+      // own empty string and a false one of what happened.
+      //
+      // Contract, not garnish: this propagates. It must never become an empty
+      // index, which `assertIndexIsUsable` would then report as
+      // `JMA alert index carries no warning bulletins` — a third wrong story
+      // about the same event (G72).
+      if (response.status === 304 && !cached) {
+        logger.error('JMA request failed', undefined, {
+          service: 'JMA',
+          operation: 'index',
+          status: 304
+        });
+        throw new Error('JMA alert index revalidation returned no content');
+      }
+
       // 304: JMA says the parse we hold is current. Zero bytes, no re-parse —
       // only the freshness stamp moves.
       if (response.status === 304 && cached) {

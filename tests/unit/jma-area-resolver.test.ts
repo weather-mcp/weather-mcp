@@ -232,6 +232,33 @@ describe('loadJmaAreas (memoised load)', () => {
     expect(attempts).toBe(1);
   });
 
+  it('the empty-array guard logs exactly once, from onFulfilled — the rejection handler is never reached', async () => {
+    // Pins the DEADNESS of the `instanceof JmaAreaDataUnavailableError` branch
+    // in the module's `onRejected` handler. `.then(onFulfilled, onRejected)`
+    // does not route a throw from `onFulfilled` into `onRejected`, so the
+    // empty-array guard's throw propagates directly and that handler never
+    // runs. The only observable difference between the two control flows is
+    // the number of `logger.error` calls: one here, two if the guard's throw
+    // were routed through the rejection handler (which logs '…failed to load'
+    // before rethrowing).
+    //
+    // ONE call to freshLoad(), deliberately: the empty-array test above calls
+    // it twice and therefore logs twice by design, which makes the count
+    // unreadable as evidence. That test is the lock for the not-memoised
+    // claim and is left unedited.
+    const factory = vi.fn(() => ({ JMA_CLASS10_AREAS: [] }));
+    vi.doMock(DATA_MODULE_SPECIFIER, factory);
+    const { loadJmaAreas: freshLoad, JmaAreaDataUnavailableError, logger } =
+      await importFreshResolver();
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    await expect(freshLoad()).rejects.toBeInstanceOf(JmaAreaDataUnavailableError);
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0]?.[0]).toBe('Japanese warning-area geometry loaded but is empty');
+    expect(errorSpy.mock.calls[0]?.[0]).not.toBe('Japanese warning-area geometry failed to load');
+  });
+
   it('a successful load that yields a non-array export throws JmaAreaDataUnavailableError on every call, and never gets cached as a valid result', async () => {
     let attempts = 0;
     const factory = vi.fn(() => {

@@ -460,7 +460,7 @@ test must task the doc update, and a plan asserting the count does not move shou
 be tested against the suite rather than believed.
 
 **Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
-2026-08-25**, **extended 2026-08-29**, **Verify line re-run 2026-09-02** (`d65ef25`, noaa-forecast-horizon-disclosure T2 — the count moved 2,933 → 2,941 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,941`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01, second time** (`f48eda3`, openmeteo-nullable-scalar-types T6 — the count moved 2,917 → 2,933 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,933`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2933`, `✅ CLAUDE.md test count: 2933`, `✅ README.md tests badge: 2933` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
+2026-08-25**, **Verify line re-run 2026-09-03** (`99cc032`, jma-service-residuals T4 — the count moved 3,130 → 3,132 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,132`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3132`, `✅ CLAUDE.md test count: 3132`, `✅ README.md tests badge: 3132` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **extended 2026-08-29**, **Verify line re-run 2026-09-02** (`d65ef25`, noaa-forecast-horizon-disclosure T2 — the count moved 2,933 → 2,941 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,941`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01, second time** (`f48eda3`, openmeteo-nullable-scalar-types T6 — the count moved 2,917 → 2,933 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,933`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2933`, `✅ CLAUDE.md test count: 2933`, `✅ README.md tests badge: 2933` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
 band-rounding T2 — the count moved 2,611 → 2,660 and all five sites were edited
 by content; with both unvalidated sites then set to `9,999` against the real
 `2,660`, `./scripts/check-doc-versions.sh` still printed `✅ README.md test
@@ -1830,7 +1830,7 @@ into an integer comparison", which was right about the mechanism. `server.json`
 was byte-identical to `main` and untouched by that plan, and `main` reports the
 same ❌ from the same harness, so nothing about the branch caused it.
 
-**Status:** active. **Not re-tested 2026-08-28** (openmeteo-nullable-series-types
+**Status:** active. **Verify line re-run 2026-09-03** (jma-service-residuals T4) — this time against the bug rather than around it: `FORCE_COLOR=1 ./scripts/check-doc-versions.sh` printed `❌ server.json description length: \033[0;31m[33m98[39m\033[0m (registry limit is 100)` and exited 1, while `env -u FORCE_COLOR` over the same unchanged `server.json` passed. The trap is intact, the mechanism is exactly as described, and `server.json` still must not be edited to satisfy it. **Not re-tested 2026-08-28** (openmeteo-nullable-series-types
 T6): the run invoked the script as `env -u FORCE_COLOR` throughout and it reported
 `server.json description length: 98 (≤ 100)` correctly. That is the workaround
 working, **not** evidence the underlying bug is gone — do not read a clean run
@@ -2334,7 +2334,40 @@ legend at all. Fixed by parsing the legend rows out of the handler's returned
 text. Same family as this entry's rule: reaching the layer is necessary, and
 reading the layer's *output* rather than re-deriving it is the other half.
 
-**Status:** active, **extended 2026-08-29 and twice on 2026-09-01**. Related: [G13] (a fixture that cannot discriminate),
+**Extended 2026-09-03** (`bc84256`/`f499cbb`, jma-service-residuals T1/T2) — **when
+the deliverable is a *deletion*, run the discriminating mutation against the
+post-deletion code, because the construct being deleted can be the thing that
+absorbs the mutation.** The task was to remove an unreachable
+`if (error instanceof JmaAreaDataUnavailableError) { throw error; }` from the
+`onRejected` argument of `.then(onFulfilled, onRejected)` in `loadJmaAreas`
+(`src/utils/jmaAreaResolver.ts`). The plan ordered a test first — `logger.error`
+called exactly once on the empty-array guard — and prescribed the design's one
+named-and-rejected alternative as the mutation that would prove it discriminates:
+`.then(a, b)` → `.then(a).catch(b)`, which routes the guard's throw into the
+handler. **Applied to the pre-deletion code it left the test green**, and reading
+that as "the test is vacuous" or "the deadness claim is wrong" would both have
+been wrong. The branch rethrows *without logging*, so it is **observationally
+inert**: a reached handler and an unreached one produce the same single
+`logger.error` call. Nothing could tell them apart while the branch stood — which
+is a stronger deadness result than the plan claimed, not a weaker one, and it is
+unfalsifiable by construction. The same mutation applied *with* the deletion in
+place went red immediately (`expected "error" to be called 1 times, but got 2
+times`, the second `'…failed to load'`), because the silent rethrow was gone and
+the guard's error reached the handler's own logging.
+
+The generalisation, and the planning rule that follows: **a construct whose only
+effect is to re-emit what already happened cannot be proven dead by any test
+while it is present.** A test written to protect its removal is not certifying
+the *pre*-state; it is a lock on the *post*-state, and its discrimination check
+belongs on the task that does the deleting, not on the task that writes the test.
+A plan that puts the mutation check on the test-writing task will read a green
+mutation and have no correct move available — the two tempting ones are to weaken
+the deletion claim and to strengthen the test, and neither is the answer. Related
+to this entry's 2026-08-29 extension (a mutation must *diverge*, not merely
+differ): there the two branches computed the same value from the fixtures; here a
+second, redundant suppressor sat between the mutation and the observable.
+
+**Status:** active, **extended 2026-08-29, twice on 2026-09-01, and 2026-09-03**. Related: [G13] (a fixture that cannot discriminate),
 [G32] (mutating to every *rejected implementation* — this entry is about the
 *entry point*, that one about the *alternative*), [G11] (read the real output),
 [G41] (a plan's mechanical prediction is not the contract), [G57] (the run that
