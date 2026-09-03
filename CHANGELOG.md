@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A cold-cache JMA 304 no longer reports itself as malformed XML.** `validateStatus` admits an HTTP 304 on the alert-index revalidation because a 304 with zero bytes is the normal success case — but only when a cached parse exists to serve. With no cached entry, the empty body used to fall through to the parser, which reported `JMA index is not well-formed XML`: an accurate description of our own empty string and a wrong one of what happened, pointing a reader at JMA's feed rather than at the intermediary in front of it. No `If-None-Match` is sent on a cold pull, so a conforming origin cannot answer 304 at all; an intermediary can. The cold-cache case now throws a fixed `JMA alert index revalidation returned no content` before reaching the parser and logs it structurally. This is an error-path change on a request shape normal operation cannot produce, and it cannot change a rendered weather answer. (`src/services/jma.ts`)
+
+- **A dead, backwards-described branch in the Japanese warning-area loader is removed.** Its rejection handler carried an `instanceof JmaAreaDataUnavailableError` check that could never run — `.then(onFulfilled, onRejected)` does not route a throw from `onFulfilled` into `onRejected` (only `.then(onFulfilled).catch(onRejected)` does) — and the comment beside it claimed the opposite, misdescribing the control flow for the next reader. The branch and comment are replaced with one describing what the handler actually sees: a rejection of the `import()` itself. No behavior changes. The branch was inert even if reached — it rethrew without logging — so nothing could observe it in place; the test added alongside pins the empty-array guard to a single `logger.error` call, and against the code without the branch, rewiring the loader so that guard's throw *does* reach the handler turns that test red. It locks the removal rather than certifying the branch beforehand. (`src/utils/jmaAreaResolver.ts`)
+
 ## [1.27.0] - 2026-09-03
 
 ### Added
