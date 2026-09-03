@@ -3862,3 +3862,48 @@ no longer fails on a successful publish. Related: [G28] (a probe that fails
 reports as a clean negative), [G4] (never trust the status alone — here the
 status is red and the outcome is success), [G47] (a control that proves the
 measurement happened at all).
+
+## G73 — The docs task runs before the diff-review fixes land, so the shipped docs describe the pre-fix behaviour and no gate reads prose
+
+**Trigger:** a `/run-plan` whose docs task committed before `/diff-review`, and
+whose triage then landed a **fix-now** that changed a *rendered* behaviour —
+a new output state, a changed branch condition, a widened or narrowed guard.
+
+**Rule:** at `/release` step 4b, walk the fix commits that landed **after** the
+docs commit and check each one against the user doc for its area. Get the
+boundary from git, not from memory:
+
+```bash
+DOCS=$(git log --format=%H --diff-filter=M -1 <last-release-tag>..HEAD -- docs/ README.md)
+git log --oneline "$DOCS"..HEAD --  src/
+```
+
+Anything in that list that changed what the tool *renders* is a docs candidate.
+
+**Why:** the pipeline's order guarantees it. The docs task is inside
+`/run-plan`; `/diff-review` runs after `/run-plan` finishes; its fixes commit
+onto the same branch with the gate re-run — and the gate is build, tests and
+`check-doc-versions.sh`. All three pass. `check-doc-versions.sh` reads
+**version strings, tool counts and test counts**; it has no opinion about
+whether a sentence of prose is still true, and there is no check anywhere that
+does. The diff review reads the diff against the plan's contracts, not against
+the docs. So a behavioural fix landing after the docs commit is structurally
+invisible until a human reads the page.
+
+Observed in v1.27.0: `e29dc82` added a **fifth** Japanese not-an-all-clear
+state — a caveat already casting doubt on the feed turns an empty area into
+*unconfirmed* rather than clear — three commits after `9515bcd` wrote
+`docs/TOOLS.md`. The page shipped naming **three** of five, on the alerts
+surface, through a green gate, a three-leg diff review and a full test drive.
+Caught only by `/release` step 4b's per-bullet docs walk.
+
+The same shape hits the architecture map, and worse, because it has no
+changelog bullet to hang off: `CLAUDE.md` still described the alerts cascade as
+`… national CAP IN-PH-ID / Google fallback` after a whole branch was inserted
+ahead of Google. Related: [G31] (a new module under `src/` has no changelog
+bullet, so the architecture map must be named explicitly), [G35] (the release
+tooling passes its own check over text nothing read).
+
+**Verify:** the boundary command above lists a non-empty set on any branch whose
+review landed a render fix, and each entry resolves to a doc page or an explicit
+"none".
