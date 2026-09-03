@@ -742,6 +742,20 @@ Codex plan review (R3). It corrected the design plan's framing (which called
 lightning "a tool that is switched off"), added a test contract, and added a
 built-dist probe that would otherwise have been missed entirely.
 
+**Broadened 2026-09-03** (`6345182`, japan-alerts T10) with the half that is
+about **dependency injection rather than arguments**. Routing reaches the
+summary automatically; a *service* does not. Adding a trailing optional
+parameter to `handleGetAlerts` is safe by construction at every existing call
+site — which is exactly why the summary's own call site is easy to miss: it
+compiles, every test passes, and the new branch is simply never taken from that
+path. Both cross-vendor prep-review legs filed it independently as this plan's
+only blocker. Proved by running the built dist both ways: with the parameter
+threaded a Japanese point rendered JMA and Google's `isKeyAvailable()` was never
+called; with it omitted, Google **was** contacted for the same point. So the
+grep is two greps — `src/index.ts` for the dispatch **and**
+`weatherSummaryHandler.ts` for the summary switch — and the acceptance check is
+that both chains pass the new argument, not that the build is clean.
+
 **Status:** active. **Re-verified live 2026-08-25** (`99ba469`,
 lightning-safe-message-coherence T5): under the genuine default preset the
 server exposes 6 tools — `get_lightning_activity` **absent**,
@@ -1039,6 +1053,19 @@ disk while the process is still running, and call the tool again.
 
 **Evidence:** 2026-08-25 — caught during `/diff-review` by probing a claim
 written minutes earlier; all three copies corrected to say a restart is needed.
+
+**A *resolved-but-badly-shaped* import is a different case from a rejected one,
+2026-09-03** (`b3f4c37`, japan-alerts T3). The retry above is observable only
+because a **rejected** `import()` is not cached by Node, so `vi.doMock`'s
+factory is re-invoked and an `attempts` counter goes 1 → 2. When the import
+*succeeds* and merely resolves to a badly-shaped module — an empty array where a
+table was expected, a non-array export — Node installs a real module record, and
+**Node's own cache, not the mocker, governs the second call**: the factory is
+not re-invoked and `attempts` stays 1. A test written on the assumption that the
+mqtt-style pattern applies uniformly asserts the wrong number and fails. The
+correct claim for the resolved case is not "our memo retried" but "our code
+re-validates and re-rejects on every call rather than trusting a one-time-cached
+bad shape" — a different property, and the one worth having.
 
 **Status:** active. Related: [G21] (the same file's mock/runtime divergences),
 [G11], [G23].
@@ -2532,6 +2559,18 @@ what the fixtures assert and what NWPS sends fails a test instead of shipping.
 This established the repo's first committed-capture convention — there was no
 `tests/fixtures/` before it.
 
+**The same gap between assumed and live values can make a whole branch
+unreachable, 2026-09-03** (japan-alerts T12). A design plan stated that a
+disputed-territory area "resolves normally and renders an explicit
+no-issuing-office note". True of the *resolver*; false of the *routing*. Live,
+`NominatimService.reverseCountry` returns **`'ru'`** for 44.0/145.8, so the point
+never reaches the Japanese branch at all and renders through Google as Russia.
+The branch is correct, tested, and simply not reachable via bare coordinates —
+only via a saved location or geocoded `city_name` carrying the country. Check a
+routing assumption by calling the live resolver at the exact coordinate, the
+same way this entry's original instance checks a fixture's value; a probe aimed
+at that branch otherwise comes back a plausible clean negative ([G28]).
+
 **Status:** active — the rule, with its original instance closed. Related: [G45] (a mutation only goes red where the contract can
 reach it — this is the case where it goes red for the wrong reason), [G32] (mutating
 to the rejected implementation, which shares the fixture's premise and so cannot
@@ -2791,6 +2830,24 @@ Commonwealth's real extent (`17.85–18.55 N`, `-67.95` to `-65.2 W`).
 bounding extremes and evaluate the predicate at all four. Partly lintable: a
 coverage predicate and the place-names in the string it selects could be
 cross-checked against a gazetteer.
+
+**The same promotion happens to a *label*, not only to a predicate, 2026-09-03**
+(`d868c6a` / `bd4a81f`, japan-alerts T1 and T8). An upstream's display label for
+one entity can be **byte-identical to a different, real entity's**, which is
+harmless while it is only a map caption and false the moment it is rendered
+beside a claim. JMA's class10 GeoJSON labels the office-less `hoppo` feature
+`根室地方` / `Nemuro` — the same string as real area `014010`, which *does* have
+an issuing office and *does* receive warnings. Rendering "no office issues
+warnings for 根室地方 (Nemuro)" is a false statement about 014010. And the
+non-uniqueness is not a one-off: `北部` / "Northern Region" labels **17**
+different class10 areas and `南部` / "Southern Region" **18**, because they are
+prefecture sub-region names meaningful only beside their parent office. Two
+rules follow — key a no-data branch off the structural fact (`officeCode ===
+undefined`) and print **no** label for it, and never render an upstream label as
+though it identified a place without the context that disambiguates it. A
+generated artifact should reproduce its source rather than rename anything, so
+the fix belongs at the render site and the trap belongs in the artifact's own
+header.
 
 **Status:** active. Related: [G48] (the same feature one level down — the resolver
 value the fixture could not produce), [G54] (the sibling from the same review —
@@ -3662,6 +3719,73 @@ mid-release is the kind of scope expansion `/release` forbids. Related: [G39] an
 the retired [G55] (both about reading a red publish run correctly, in the
 opposite direction — a *successful* publish reported red), and the standing
 flaky-live-network note in the test suite.
+
+---
+
+## G72 — An upstream can answer 200 with well-formed, correctly-shaped content it has stopped updating, and every check this project runs will pass
+
+**Trigger:** adopting an upstream endpoint as a live source, or re-probing one a
+plan already named — especially one an earlier plan, a roadmap line, or a
+deferral note said was the right endpoint.
+
+**Rule:** **sweep the whole key space, not a sample, and compare against a
+sibling endpoint on the same host as a positive control.** `last-modified` from
+the origin with a cache-buster is the cheap version:
+
+```bash
+curl -s -I "https://host/path/<key>.json?cb=$RANDOM" | grep -i '^last-modified'
+```
+
+Run it for **every** key, not two, and run it once for a sibling endpoint you
+expect to be current. A stale reading on one key is ambiguous; a stale reading
+on every key beside a current sibling is conclusive. Rule out the benign
+readings explicitly — a CDN serving from cache reads the same as an origin that
+has stopped, which is why the cache-buster and the `x-cache` header matter.
+
+**Why:** this is invisible to everything else. The response is HTTP 200. It
+parses. Its shape is exactly what the documentation says. A schema check passes,
+a null-guard passes, a type narrows cleanly, and a unit suite that mocks the
+transport cannot see it at all. [G47] is the fast sibling — a rate-limited
+upstream returning a legitimate-looking zero — and its control is a
+known-non-zero count in the same batch. This one is slower and its control is
+different: the count is fine, the *shape* is fine, and only the **clock**
+disagrees. Nothing in a gate reads a clock.
+
+The consequence on safety data is the project's worst output. A frozen warning
+endpoint renders as "no warnings in force", which is a fabricated all-clear
+assembled from a source that stopped talking months ago.
+
+**Verify:** sweep all keys and one sibling:
+
+```bash
+for o in $(all keys); do curl -s -I "https://www.jma.go.jp/bosai/warning/data/warning/${o}.json?cb=$RANDOM" \
+  | grep -i '^last-modified'; done
+curl -s -I "https://www.jma.go.jp/bosai/forecast/data/overview_forecast/130000.json?cb=$RANDOM" | grep -i '^last-modified'
+```
+
+**Evidence:** 2026-09-03, JMA. `bosai/warning/data/warning/<office>.json` is the
+endpoint the international-coverage roadmap, the v1.24.0 Japan deferral and two
+earlier design notes all named, and **three separate probes across two sessions
+accepted it** — it answers 200 and parses cleanly. A sweep of all **58** offices
+found none updated since May 2026 (17 at 28 May, 24 at 27 May, 9 at 26 May, 8
+between 21–25 May); the aggregate `warning/data/warning/map.json` was frozen at
+28 May too. A cache-busted request returned the same `last-modified` from
+AmazonS3/CloudFront with `x-cache: RefreshHit`, ruling out a stale cache, and
+the sibling `forecast/data/overview_forecast/130000.json` on the same host was
+current. Japan was not quiet: over the same seven days the official XML feed
+carried **6,734 warning bulletins**. Re-verified during `/run-plan` T13 —
+6 of 6 sampled offices still reported 26–28 May while the sibling reported that
+day. The feature was rebuilt against `data.jma.go.jp/developer/xml/feed/` and
+ships a per-request cross-check, because a check that the answer actually covers
+the point asked about is the only mechanism that catches this class in the
+field.
+
+**Status:** active. Related: [G47] (the fast sibling — a throttled upstream
+returning a plausible zero; same "well-formed body, wrong answer" family, but
+its control is a count and this one's is a clock), [G4] (never trust the HTTP
+200 alone), [G11] (read the real thing), [G46] (do not inherit a plan's claim
+about an upstream — re-probe it). Partly lintable: a sweep helper that refuses
+to report unless a named sibling control is current would close it mechanically.
 
 ---
 
