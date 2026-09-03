@@ -28,7 +28,8 @@
     "audit": "npm audit --audit-level=moderate",
     "audit:fix": "npm audit fix",
     "stress": "node scripts/stress-harness.mjs",
-    "examples": "node scripts/capture-examples.mjs"
+    "examples": "node scripts/capture-examples.mjs",
+    "generate:jma-areas": "node scripts/generate-jma-areas.mjs"
   },
   "keywords": [
     "mcp",
