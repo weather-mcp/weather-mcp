@@ -183,6 +183,24 @@ export const CacheConfig = {
     // 24h entry rather than Infinity so a long-running server's LRU is not
     // pinned with dead alerts.
     capDocument: 24 * HOUR,
+
+    // UK Environment Agency bulk latest-readings pull (GET /data/readings?latest&
+    // parameter=level). Every EA gauge measure publishes on a 15-minute period
+    // (period: 900), so a shorter TTL buys nothing real — the value cannot
+    // change between now and the next 15-minute tick.
+    eaLatestReadings: 15 * MINUTE,
+
+    // EA per-station detail (GET /id/stations/{ref}?_view=full) — mirrors
+    // nwpsGaugeDetail: read only for its stageScale threshold fields
+    // (datum, typicalRangeHigh/Low, scaleMax, min/maxOnRecord), which are
+    // gauge metadata revised on the order of years. This entry MUST carry the
+    // threshold fields only and never a reading — the same response body also
+    // carries each measure's 15-minute-volatile latestReading, and caching
+    // that whole would serve a day-old river level as current on a
+    // safety-critical output surface (see G7). The service builds a fresh
+    // copy each refresh and merges the volatile reading into that copy;
+    // only the threshold projection is cached at this TTL.
+    eaStationDetail: 24 * HOUR,
   },
 } as const;
 

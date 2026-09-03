@@ -73,7 +73,7 @@ get_wildfire_info({
 **Size:** 102003 acres (41279 hectares)
 **Containment:** 82% ████████░░
 **Discovery Date:** 6/29/2026
-**Days Active:** 64
+**Days Active:** 65
 
 ---
 
@@ -88,7 +88,7 @@ get_wildfire_info({
 **Size:** 603 acres (244 hectares)
 **Containment:** 100% ██████████
 **Discovery Date:** 8/6/2026
-**Days Active:** 26
+**Days Active:** 27
 
 ---
 
@@ -103,7 +103,7 @@ get_wildfire_info({
 **Size:** 7257 acres (2937 hectares)
 **Containment:** 73% ███████░░░
 **Discovery Date:** 7/9/2026
-**Days Active:** 54
+**Days Active:** 55
 
 ---
 
@@ -171,33 +171,31 @@ get_air_quality({
 **Timezone:** America/Denver
 **Elevation:** 1599m
 
-**Observation Time:** 9/1/2026, 8:00:00 PM
+**Observation Time:** 9/2/2026, 3:00:00 PM
 
-## 🟡 US Air Quality Index: 64
+## 🟢 US Air Quality Index: 46
 
-**Category:** Moderate (Yellow)
-**Description:** Air quality is acceptable
+**Category:** Good (Green)
+**Description:** Air quality is satisfactory
 
 **Health Implications:**
-Air quality is acceptable; however, unusually sensitive people may experience minor respiratory symptoms.
+Air quality is considered satisfactory, and air pollution poses little or no risk.
 
-⚠️ **Caution:** Unusually sensitive people should consider reducing prolonged outdoor exertion.
+## 🟠 UV Index: 6.0
 
-## 🟢 UV Index: 0.0
-
-**Level:** Low
-**Description:** Minimal protection required
-**Recommendation:** No protection required. You can safely stay outside.
+**Level:** High
+**Description:** Protection essential
+**Recommendation:** Apply SPF 30+ sunscreen. Wear protective clothing, hat, and sunglasses. Reduce midday sun exposure.
 
 ## Pollutant Concentrations
 
-**PM2.5 (Fine Particulate Matter):** 6.5 μg/m³
-**PM10 (Coarse Particulate Matter):** 6.8 μg/m³
-**Ozone (O₃):** 77 μg/m³
-**Nitrogen Dioxide (NO₂):** 19 μg/m³
-**Sulfur Dioxide (SO₂):** 0.60 μg/m³
-**Carbon Monoxide (CO):** 306 μg/m³
-**Aerosol Optical Depth:** 0.050 (atmospheric haze indicator)
+**PM2.5 (Fine Particulate Matter):** 3.0 μg/m³
+**PM10 (Coarse Particulate Matter):** 3.8 μg/m³
+**Ozone (O₃):** 118 μg/m³
+**Nitrogen Dioxide (NO₂):** 1.1 μg/m³
+**Sulfur Dioxide (SO₂):** 0.40 μg/m³
+**Carbon Monoxide (CO):** 106 μg/m³
+**Aerosol Optical Depth:** 0.070 (atmospheric haze indicator)
 
 ## 🌾 Pollen
 
@@ -208,7 +206,7 @@ In season: Ragweed (Very High)
 
 *Universal Pollen Index (0–5) for today. Source: Includes pollen data from Google.*
 
-*European AQI: 31 (Fair)*
+*European AQI: 52 (Moderate)*
 ````
 
 </details>
@@ -244,16 +242,13 @@ get_current_conditions({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KBJC
-**Time:** Sep 1, 2026, 7:15 PM (47 minutes ago)
+**Time:** Sep 2, 2026, 1:45 PM (1.3 hours ago)
 
-**Conditions:**  Rain
-**Temperature:** 79°F
-**Dewpoint:** 41°F
-**Humidity:** 26%
-**Wind:** 3 mph from 150°
-**Pressure:** 30.10 inHg
+**Conditions:** Clear
+**Temperature:** 88°F
+**Pressure:** 30.09 inHg
 **Visibility:** 10.0 miles (clear)
-**Cloud Cover:** Scattered clouds at 8990ft
+**Cloud Cover:** Clear
 
 ## Fire Weather
 
@@ -261,8 +256,8 @@ get_current_conditions({
 Current conditions do not meet thresholds for fire weather concerns. Fire danger indices are calculated during periods of low humidity, high temperatures, and strong winds.
 
 **Atmospheric Monitoring:**
-**Mixing Height:** 147 ft (very poor dispersion)
-**Transport Wind:** 7 mph (moderate smoke transport)
+**Mixing Height:** 109 ft (very poor dispersion)
+**Transport Wind:** 9 mph (moderate smoke transport)
 
 *Fire danger indices (Haines Index, Grassland Fire Danger, Red Flag Threat) are calculated during elevated fire risk periods, typically during dry seasons or when Red Flag conditions are possible.*
 
@@ -319,7 +314,7 @@ get_wildfire_info({
 
 ⚠️ Satellite heat detections — not managed incident data. No fire names, sizes, or containment are available; detections may include industrial heat sources, gas flares, or agricultural burns.
 
-🔥 **2 satellite fire detections in the last 3 days, grouped into 2 clusters within 200 km**
+🔥 **29 satellite fire detections in the last 3 days, grouped into 4 clusters within 200 km**
 
 ## Detection Cluster 1
 
@@ -327,7 +322,7 @@ get_wildfire_info({
 **Distance:** 24.1 km (15.0 mi) NW
 **Center:** 38.1299, 23.5240
 **Peak intensity:** 2.0 MW (fire radiative power)
-**Newest detection:** 2 days ago
+**Newest detection:** 3 days ago
 **Confidence:** 1 nominal
 **Satellite:** Suomi NPP (VIIRS)
 
@@ -335,12 +330,36 @@ get_wildfire_info({
 
 ## Detection Cluster 2
 
-**Detections:** 1 hotspot (0 day / 1 night)
+**Detections:** 9 hotspots (9 day / 0 night)
+**Distance:** 47.3 km (29.4 mi) NW
+**Center:** 38.3350, 23.4216
+**Peak intensity:** 204.7 MW (fire radiative power)
+**Newest detection:** 8.4 hours ago
+**Confidence:** 3 high, 5 nominal, 1 low
+**Satellite:** Suomi NPP (VIIRS)
+
+---
+
+## Detection Cluster 3
+
+**Detections:** 16 hotspots (16 day / 0 night)
+**Distance:** 57.6 km (35.8 mi) E
+**Center:** 38.0038, 24.3842
+**Peak intensity:** 66.7 MW (fire radiative power)
+**Newest detection:** 10.1 hours ago
+**Confidence:** 1 high, 14 nominal, 1 low
+**Satellite:** Suomi NPP (VIIRS)
+
+---
+
+## Detection Cluster 4
+
+**Detections:** 3 hotspots (0 day / 3 night)
 **Distance:** 165.6 km (102.9 mi) NNW
-**Center:** 39.3555, 22.9833
-**Peak intensity:** 0.7 MW (fire radiative power)
-**Newest detection:** 2 days ago
-**Confidence:** 1 nominal
+**Center:** 39.3555, 22.9841
+**Peak intensity:** 0.8 MW (fire radiative power)
+**Newest detection:** 19.8 hours ago
+**Confidence:** 3 nominal
 **Satellite:** Suomi NPP (VIIRS)
 
 ---
@@ -395,16 +414,16 @@ get_current_conditions({
 ````markdown
 # Current Weather Conditions
 
-**Time:** Sep 2, 2026, 5:00 AM
+**Time:** Sep 3, 2026, 12:00 AM
 
 **Conditions:** Clear sky
-**Temperature:** 78°F
-**Today's Range:** High 96°F / Low 78°F
-**Dewpoint:** 52°F
-**Humidity:** 41%
-**Wind:** 4 mph from 43°, gusting to 11 mph
-**Pressure:** 29.96 inHg
-**Cloud Cover:** 0%
+**Temperature:** 82°F
+**Today's Range:** High 92°F / Low 79°F
+**Dewpoint:** 48°F
+**Humidity:** 31%
+**Wind:** 4 mph from 52°, gusting to 10 mph
+**Pressure:** 29.93 inHg
+**Cloud Cover:** 6%
 
 ## Fire Weather
 
@@ -412,7 +431,7 @@ get_current_conditions({
 Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.
 
 **Dryness context:**
-- **Vapour-pressure deficit:** 1.9 kPa (moderate drying power)
+- **Vapour-pressure deficit:** 2.5 kPa (high drying power)
 - **Topsoil moisture (top 1 cm):** 0.08 m³/m³ (very dry)
 
 *Derived by this server from Open-Meteo model data — not an official fire-danger rating. Heed warnings from your national fire authority.*
@@ -429,5 +448,5 @@ Computed from current temperature, humidity, and sustained wind. Higher values m
 **Features shown:** `get_wildfire_info` on both paths — NIFC named incidents in the US (containment, distance, safety tier) and NASA FIRMS satellite heat detections everywhere else (clustered hotspots, no names or containment, never an all-clear) · `get_current_conditions` with `include_fire_weather` on both paths — NOAA's published indices in the US, a server-computed Fosberg index with dryness context elsewhere, each labeled for what it is · `get_air_quality` on the US path — US AQI scale, pollutant breakdown (PM2.5 is the smoke signal), UV index, health recommendations.
 
 <!-- capture-stamp -->
-*Captured 2026-09-02 with weather-mcp v1.25.16 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

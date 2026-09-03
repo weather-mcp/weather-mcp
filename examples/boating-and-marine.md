@@ -39,7 +39,7 @@ get_marine_conditions({
 
 ⚠️ **DISCLAIMER:** This data is modeled and may have limited accuracy in coastal areas. **NOT suitable for coastal navigation.** Always consult official marine forecasts for safety-critical decisions.
 
-**Observation Time:** Sep 2, 2026, 12:00 PM
+**Observation Time:** Sep 3, 2026, 7:00 AM
 
 ## 🟢 Current Conditions: Slight
 
@@ -47,26 +47,26 @@ Slight Conditions dominated by swell from distant systems.
 
 ## 🌊 Wave Conditions
 
-**Significant Wave Height:** 0.9m (3.1ft) (Slight)
-**Wave Direction:** ESE (116°)
-**Wave Period:** 9.0s
+**Significant Wave Height:** 0.8m (2.8ft) (Slight)
+**Wave Direction:** SE (125°)
+**Wave Period:** 8.7s
 
 ### Wind Waves
 
-**Height:** 0.1m (0.3ft)
-**Direction:** NW (307°)
-**Period:** 1.4s
+**Height:** 0.4m (1.2ft)
+**Direction:** NW (325°)
+**Period:** 2.4s
 
 ### Swell
 
-**Height:** 0.7m (2.3ft)
-**Direction:** SSE (159°)
-**Period:** 9.6s
+**Height:** 0.6m (2.0ft)
+**Direction:** SSE (156°)
+**Period:** 9.8s
 
 ## 🌀 Ocean Currents
 
-**Velocity:** 0.40 m/s (0.78 knots)
-**Direction:** S (180°)
+**Velocity:** 0.30 m/s (0.58 knots)
+**Direction:** SE (135°)
 
 ---
 
@@ -74,26 +74,26 @@ Slight Conditions dominated by swell from distant systems.
 
 **Next 3 days:**
 
-**Wed, Sep 2:**
-  • Max Wave Height: 1.1m (3.5ft) (Slight)
-  • Wave Direction: ESE (123°)
-  • Max Wave Period: 9.3s
-  • Swell Height: 0.9m (2.8ft)
-  • Swell Direction: SSE (159°)
-
 **Thu, Sep 3:**
   • Max Wave Height: 0.9m (3.0ft) (Slight)
-  • Wave Direction: SE (134°)
-  • Max Wave Period: 9.6s
-  • Swell Height: 0.6m (2.1ft)
-  • Swell Direction: SSE (158°)
+  • Wave Direction: SE (132°)
+  • Max Wave Period: 9.3s
+  • Swell Height: 0.6m (2.0ft)
+  • Swell Direction: SSE (157°)
 
 **Fri, Sep 4:**
-  • Max Wave Height: 1.1m (3.6ft) (Slight)
-  • Wave Direction: SSE (163°)
-  • Max Wave Period: 9.8s
-  • Swell Height: 1.0m (3.2ft)
+  • Max Wave Height: 1.2m (3.9ft) (Slight)
+  • Wave Direction: SSE (165°)
+  • Max Wave Period: 9.6s
+  • Swell Height: 1.1m (3.6ft)
   • Swell Direction: SSE (166°)
+
+**Sat, Sep 5:**
+  • Max Wave Height: 1.1m (3.5ft) (Slight)
+  • Wave Direction: SE (142°)
+  • Max Wave Period: 9.7s
+  • Swell Height: 0.9m (3.1ft)
+  • Swell Direction: SSE (165°)
 
 ---
 
@@ -144,13 +144,13 @@ get_lightning_activity({
 
 **Location:** -33.8688, 151.2093
 **Search Radius:** 250 km
-**Time Window:** 60 minutes (2026-09-02T01:01:35.916Z to 2026-09-02T02:01:35.916Z)
+**Time Window:** 60 minutes (2026-09-02T20:04:05.795Z to 2026-09-02T21:04:05.795Z)
 
 ## 🟢 Safety Status: SAFE (LIMITED DATA)
 
 No lightning strikes observed during the limited monitoring period. This does NOT confirm the absence of lightning activity.
 
-⚠️ **Limited monitoring coverage:** Live strike collection for this area spans 1.1 of the requested 60 minutes (since 2026-09-02T02:00:30.461Z). An absence of strikes in this report does not confirm an absence of lightning. Re-check in a few minutes or consult official weather services before making safety decisions.
+⚠️ **Limited monitoring coverage:** Live strike collection for this area spans 1.1 of the requested 60 minutes (since 2026-09-02T21:03:00.260Z). An absence of strikes in this report does not confirm an absence of lightning. Re-check in a few minutes or consult official weather services before making safety decisions.
 
 *Why: lightning is monitored via a live feed that only begins buffering strikes once an area is first queried, so a location’s first lookup starts near zero coverage and builds over the following minutes. Saved locations are pre-warmed at startup. Historical strikes cannot be backfilled.*
 
@@ -172,7 +172,7 @@ No lightning strikes detected in the search area during the time window.
 ⚠️ **DISCLAIMER:** Lightning data from Blitzortung.org community network. Data may have 5-15 minute delay. For life-safety decisions, consult official weather services and local emergency management. When thunder roars, go indoors!
 
 ---
-*Generated: 2026-09-02T02:01:35.916Z*
+*Generated: 2026-09-02T21:04:05.795Z*
 *Data source: Blitzortung.org*
 ````
 
@@ -184,5 +184,5 @@ No lightning strikes detected in the search area during the time window.
 **Features shown:** `get_marine_conditions` with `forecast_days` (waves, swell, period, currents, safety assessment) · `get_lightning_activity` real-time strike detection with `radius`/`timeWindow` and a 4-level safety assessment · metric units for an Australian location.
 
 <!-- capture-stamp -->
-*Captured 2026-09-02 with weather-mcp v1.25.16 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

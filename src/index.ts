@@ -27,6 +27,7 @@ import { FIRMSService } from './services/firms.js';
 import { GooglePollenService } from './services/googlePollen.js';
 import { GoogleWeatherService } from './services/googleWeather.js';
 import { NationalCapService } from './services/nationalCap.js';
+import { EnvironmentAgencyService } from './services/environmentAgency.js';
 import { GeocodingService } from './services/geocoding.js';
 import { LocationStore } from './services/locationStore.js';
 import { blitzortungService } from './services/blitzortung.js';
@@ -122,6 +123,12 @@ const openMeteoService = new OpenMeteoService();
  * Rate limited to 1 request/second as per OSM usage policy
  */
 const nominatimService = new NominatimService();
+
+/**
+ * Initialize the Environment Agency service for Great Britain river gauges
+ * No API key required - Open Government Licence v3, keyless
+ */
+const environmentAgencyService = new EnvironmentAgencyService();
 
 /**
  * Initialize the LocationStore for managing saved/favorite locations
@@ -625,22 +632,22 @@ export const TOOL_DEFINITIONS = {
 
   get_river_conditions: {
     name: 'get_river_conditions' as const,
-    description: 'Monitor river levels and flood status for a location (global coverage). Use this when asked about "river flooding", "river level", "flood stage", "streamflow", "safe to kayak", or "river conditions". Two data modes: for US locations, returns NOAA NWPS gauge observations within the search radius — river stage, flow rate, official flood categories (action/minor/moderate/major), crest history, and forecasts. Everywhere else, returns Open-Meteo Flood API (GloFAS v4) modeled river discharge in m³/s, snapped to the nearest modeled river channel and presented against its own recent history and forecast ensemble; no official flood-stage thresholds exist for model data. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for flood-prone areas and water recreation.',
+    description: 'Monitor river levels and flood status for a location (global coverage). Use this when asked about "river flooding", "river level", "flood stage", "streamflow", "safe to kayak", or "river conditions". Three data modes: for US locations, returns NOAA NWPS gauge observations within the search radius — river stage, flow rate, official flood categories (action/minor/moderate/major), crest history, and forecasts. In Great Britain, returns Environment Agency gauge observations — observed river level and the published typical range where one exists, with no forecast and no flood categories. Everywhere else, returns Open-Meteo Flood API (GloFAS v4) modeled river discharge in m³/s, snapped to the nearest modeled river channel and presented against its own recent history and forecast ensemble; no official flood-stage thresholds exist for model data. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for flood-prone areas and water recreation.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         ...LOCATION_SCHEMA_PROPERTIES,
         radius: {
           type: 'number' as const,
-          description: 'US gauge search radius in kilometers (1-500, default: 50); ignored for the global model path',
+          description: 'Gauge search radius in kilometers (1-500); used by the US gauge path (default: 50) and the Great Britain gauge path (default: 25); ignored for the global model path',
           minimum: 1,
           maximum: 500,
           default: 50
         },
         source: {
           type: 'string' as const,
-          description: 'Data source: "auto" (default, selects NOAA for US or Open-Meteo for international), "noaa" (US only), or "openmeteo" (global)',
-          enum: ['auto', 'noaa', 'openmeteo'],
+          description: 'Data source: "auto" (default, selects NOAA for the US, the Environment Agency gauge network in Great Britain, or Open-Meteo elsewhere), "noaa" (US only), "ea" (Environment Agency river gauges, Great Britain), or "openmeteo" (global)',
+          enum: ['auto', 'noaa', 'openmeteo', 'ea'],
           default: 'auto'
         },
         forecast_days: {
@@ -875,7 +882,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_river_conditions':
         return await withAnalytics('get_river_conditions', async () =>
-          handleGetRiverConditions(args, noaaService, locationStore, geocodingService, openMeteoService, nominatimService)
+          handleGetRiverConditions(args, noaaService, locationStore, geocodingService, openMeteoService, nominatimService, environmentAgencyService)
         );
 
       case 'get_wildfire_info':

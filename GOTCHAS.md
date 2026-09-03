@@ -3427,6 +3427,191 @@ override, and not silence.
 
 ---
 
+## G67 — A fixture captured from a live feed expires, because the consumer under test has a recency guard
+
+**Trigger:** capturing a real upstream response into `tests/fixtures/` when any
+code path that reads it rejects or re-labels data by **age** — a staleness
+cutoff, an "observed N minutes ago" line, a freshest-wins selector, a
+not-current sentinel.
+
+**Rule:** freeze the clock. Pin `vi.setSystemTime` to a moment just after the
+timestamps inside the fixture, in the same file that loads it. The fixture's own
+`dateTime` values are now part of its contract, so say in a comment which
+timestamp the frozen clock is anchored to.
+
+**Why:** the two halves of the practice fight each other. This repo captures
+fixtures from real responses **on purpose** — the whole point of
+`ea-station-L2402.json` is that the `string | object` shape trap is real and not
+imagined — but a captured response carries the capture moment inside it. A
+6-hour staleness cutoff plus a fixture stamped at capture time yields a test
+that is green on the day it is written, green all through the review, and red
+forever after, with a failure message about river levels that says nothing about
+clocks. Nobody is watching the suite six hours later, so it lands.
+
+The trap scales with how *good* the fixture is: the more faithfully a capture
+reproduces a live response, the more live state it smuggles in.
+
+**Verify:** two acceptable fixes, and the check must allow both — freeze the
+clock (`setSystemTime`) **or** inject one (pass an explicit `now` into the pure
+function, which is the better shape where the signature allows it):
+
+```bash
+grep -rl 'tests/fixtures' tests/unit \
+  | xargs grep -LE 'setSystemTime|new Date\(' \
+  | xargs -r grep -lE 'dateTime|validTime|observedAt'
+```
+
+Then confirm by hand that each hit actually exercises an age-sensitive path —
+a fixture consumer that reads no timestamp needs neither fix. Run 2026-09-02
+over the whole suite: **no outstanding instances.** `ea-gauges.test.ts` injects
+`now` explicitly, and `nwps-gauge-shape.test.ts` contains no timestamp at all.
+
+**Evidence:** 2026-09-02 (`fdc35ed`, UK EA gauges T8). `ea-station-L2402.json`
+carries two readings stamped `2026-09-02T19:15:00Z`, and `selectStageMeasure`
+rejects anything older than 6 hours (`EA_STAGE_STALE_CUTOFF_MINUTES = 360`).
+Caught during the task, not after, and fixed by pinning the clock to
+`2026-09-02T19:20:00Z`. Had it shipped, the file would have started failing the
+same evening.
+
+**Status:** active. Lint candidate — a rule flagging a `tests/fixtures` read in a
+file that neither calls `setSystemTime` nor injects a clock. Related: [G48] (the
+other way a fixture describes a world that does not exist).
+
+---
+
+## G68 — A safety refusal inside a pure function is only real if the render site honours it
+
+**Trigger:** a pure helper returns `null`/`undefined` to mean **"this comparison
+would be unsafe"** rather than "no data", and the caller renders the inputs that
+comparison was about.
+
+**Rule:** gate the **whole block** on the refusal, not just the sentence the
+helper would have produced. If the function declines to compare A against B,
+the renderer must not print B beside A either. Find every render site of every
+guard, not just the guard.
+
+**Why:** refusing to state a conclusion while still printing both operands does
+not withhold the conclusion — it delegates it. The reader is less equipped to
+make the comparison than the code was, and has none of the context that made it
+unsafe, so the refusal actively misleads: the numbers look adjacent *because*
+they are meant to be compared, and the missing verdict reads as "unremarkable"
+rather than "not applicable".
+
+It also passes every test. The helper's own unit tests assert it returns `null`
+and are green; the handler's tests assert the verdict line is absent and are
+green; and the defect lives entirely in the two lines that are still printed.
+
+**Verify:** for each pure guard returning a refusal, grep its call sites and
+check what else is emitted inside the same `if`. The block should be all-or-
+nothing.
+
+**Evidence:** 2026-09-02 (`735fe81`, UK EA gauges T7). `bandRiverLevel` refuses
+to band a measure whose qualifier is not `Stage`, because `stageScale` describes
+the station's Stage measure — banding the River Tweed at Berwick's `Tidal Level`
+reading against it renders a false "above typical range" on a river-safety
+surface. The refusal worked. The renderer printed the typical range anyway, so a
+`4.09 ft` level sat directly above a range it does not belong to, with no verdict
+between them. Found by reading live output at a 5 km radius around Berwick;
+no assertion could have reached it. Fixed by gating the range on the band.
+
+**Status:** active. Related: [G11] (reading the output is what exposes it),
+[G8] (a defensive limit producing a misleading render), [G53].
+
+---
+
+## G69 — Band after the unit conversion, because a rendered threshold is a display value too
+
+**Trigger:** comparing a value against a threshold when **either** is converted
+before it is printed — metres to feet, °C to °F, m³/s to ft³/s — and both the
+value and the threshold appear in the output.
+
+**Rule:** convert first, round second, compare third, using the caller's own
+unit preferences for all three numbers. Pass `prefs` into the band function
+rather than banding in storage units and rendering in display units.
+
+**Why:** `displayValue`'s existing discipline says to band on the number the
+reader sees, and it is easy to satisfy that for the *reading* while leaving the
+*threshold* raw — the threshold feels like upstream metadata rather than
+rendered output, and rounding it feels like corrupting a published figure. But
+the moment the renderer prints the range, the range is a display value as well,
+and a conversion between storage and display collapses pairs that were distinct
+in storage. A level of `2.2475 m` against a `typicalRangeHigh` of `2.247 m`
+prints as `7.37 ft` and `7.37 ft` under imperial and `2.25 m` and `2.25 m` under
+metric, while a raw comparison says *above the published typical range* — a
+contradiction directly under two identical numbers, in **both** unit systems.
+
+The single-unit case hides this: as long as nothing is converted, banding on the
+stored value and rounding only for display usually agree, so the habit survives
+until a converting path arrives.
+
+**Verify:** for each band/threshold pair, check whether the renderer prints the
+threshold. If it does, confirm the band function receives the same `prefs` the
+renderer uses. `bandRiverLevel` in `src/utils/eaGauges.ts` is the reference
+shape; its lock is the display-space test in `tests/unit/ea-gauges.test.ts`.
+
+**Evidence:** 2026-09-02 (`00953cf`, UK EA gauges T3), caught in orchestrator
+review of the returned diff rather than by a test — the sub-agent's reasoning
+("rounding them would move the published range") is correct in isolation and
+wrong once the range is rendered.
+
+**Status:** active. Related: [G36] (the binary-halves trap on the same seam),
+[G11], and `src/utils/displayBanding.ts`'s own doc comment, which this extends
+rather than contradicts.
+
+---
+
+## G70 — A mock applied to the wrong seam is inert, so the test silently becomes a live-network test that passes while the network is fast
+
+**Trigger:** `vi.spyOn(service as any, '<privateMethod>')` where the method under
+test reaches the network by some *other* route — `this.client.get`, a second
+axios instance, a module-level helper — rather than through the mocked one.
+
+**Rule:** mock the seam the method under test actually calls, and make the mock
+supply the shape that method **inspects**, not the shape a neighbouring method
+returns. Confirm by mutation: break the branch the test names and check it goes
+red. A status test that cannot go red when the status flips is testing the
+network, not the code.
+
+**Why:** an inert mock fails open. Nothing errors, nothing warns, the spy
+records zero calls that nobody asserts on, and the real request underneath
+usually succeeds — so the test is green for years. What it is actually
+measuring is round-trip latency against the test timeout, so it converts into
+an intermittent failure the first time the network, the machine, or a parallel
+suite is slow, and the failure message names the timeout rather than the mock.
+The wrong-seam mock also means the branch the test claims to cover has never
+been executed once.
+
+The tell is a `vi.spyOn` on a private method whose name does not appear in the
+method under test. Grep it before trusting the mock.
+
+**Verify:** for each `vi.spyOn(x as any, 'm')`, grep the method under test for
+`m`; if it does not call it, the mock is inert. **Match the generic form** —
+these methods are called as `this.makeRequest<T>(...)`, so a `this\.m\(`
+pattern reports zero call sites for a method with five, and the sweep looks
+alarming for the wrong reason. Use `this\.m[<(]`. Run 2026-09-02 across
+`tests/`: the four spied methods (`makeRequest`, `makeRequestToEnsemble`,
+`makeRequestToFlood`, `makeRequestToForecast`) all have real call sites, and
+all three `checkServiceStatus` tests now mock `client.get` — **no inert mocks
+remain.** Mechanically checkable, so a strong lint candidate.
+
+**Evidence:** 2026-09-02 (`f9f6771`). Two tests in
+`tests/integration/error-recovery.test.ts` mocked `makeRequest` while
+`OpenMeteoService.checkServiceStatus` calls `this.client.get('/archive', …)`
+directly, so both made a real archive-API call inside a 5-second test timeout.
+They failed identically on `main` and on the feature branch while the live API
+was demonstrably healthy — HTTP 200 in ~0.45 s on three consecutive probes, and
+`checkServiceStatus()` itself returning `operational: true` in 474 ms. **The
+answer was already written in the file:** the passing sibling test sitting
+between the two failures carried the comment *"Mock the client.get method (not
+makeRequest) since checkServiceStatus uses it directly"* — someone hit this
+once, fixed the one test in front of them, and left its neighbours alone.
+
+**Status:** active. Lint candidate (see Verify). Related: [G45] (the mutation
+check that exposes it), [G21] (the other way a mock is not the thing you think
+it is), and the project's determinism rule — anything mockable is mocked.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the

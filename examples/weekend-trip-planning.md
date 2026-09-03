@@ -42,51 +42,52 @@ get_forecast({
 **Timezone:** Asia/Tokyo
 **Forecast Days:** 3
 
-## Friday, August 28
-**Temperature:** High 90°F / Low 73°F
-**Feels Like:** High 102°F / Low 82°F
-**Sunrise:** 5:09 AM
-**Sunset:** 6:14 PM
-**Moon:** Full Moon (100% illuminated) · Rise 6:14 PM · Set 4:53 AM
-**Twilight:** Civil 4:43 AM / 6:40 PM · Nautical 4:11 AM / 7:11 PM · Astronomical 3:39 AM / 7:44 PM
-**Daylight Duration:** 13h 4m
+## Thursday, September 3
+**Temperature:** High 87°F / Low 77°F
+**Feels Like:** High 98°F / Low 87°F
+**Sunrise:** 5:14 AM
+**Sunset:** 6:06 PM
+**Moon:** Third Quarter (64% illuminated) · Rise 9:19 PM · Set 11:28 AM
+**Twilight:** Civil 4:48 AM / 6:32 PM · Nautical 4:17 AM / 7:02 PM · Astronomical 3:45 AM / 7:34 PM
+**Daylight Duration:** 12h 52m
+**Precipitation Chance:** 59%
+**Precipitation:** 0.09 in
+**Wind:** 4 mph S
+**Wind Gusts:** 19 mph
+**Conditions:** Slight rain
+**UV Index:** 6.8
+
+## Friday, September 4
+**Temperature:** High 77°F / Low 72°F
+**Feels Like:** High 86°F / Low 79°F
+**Sunrise:** 5:15 AM
+**Sunset:** 6:05 PM
+**Moon:** Third Quarter (52% illuminated) · Rise 10:10 PM · Set 12:39 PM
+**Twilight:** Civil 4:48 AM / 6:30 PM · Nautical 4:18 AM / 7:01 PM · Astronomical 3:46 AM / 7:32 PM
+**Daylight Duration:** 12h 50m
 **Precipitation Chance:** 84%
-**Precipitation:** 0.03 in
-**Wind:** 3 mph NNW
-**Wind Gusts:** 20 mph
-**Conditions:** Light drizzle
-**UV Index:** 5.6
-
-## Saturday, August 29
-**Temperature:** High 80°F / Low 72°F
-**Feels Like:** High 88°F / Low 78°F
-**Sunrise:** 5:10 AM
-**Sunset:** 6:13 PM
-**Moon:** Full Moon (99% illuminated) · Rise 6:39 PM · Set 5:55 AM
-**Twilight:** Civil 4:44 AM / 6:39 PM · Nautical 4:12 AM / 7:10 PM · Astronomical 3:40 AM / 7:42 PM
-**Daylight Duration:** 13h 2m
-**Precipitation Chance:** 94%
-**Precipitation:** 0.17 in
-**Wind:** 4 mph ENE
-**Wind Gusts:** 22 mph
+**Precipitation:** 0.63 in
+**Wind:** 3 mph NNE
+**Wind Gusts:** 11 mph
 **Conditions:** Moderate rain
-**UV Index:** 1.3
+**UV Index:** 3.8
 
-## Sunday, August 30
-**Temperature:** High 82°F / Low 70°F
-**Feels Like:** High 91°F / Low 76°F
-**Sunrise:** 5:11 AM
-**Sunset:** 6:12 PM
-**Moon:** Waning Gibbous (96% illuminated) · Rise 7:04 PM · Set 6:58 AM
-**Twilight:** Civil 4:44 AM / 6:37 PM · Nautical 4:13 AM / 7:08 PM · Astronomical 3:41 AM / 7:40 PM
-**Daylight Duration:** 13h 0m
-**Precipitation Chance:** 45%
-**Wind:** 4 mph N
-**Wind Gusts:** 14 mph
-**Conditions:** Overcast
-**UV Index:** 4.5
+## Saturday, September 5
+**Temperature:** High 79°F / Low 70°F
+**Feels Like:** High 83°F / Low 76°F
+**Sunrise:** 5:15 AM
+**Sunset:** 6:03 PM
+**Moon:** Third Quarter (41% illuminated) · Rise 11:12 PM · Set 1:46 PM
+**Twilight:** Civil 4:49 AM / 6:29 PM · Nautical 4:19 AM / 6:59 PM · Astronomical 3:47 AM / 7:31 PM
+**Daylight Duration:** 12h 47m
+**Precipitation Chance:** 65%
+**Precipitation:** 0.95 in
+**Wind:** 7 mph NNE
+**Wind Gusts:** 18 mph
+**Conditions:** Moderate rain
+**UV Index:** 1.9
 
-**Next full moon:** Aug 28 · **Next new moon:** Sep 11
+**Next full moon:** Sep 27 · **Next new moon:** Sep 11
 
 ---
 *Data source: Open-Meteo (Global)*
@@ -135,8 +136,8 @@ get_weather_imagery({
 
 ## 📸 Current Imagery
 
-**Timestamp:** 2026-08-27T21:40:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/4f9de34f3b2f/512/6/56/25/4/1_1.png
+**Timestamp:** 2026-09-02T21:00:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/31753a8fd4ec/512/6/56/25/4/1_1.png
 
 **Interactive map:** https://www.rainviewer.com/map.html?loc=35.6769,139.7639,7
 *Opens live animated radar over a base map in the browser — the frame URLs above are transparent overlay tiles (blank where dry) and expire within about two hours.*
@@ -146,7 +147,7 @@ get_weather_imagery({
 ⚠️ **DISCLAIMER:** RainViewer provides global precipitation radar. Data may have 5-10 minute delay. For official forecasts, consult local meteorological services.
 
 ---
-*Generated: 2026-08-27T21:48:07.117Z*
+*Generated: 2026-09-02T21:02:39.666Z*
 *Data source: RainViewer*
 ````
 
@@ -158,5 +159,5 @@ get_weather_imagery({
 **Features shown:** `city_name` free-text geocoding (no coordinates needed) · `include_astronomy` (moon phase, moonrise/moonset, twilight times — computed locally, no extra API call) · `days` forecast-length control · `get_weather_imagery` radar (RainViewer) with a committed snapshot.
 
 <!-- capture-stamp -->
-*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

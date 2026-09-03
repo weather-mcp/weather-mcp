@@ -6,6 +6,7 @@ We release patches for security vulnerabilities for the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 1.26.x   | :white_check_mark: |
 | 1.25.x   | :white_check_mark: |
 | 1.24.x   | :white_check_mark: |
 | 1.23.x   | :white_check_mark: |

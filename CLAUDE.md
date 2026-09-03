@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.25.18 (Production Ready)
+- **Version:** 1.26.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -31,7 +31,7 @@ src/
 │   ├── marineConditionsHandler.ts
 │   ├── weatherImageryHandler.ts     # get_weather_imagery (+ composite radar maps)
 │   ├── lightningHandler.ts
-│   ├── riverConditionsHandler.ts    # NOAA NWPS (US) / Open-Meteo Flood (elsewhere)
+│   ├── riverConditionsHandler.ts    # NOAA NWPS (US) / Environment Agency (GB) / Open-Meteo Flood (elsewhere)
 │   ├── wildfireHandler.ts           # NIFC (US, PR, VI, GU) / NASA FIRMS (elsewhere)
 │   └── savedLocationsHandler.ts     # save/list/get/remove_saved_location
 ├── services/                # External API clients (one per upstream)
@@ -44,6 +44,7 @@ src/
 │   ├── nationalCap.ts       # National CAP feeds — NDMA SACHET (IN), PAGASA (PH), BMKG (ID); first XML upstream
 │   ├── googleWeather.ts     # Google Weather publicAlerts — optional keyed global alerts fallback
 │   ├── googlePollen.ts      # Google Pollen API — optional keyed global pollen fallback
+│   ├── environmentAgency.ts # EA flood-monitoring — GB river gauges, levels, typical ranges (keyless, OGL v3)
 │   ├── nifc.ts              # NIFC wildfire incidents (US)
 │   ├── firms.ts             # NASA FIRMS satellite fire detections (global)
 │   ├── acis.ts              # RCC ACIS — US daily temperature records
@@ -68,6 +69,7 @@ src/
 │   ├── modelComparison.ts / ensembleSpread.ts        # Forecast agreement + member spread (pure)
 │   ├── fireWeather.ts / thermalStress.ts             # Fire indices incl. Fosberg; wind chill, frostbite, WBGT (pure)
 │   ├── firmsHotspots.ts / metarStation.ts / riverDischarge.ts  # FIRMS parse+cluster; METAR picker; GloFAS cell snap (pure)
+│   ├── eaGauges.ts          # EA station filter, measure selection, level banding (pure)
 │   ├── capParse.ts / pointInPolygon.ts  # CAP 1.2 XML → records, active filter, feed-URL allowlist; ray-casting point-in-ring (pure)
 │   ├── composite.ts         # PNG stitch/blend/marker/encode (pure)
 │   ├── airQuality.ts / marine.ts / snow.ts / distance.ts / geohash.ts
@@ -111,7 +113,7 @@ Full per-tool parameter reference: `docs/TOOLS.md`.
 9. **get_marine_conditions** - Wave height, swell, currents (Open-Meteo, global)
 10. **get_weather_imagery** - Radar/precipitation imagery (RainViewer, global); `composite: true` returns a finished radar map over a NASA GIBS base map as an MCP image block
 11. **get_lightning_activity** - Real-time lightning detection (Blitzortung.org, global)
-12. **get_river_conditions** - NOAA NWPS gauges in the US, Open-Meteo Flood/GloFAS modeled discharge elsewhere; `source` override, no cross-fallback
+12. **get_river_conditions** - NOAA NWPS gauges in the US, Environment Agency observed levels in Great Britain, Open-Meteo Flood/GloFAS modeled discharge elsewhere; `source` override, no cross-fallback
 13. **get_wildfire_info** - NIFC named incidents in the US, NASA FIRMS satellite heat detections elsewhere; `source` override, no cross-fallback
 14. **save_location** / 15. **list_saved_locations** / 16. **get_saved_location** / 17. **remove_saved_location** - Saved-location management
 
@@ -394,6 +396,8 @@ via `src/utils/unitFormat.ts`.
 - **Historical data (>1 day old):** Infinity (finalized)
 - **Recent historical (<1 day):** 1 hour (may be corrected)
 - **NWPS gauge detail (flood-stage thresholds):** 24 hours (gauge metadata, revised ~annually)
+- **EA bulk latest readings:** 15 minutes (every EA gauge measure publishes on a 15-minute period)
+- **EA station detail (typical-range thresholds):** 24 hours (gauge metadata; the threshold projection only — never a reading, see GOTCHAS G7)
 - Newer entries (normals, Google pollen, FIRMS, tiles, composites) are documented inline in `CacheConfig`
 
 ### Cache Implementation
@@ -586,15 +590,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.25.18 — Production Ready ✅
-- **Test Coverage:** 2,942 tests, 100% pass rate
+- **Version:** 1.26.0 — Production Ready ✅
+- **Test Coverage:** 3,011 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.26.0:** Great Britain river requests now return Environment Agency observed gauge levels instead of modeled discharge
 - **New in v1.25.18:** A NOAA forecast asking for more days than NOAA publishes now discloses the shortfall instead of rendering as if answered in full
 - **New in v1.25.17:** A null Open-Meteo scalar no longer renders as a fabricated 0, N/A or nullm — the line is omitted
-- **New in v1.25.16:** Marine sea-state markers, names and legend now come from one WMO 3700 table
 
 ## Useful References
 
@@ -617,7 +621,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-02 (v1.25.18)
+**Last Updated:** 2026-09-02 (v1.26.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

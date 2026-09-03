@@ -336,3 +336,62 @@ export function isInUS(latitude: number, longitude: number): boolean {
 
   return inContinentalUS || inAlaska || inHawaii || inPuertoRico;
 }
+
+/**
+ * Determine if coordinates fall within Great Britain and its surrounding waters,
+ * drawn generously — this is a **routing-only** pre-gate, not a coverage claim.
+ *
+ * It exists to answer one question cheaply: "is a Nominatim reverse-geocode call
+ * worth making for this point?" Nominatim is rate-limited to 1 req/sec server-wide,
+ * so `get_river_conditions` must not fire one for every non-US point on Earth just
+ * to learn the answer is 'not gb' for the vast majority of them. This predicate
+ * narrows that down; the country-code lookup that follows it is what actually
+ * decides 'gb' vs anything else.
+ *
+ * This function NEVER renders, and no sentence in any tool output may be derived
+ * from it — it must never be promoted to one. The coverage claim the tool actually
+ * makes — "the EA river-gauge network" — comes from filtering stations on a
+ * non-empty `riverName` field, never from this box and never from the word
+ * "England". See GOTCHAS G53: a routing box that is 95% right is fine for "which
+ * upstream do I ask" — the wrong 5% costs one extra API call — but the same box
+ * behind a rendered sentence becomes a false statement about a named place. Keep
+ * this predicate on the routing side of that line.
+ *
+ * Because a false positive here costs one Nominatim call (cheap) and a false
+ * negative silently drops the feature for a real GB point (expensive), the boxes
+ * below are drawn wide: they cover the Scottish islands (Outer Hebrides, Orkney,
+ * Shetland — Shetland reaches past 60.85N), the southwest tip (Land's End, Isles
+ * of Scilly), and are allowed to overlap the near Continent and Atlantic approaches.
+ *
+ * Ireland is the one neighbor that must be excluded (Dublin must read false), and
+ * it cannot be excluded with a single box: Ireland's latitude span (Mizen Head
+ * 51.45N to Malin Head 55.38N) and longitude span (Dunmore Head -10.66W to Burr
+ * Point, Co. Down, -5.43W) both overlap Great Britain's. So GB is split into three
+ * latitude bands here, each clipped only where it actually risks Ireland:
+ *   - south of 51.4N (Scilly, Land's End, the Channel coast) — south of Ireland's
+ *     southernmost point, so longitude is left wide open
+ *   - north of 55.45N (Highlands, Hebrides, Orkney, Shetland) — north of Ireland's
+ *     northernmost point, so longitude is left wide open
+ *   - the 51.4-55.45N band in between (England, Wales, southern/mid Scotland),
+ *     where the west edge is drawn at -5.85: it clears Dublin (-6.26) and the rest
+ *     of the Republic, though it also catches the extreme eastern tip of Northern
+ *     Ireland (Burr Point, Co. Down, -5.43) — harmless, since NI is still part of
+ *     the UK and resolves to 'gb' at the country-code step that follows
+ *
+ * @param latitude Latitude coordinate
+ * @param longitude Longitude coordinate
+ * @returns True if coordinates fall within Great Britain's generous routing box
+ */
+export function isInGreatBritain(latitude: number, longitude: number): boolean {
+  // South of Ireland entirely (Mizen Head 51.45N) — longitude left wide open
+  const inSouthwestApproaches =
+    latitude >= 49.8 && latitude <= 51.4 && longitude >= -6.7 && longitude <= 2.0;
+  // Overlaps Ireland's latitude band — west edge clipped east of Dublin (-6.26)
+  const inEnglandWalesScotland =
+    latitude >= 51.4 && latitude <= 55.45 && longitude >= -5.85 && longitude <= 2.0;
+  // North of Ireland entirely (Malin Head 55.38N) — longitude left wide open
+  const inNorthernScotlandIsles =
+    latitude >= 55.45 && latitude <= 61.05 && longitude >= -9.0 && longitude <= 2.0;
+
+  return inSouthwestApproaches || inEnglandWalesScotland || inNorthernScotlandIsles;
+}

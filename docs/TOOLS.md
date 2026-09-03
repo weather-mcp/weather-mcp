@@ -753,18 +753,19 @@ claiming no immediate threat.
 **Requires the optional `mqtt` package.** It is installed by default; if the server was installed with `--omit=optional` this tool returns an error naming the package and how to reinstall it, never a "no strikes" result. The same message appears in `get_weather_summary`'s `lightning` section. See [Optional dependency](../README.md#optional-dependency).
 
 ### 12. get_river_conditions
-Monitor river levels and flood status worldwide — NOAA gauge observations in the US, GloFAS modeled discharge elsewhere.
+Monitor river levels and flood status worldwide — NOAA gauge observations in the US, Environment Agency gauge observations in Great Britain, GloFAS modeled discharge elsewhere.
 
 **Parameters:**
 - `latitude` (required*): Latitude coordinate (-90 to 90)
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `radius` (optional): US gauge search radius in kilometers (1-500, default: 50). Ignored on the global model path, which has no gauges to search
-- `source` (optional): `"auto"` (default — NOAA for US coordinates, Open-Meteo elsewhere), `"noaa"` (NWPS gauges, which cover the US mainland and Puerto Rico only — **the other US territories are not gauged**: Guam, the US Virgin Islands, American Samoa and the Northern Marianas all return the coverage disclosure, not gauges — outside that coverage the report returns an explicit coverage disclosure naming `source: "openmeteo"`, not an empty result), or `"openmeteo"` (global). There is deliberately no automatic cross-fallback: a gauge observation and a modeled discharge are different claims.
+- `radius` (optional): Gauge search radius in kilometers (1-500). Default **50** on the US gauge path and **25** on the Great Britain gauge path, whose network is far denser. Ignored on the global model path, which has no gauges to search
+- `source` (optional): `"auto"` (default — NOAA for US coordinates, the Environment Agency in Great Britain, Open-Meteo elsewhere), `"ea"` (Environment Agency river gauges; honoured anywhere, and outside the network it returns an explicit coverage disclosure rather than an empty result), `"noaa"` (NWPS gauges, which cover the US mainland and Puerto Rico only — **the other US territories are not gauged**: Guam, the US Virgin Islands, American Samoa and the Northern Marianas all return the coverage disclosure, not gauges — outside that coverage the report returns an explicit coverage disclosure naming `source: "openmeteo"`, not an empty result), or `"openmeteo"` (global). There is deliberately no automatic cross-fallback: a gauge observation and a modeled discharge are different claims.
 - `forecast_days` (optional): Discharge forecast days, 1-210 (default: 7). Global model path only; ignored for US gauge data
 - `detail` (optional): `"summary"`, `"standard"` (default), or `"full"`
   - US path: `full` shows up to 25 nearest gauges (instead of 5), up to 25 historic crests per gauge (instead of 3), and each gauge's multi-point NWPS forecast series where one exists
+  - Great Britain path: `full` shows up to 25 nearest gauges (instead of 5). Published typical ranges are fetched for the **nearest 5 only** at every detail level, and the report says so — the remaining gauges are listed and counted in full, just without a range
   - Global path: `full` adds the min/max ensemble envelope and the full requested day range (lower levels cap the forecast at 7 days)
 
 *Coordinates not required when `location_name` or `city_name` is provided.
@@ -772,6 +773,8 @@ Monitor river levels and flood status worldwide — NOAA gauge observations in t
 **Description:**
 
 *US locations (NOAA NWPS):* Finds the nearest river gauges within the specified radius and reports current water levels, flood stages, and flow rates. Each shown gauge also gets an observed rise/fall trend derived from its stage history (e.g. `↗ rising (+0.5 ft / 6h)`); gauges whose stage series can't be fetched simply omit the trend. Gauge IDs include the USGS site number where NWPS reports one, but streamflow data is not fetched from USGS Water Services.
+
+*Great Britain (Environment Agency):* Finds the nearest river gauges and reports their **observed** level, updated every 15 minutes, against each gauge's published typical range. A station is reported when the Environment Agency publishes a river name for it, so tide gauges are excluded and Scottish river gauges are included. There is no forecast and there are no flood categories — see **Returns** below.
 
 *Everywhere else (Open-Meteo Flood API, GloFAS v4):* Returns modeled river discharge in m³/s (with ft³/s under imperial units) on a ~5km grid. Because a grid cell that misses the river channel reports local runoff rather than the river, each request probes a 3×3 neighborhood in one call and selects the cell with the highest mean discharge over the past 31 days; when the selected cell is not the requested point, the output discloses it ("Nearest modeled river channel: ~5 km W of requested point"). GloFAS publishes no flood-stage thresholds, so discharge is presented against its own recent history and the forecast ensemble instead of flood categories. Points with no modeled channel — open ocean, arid regions — return a plain "no river data" result rather than an error.
 
@@ -794,6 +797,21 @@ Monitor river levels and flood status worldwide — NOAA gauge observations in t
 - River and location names, safety assessment for recreation
 - Recent historic crests, where NOAA records them — year and stage, plus the flow when NOAA recorded one (many older crests have no flow on record and show the stage alone)
 
+**Returns (Great Britain — Environment Agency):**
+- Nearest river gauges with their **observed** level, updated every 15 minutes
+- The basis of every level, in words: `m`/`mASD` readings are heights above the gauge datum, while `mAOD` readings are a water-surface **elevation above Ordnance Datum, not river depth**. Roughly a third of gauges publish only in mAOD, so the distinction is stated on every reading rather than left to the unit label
+- The gauge's published **typical range**, where one exists, and a plain position report against it (below / within / above). This is a normal-conditions reference, **not a flood category** — the Environment Agency publishes no action/minor/moderate/major equivalent on this API and `typicalRangeHigh` is not a flood threshold
+- Observation age per gauge, so a stale gauge discloses itself rather than reading as current
+- Distance to each gauge, and the count of every river gauge found — not just the ones displayed
+- **No forecast.** This API publishes observations only; use `source: "openmeteo"` for a modeled forecast
+
+Coverage is the **Environment Agency river-gauge network**, which is what the tool says and what it
+means: a station is reported when the Environment Agency publishes a river name for it. That is true
+by construction rather than by geography — the River Tweed at Sprouston is in Scotland and is
+correctly included, while the tide gauges at Leith are correctly excluded. A point where the Agency
+monitors nothing, and a point where it monitors only tidal stations, produce **different** messages,
+and neither is an all-clear.
+
 **Returns (global model path):**
 - Current modeled discharge with a rise/fall trend over the past 7 days (relative ±10% threshold)
 - Context against the past-31-day mean ("~2.1× the recent average" / "near the recent average" / "well below the recent average")
@@ -801,7 +819,7 @@ Monitor river levels and flood status worldwide — NOAA gauge observations in t
 - Ensemble forecast: daily median with the p25–p75 band, plus the min/max envelope at `detail="full"`
 - A "minor local drainage" label when the best cell is under 0.1 m³/s
 
-**Note:** US data provided by NOAA National Water Prediction Service (NWPS). Non-US data provided by the Open-Meteo Flood API (GloFAS v4), licensed CC-BY 4.0 and credited in the output as *"River discharge data by Open-Meteo.com (CC-BY 4.0)"*. Model discharge is **not** a gauge observation and carries no official flood-stage thresholds — do not substitute it for national flood warnings. Border cities that fall inside the US routing boxes (Toronto, Vancouver) still route to NOAA — routing is by bounding box, not by country — but an empty NWPS result there no longer reads as an all-clear: the report states that NWPS gauges the US and Puerto Rico only, that no gauges is an absence of coverage rather than an absence of flooding, and names `source: "openmeteo"` as the authority that can answer. The same disclosure now also renders in the US territories NWPS does not gauge — being US is not sufficient, since the geocoder resolves every territory to the same `us` country code Puerto Rico gets, so coverage is decided by geography as well.
+**Note:** US data provided by NOAA National Water Prediction Service (NWPS). Great Britain data provided by the Environment Agency real-time flood-monitoring API under the Open Government Licence v3, and credited in the output with the attribution that licence requires: *"this uses Environment Agency flood and river level data from the real-time data API (Beta)"*. Remaining non-US data provided by the Open-Meteo Flood API (GloFAS v4), licensed CC-BY 4.0 and credited in the output as *"River discharge data by Open-Meteo.com (CC-BY 4.0)"*. Model discharge is **not** a gauge observation and carries no official flood-stage thresholds — do not substitute it for national flood warnings. Border cities that fall inside the US routing boxes (Toronto, Vancouver) still route to NOAA — routing is by bounding box, not by country — but an empty NWPS result there no longer reads as an all-clear: the report states that NWPS gauges the US and Puerto Rico only, that no gauges is an absence of coverage rather than an absence of flooding, and names `source: "openmeteo"` as the authority that can answer. The same disclosure now also renders in the US territories NWPS does not gauge — being US is not sufficient, since the geocoder resolves every territory to the same `us` country code Puerto Rico gets, so coverage is decided by geography as well.
 
 ### 13. get_wildfire_info
 Monitor active wildfires and fire activity for safety and evacuation planning, worldwide.
@@ -1038,7 +1056,7 @@ Weather output defaults to **imperial** units and can be switched to **metric** 
 "Wind in knots for the marina"                → wind_speed_unit: "kn"
 ```
 
-**Note:** Fire-weather heights/transport wind, river gauge stage, and the marine tool's wave output use their domain-standard units and are not affected by this setting.
+**Note:** Fire-weather heights/transport wind, NWPS river gauge stage, and the marine tool's wave output use their domain-standard units and are not affected by this setting. The Environment Agency river level in Great Britain **is** affected: it is published in metres and follows the distance preference (metres under `km`, feet under `mi`).
 
 ## Error Handling & Service Status
 

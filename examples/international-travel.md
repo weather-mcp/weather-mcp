@@ -31,20 +31,20 @@ get_current_conditions({
 **The server returned** (verbatim — this is exactly what the MCP client receives):
 
 ````markdown
-**Location:** Paris, Ile-de-France, Metropolitan France, France (48.8535, 2.3484)
+**Location:** Paris, Ile-de-France, Metropolitan France, France (48.8589, 2.3200)
 
-# Current Conditions — Paris/Le Bourge Arpt, ID, FR (LFPB)
+# Current Conditions — Villacoublay, ID, FR (LFPV)
 
-**Station:** Paris/Le Bourge Arpt, ID, FR (LFPB) — 14 km NNE of the requested point, elev 50m
-**Observed:** Aug 27, 2026, 23:30 GMT+2 (20 minutes ago)
+**Station:** Villacoublay, ID, FR (LFPV) — 13 km SW of the requested point, elev 171m
+**Observed:** Sep 2, 2026, 23:00 GMT+2 (4 minutes ago)
 
-**Temperature:** 19°C (dew point 17°C, humidity 88%)
-**Wind:** SSE (160°) at 6 km/h
+**Temperature:** 20°C (dew point 11°C, humidity 56%)
+**Wind:** SW (230°) at 9 km/h
 **Visibility:** +9.7 km
-**Pressure:** 1010 hPa
+**Pressure:** 1022 hPa
 **Flight category:** VFR
 
-`METAR LFPB 272130Z AUTO 16003KT CAVOK 19/17 Q1010 NOSIG`
+`METAR LFPV 022100Z AUTO 23005KT CAVOK 20/11 Q1022 NOSIG`
 
 ---
 *Data source: NOAA Aviation Weather Center (aviationweather.gov) — METAR station observation*
@@ -83,7 +83,7 @@ get_air_quality({
 **Timezone:** Europe/Paris
 **Elevation:** 36m
 
-**Observation Time:** 8/27/2026, 11:00:00 PM
+**Observation Time:** 9/2/2026, 11:00:00 PM
 
 ## 🟢 European Air Quality Index: 21
 
@@ -101,27 +101,27 @@ Enjoy your usual outdoor activities.
 
 ## Pollutant Concentrations
 
-**PM2.5 (Fine Particulate Matter):** 6.3 μg/m³
-**PM10 (Coarse Particulate Matter):** 8.9 μg/m³
-**Ozone (O₃):** 52 μg/m³
-**Nitrogen Dioxide (NO₂):** 37 μg/m³
-**Sulfur Dioxide (SO₂):** 1.6 μg/m³
-**Carbon Monoxide (CO):** 237 μg/m³
-**Ammonia (NH₃):** 1.1 μg/m³
-**Aerosol Optical Depth:** 0.140 (atmospheric haze indicator)
+**PM2.5 (Fine Particulate Matter):** 7.1 μg/m³
+**PM10 (Coarse Particulate Matter):** 11 μg/m³
+**Ozone (O₃):** 53 μg/m³
+**Nitrogen Dioxide (NO₂):** 20 μg/m³
+**Sulfur Dioxide (SO₂):** 1.2 μg/m³
+**Carbon Monoxide (CO):** 194 μg/m³
+**Ammonia (NH₃):** 2.9 μg/m³
+**Aerosol Optical Depth:** 0.100 (atmospheric haze indicator)
 
 ## 🌾 Pollen
 
 **Alder:** 0 grains/m³
 **Birch:** 0 grains/m³
-**Grass:** 0.5 grains/m³
-**Mugwort:** 0.4 grains/m³
+**Grass:** 1.2 grains/m³
+**Mugwort:** 2.3 grains/m³
 **Olive:** 0 grains/m³
 **Ragweed:** 0 grains/m³
 
 *Pollen from the CAMS European forecast — available for European locations only.*
 
-*US AQI: 37 (Good)*
+*US AQI: 49 (Good)*
 ````
 
 </details>
@@ -132,5 +132,5 @@ Enjoy your usual outdoor activities.
 **Features shown:** `source: "metar"` — real airport instrument observations anywhere on earth (station, distance, bearing, observation age always disclosed) · European pollen levels on `get_air_quality` (automatic for European locations) · European EAQI air-quality scale · per-call `units: "metric"`.
 
 <!-- capture-stamp -->
-*Captured 2026-08-27 with weather-mcp v1.25.6 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-09-02
+
+### Added
+
+- **`get_river_conditions` now answers Great Britain with observed river levels instead of modeled discharge.** A British caller previously got GloFAS v4 output — cubic metres per second on a ~5 km model grid, under an explicit caveat that it is *"not gauge observations"*. That is the honest best answer for most of the world and the wrong one here, because the Environment Agency publishes **observed 15-minute river levels** from a dense real gauge network, keyless, under the Open Government Licence v3. `source: "auto"` now routes Great Britain to that network, and a new `source: "ea"` forces it anywhere. NWPS and GloFAS output is **byte-identical** to before (verified base-versus-branch, both unit systems, back-to-back).
+
+  What a report returns: each gauge's observed level, the basis that level is measured from, the published typical range where one exists, a plain position report against that range, the observation age, and the count of every river gauge found. There is **no forecast** — this API publishes observations only — and **no flood categories**, because the Environment Agency publishes none on this API; `typicalRangeHigh` is a normal-conditions reference and is never presented as a flood threshold.
+
+  **Coverage is "the EA river-gauge network", never "England".** A station is reported when the Agency publishes a river name for it, which makes the claim true by construction rather than by drawing a border: the River Tweed at Sprouston is in Scotland and is correctly included, while the tide gauges at Leith are correctly excluded. A point the Agency does not monitor and a point where it monitors only tidal stations produce different messages, and neither is an all-clear.
+
+  Three details that are easy to get wrong and were settled against the live API rather than its documentation. **A third of gauges publish only in `mAOD`** — a water-surface elevation above Ordnance Datum, not a river depth — so every level states in words what it is measured from; 21 of the 68 gauges around York are in this case. **The typical range belongs to a station's `Stage` measure**, so a station publishing only a `Tidal Level` measure shows its level with no range at all, rather than inviting a comparison against a range that does not describe it. And **the level and the range are banded after conversion and rounding**, so the words and the figures cannot disagree at an edge in either unit system.
+
+  One national bulk readings pull (4,106 readings, 1.3 MB) is cached for 15 minutes and serves every British query, rather than one request per station. Typical ranges are fetched for the nearest five gauges only and cached for 24 hours — carrying the threshold fields alone, never a reading, so a day-old level can never be served as current. Cold requests measured 8.1–11.1 s; warm requests are instant. (`src/services/environmentAgency.ts`, `src/utils/eaGauges.ts`, `src/utils/geography.ts`, `src/handlers/riverConditionsHandler.ts`, `src/types/environmentAgency.ts`, `src/config/cache.ts`, `src/index.ts`)
+
 ### Security
 
 - **A high-severity advisory that appeared after v1.25.18 shipped is cleared, without disabling the cooldown guard.** `npm audit` began reporting `fast-uri` 3.1.5 as **high** — GHSA-5jgf-p345-68v8 (host confusion via skipped IDN canonicalization on scheme-relative references), GHSA-f65p-4m7j-42xc and GHSA-fph4-wmhf-6fwf (server-side request forgery via malformed IPv6 normalization and via repeated hostname percent-decoding), and GHSA-jqff-g426-hqxp (host confusion via percent-encoded scheme normalization) — reached as `@modelcontextprotocol/sdk` → `ajv` → `fast-uri`. This project's release gate is "no high or critical vulnerabilities", so the gate was red on `main` until this commit. **`fast-uri` is pinned to 3.1.6 through an `overrides` entry**, which is the first exact pin this package has carried. 3.1.6 was published on 2026-08-23, is ten days clear of npm's seven-day `min-release-age`, and sits outside the vulnerable range `3.0.0 - 3.1.5` — so the advisory clears today rather than waiting on 3.1.7, which was published on 2026-09-02 and which the cooldown declines until 2026-09-09. Taking 3.1.7 would have meant either waiting a week with a high open or switching off the guard that exists to catch the freshly-published-and-compromised case; pinning the older patched release needs neither. `npm ci` from the committed lockfile resolves 3.1.6, so the published build gets the fix. The one moderate `qs` advisory v1.25.18 documented is **unchanged and still carried**: `qs` 6.16.0 clears its own cooldown on 2026-09-05 and remains due as a separate `chore:` bump. (`package.json`, `package-lock.json`)
@@ -1637,7 +1651,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.18...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.26.0...HEAD
+[1.26.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.18...v1.26.0
 [1.25.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.17...v1.25.18
 [1.25.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.16...v1.25.17
 [1.25.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.15...v1.25.16
