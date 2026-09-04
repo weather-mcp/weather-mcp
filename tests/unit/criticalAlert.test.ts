@@ -5,6 +5,7 @@ import {
   formatCriticalAlertBanner,
   type CriticalAlertCandidate,
 } from '../../src/utils/criticalAlert.js';
+import { DisplayThresholds } from '../../src/config/displayThresholds.js';
 
 /**
  * Fixtures are shaped like real `api.weather.gov/alerts/active` properties —
@@ -481,5 +482,73 @@ describe('formatCriticalAlertBanner', () => {
       expect(text).toBe(WHOLE_BANNER);
       expect(text).not.toContain('MUST NOT RENDER');
     });
+  });
+});
+
+/**
+ * G77 — the cancelled-warning shape (codex-MAJOR-3, diff review 2026-09-03).
+ *
+ * NOAA does not delete a warning when it ends; it publishes an update carrying
+ * the same `event` with the CAP quadruple flipped to
+ * `Minor / Past / Observed / AllClear`. Calibration measured 136 firing of 159
+ * candidates on the live national feed, rejecting exactly the 23 cancellations
+ * — but nothing pinned that shape, so a later widening of the gate could
+ * re-fire "TORNADO WARNING" for a storm that is over. A banner is an
+ * imperative addressed to the reader; firing one on a cancellation is a
+ * fabricated alarm, which is worse than the silence the gate is allowed.
+ */
+describe('isCriticalAlert — cancelled warnings must never fire (G77)', () => {
+  /** A Tornado Warning that has been cancelled: same event, quadruple flipped. */
+  const cancelledTornadoWarning: CriticalAlertCandidate = {
+    event: 'Tornado Warning',
+    severity: 'Minor',
+    urgency: 'Past',
+    certainty: 'Observed',
+    response: 'AllClear',
+    senderName: 'NWS Grand Rapids MI',
+    expires: '2026-09-03T16:15:00-04:00',
+  };
+
+  it('does not fire on the cancelled shape', () => {
+    expect(isCriticalAlert(cancelledTornadoWarning)).toBe(false);
+  });
+
+  it('fires on the live shape carrying the same event name', () => {
+    // The inverse half (G10): the assertion above must be rejecting the
+    // cancellation, not the event name.
+    expect(isCriticalAlert({ ...cancelledTornadoWarning, ...tornadoWarning })).toBe(true);
+  });
+
+  it('is skipped by first-match selection, and the live warning behind it wins', () => {
+    // Selection is first-match in the caller's order (newest-first from NOAA),
+    // so a cancellation arriving ahead of a still-live warning must not shadow
+    // it — and must not be returned itself.
+    const selected = selectCriticalAlert([cancelledTornadoWarning, hurricaneWarning]);
+    expect(selected).toBe(hurricaneWarning);
+  });
+
+  it('selects nothing when a cancellation is the only alert present', () => {
+    expect(selectCriticalAlert([cancelledTornadoWarning])).toBeUndefined();
+  });
+
+  /**
+   * The assertion that actually protects G77's stated hazard. Rejecting the
+   * cancelled shape today is not enough: the gate is a config surface, and
+   * `displayThresholds.ts` invites re-calibration. This pins that the
+   * cancellation is at least TWO widenings away from firing, so loosening any
+   * single term — the urgency term G77 names in particular — still cannot
+   * re-fire a cancelled tornado warning.
+   */
+  it('stays at least two gate widenings away from firing', () => {
+    const gate = DisplayThresholds.criticalAlert;
+    const axisMisses = [
+      gate.severities.includes(cancelledTornadoWarning.severity as string),
+      gate.urgencies.includes(cancelledTornadoWarning.urgency as string),
+      gate.certainties.includes(cancelledTornadoWarning.certainty as string),
+    ].filter(matches => !matches).length;
+
+    expect(axisMisses).toBeGreaterThanOrEqual(2);
+    // And the response leg, which stands alone, must not admit it either.
+    expect(gate.responses).not.toContain(cancelledTornadoWarning.response);
   });
 });
