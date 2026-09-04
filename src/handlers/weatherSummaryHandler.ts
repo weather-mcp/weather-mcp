@@ -27,6 +27,8 @@ import { handleGetAlerts } from './alertsHandler.js';
 import { JmaService } from '../services/jma.js';
 import { handleGetAirQuality } from './airQualityHandler.js';
 import { handleGetLightningActivity } from './lightningHandler.js';
+import { resolveCriticalAlertBanner } from './criticalAlertBanner.js';
+import { guessTimezoneFromCoords } from '../utils/timezone.js';
 
 /**
  * Sections that can be included in a weather summary.
@@ -105,7 +107,23 @@ export async function handleGetWeatherSummary(
   // it is threaded explicitly, which would silently render a Japanese point
   // through Google or the not-covered sentence — a fabricated all-clear on
   // safety data (G19, and both prep-review legs filed it).
-  jmaService?: JmaService
+  jmaService?: JmaService,
+  // The critical-alert banner runs the hazard the other way round. Every other
+  // trailing parameter here has to be threaded *down* or its feature is missing
+  // from the summary; this one must NOT be, because the summary already renders
+  // the forecast and current-conditions sections through the same handlers that
+  // now carry the flag. Thread it into either of those two calls below and the
+  // banner renders three times in one response — a safety element repeated is a
+  // safety element people stop reading.
+  //
+  // The summary therefore resolves the banner **once, here**, and prepends it to
+  // its own assembled body. Two facts already keep the sub-handlers quiet: both
+  // calls below pass 6 arguments, so a trailing 8th/9th arrives `undefined`; and
+  // `subArgs` is spread from the caller's `args`, while this is a function
+  // parameter and not a member of `args`. Neither survives a future edit
+  // unnoticed, which is why `tests/unit/critical-alert-summary.test.ts` counts
+  // the banner's occurrences rather than merely asserting it is present.
+  criticalAlertBanner?: boolean
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   const typedArgs = (args ?? {}) as WeatherSummaryArgs;
 
@@ -134,7 +152,22 @@ export async function handleGetWeatherSummary(
     detail
   };
 
-  let body = `# Weather Summary\n\n`;
+  // Resolved once for the whole summary and prepended outermost, so the reader
+  // meets the warning before the heading. The summary builds a string rather
+  // than mutating `content[0].text`, so this is plain concatenation and
+  // `prependCriticalAlertBanner` is not used at this site.
+  //
+  // The falsy flag short-circuits before the `await`, so the no-flag path gains
+  // no latency at all.
+  const criticalBanner = criticalAlertBanner
+    ? await resolveCriticalAlertBanner(
+        noaaService,
+        resolved,
+        guessTimezoneFromCoords(resolved.latitude, resolved.longitude)
+      )
+    : '';
+
+  let body = `${criticalBanner}# Weather Summary\n\n`;
   const locationLine = formatLocationLine(resolved);
   if (locationLine) {
     body += locationLine;
