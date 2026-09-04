@@ -836,12 +836,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'get_forecast':
         return await withAnalytics('get_forecast', async () =>
-          handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService, acisService)
+          handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService, acisService, true)
         );
 
       case 'get_current_conditions':
         return await withAnalytics('get_current_conditions', async () =>
-          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService, acisService, aviationWeatherService)
+          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService, acisService, aviationWeatherService, true)
         );
 
       case 'get_alerts':
@@ -859,7 +859,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           handleGetWeatherSummary(
             args, noaaService, openMeteoService, nceiService, locationStore, geocodingService,
             meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService,
-            jmaService
+            jmaService, true
           )
         );
 
