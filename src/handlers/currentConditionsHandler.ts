@@ -9,7 +9,8 @@ import { AcisService } from '../services/acis.js';
 import { AviationWeatherService } from '../services/aviationWeather.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
-import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import { resolveLocationAsync, prependLocationLine, prependCriticalAlertBanner } from '../utils/locationResolver.js';
+import { resolveCriticalAlertBanner } from './criticalAlertBanner.js';
 import { validateOptionalBoolean } from '../utils/validation.js';
 import { convertToFahrenheit } from '../utils/temperatureConversion.js';
 import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
@@ -125,7 +126,8 @@ export async function handleGetCurrentConditions(
   locationStore: LocationStore,
   geocodingService: GeocodingService,
   acisService?: AcisService,
-  aviationWeatherService?: AviationWeatherService
+  aviationWeatherService?: AviationWeatherService,
+  criticalAlertBanner?: boolean
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as CurrentConditionsArgs, locationStore, geocodingService);
@@ -232,14 +234,29 @@ export async function handleGetCurrentConditions(
     );
   }
 
-  return prependLocationLine({
+  // The flag check gates the fetch itself (before any await), so an absent
+  // flag adds no latency to the no-op path. The banner is prepended last —
+  // outermost, above the `**Location:**` line this wraps — because a
+  // life-threatening warning outranks knowing which place it is about. This
+  // single return is shared by every source arm (NOAA, Open-Meteo, and the
+  // METAR arm at :153 which falls through to it), so wrapping it here covers
+  // all three by construction.
+  const banner = criticalAlertBanner
+    ? await resolveCriticalAlertBanner(
+        noaaService,
+        resolved,
+        guessTimezoneFromCoords(latitude, longitude)
+      )
+    : '';
+
+  return prependCriticalAlertBanner(prependLocationLine({
     content: [
       {
         type: 'text',
         text: output
       }
     ]
-  }, resolved);
+  }, resolved), banner);
 }
 
 /**

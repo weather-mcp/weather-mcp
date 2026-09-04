@@ -18,7 +18,8 @@ import {
   validateDetail,
   DetailLevel,
 } from '../utils/validation.js';
-import { resolveLocationAsync, formatLocationLine } from '../utils/locationResolver.js';
+import { resolveLocationAsync, formatLocationLine, prependCriticalAlertBanner } from '../utils/locationResolver.js';
+import { resolveCriticalAlertBanner } from './criticalAlertBanner.js';
 import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
 import { UnitPreferences } from '../config/units.js';
 import {
@@ -237,7 +238,8 @@ export async function handleGetForecast(
   locationStore: LocationStore,
   geocodingService: GeocodingService,
   nceiService?: NCEIService,
-  acisService?: AcisService
+  acisService?: AcisService,
+  criticalAlertBanner?: boolean
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as ForecastArgs, locationStore, geocodingService);
@@ -442,7 +444,19 @@ export async function handleGetForecast(
     result.content[0].text = locationLine + result.content[0].text;
   }
 
-  return result;
+  // The flag check gates the fetch itself (before any await), so an absent
+  // flag adds no latency to the no-op path. The banner is prepended last —
+  // outermost, above the `**Location:**` line just added — because a
+  // life-threatening warning outranks knowing which place it is about.
+  const banner = criticalAlertBanner
+    ? await resolveCriticalAlertBanner(
+        noaaService,
+        resolved,
+        guessTimezoneFromCoords(latitude, longitude)
+      )
+    : '';
+
+  return prependCriticalAlertBanner(result, banner);
 }
 
 /**
