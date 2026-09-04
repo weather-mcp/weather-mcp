@@ -255,9 +255,15 @@ describe('resolveCriticalAlertBanner', () => {
     });
 
     it('logs no URL and no raw axios error', async () => {
+      // The title's second half used to outrun its assertions (MAJOR-1): the
+      // warn carried `error.message`, and "Request failed with status code 503"
+      // IS the raw axios message. Both halves are asserted now.
       const axiosShaped = Object.assign(
         new Error('Request failed with status code 503'),
-        { config: { url: 'https://api.weather.gov/alerts/active?point=42.9634,-85.6681' } }
+        {
+          config: { url: 'https://api.weather.gov/alerts/active?point=42.9634,-85.6681' },
+          response: { status: 503 },
+        }
       );
       const getAlerts = vi.fn().mockRejectedValue(axiosShaped);
 
@@ -266,6 +272,26 @@ describe('resolveCriticalAlertBanner', () => {
       const logged = JSON.stringify(warnSpy.mock.calls);
       expect(logged).not.toContain('api.weather.gov');
       expect(logged).not.toContain('point=');
+      expect(logged).not.toContain('Request failed with status code');
+    });
+
+    it('logs the status and the error type, so an outage is still diagnosable', () => {
+      // The inverse half (G10): a warn that carried nothing at all would pass
+      // every assertion above. Dropping the message must not leave the log
+      // useless — a reader still has to tell a 404 from a 503.
+      const axiosShaped = Object.assign(
+        new Error('Request failed with status code 503'),
+        { response: { status: 503 } }
+      );
+      const getAlerts = vi.fn().mockRejectedValue(axiosShaped);
+
+      return resolveCriticalAlertBanner(fakeNoaa(getAlerts), US_POINT, 'America/Detroit').then(() => {
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        const meta = warnSpy.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(meta.status).toBe(503);
+        expect(meta.errorType).toBe('Error');
+        expect(meta.securityEvent).toBe(true);
+      });
     });
 
     it('renders no note of any kind on failure', async () => {

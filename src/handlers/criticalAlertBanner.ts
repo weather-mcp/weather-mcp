@@ -30,6 +30,27 @@ import {
 } from '../utils/criticalAlert.js';
 
 /**
+ * The HTTP status an error carries, or `undefined`.
+ *
+ * Reads the two shapes this path can see — an `ApiError` subclass's
+ * `statusCode`, and an axios error's `response.status` — and nothing else. A
+ * bare number is the whole of what is logged: no message, no config, no URL.
+ */
+function httpStatusOf(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+  const record = error as { statusCode?: unknown; response?: { status?: unknown } };
+  if (typeof record.statusCode === 'number') {
+    return record.statusCode;
+  }
+  if (typeof record.response?.status === 'number') {
+    return record.response.status;
+  }
+  return undefined;
+}
+
+/**
  * The banner for this point, or `''` — which is every path but one.
  *
  * In order:
@@ -102,10 +123,19 @@ export async function resolveCriticalAlertBanner(
     // Exactly one warn, carrying no URL and no raw axios error. The banner is
     // garnish (D1): this must add no latency and must never rethrow, because
     // the forecast the caller actually asked for still has to render.
+    //
+    // The impl plan's contract is "no URL and no raw axios error", and
+    // `error.message` was carrying exactly that — "Request failed with status
+    // code 503" is the axios message, and an axios message is one upstream
+    // change away from carrying the request URL with it. What is logged is
+    // therefore the error's *type* and its status, the shape this project
+    // already uses for key-bearing services, which is what a reader of these
+    // logs actually needs to tell a 404 from an outage.
     logger.warn('Critical-alert banner lookup failed; omitting the banner', {
       service: 'NOAA',
       securityEvent: true,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+      status: httpStatusOf(error),
     });
     return '';
   }
