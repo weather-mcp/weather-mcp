@@ -552,3 +552,84 @@ describe('isCriticalAlert — cancelled warnings must never fire (G77)', () => {
     expect(gate.responses).not.toContain(cancelledTornadoWarning.response);
   });
 });
+
+/**
+ * Sanitizer hardening (codex-MAJOR-4, diff review 2026-09-03).
+ *
+ * Two defects against the design's fixed-copy boundary. Neither is reachable
+ * without a compromised api.weather.gov — `event`, `senderName` and `response`
+ * have no other source — so both are defence in depth rather than a live
+ * exposure. They are still worth closing: the banner's whole claim is that its
+ * wording is the project's and only the named values come from upstream.
+ */
+describe('sanitizeField — invisible and astral input (MAJOR-4)', () => {
+  /** U+202E RIGHT-TO-LEFT OVERRIDE reverses the rendering of everything after it. */
+  const RLO = '\u202E';
+  /** Written as escapes, deliberately: a literal invisible character in a test
+   * file is unreviewable, and a diff cannot show it changing. */
+  const INVISIBLES = {
+    zeroWidthSpace: '\u200B',
+    zeroWidthJoiner: '\u200D',
+    leftToRightIsolate: '\u2066',
+    leftToRightEmbedding: '\u202A',
+    byteOrderMark: '\uFEFF',
+  };
+  /** Matches a high or low surrogate that is not part of a valid pair. */
+  const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+  it('strips a right-to-left override from the event name', () => {
+    const text = formatCriticalAlertBanner(
+      { ...tornadoWarning, event: `Tornado${RLO} Warning` },
+      1,
+      'America/Detroit'
+    );
+    expect(text).not.toContain(RLO);
+    expect(text).toContain('Tornado Warning');
+  });
+
+  it('strips bidi, zero-width and BOM characters from every interpolated field', () => {
+    const text = formatCriticalAlertBanner(
+      {
+        ...tornadoWarning,
+        event: `Tornado${INVISIBLES.zeroWidthSpace} Warning${INVISIBLES.leftToRightIsolate}`,
+        senderName:
+          `NWS${INVISIBLES.byteOrderMark} Grand${INVISIBLES.zeroWidthJoiner} ` +
+          `Rapids${INVISIBLES.leftToRightEmbedding} MI`,
+      },
+      1,
+      'America/Detroit'
+    );
+
+    for (const ch of Object.values(INVISIBLES)) {
+      expect(text).not.toContain(ch);
+    }
+    // The visible words survive — the strip must not eat the field.
+    expect(text).toContain('Tornado Warning');
+    expect(text).toContain('NWS Grand Rapids MI');
+  });
+
+  it('truncates on a character boundary, never mid-surrogate-pair', () => {
+    // 130 astral characters: past the 120 cap, and each two UTF-16 code units
+    // wide, so a code-unit slice is guaranteed to cut one in half.
+    const event = '\u{1F300}'.repeat(130);
+    const text = formatCriticalAlertBanner({ ...tornadoWarning, event }, 1, 'America/Detroit');
+
+    expect(text).not.toMatch(LONE_SURROGATE);
+    expect(text).not.toContain('�');
+  });
+
+  it('keeps 120 whole characters when it truncates', () => {
+    const event = '\u{1F300}'.repeat(130);
+    const text = formatCriticalAlertBanner({ ...tornadoWarning, event }, 1, 'America/Detroit');
+    const rendered = Array.from(text).filter(ch => ch === '\u{1F300}').length;
+    expect(rendered).toBe(120);
+  });
+
+  it('leaves a field shorter than the cap untouched', () => {
+    // The inverse half (G10): truncation must be doing nothing in the common
+    // case, or the assertions above would pass on a field that is always cut.
+    const event = '\u{1F300}'.repeat(10);
+    const text = formatCriticalAlertBanner({ ...tornadoWarning, event }, 1, 'America/Detroit');
+    expect(Array.from(text).filter(ch => ch === '\u{1F300}').length).toBe(10);
+  });
+});

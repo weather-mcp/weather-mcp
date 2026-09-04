@@ -66,15 +66,27 @@ const CAP_RESPONSE_VALUES: readonly string[] = [
 const MAX_FIELD_LENGTH = 120;
 
 /**
- * Control characters and backticks, the two classes that let an upstream field
- * escape the clause it was interpolated into.
+ * Control characters, invisible formatting characters, and backticks — the
+ * classes that let an upstream field escape the clause it was interpolated
+ * into, or misrepresent what it says.
  *
  * The control class is deliberately wider than the CR/LF the design names: a
  * bare `\r`, a NUL, or an ANSI escape sequence all break out of a line as
  * effectively as a newline does, and none of them belongs in an event name.
  * Backticks would close the banner's own code span around `get_alerts`.
+ *
+ * The bidi and zero-width classes are here for a different reason than escape:
+ * they are *visually* deceptive rather than structurally so. U+202E
+ * (RIGHT-TO-LEFT OVERRIDE) reverses the rendering of everything after it, so an
+ * event name carrying one can make a banner read as something other than what
+ * the feed published, while every character in it is individually innocuous.
+ * A safety banner asserts something in the reader's own words; a field that can
+ * rewrite the sentence around it defeats that. Zero-width joiners and the BOM
+ * are stripped on the same principle — invisible input has no legitimate place
+ * in a CAP event name, sender name, or response value.
  */
-const UNSAFE_FIELD_CHARS = /[\u0000-\u001F\u007F-\u009F`]/g;
+const UNSAFE_FIELD_CHARS =
+  /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF`]/g;
 
 /**
  * Reduce one upstream field to something safe to interpolate, or `undefined`
@@ -90,12 +102,23 @@ function sanitizeField(value: string | undefined): string | undefined {
     return undefined;
   }
 
-  const cleaned = value
+  const collapsed = value
     .replace(UNSAFE_FIELD_CHARS, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, MAX_FIELD_LENGTH)
     .trim();
+
+  // Truncate by code point, not by UTF-16 code unit. `String.prototype.slice`
+  // cuts between the halves of a surrogate pair, which turns a legitimate
+  // astral character at the boundary into a lone surrogate — an invalid
+  // sequence that renders as a replacement glyph in the middle of a safety
+  // banner. `Array.from` iterates code points, so the cut always lands on a
+  // character boundary.
+  const codePoints = Array.from(collapsed);
+  const cleaned = (
+    codePoints.length > MAX_FIELD_LENGTH
+      ? codePoints.slice(0, MAX_FIELD_LENGTH).join('')
+      : collapsed
+  ).trim();
 
   return cleaned.length > 0 ? cleaned : undefined;
 }
