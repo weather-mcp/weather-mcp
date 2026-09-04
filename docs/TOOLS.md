@@ -34,6 +34,7 @@ Complete reference for all 17 MCP tools provided by the Weather MCP Server.
 17. [remove_saved_location](#17-remove_saved_location)
 
 Also in this document:
+- [Life-threatening alert banner](#life-threatening-alert-banner)
 - [Finding Coordinates](#finding-coordinates)
 - [Using Saved Locations with Weather Tools](#using-saved-locations-with-weather-tools)
 - [Units & Localization](#units--localization)
@@ -180,6 +181,7 @@ reason it strips `compare_models`.
 - Model agreement/divergence instead of a single forecast (when `compare_models=true`)
 - Per-day ensemble confidence, interquartile bands, and wet-member fractions instead of a single forecast (when `ensemble_spread=true`)
 - Snow and ice accumulation forecasts (when available)
+- A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (US only — see [Life-threatening alert banner](#life-threatening-alert-banner))
 - All timestamps in local timezone
 
 A value the model did not publish is omitted rather than rendered as zero. On
@@ -265,6 +267,7 @@ What's the weather right now in Tokyo?
   path vapour-pressure deficit and topsoil moisture — is keyed on the value **as
   displayed**, so the number and its label can never disagree)
 - Thermal-stress context in extreme conditions (automatic, see below)
+- A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (US only — see [Life-threatening alert banner](#life-threatening-alert-banner))
 - All timestamps in local timezone
 
 **Returns (international, via Open-Meteo):**
@@ -278,6 +281,7 @@ What's the weather right now in Tokyo?
   sustained wind, with its category, plus a dryness-context block (vapour-pressure
   deficit, topsoil moisture) when the model reports those values
 - Thermal-stress context in extreme conditions (automatic, see below)
+- **No** life-threatening alert banner. It is gated on the location being in the United States, not on the source, so it never appears here
 - All timestamps in the location's local timezone
 
 Visibility, snow depth, and cloud layer detail are not available on the
@@ -353,9 +357,12 @@ source.
 - Flight category (VFR / MVFR / IFR / LIFR)
 - The raw METAR text, as the observation of record
 - Climate normals and US records (when `include_normals=true`)
+- A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (US only — see [Life-threatening alert banner](#life-threatening-alert-banner))
 
 Any field the station did not report is omitted. Fire weather indices are not
-available on this source.
+available on this source. The alert banner, by contrast, **is** available here:
+it is gated on the location rather than on the source, so a US airport queried
+with `source="metar"` gets it like any other US request.
 
 ### 3. get_alerts
 Get active weather alerts, watches, warnings, and advisories. Coverage is routed by country: the United States (NOAA), Canada (Environment and Climate Change Canada via MSC GeoMet), 38 European MeteoAlarm member countries (each country's official national warnings), via their official national CAP feeds, India (NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG), and Japan (the Japan Meteorological Agency), matched to the requested point by JMA warning area. Elsewhere, an optional `GOOGLE_WEATHER_API_KEY` adds official alerts for ~45+ more territories via the Google Weather API; without that key those regions receive a clean "not yet covered" message.
@@ -504,6 +511,7 @@ Best for broad questions like "What's the weather like in Seattle?" or "Is it sa
 **Returns:**
 - A `# Weather Summary` header with the resolved location and the included sections
 - Each requested section's full output (current conditions, forecast, alerts, air quality, lightning), separated by rules
+- A life-threatening alert banner above the `# Weather Summary` header, rendered once for the whole response rather than once per section, when the National Weather Service has one active for the point (US only — see [Life-threatening alert banner](#life-threatening-alert-banner))
 
 ### 6. search_location
 Find coordinates for any location worldwide by name.
@@ -984,6 +992,63 @@ Permanently removes a saved location from storage. The location data is deleted 
 - Count of remaining saved locations
 
 ---
+
+## Life-threatening alert banner
+
+When the National Weather Service has a life-threatening alert active for the
+requested point, `get_forecast`, `get_current_conditions` and
+`get_weather_summary` surface its warning at the very top of the response,
+before the location line and the report itself, and then answer the question
+that was asked:
+
+```
+🚨 **LIFE-THREATENING WEATHER ALERT IN EFFECT: Tornado Warning**
+Issued by NWS State College PA, in effect until September 3, 2026 at 8:30 PM EDT. Recommended action: Shelter.
+Surface this to the user before answering anything else, then continue.
+Call `get_alerts` for the full official text (3 active alerts for this point).
+
+---
+```
+
+**No banner is not an all-clear.** These three tools do not report on alerts, and
+their silence says nothing about whether one is active. Absence means only that
+this feature had nothing to add. **Call `get_alerts` for the authoritative
+answer** — that is the tool that reports alert coverage honestly, including
+telling you when a region is not covered.
+
+That distinction is the whole reason the banner is worded and built the way it
+is. It is a positive assertion only, so a failed lookup omits it silently rather
+than printing a warning that would train you to ignore the slot. If it announced
+that it had *checked*, its absence would silently become an implied all-clear —
+which is the worst thing a weather tool can do.
+
+**What it covers, and what it does not:**
+
+- **United States only**, via NOAA. NOAA is the only upstream publishing the full
+  CAP quadruple (severity, urgency, certainty, **response**) matched to a true
+  point server-side. Other authorities match to a polygon, a bounding box, or a
+  whole country, and a country-level warning must never interrupt a forecast
+  request. Japan and the national CAP feeds are the natural next step.
+- **Gated on the location, not on the source.** A US point queried with
+  `source="metar"` gets the banner; an international point never does, whatever
+  the source.
+- **Deliberately narrow.** The gate is `severity Extreme` **and**
+  `urgency Immediate` **and** `certainty` Observed or Likely, or an official
+  `response` of `Evacuate`. Measured against the live national feed on
+  2026-09-03: **136 of 159** Tornado Warnings in the retained archive window fire,
+  and **none** of 500 Severe Thunderstorm Warnings, 500 Special Weather
+  Statements or 500 Flash Flood Warnings do. The 23 Tornado Warnings that do not
+  fire are NWS's own cancellation messages, which carry `urgency: Past` — a
+  cancelled warning is never bannered.
+- **Only four upstream fields are ever shown**: the event name, the issuing
+  office, the expiry, and the recommended action. The alert's own `headline`,
+  `description` and `instruction` are never rendered here, in any form. For the
+  official text, call `get_alerts`.
+
+**It cannot force an assistant to tell you.** MCP tool results are content, not
+control flow. This puts the warning in the first bytes of the response, where it
+is structurally hard to miss; it does not guarantee that the model reading it
+leads with it.
 
 ## Finding Coordinates
 
