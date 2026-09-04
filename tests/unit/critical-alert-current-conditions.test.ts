@@ -23,6 +23,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleGetCurrentConditions } from '../../src/handlers/currentConditionsHandler.js';
+import { criticalAlertBannerFromError } from '../../src/handlers/criticalAlertBanner.js';
 import { logger } from '../../src/utils/logger.js';
 import type { NOAAService } from '../../src/services/noaa.js';
 import type { OpenMeteoService } from '../../src/services/openmeteo.js';
@@ -423,5 +424,88 @@ describe('handleGetCurrentConditions — criticalAlertBanner (T4)', () => {
       expect(text).not.toContain('LIFE-THREATENING WEATHER ALERT IN EFFECT');
       expect(fakes.noaa.getAlerts).toHaveBeenCalledTimes(0);
     });
+  });
+});
+
+/**
+ * BLOCKER-1 (diff review, 2026-09-03): the mirror of the get_forecast case.
+ * The banner used to resolve only after the observation body completed, so a
+ * provider throw suppressed a live warning and `getAlerts` was never called.
+ */
+describe('handleGetCurrentConditions — a failed observation must not suppress the banner (BLOCKER-1)', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** A plain Error is neither DataNotFoundError nor InvalidLocationError, so
+   * the auto-route fallback rethrows it rather than dropping to Open-Meteo. */
+  function buildFailingNoaaFake(getAlerts: ReturnType<typeof vi.fn>) {
+    const fake = buildNoaaFake(getAlerts);
+    fake.getStations = vi.fn().mockRejectedValue(new Error('upstream station failure'));
+    fake.getLatestObservation = vi.fn().mockRejectedValue(new Error('upstream station failure'));
+    fake.getCurrentConditions = vi.fn().mockRejectedValue(new Error('upstream station failure'));
+    return fake;
+  }
+
+  async function catchError(promise: Promise<unknown>): Promise<unknown> {
+    try {
+      await promise;
+    } catch (error) {
+      return error;
+    }
+    throw new Error('expected the observation to reject, but it resolved');
+  }
+
+  it('still fetches alerts when the observation throws, and carries the banner on the error', async () => {
+    const getAlerts = vi.fn().mockResolvedValue(alertCollection(TORNADO_WARNING));
+    const fakes = buildFakes({ noaa: buildFailingNoaaFake(getAlerts) });
+
+    const error = await catchError(
+      call({ ...US_COORDS }, fakes, undefined, undefined, true)
+    );
+
+    expect(getAlerts).toHaveBeenCalledTimes(1);
+    expect(criticalAlertBannerFromError(error)).toContain(BANNER_FIRST_LINE);
+  });
+
+  it('rethrows the original error untouched when no critical alert is active', async () => {
+    const getAlerts = vi.fn().mockResolvedValue(alertCollection());
+    const fakes = buildFakes({ noaa: buildFailingNoaaFake(getAlerts) });
+
+    const error = await catchError(
+      call({ ...US_COORDS }, fakes, undefined, undefined, true)
+    );
+
+    expect(criticalAlertBannerFromError(error)).toBe('');
+    expect((error as Error).message).toBe('upstream station failure');
+  });
+
+  it('carries nothing when the flag is absent, so the error contract is unchanged', async () => {
+    const getAlerts = vi.fn().mockResolvedValue(alertCollection(TORNADO_WARNING));
+    const fakes = buildFakes({ noaa: buildFailingNoaaFake(getAlerts) });
+
+    const error = await catchError(call({ ...US_COORDS }, fakes));
+
+    expect(getAlerts).not.toHaveBeenCalled();
+    expect(criticalAlertBannerFromError(error)).toBe('');
+  });
+
+  it('omits the banner silently when the observation fails and the alert fetch fails too', async () => {
+    const getAlerts = vi.fn().mockRejectedValue(new Error('alerts upstream down'));
+    const fakes = buildFakes({ noaa: buildFailingNoaaFake(getAlerts) });
+
+    const error = await catchError(
+      call({ ...US_COORDS }, fakes, undefined, undefined, true)
+    );
+
+    expect((error as Error).message).toBe('upstream station failure');
+    expect(criticalAlertBannerFromError(error)).toBe('');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });

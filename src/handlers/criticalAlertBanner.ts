@@ -110,3 +110,56 @@ export async function resolveCriticalAlertBanner(
     return '';
   }
 }
+
+/**
+ * The banner a failed weather request is carrying, if any.
+ *
+ * A `Symbol.for` key rather than a named property: it cannot collide with any
+ * field on an `ApiError` subclass, it does not appear in `JSON.stringify`, and
+ * it survives being rethrown unchanged through the handlers' existing
+ * fallback `catch` blocks.
+ */
+const CRITICAL_ALERT_BANNER = Symbol.for('weather-mcp.critical-alert-banner');
+
+/**
+ * Carry an already-resolved banner on an error about to be thrown.
+ *
+ * `get_forecast` and `get_current_conditions` resolve the banner concurrently
+ * with the weather body. When the body fails, the warning is the half the
+ * caller most needs, so it travels with the error to the one place that renders
+ * errors (`src/index.ts`) instead of being dropped. This keeps error formatting
+ * and error logging at that single site rather than duplicating either here.
+ *
+ * An empty banner attaches nothing at all, so a failure with no critical alert
+ * — every non-US point, and every US point with nothing life-threatening
+ * active — is byte-identical to what it was before.
+ *
+ * @param error The error being thrown; returned unchanged for `throw` chaining
+ * @param banner The resolved banner, or `''`
+ * @returns The same error
+ */
+export function carryCriticalAlertBannerOnError(error: unknown, banner: string): unknown {
+  if (banner && typeof error === 'object' && error !== null) {
+    (error as Record<symbol, unknown>)[CRITICAL_ALERT_BANNER] = banner;
+  }
+  return error;
+}
+
+/**
+ * The banner carried by an error, or `''`.
+ *
+ * Read once, by the dispatch's error path. Returning `''` for every error that
+ * carries nothing is what keeps the existing error output unchanged.
+ *
+ * @param error The caught error
+ * @returns The carried banner, or `''`
+ */
+export function criticalAlertBannerFromError(error: unknown): string {
+  if (typeof error === 'object' && error !== null) {
+    const banner = (error as Record<symbol, unknown>)[CRITICAL_ALERT_BANNER];
+    if (typeof banner === 'string') {
+      return banner;
+    }
+  }
+  return '';
+}

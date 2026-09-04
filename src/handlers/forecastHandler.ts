@@ -19,7 +19,7 @@ import {
   DetailLevel,
 } from '../utils/validation.js';
 import { resolveLocationAsync, formatLocationLine, prependCriticalAlertBanner } from '../utils/locationResolver.js';
-import { resolveCriticalAlertBanner } from './criticalAlertBanner.js';
+import { resolveCriticalAlertBanner, carryCriticalAlertBannerOnError } from './criticalAlertBanner.js';
 import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
 import { UnitPreferences } from '../config/units.js';
 import {
@@ -325,6 +325,21 @@ export async function handleGetForecast(
     }
   }
 
+  // BLOCKER-1 (diff review): a life-threatening warning must not be suppressed
+  // by a weather failure. Started here rather than awaited — every validation
+  // guard above has already run, so an invalid request still throws before any
+  // request is made, and the alert fetch now overlaps the forecast fetch
+  // instead of serialising ahead of it. `resolveCriticalAlertBanner` never
+  // rejects (it is silent-omit by construction), so this promise is safe to
+  // leave in flight across the forecast's own error paths.
+  const bannerPromise = criticalAlertBanner
+    ? resolveCriticalAlertBanner(
+        noaaService,
+        resolved,
+        guessTimezoneFromCoords(latitude, longitude)
+      )
+    : undefined;
+
   let useNOAA: boolean;
 
   if (requestedSource === 'auto') {
@@ -336,71 +351,92 @@ export async function handleGetForecast(
 
   // Use NOAA for US locations or if explicitly requested
   let result: { content: Array<{ type: string; text: string }> };
-  if (ensemble_spread) {
-    // The spread short-circuits routing exactly as the comparison does (D2):
-    // NOAA is never called, so none of the auto-fallback logic below applies.
-    // US points still get a spread, with the NWS-not-the-model-shown
-    // disclosure in the footer.
-    result = await formatEnsembleSpreadForecast(
-      openMeteoService,
-      latitude,
-      longitude,
-      days,
-      prefs,
-      detail
-    );
-  } else if (compare_models) {
-    // The comparison short-circuits routing entirely (D2): NOAA is never
-    // called, so none of the auto-fallback logic below applies — there is
-    // nothing to fall back from. US points still get a comparison, with the
-    // NWS-not-compared disclosure in the footer.
-    result = await formatModelComparisonForecast(
-      openMeteoService,
-      latitude,
-      longitude,
-      days,
-      include_precipitation_probability,
-      prefs,
-      detail
-    );
-  } else if (useNOAA) {
-    try {
-      result = await formatNOAAForecast(
-        noaaService,
+  try {
+    if (ensemble_spread) {
+      // The spread short-circuits routing exactly as the comparison does (D2):
+      // NOAA is never called, so none of the auto-fallback logic below applies.
+      // US points still get a spread, with the NWS-not-the-model-shown
+      // disclosure in the footer.
+      result = await formatEnsembleSpreadForecast(
         openMeteoService,
-        nceiService,
         latitude,
         longitude,
         days,
-        granularity,
-        include_precipitation_probability,
-        include_severe_weather,
-        include_normals,
-        include_astronomy,
         prefs,
-        detail,
-        acisService
+        detail
       );
-    } catch (error) {
-      // The US bounding boxes overrun the border (Toronto, Vancouver, Windsor
-      // all sit inside them), so auto-routed points NOAA rejects fall back to
-      // Open-Meteo instead of erroring. NOAA maps the coverage 404 ("Unable to
-      // provide data for requested point") to DataNotFoundError and other 4xx
-      // to InvalidLocationError — both are non-retryable "NOAA can't serve
-      // this request" failures, so both fall back. Transient failures
-      // (RateLimitError, ServiceUnavailableError, network) still propagate,
-      // and explicit source="noaa" keeps its error contract.
-      if (
-        requestedSource !== 'auto' ||
-        !(error instanceof DataNotFoundError || error instanceof InvalidLocationError)
-      ) {
-        throw error;
-      }
-      logger.warn('NOAA rejected auto-routed location; falling back to Open-Meteo', {
+    } else if (compare_models) {
+      // The comparison short-circuits routing entirely (D2): NOAA is never
+      // called, so none of the auto-fallback logic below applies — there is
+      // nothing to fall back from. US points still get a comparison, with the
+      // NWS-not-compared disclosure in the footer.
+      result = await formatModelComparisonForecast(
+        openMeteoService,
         latitude,
         longitude,
-        fallback: true
-      });
+        days,
+        include_precipitation_probability,
+        prefs,
+        detail
+      );
+    } else if (useNOAA) {
+      try {
+        result = await formatNOAAForecast(
+          noaaService,
+          openMeteoService,
+          nceiService,
+          latitude,
+          longitude,
+          days,
+          granularity,
+          include_precipitation_probability,
+          include_severe_weather,
+          include_normals,
+          include_astronomy,
+          prefs,
+          detail,
+          acisService
+        );
+      } catch (error) {
+        // The US bounding boxes overrun the border (Toronto, Vancouver, Windsor
+        // all sit inside them), so auto-routed points NOAA rejects fall back to
+        // Open-Meteo instead of erroring. NOAA maps the coverage 404 ("Unable to
+        // provide data for requested point") to DataNotFoundError and other 4xx
+        // to InvalidLocationError — both are non-retryable "NOAA can't serve
+        // this request" failures, so both fall back. Transient failures
+        // (RateLimitError, ServiceUnavailableError, network) still propagate,
+        // and explicit source="noaa" keeps its error contract.
+        if (
+          requestedSource !== 'auto' ||
+          !(error instanceof DataNotFoundError || error instanceof InvalidLocationError)
+        ) {
+          throw error;
+        }
+        logger.warn('NOAA rejected auto-routed location; falling back to Open-Meteo', {
+          latitude,
+          longitude,
+          fallback: true
+        });
+        result = await formatOpenMeteoForecast(
+          openMeteoService,
+          nceiService,
+          latitude,
+          longitude,
+          days,
+          granularity,
+          include_precipitation_probability,
+          include_normals,
+          include_astronomy,
+          prefs,
+          detail,
+          acisService
+        );
+        if (result.content.length > 0 && result.content[0]?.type === 'text' && result.content[0].text) {
+          result.content[0].text = insertNoteAfterHeading(result.content[0].text, NOAA_FALLBACK_NOTE);
+        }
+      }
+    } else {
+      // Use Open-Meteo for international locations
       result = await formatOpenMeteoForecast(
         openMeteoService,
         nceiService,
@@ -415,26 +451,13 @@ export async function handleGetForecast(
         detail,
         acisService
       );
-      if (result.content.length > 0 && result.content[0]?.type === 'text' && result.content[0].text) {
-        result.content[0].text = insertNoteAfterHeading(result.content[0].text, NOAA_FALLBACK_NOTE);
-      }
     }
-  } else {
-    // Use Open-Meteo for international locations
-    result = await formatOpenMeteoForecast(
-      openMeteoService,
-      nceiService,
-      latitude,
-      longitude,
-      days,
-      granularity,
-      include_precipitation_probability,
-      include_normals,
-      include_astronomy,
-      prefs,
-      detail,
-      acisService
-    );
+  } catch (error) {
+    // The forecast failed, but the banner may still have resolved. Carry it on
+    // the error so the dispatch's single error-rendering site can show the
+    // warning above the failure message; with no banner this rethrows the
+    // original error untouched and the existing error contract is unchanged.
+    throw carryCriticalAlertBannerOnError(error, bannerPromise ? await bannerPromise : '');
   }
 
   // If the location was resolved from a name (saved or geocoded), show the user
@@ -444,17 +467,11 @@ export async function handleGetForecast(
     result.content[0].text = locationLine + result.content[0].text;
   }
 
-  // The flag check gates the fetch itself (before any await), so an absent
-  // flag adds no latency to the no-op path. The banner is prepended last —
-  // outermost, above the `**Location:**` line just added — because a
+  // The flag check gated the fetch at the start (before any await), so an
+  // absent flag adds no latency to the no-op path. The banner is prepended
+  // last — outermost, above the `**Location:**` line just added — because a
   // life-threatening warning outranks knowing which place it is about.
-  const banner = criticalAlertBanner
-    ? await resolveCriticalAlertBanner(
-        noaaService,
-        resolved,
-        guessTimezoneFromCoords(latitude, longitude)
-      )
-    : '';
+  const banner = bannerPromise ? await bannerPromise : '';
 
   return prependCriticalAlertBanner(result, banner);
 }

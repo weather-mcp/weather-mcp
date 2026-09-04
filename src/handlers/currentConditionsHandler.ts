@@ -10,7 +10,7 @@ import { AviationWeatherService } from '../services/aviationWeather.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine, prependCriticalAlertBanner } from '../utils/locationResolver.js';
-import { resolveCriticalAlertBanner } from './criticalAlertBanner.js';
+import { resolveCriticalAlertBanner, carryCriticalAlertBannerOnError } from './criticalAlertBanner.js';
 import { validateOptionalBoolean } from '../utils/validation.js';
 import { convertToFahrenheit } from '../utils/temperatureConversion.js';
 import { resolveUnitPreferences, UnitArgs } from '../utils/unitPreferences.js';
@@ -151,33 +151,35 @@ export async function handleGetCurrentConditions(
     ? isInUS(latitude, longitude)
     : requestedSource === 'noaa';
 
-  let output: string;
-  if (requestedSource === 'metar') {
-    // METAR is never auto-routed (D1): `auto` keeps its exact US-NOAA /
-    // elsewhere-Open-Meteo semantics, and this arm is reached only on an
-    // explicit request. A model estimate at the caller's coordinates and a
-    // measurement at an airport 40 km away answer different questions.
-    if (!aviationWeatherService) {
-      throw new ServiceUnavailableError(
-        'AviationWeather',
-        'METAR station observations are not available in this server configuration.'
-      );
-    }
-    output = await formatMetarCurrentConditions(
-      aviationWeatherService,
-      openMeteoService,
-      nceiService,
-      latitude,
-      longitude,
-      includeFireWeather,
-      includeNormals,
-      prefs,
-      acisService
-    );
-  } else if (useNOAA) {
-    try {
-      output = await formatNOAACurrentConditions(
+  // BLOCKER-1 (diff review): a life-threatening warning must not be suppressed
+  // by a weather failure. Started here rather than awaited — every validation
+  // above has already run, and the alert fetch now overlaps the observation
+  // fetch instead of serialising ahead of it. `resolveCriticalAlertBanner`
+  // never rejects (it is silent-omit by construction), so this promise is safe
+  // to leave in flight across the observation's own error paths.
+  const bannerPromise = criticalAlertBanner
+    ? resolveCriticalAlertBanner(
         noaaService,
+        resolved,
+        guessTimezoneFromCoords(latitude, longitude)
+      )
+    : undefined;
+
+  let output: string;
+  try {
+    if (requestedSource === 'metar') {
+      // METAR is never auto-routed (D1): `auto` keeps its exact US-NOAA /
+      // elsewhere-Open-Meteo semantics, and this arm is reached only on an
+      // explicit request. A model estimate at the caller's coordinates and a
+      // measurement at an airport 40 km away answer different questions.
+      if (!aviationWeatherService) {
+        throw new ServiceUnavailableError(
+          'AviationWeather',
+          'METAR station observations are not available in this server configuration.'
+        );
+      }
+      output = await formatMetarCurrentConditions(
+        aviationWeatherService,
         openMeteoService,
         nceiService,
         latitude,
@@ -187,28 +189,10 @@ export async function handleGetCurrentConditions(
         prefs,
         acisService
       );
-    } catch (error) {
-      // The US bounding boxes overrun the border (Toronto, Vancouver, Windsor
-      // all sit inside them), so auto-routed points NOAA rejects fall back to
-      // Open-Meteo instead of erroring. NOAA maps the coverage 404 ("Unable to
-      // provide data for requested point") to DataNotFoundError and other 4xx
-      // to InvalidLocationError — both are non-retryable "NOAA can't serve
-      // this request" failures, so both fall back. Transient failures
-      // (RateLimitError, ServiceUnavailableError, network) still propagate,
-      // and explicit source="noaa" keeps its error contract.
-      if (
-        requestedSource !== 'auto' ||
-        !(error instanceof DataNotFoundError || error instanceof InvalidLocationError)
-      ) {
-        throw error;
-      }
-      logger.warn('NOAA rejected auto-routed location; falling back to Open-Meteo', {
-        latitude,
-        longitude,
-        fallback: true
-      });
-      output = insertNoteAfterHeading(
-        await formatOpenMeteoCurrentConditions(
+    } else if (useNOAA) {
+      try {
+        output = await formatNOAACurrentConditions(
+          noaaService,
           openMeteoService,
           nceiService,
           latitude,
@@ -217,37 +201,69 @@ export async function handleGetCurrentConditions(
           includeNormals,
           prefs,
           acisService
-        ),
-        NOAA_FALLBACK_NOTE
+        );
+      } catch (error) {
+        // The US bounding boxes overrun the border (Toronto, Vancouver, Windsor
+        // all sit inside them), so auto-routed points NOAA rejects fall back to
+        // Open-Meteo instead of erroring. NOAA maps the coverage 404 ("Unable to
+        // provide data for requested point") to DataNotFoundError and other 4xx
+        // to InvalidLocationError — both are non-retryable "NOAA can't serve
+        // this request" failures, so both fall back. Transient failures
+        // (RateLimitError, ServiceUnavailableError, network) still propagate,
+        // and explicit source="noaa" keeps its error contract.
+        if (
+          requestedSource !== 'auto' ||
+          !(error instanceof DataNotFoundError || error instanceof InvalidLocationError)
+        ) {
+          throw error;
+        }
+        logger.warn('NOAA rejected auto-routed location; falling back to Open-Meteo', {
+          latitude,
+          longitude,
+          fallback: true
+        });
+        output = insertNoteAfterHeading(
+          await formatOpenMeteoCurrentConditions(
+            openMeteoService,
+            nceiService,
+            latitude,
+            longitude,
+            includeFireWeather,
+            includeNormals,
+            prefs,
+            acisService
+          ),
+          NOAA_FALLBACK_NOTE
+        );
+      }
+    } else {
+      output = await formatOpenMeteoCurrentConditions(
+        openMeteoService,
+        nceiService,
+        latitude,
+        longitude,
+        includeFireWeather,
+        includeNormals,
+        prefs,
+        acisService
       );
     }
-  } else {
-    output = await formatOpenMeteoCurrentConditions(
-      openMeteoService,
-      nceiService,
-      latitude,
-      longitude,
-      includeFireWeather,
-      includeNormals,
-      prefs,
-      acisService
-    );
+  } catch (error) {
+    // The observation failed, but the banner may still have resolved. Carry it
+    // on the error so the dispatch's single error-rendering site can show the
+    // warning above the failure message; with no banner this rethrows the
+    // original error untouched and the existing error contract is unchanged.
+    throw carryCriticalAlertBannerOnError(error, bannerPromise ? await bannerPromise : '');
   }
 
-  // The flag check gates the fetch itself (before any await), so an absent
-  // flag adds no latency to the no-op path. The banner is prepended last —
-  // outermost, above the `**Location:**` line this wraps — because a
+  // The flag check gated the fetch at the start (before any await), so an
+  // absent flag adds no latency to the no-op path. The banner is prepended
+  // last — outermost, above the `**Location:**` line this wraps — because a
   // life-threatening warning outranks knowing which place it is about. This
   // single return is shared by every source arm (NOAA, Open-Meteo, and the
-  // METAR arm at :153 which falls through to it), so wrapping it here covers
-  // all three by construction.
-  const banner = criticalAlertBanner
-    ? await resolveCriticalAlertBanner(
-        noaaService,
-        resolved,
-        guessTimezoneFromCoords(latitude, longitude)
-      )
-    : '';
+  // METAR arm which falls through to it), so wrapping it here covers all three
+  // by construction.
+  const banner = bannerPromise ? await bannerPromise : '';
 
   return prependCriticalAlertBanner(prependLocationLine({
     content: [

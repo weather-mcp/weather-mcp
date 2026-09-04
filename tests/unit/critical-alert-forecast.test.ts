@@ -24,6 +24,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleGetForecast } from '../../src/handlers/forecastHandler.js';
+import { criticalAlertBannerFromError } from '../../src/handlers/criticalAlertBanner.js';
 import { logger } from '../../src/utils/logger.js';
 import type { NOAAService } from '../../src/services/noaa.js';
 import type { OpenMeteoService } from '../../src/services/openmeteo.js';
@@ -363,5 +364,136 @@ describe('handleGetForecast — criticalAlertBanner (T4)', () => {
       expect(text).not.toContain('LIFE-THREATENING WEATHER ALERT IN EFFECT');
       expect(fakes.noaa.getAlerts).toHaveBeenCalledTimes(0);
     });
+  });
+});
+
+/**
+ * BLOCKER-1 (diff review, 2026-09-03): the banner used to be resolved only
+ * after the forecast body completed, so any provider throw suppressed a live
+ * warning — `getAlerts` was never called at all. The banner is now started
+ * before the forecast and awaited on both paths.
+ *
+ * The assertion that actually pins the regression is `getAlerts` having been
+ * called: a test that only checks the thrown error would still pass against the
+ * old ordering if the error happened to carry nothing.
+ */
+describe('handleGetForecast — a failed forecast must not suppress the banner (BLOCKER-1)', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** A NOAA fake whose forecast fails with an error the auto-fallback does not
+   * swallow (a plain Error is neither DataNotFoundError nor InvalidLocationError). */
+  function buildFailingNoaaFake(getAlerts: ReturnType<typeof vi.fn>) {
+    const fake = buildNoaaFake(getAlerts);
+    fake.getForecast = vi.fn().mockRejectedValue(new Error('upstream gridpoint failure'));
+    return fake;
+  }
+
+  async function catchError(promise: Promise<unknown>): Promise<unknown> {
+    try {
+      await promise;
+    } catch (error) {
+      return error;
+    }
+    throw new Error('expected the forecast to reject, but it resolved');
+  }
+
+  it('still fetches alerts when the forecast throws, and carries the banner on the error', async () => {
+    const getAlerts = vi.fn().mockResolvedValue(alertCollection(TORNADO_WARNING));
+    const fakes = buildFakes({ noaa: buildFailingNoaaFake(getAlerts) });
+
+    const error = await catchError(
+      handleGetForecast(
+        { ...US_COORDS },
+        fakes.noaa as unknown as NOAAService,
+        fakes.openMeteo as unknown as OpenMeteoService,
+        fakes.locationStore,
+        fakes.geocoding as unknown as GeocodingService,
+        fakes.ncei as unknown as NCEIService,
+        undefined,
+        true
+      )
+    );
+
+    // The regression itself: the old ordering never reached this call.
+    expect(getAlerts).toHaveBeenCalledTimes(1);
+    expect(criticalAlertBannerFromError(error)).toContain(BANNER_FIRST_LINE);
+  });
+
+  it('rethrows the original error untouched when no critical alert is active', async () => {
+    const getAlerts = vi.fn().mockResolvedValue(alertCollection());
+    const fakes = buildFakes({ noaa: buildFailingNoaaFake(getAlerts) });
+
+    const error = await catchError(
+      handleGetForecast(
+        { ...US_COORDS },
+        fakes.noaa as unknown as NOAAService,
+        fakes.openMeteo as unknown as OpenMeteoService,
+        fakes.locationStore,
+        fakes.geocoding as unknown as GeocodingService,
+        fakes.ncei as unknown as NCEIService,
+        undefined,
+        true
+      )
+    );
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe('upstream gridpoint failure');
+    expect(criticalAlertBannerFromError(error)).toBe('');
+  });
+
+  it('carries nothing when the flag is absent, so the error contract is unchanged', async () => {
+    const getAlerts = vi.fn().mockResolvedValue(alertCollection(TORNADO_WARNING));
+    const fakes = buildFakes({ noaa: buildFailingNoaaFake(getAlerts) });
+
+    const error = await catchError(
+      handleGetForecast(
+        { ...US_COORDS },
+        fakes.noaa as unknown as NOAAService,
+        fakes.openMeteo as unknown as OpenMeteoService,
+        fakes.locationStore,
+        fakes.geocoding as unknown as GeocodingService,
+        fakes.ncei as unknown as NCEIService,
+        undefined
+        // criticalAlertBanner omitted entirely
+      )
+    );
+
+    // No flag means no fetch at all, exactly as before — the failure path adds
+    // no request to the 23 pre-existing call sites.
+    expect(getAlerts).not.toHaveBeenCalled();
+    expect(criticalAlertBannerFromError(error)).toBe('');
+    expect((error as Error).message).toBe('upstream gridpoint failure');
+  });
+
+  it('omits the banner silently when the forecast fails and the alert fetch fails too', async () => {
+    const getAlerts = vi.fn().mockRejectedValue(new Error('alerts upstream down'));
+    const fakes = buildFakes({ noaa: buildFailingNoaaFake(getAlerts) });
+
+    const error = await catchError(
+      handleGetForecast(
+        { ...US_COORDS },
+        fakes.noaa as unknown as NOAAService,
+        fakes.openMeteo as unknown as OpenMeteoService,
+        fakes.locationStore,
+        fakes.geocoding as unknown as GeocodingService,
+        fakes.ncei as unknown as NCEIService,
+        undefined,
+        true
+      )
+    );
+
+    // Silent-omit survives: the forecast's own error is what surfaces, and the
+    // banner failure is one warn, never a second thrown error.
+    expect((error as Error).message).toBe('upstream gridpoint failure');
+    expect(criticalAlertBannerFromError(error)).toBe('');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });
