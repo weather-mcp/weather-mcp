@@ -89,6 +89,42 @@ export function prependLocationLine<
 }
 
 /**
+ * Prepend an already-formatted critical-alert banner to a handler's text content, if any.
+ *
+ * Mutates the first text block of a standard `{ content: [...] }` handler result,
+ * the same shape `prependLocationLine` uses. This function stays deliberately
+ * ignorant of what a critical alert is or how one is formatted — it takes the
+ * finished `banner` string and only prepends it, so this file never imports
+ * `src/utils/criticalAlert.ts` and never grows a dependency cycle.
+ *
+ * Ordering: the banner is outermost. Callers run `prependLocationLine` first
+ * and this function second, so rendered text reads `banner` -> `**Location:**`
+ * -> `# Heading`. That ordering is exactly what leaves the two whole-string
+ * `prependLocationLine` locks in `tests/unit/locationResolver.test.ts`
+ * unedited — this function only ever adds *above* the location line, never
+ * between it and the heading.
+ *
+ * `text` is optional in the constraint for the same reason it is on
+ * `prependLocationLine`: a handler may return mixed content (e.g.
+ * get_weather_imagery's composite branch returns `[text, image]`), and an
+ * image block carries no `text`. The runtime guard below already checks for
+ * a leading text block, so behaviour is unchanged.
+ *
+ * @param result - Handler result whose first text block will be prefixed
+ * @param banner - Already-formatted banner string (empty string is a no-op)
+ * @returns The same result object (for convenient chaining)
+ */
+export function prependCriticalAlertBanner<
+  T extends { content: Array<{ type: string; text?: string }> }
+>(result: T, banner: string): T {
+  const first = result.content[0];
+  if (banner && first?.type === 'text' && typeof first.text === 'string') {
+    first.text = banner + first.text;
+  }
+  return result;
+}
+
+/**
  * Cached geocode result for a free-text city name.
  * City coordinates are effectively static, so these are cached with an
  * Infinity TTL (see CacheConfig.ttl.geocoding).

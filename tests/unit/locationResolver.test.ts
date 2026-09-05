@@ -11,6 +11,7 @@ import {
   clearCityGeocodeCache,
   formatLocationLine,
   prependLocationLine,
+  prependCriticalAlertBanner,
 } from '../../src/utils/locationResolver.js';
 import type { ResolvedLocation } from '../../src/utils/locationResolver.js';
 import type { LocationStore } from '../../src/services/locationStore.js';
@@ -446,5 +447,59 @@ describe('prependLocationLine', () => {
     prependLocationLine(result, resolved);
 
     expect(result.content[0].text).toBe('# Forecast\n');
+  });
+});
+
+describe('prependCriticalAlertBanner', () => {
+  it('prepends above an existing location line, preserving order (banner -> Location -> heading)', () => {
+    const result = {
+      content: [
+        { type: 'text', text: '**Location:** home (47.6062, -122.3321)\n\n# Forecast\n' },
+      ],
+    };
+
+    const out = prependCriticalAlertBanner(result, '🚨 BANNER 🚨\n\n');
+
+    expect(out.content[0].text).toBe(
+      '🚨 BANNER 🚨\n\n**Location:** home (47.6062, -122.3321)\n\n# Forecast\n'
+    );
+  });
+
+  it('is a no-op for an empty banner', () => {
+    const result = { content: [{ type: 'text', text: '# Forecast\n' }] };
+
+    const out = prependCriticalAlertBanner(result, '');
+
+    expect(out.content[0].text).toBe('# Forecast\n');
+  });
+
+  it('is a no-op for a non-text first content block', () => {
+    const result = { content: [{ type: 'image', data: 'base64data' }] };
+
+    expect(() => prependCriticalAlertBanner(result, '🚨 BANNER 🚨\n\n')).not.toThrow();
+    expect(result.content[0]).toEqual({ type: 'image', data: 'base64data' });
+  });
+
+  it('is a no-op when the first block has no text', () => {
+    const result = { content: [{ type: 'text' }] };
+
+    prependCriticalAlertBanner(result, '🚨 BANNER 🚨\n\n');
+
+    expect(result.content[0].text).toBeUndefined();
+  });
+
+  it('returns the same object reference', () => {
+    const result = { content: [{ type: 'text', text: '# Forecast\n' }] };
+
+    const out = prependCriticalAlertBanner(result, '🚨 BANNER 🚨\n\n');
+
+    expect(out).toBe(result);
+  });
+
+  it('is a no-op for an empty content array', () => {
+    const result = { content: [] };
+
+    expect(() => prependCriticalAlertBanner(result, '🚨 BANNER 🚨\n\n')).not.toThrow();
+    expect(result.content).toEqual([]);
   });
 });

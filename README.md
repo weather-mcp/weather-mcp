@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-3%2C132%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-3%2C250%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Three optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 3,132 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 3,250 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -70,11 +70,11 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 | Tool | What it does | Coverage |
 |------|-------------|----------|
-| `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name (NOAA publishes 7 days daily and ~6.5 days hourly in the US, and says so when you ask for more; `source="openmeteo"` reaches the full range); sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac, optional five-model agreement comparison | 🌍 Global |
-| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional NOAA fire-weather indices), Open-Meteo model data elsewhere (with an optional computed Fosberg fire-weather index), or real airport station observations worldwide with `source="metar"`. Always states the observation's age, and automatically falls back to a fresher nearby station when the nearest one has gone dark. In extreme conditions automatically adds frostbite time-to-onset (computed wind chill) or heat-stress context (estimated WBGT) | 🌍 Global |
+| `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name (NOAA publishes 7 days daily and ~6.5 days hourly in the US, and says so when you ask for more; `source="openmeteo"` reaches the full range); sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac, optional five-model agreement comparison When the National Weather Service has a life-threatening alert active for a US point, its warning is surfaced at the top of the response before the report — absence of the banner is not an all-clear, so call `get_alerts` for the authoritative answer | 🌍 Global |
+| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional NOAA fire-weather indices), Open-Meteo model data elsewhere (with an optional computed Fosberg fire-weather index), or real airport station observations worldwide with `source="metar"`. Always states the observation's age, and automatically falls back to a fresher nearby station when the nearest one has gone dark. In extreme conditions automatically adds frostbite time-to-onset (computed wind chill) or heat-stress context (estimated WBGT) When the National Weather Service has a life-threatening alert active for a US point, its warning is surfaced at the top of the response before the report — absence of the banner is not an all-clear, so call `get_alerts` for the authoritative answer | 🌍 Global |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity; official national warnings for the US (NOAA), Canada (ECCC), 38 European countries (MeteoAlarm), India (NDMA SACHET), the Philippines (PAGASA), Indonesia (BMKG), and Japan (JMA) | 🇺🇸 🇨🇦 🇪🇺 🇮🇳 🇵🇭 🇮🇩 🇯🇵 |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
-| `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning) | 🌍 Global |
+| `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning); a life-threatening US alert is surfaced once above the whole summary, not once per section | 🌍 Global |
 | `search_location` | Geocode place names to coordinates ("Paris" → 48.85, 2.35) | 🌍 Global |
 | `get_air_quality` | AQI (US/European scales), pollutants, UV index, health guidance; current pollen levels for European locations (or worldwide with an optional key); optional day-grouped forecast up to 7 days with per-day peak AQI and UV | 🌍 Global |
 | `get_marine_conditions` | Wave height, swell, ocean currents, sea state on WMO Code Table 3700 (Douglas sea scale) with a severity marker and legend — includes Great Lakes and major US bays; forecast up to 16 days | 🌍 Global |
@@ -380,7 +380,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 3,132 tests
+npm test               # Run all 3,250 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

@@ -113,6 +113,38 @@ export const DisplayThresholds = {
     /** Compute/render WBGT only when air temp (°F) is at or above showHeatIndex and rounded WBGT (°F) is at or above this */
     showWbgtF: 80,
   },
+
+  /**
+   * Life-threatening alert banner gate
+   */
+  criticalAlert: {
+    /**
+     * Display gates only. The predicate that reads them lives in
+     * `src/utils/criticalAlert.ts`, which owns the *shape* of the rule — the
+     * three-axis leg is an `and`, the response leg stands alone, and the two
+     * are `or`ed. Widening a list here loosens the gate; it cannot change that
+     * shape.
+     *
+     * These are membership lists rather than a rank because CAP's severity,
+     * urgency and certainty are unordered enums as far as this repo is
+     * concerned: `CAP_SEVERITY_ORDER` in `alertsHandler.ts` is a sort rank for
+     * display, and reusing it here would tie a safety gate to a presentation
+     * decision.
+     *
+     * Calibrated against the live national feed — see the Verification section
+     * of the design plan for the histogram the current values were read from.
+     * Tuning is a config change here, deliberately, so re-calibration never
+     * needs a code review of the predicate.
+     */
+    /** CAP `severity` values that can reach the gate's three-axis leg */
+    severities: ['Extreme'] as readonly string[],
+    /** CAP `urgency` values that can reach the gate's three-axis leg */
+    urgencies: ['Immediate'] as readonly string[],
+    /** CAP `certainty` values that can reach the gate's three-axis leg */
+    certainties: ['Observed', 'Likely'] as readonly string[],
+    /** CAP `response` values that fire the gate on their own, whatever the severity */
+    responses: ['Evacuate'] as readonly string[],
+  },
 } as const;
 
 /**

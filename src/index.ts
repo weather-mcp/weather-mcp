@@ -37,6 +37,7 @@ import { toolConfig } from './config/tools.js';
 import { getDefaultLocation } from './config/defaultLocation.js';
 import { logger, LogLevel } from './utils/logger.js';
 import { formatErrorForUser } from './errors/ApiError.js';
+import { criticalAlertBannerFromError } from './handlers/criticalAlertBanner.js';
 import { handleGetForecast } from './handlers/forecastHandler.js';
 import { handleGetCurrentConditions } from './handlers/currentConditionsHandler.js';
 import { handleGetAlerts } from './handlers/alertsHandler.js';
@@ -836,12 +837,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'get_forecast':
         return await withAnalytics('get_forecast', async () =>
-          handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService, acisService)
+          handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService, acisService, true)
         );
 
       case 'get_current_conditions':
         return await withAnalytics('get_current_conditions', async () =>
-          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService, acisService, aviationWeatherService)
+          handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService, acisService, aviationWeatherService, true)
         );
 
       case 'get_alerts':
@@ -859,7 +860,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           handleGetWeatherSummary(
             args, noaaService, openMeteoService, nceiService, locationStore, geocodingService,
             meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService,
-            jmaService
+            jmaService, true
           )
         );
 
@@ -941,11 +942,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Format error for user display (sanitized)
     const userMessage = formatErrorForUser(error as Error);
 
+    // A life-threatening alert banner resolved by get_forecast or
+    // get_current_conditions before their weather request failed. The warning
+    // outranks the failure, so it renders above the message rather than being
+    // lost with the thrown error. Every other error carries nothing and this
+    // is the empty string, leaving the existing output byte-identical.
+    const banner = criticalAlertBannerFromError(error);
+
     return {
       content: [
         {
           type: 'text',
-          text: userMessage
+          text: banner + userMessage
         }
       ],
       isError: true

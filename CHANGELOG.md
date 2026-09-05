@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-09-04
+
+### Added
+
+- **A life-threatening weather alert is now surfaced before the answer, not behind another tool call.** Someone calling `get_forecast` during a tornado warning was told nothing about it: alerts live behind `get_alerts`, and nothing in a forecast response told the reading model to go and look. `get_forecast`, `get_current_conditions` and `get_weather_summary` now put a banner in the **first bytes** of the response — above the location line and the heading — whenever the National Weather Service has a life-threatening alert active for the requested point, and then answer the question as asked.
+
+  **The banner is a positive assertion only, and this is load-bearing.** These tools do not report on alerts and nothing in their output claims they do; a failed lookup omits the banner silently rather than printing a "could not check" note, because a note that appears during every upstream hiccup teaches readers to ignore the slot. Absence therefore means only that this feature had nothing to add — never that nothing is active. `get_alerts` remains the tool that answers that question, under full contract rules, and the docs say so at every site the banner is described.
+
+  **The gate is deliberately narrow and was calibrated against the live national feed before shipping** (2026-09-03). It fires on CAP `severity: Extreme` **and** `urgency: Immediate` **and** `certainty` of Observed or Likely, or on an official `response` of `Evacuate`. Over the archive window available at calibration: **136 of 159 Tornado Warnings fire**, and **0 of 500** Severe Thunderstorm Warnings, **0 of 500** Special Weather Statements and **0 of 500** Flash Flood Warnings do. The 23 Tornado Warnings that do not fire are NWS's own cancellation messages, which carry `urgency: Past` — a cancelled warning is never bannered. The thresholds live in `src/config/displayThresholds.ts`, beside `thermalStress`, so re-calibration is a config change rather than a code change.
+
+  **Only four upstream fields are ever rendered** — the event name, the issuing office, the expiry and the recommended action — each sanitized (control characters, backticks, and bidi and zero-width formatting characters stripped, whitespace collapsed, capped at 120 characters — counted by character, so the cut never splits a surrogate pair) with `response` validated against NOAA's nine CAP literals. The alert's own `headline`, `description` and `instruction` never reach the output in any form: the banner carries an imperative line addressed to the reading model, so an upstream field able to break out of its clause and continue the sentence would be a prompt-injection surface, trusted publisher or not. Verified against a real archived Tornado Warning whose `instruction` reads "TAKE COVER NOW! …" — none of the three prose fields appears anywhere in the rendered output. Every clause is all-or-nothing: an absent or unparseable expiry drops the whole `in effect until` clause rather than rendering a partial value.
+
+  **United States only in this release**, via NOAA — the only upstream publishing the full CAP quadruple matched to a true point server-side. It is gated on the *location*, not the source, so a US airport queried with `source="metar"` gets the banner and an international point never does. `get_weather_summary` renders it **once**, above its own header, rather than once per section. Output with no active life-threatening alert is byte-identical to before: verified base-versus-branch by md5 across ten probes — all three tools at a US and a non-US point in both unit systems — run back-to-back with a positive control on each side, and re-run against the final shipped code rather than only against the first cut. (`src/utils/criticalAlert.ts`, `src/handlers/criticalAlertBanner.ts`, `src/utils/locationResolver.ts`, `src/config/displayThresholds.ts`, `src/handlers/forecastHandler.ts`, `src/handlers/currentConditionsHandler.ts`, `src/handlers/weatherSummaryHandler.ts`, `src/index.ts`)
+
+  This cannot *force* an assistant to report anything — MCP tool results are content, not control flow. It makes the warning structurally hard to miss; it does not guarantee the model leads with it.
+
 ## [1.27.1] - 2026-09-03
 
 ### Fixed
@@ -1677,7 +1693,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.1...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.0...HEAD
+[1.28.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.1...v1.28.0
 [1.27.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.0...v1.27.1
 [1.27.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.26.0...v1.27.0
 [1.26.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.25.18...v1.26.0

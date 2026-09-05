@@ -335,7 +335,17 @@ probes that *should* differ hashing identically is the bug, not drift — the
 opposite reading from this entry's usual one, and worth asserting deliberately
 when the plan's whole premise is that a distinction is missing.
 
-**Status:** active, **extended 2026-08-27 and 2026-09-02**, **re-run 2026-09-01**
+**The unit-level twin, 2026-09-03** (`84fbcef`, critical-alert-banner T4). This entry is
+written for live sweeps, but the vacuity is available to **any `toBe` between two generated
+strings**, with no network involved. A byte-identity contract of the shape "render with the flag
+absent equals render with the flag `false`" passes just as happily when a fake service failed and
+both sides are an error string — and a unit test has no feed to blame, so nothing looks wrong.
+Five such locks came back from the subagent comparing two renders with no assertion that either
+had rendered; the fix is the same construct check the live half uses, one line per side
+(`expect(textOf(a)).toContain('# Weather Forecast')`). **Generalise the rule as: a hash or a
+`toBe` is a claim about two things being equal, never a claim that either exists.**
+
+**Status:** active, **extended 2026-08-27, 2026-09-02 and 2026-09-03**, **re-run 2026-09-01**
 (openmeteo-nullable-scalar-types T1–T3: the plan told the sweep in advance that
 a probe landing on a wire null would differ from base by exactly the omitted
 line and to record that as the fix, not drift — Sydney Heads (two `Peak Period`
@@ -460,7 +470,7 @@ test must task the doc update, and a plan asserting the count does not move shou
 be tested against the suite rather than believed.
 
 **Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
-2026-08-25**, **Verify line re-run 2026-09-03** (`99cc032`, jma-service-residuals T4 — the count moved 3,130 → 3,132 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,132`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3132`, `✅ CLAUDE.md test count: 3132`, `✅ README.md tests badge: 3132` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **extended 2026-08-29**, **Verify line re-run 2026-09-02** (`d65ef25`, noaa-forecast-horizon-disclosure T2 — the count moved 2,933 → 2,941 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,941`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01, second time** (`f48eda3`, openmeteo-nullable-scalar-types T6 — the count moved 2,917 → 2,933 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,933`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2933`, `✅ CLAUDE.md test count: 2933`, `✅ README.md tests badge: 2933` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
+2026-08-25**, **Verify line re-run 2026-09-03, second time** (`4cac538`, critical-alert-banner diff-triage MAJOR-5 — the count moved 3,132 → 3,250 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,250`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3250`, `✅ CLAUDE.md test count: 3250`, `✅ README.md tests badge: 3250` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-03** (`99cc032`, jma-service-residuals T4 — the count moved 3,130 → 3,132 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,132`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3132`, `✅ CLAUDE.md test count: 3132`, `✅ README.md tests badge: 3132` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **extended 2026-08-29**, **Verify line re-run 2026-09-02** (`d65ef25`, noaa-forecast-horizon-disclosure T2 — the count moved 2,933 → 2,941 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,941`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01, second time** (`f48eda3`, openmeteo-nullable-scalar-types T6 — the count moved 2,917 → 2,933 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,933`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2933`, `✅ CLAUDE.md test count: 2933`, `✅ README.md tests badge: 2933` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
 band-rounding T2 — the count moved 2,611 → 2,660 and all five sites were edited
 by content; with both unvalidated sites then set to `9,999` against the real
 `2,660`, `./scripts/check-doc-versions.sh` still printed `✅ README.md test
@@ -1171,6 +1181,17 @@ restore discarded the uncommitted predicate fix; the second mutation's Python
 anchor assertion then failed to match, which is the only reason it was caught.
 The mutation evidence survived, but only by luck: the accidental clean-tree run
 happened to be a valid proof of the un-fixed case.
+
+**Re-verified the hard way 2026-09-03** (critical-alert-banner T1). Mutating
+`src/config/displayThresholds.ts` to widen the gate, then restoring it with
+`git checkout -- src/config/displayThresholds.ts`, **deleted the entire new
+`criticalAlert` block** — the file was tracked but the block was uncommitted, so
+the checkout restored `main`'s version, not the pre-mutation one. Caught only by
+the post-mutation control run reporting 18 failures where 0 were expected. The
+entry's rule was known and written down and was still the thing that went wrong,
+because `git checkout --` is muscle memory. The control run is what makes the
+trap cheap: **always end a mutation sweep by re-running the suite on the restored
+tree and asserting it is green**, not merely by restoring.
 
 **Status:** active. Lint candidate — a mutation helper that snapshots and restores
 by copy would close it mechanically.
@@ -2086,7 +2107,28 @@ prove the check can fail at all with a planted defect, then look for the other
 layer that admits the value** — here a builder parameter widened by an earlier
 plan.
 
-**Status:** active, **extended twice on 2026-09-01**. Lint candidate on the vacuous half — a plan-authoring check
+**Three instances in one run, 2026-09-03** (critical-alert-banner), all in acceptance lines a
+`sonnet` task would have obeyed literally:
+
+1. **A grep that its own prohibition trips.** T8's check was
+   `grep -rniE 'check(s|ing)? for alerts|monitors alerts' docs/TOOLS.md README.md CLAUDE.md`
+   returns no hit. It returned one — on the new `CLAUDE.md` conventions bullet that **forbids**
+   the phrase by quoting it. A negative-wording check cannot tell a violation from a rule against
+   it, and the more carefully you document a prohibition the more certainly you trip it.
+2. **A grep that a docblock trips.** T3's F5 check was
+   `grep -n 'generateKey\|CacheConfig.ttl' src/handlers/criticalAlertBanner.ts` returns nothing.
+   It hit a comment naming the *existing* key the module deliberately reuses — the opposite of
+   introducing one. Resolved by rewording the comment rather than by waiving the check, because a
+   mechanical acceptance line that fails on a correct build is a trap for whoever re-runs it.
+3. **Two acceptance lines in the same task that cannot both hold.** T8 required
+   `./scripts/check-doc-versions.sh` passes **and** forbade hand-editing the test count. The
+   script's only three failures *were* the test-count sites (3132 → 3226), which
+   `update-docs-for-release.sh` owns at `/release`. Every branch that adds a test fails that
+   check until release. The honest resolution is to report which sub-checks pass — tool counts,
+   description length, README links, the CHANGELOG link block — rather than to satisfy the
+   literal line by breaking [G12].
+
+**Status:** active, **extended twice on 2026-09-01 and again 2026-09-03**. Lint candidate on the vacuous half — a plan-authoring check
 could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
 contains a file marked **new**. Related: [G10] (prove the hash is not vacuous —
 same family, a check that cannot fail is not evidence), [G40] (a plan's claim
@@ -3696,9 +3738,23 @@ between the two failures carried the comment *"Mock the client.get method (not
 makeRequest) since checkServiceStatus uses it directly"* — someone hit this
 once, fixed the one test in front of them, and left its neighbours alone.
 
-**Status:** active. Lint candidate (see Verify). Related: [G45] (the mutation
+**The return-value twin, 2026-09-03** (`5bded01`, critical-alert-banner T5). The seam can be
+right and the mock still inert, when the mock **ignores the parameter under test**. The summary's
+job is to render the banner exactly once, so its lock is a count of occurrences, and the
+mutation that must redden it is threading the flag down into a sub-handler. The sub-handlers were
+mocked at the correct module seam — but with `mockResolvedValue`, a fixed string. Threading the
+flag therefore changed *nothing observable*: the count stayed 1, the mutation stayed green, and
+the effect-level assertion the whole task exists for was unfalsifiable. Only the argument-count
+tests beside it went red. Fixed by making each mock honour the flag the way the real handler does
+(`args[8]`/`args[7]` → prepend the banner); both leak mutations then redden the count itself.
+**A mock's return value is part of the seam.** If the thing under test can vary an input to the
+mock, the mock must vary its output accordingly, or every assertion downstream of it is a
+tautology.
+
+**Status:** active, **extended 2026-09-03**. Lint candidate (see Verify). Related: [G45] (the mutation
 check that exposes it), [G21] (the other way a mock is not the thing you think
-it is), and the project's determinism rule — anything mockable is mocked.
+it is), [G13] (a fixture that cannot discriminate — this is its mock-shaped
+sibling), and the project's determinism rule — anything mockable is mocked.
 
 ---
 
@@ -3920,6 +3976,140 @@ promoted and then abandoned.
 
 **Verify:** `grep -c` on a shipped item's title in `<roadmap>` returns the
 expected row count, and every returned row carries the same status marker.
+
+---
+
+## G75 — ICU puts a narrow no-break space before AM/PM in some zones and an ordinary space in others, from the same call
+
+**Trigger:** rendering a time through `src/utils/timezone.ts` (or any
+`toLocaleString`/Luxon format carrying an AM/PM marker) and then asserting on,
+grepping, diffing, or byte-comparing the result.
+
+**Rule:** normalise the separator before the string reaches an assertion or a
+committed output. `formatExpiry` in `src/utils/criticalAlert.ts` does
+`.replace(/[\u202F\u00A0]/g, ' ')` for exactly this reason. Never write the
+expectation by copying a rendered string out of a terminal — the two characters
+are indistinguishable there.
+
+**Why:** the same `formatInTimezone(iso, zone, 'full')` call renders
+`8:15\u202fPM UTC` for the `UTC` zone and `4:15 PM EDT` for `America/Detroit`.
+U+202F (narrow no-break space) and U+0020 look identical on screen and in a diff,
+so a `toContain` written against one form fails against the other with a message
+showing two apparently identical strings — *"expected '…' to contain '…'"* where
+the received text visibly contains the expected text. The zone is data, so which
+form you get is decided by the caller's coordinates: a test that passes in
+Michigan fails at a UTC fallback, and a byte-identity sweep can differ by a
+character nobody can see.
+
+The same class covers U+00A0 (no-break space), which some locales use between a
+number and its unit.
+
+**Verify:** `node -e "const {DateTime}=require('luxon'); for (const z of ['UTC','America/Detroit']) console.log(z, [...DateTime.fromISO('2026-09-03T20:15:00Z',{zone:z}).toLocaleString(DateTime.DATETIME_FULL)].map(c=>c.codePointAt(0).toString(16)).join(' '))"` — the UTC row carries `202f` where the Detroit row carries `20`. More generally, pipe any suspect rendered string through `cat -A` or `[...s].map(c=>c.codePointAt(0).toString(16))` before writing an expectation against it.
+
+**Evidence:** 2026-09-03 (`35c69bc`, critical-alert-banner T1). Two
+`formatCriticalAlertBanner` tests failed against a banner whose text was visibly
+correct; the axis was the zone, not the format. Both were UTC-fallback cases and
+both passed for `America/Detroit`. Resolved by normalising inside `formatExpiry`
+rather than by encoding U+202F in the expectations, because whitespace that
+varies by the caller's coordinates is a latent trap for every later assertion,
+grep and byte-identity sweep over the same output.
+
+**Status:** active. Related: [G10] (byte-identity sweeps — an invisible
+character is the purest form of a diff you cannot read), [G11] (read the
+rendered output; this is the case where reading it is not enough and you have to
+read its code points). Lintable in the narrow form: a grep for `\u202F` in
+`tests/` expectations, or a check that no rendered-time assertion contains a bare
+`' PM'`/`' AM'` without normalisation upstream.
+
+---
+
+## G76 — `api.weather.gov/alerts` serves ~7 days regardless of the `start`/`end` window, so a zero over a long span is retention, not absence
+
+**Trigger:** querying the NWS **archive** endpoint (`/alerts?event=…&start=…&end=…`,
+as opposed to `/alerts/active`) to establish that something does or does not
+happen — a calibration histogram, a coverage claim, "this event type never
+carries severity X".
+
+**Rule:** measure the **span actually returned**, not the span requested, and
+say so beside any zero. `props.map(p => p.sent).sort()` gives the real window in
+two lines. A zero row is only evidence of absence if a known-frequent control
+event returns rows spanning the whole query.
+
+**Why:** the endpoint accepts a 365-day window without complaint, returns HTTP
+200 and a well-formed `FeatureCollection`, and quietly serves only the recent
+slice it retains. Nothing in the response says the window was truncated. So
+"0 Hurricane Warnings over 12 months" and "Hurricane Warnings do not exist" are
+the same bytes, and the wrong reading is the natural one — you asked for a year
+and got an answer.
+
+This is [G47]'s failure with a different mechanism: there the upstream is
+rate-limited and the well-formed body parses to a legitimate-looking zero; here
+the upstream is perfectly healthy and the *window* is the lie. G47's control
+(is a known-common type present?) does **not** catch it, because the retained
+slice contains plenty of common types. The control has to be a **span**
+measurement, not a presence check.
+
+**Verify:** query a known-frequent event over 365 days and compute the span of
+the returned `sent` timestamps:
+`https://api.weather.gov/alerts?event=Tornado%20Warning&start=<now-365d>&end=<now>&limit=500`
+— 2026-09-03 this returned 159 rows spanning **7.0 days** (2026-08-27 to
+2026-09-03).
+
+**Evidence:** 2026-09-03 (critical-alert-banner T7). The calibration needed to
+confirm that Tornado, Tsunami, Extreme Wind and Hurricane Warnings fire. Tornado
+Warning came back 136/159 firing; the other three came back `0 rows` over 12- and
+24-month windows and would have been recorded as "confirmed absent from the feed"
+or, worse, as evidence about the gate. The span control showed the archive holds
+one week, so those three are **unverified rather than confirmed** — recorded that
+way in the design plan's Verification section instead of being glossed.
+
+**Status:** active. Related: [G47] (the same "zero that looks like data", where
+the cause is rate limiting and the control is a presence check — this entry is
+the one that control misses), [G10] (prove the measurement is not vacuous),
+[G28] (a probe that fails and reports a clean negative). Lintable: a helper that
+refuses to report a zero without printing the returned span would close it.
+
+---
+
+## G77 — NWS re-issues a cancelled warning under the same event name, so an event-type filter sees a tornado warning that is over
+
+**Trigger:** classifying NWS alerts by `event` name, or writing any gate,
+histogram or coverage claim over `api.weather.gov` alert properties.
+
+**Rule:** the CAP quadruple, not the event name, says whether an alert is live.
+A cancellation arrives as the **same `event` string** with
+`severity: Minor`, `urgency: Past`, `certainty: Observed`, `response: AllClear`.
+Any gate meant to fire on live hazards must test `urgency` (or `messageType`),
+and **widening or removing the urgency term un-suppresses every cancellation** —
+that is a regression even though it reads like a loosening.
+
+**Why:** "Tornado Warning" is not a state, it is a product name, and NWS uses it
+for the cancellation as well as the warning. A filter written as
+`event === 'Tornado Warning'` therefore selects a set in which some members are
+over. On a safety surface the consequence is the mirror image of this project's
+usual failure: not a fabricated all-clear, but a **fabricated alarm** — a banner
+announcing a life-threatening tornado warning that was cancelled twenty minutes
+ago, which costs the reader's trust in every future banner just as surely.
+
+**Verify:** pull a week of Tornado Warnings from the archive and tally the CAP
+axes: 2026-09-03 gave `Extreme/Immediate/Observed/Shelter` ×136 and
+`Minor/Past/Observed/AllClear` ×23 across 159 rows. Then confirm the project's
+gate rejects the second group — `isCriticalAlert` fires on exactly 136.
+
+**Evidence:** 2026-09-03 (critical-alert-banner T7 calibration). The design
+plan's gate excluded these **by accident**: the `urgency ∈ {Immediate}` term was
+written to catch imminence, and cancellation-filtering fell out of it unnoticed.
+It was found only by asking why 23 of 159 Tornado Warnings did not fire, rather
+than by celebrating that 136 did. Recorded because the next person tuning
+`DisplayThresholds.criticalAlert` will read `urgencies: ['Immediate']` as a
+strictness knob and will not know that relaxing it re-admits cancelled warnings.
+
+**Status:** active. Related: [G4] (never trust the HTTP 200 alone — here the
+payload is valid and the *event name* is the misleading part), [G13] (a fixture
+that cannot discriminate — a Tornado Warning fixture set with no cancellation in
+it cannot see this), [G53] (a claim inheriting edges the heuristic was allowed to
+get wrong). Lintable: a test asserting `isCriticalAlert` is false for a
+`Minor/Past/Observed/AllClear` record under a firing event name — worth adding.
 
 ---
 

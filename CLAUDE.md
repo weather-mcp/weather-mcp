@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.27.1 (Production Ready)
+- **Version:** 1.28.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -33,6 +33,8 @@ src/
 │   ├── lightningHandler.ts
 │   ├── riverConditionsHandler.ts    # NOAA NWPS (US) / Environment Agency (GB) / Open-Meteo Flood (elsewhere)
 │   ├── wildfireHandler.ts           # NIFC (US, PR, VI, GU) / NASA FIRMS (elsewhere)
+│   ├── criticalAlertBanner.ts       # Life-threatening NWS alert banner — US pre-filter, one
+│   │                                #   getAlerts call, silent-omit failure posture in one place
 │   └── savedLocationsHandler.ts     # save/list/get/remove_saved_location
 ├── services/                # External API clients (one per upstream)
 │   ├── noaa.ts              # NOAA Weather API (forecast, observations, alerts, NWPS rivers)
@@ -63,6 +65,7 @@ src/
 │   ├── cache.ts             # LRU cache with TTL
 │   ├── validation.ts        # Input validation (all user inputs go through here)
 │   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
+│   ├── criticalAlert.ts     # Life-threatening-alert gate, selection, banner copy (pure)
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
 │   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing
@@ -109,11 +112,11 @@ All location-based tools accept coordinates, a saved `location_name`, or a
 free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
 Full per-tool parameter reference: `docs/TOOLS.md`.
 
-1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only
-2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere, or worldwide METAR airport observations via `source="metar"`); `include_fire_weather` gives NOAA's published indices in the US and a server-computed Fosberg index on the Open-Meteo path (not on METAR); automatically adds a frostbite-risk or heat-stress (WBGT) line in extreme conditions — no parameter, gated so moderate output is unchanged
+1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); surfaces a life-threatening NWS alert banner above the response for US points (positive-assertion-only — absence is never an all-clear); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only
+2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere, or worldwide METAR airport observations via `source="metar"`); surfaces the same life-threatening alert banner for US points, gated on *location* not source (so a US `source="metar"` request gets it); `include_fire_weather` gives NOAA's published indices in the US and a server-computed Fosberg index on the Open-Meteo path (not on METAR); automatically adds a frostbite-risk or heat-stress (WBGT) line in extreme conditions — no parameter, gated so moderate output is unchanged
 3. **get_alerts** - Weather alerts/warnings routed by country: NOAA (US), MSC GeoMet/ECCC (Canada), EUMETNET MeteoAlarm (38 European countries), and the national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG) — matched by alert polygon where the feed publishes geometry inline (PH/ID), country-level with an explicit note otherwise (IN, whose geometry endpoint is not server-reachable) — and JMA (Japan), matched to the point by class10 warning area from a committed geometry artifact, with the Japanese name verbatim and an English gloss where known; elsewhere the optional keyed Google Weather fallback (`GOOGLE_WEATHER_API_KEY`) or a clean not-covered message; `detail` output control
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo archive, global; NOAA for recent US dates)
-5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning)
+5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning); renders the life-threatening alert banner **once**, above its own header, never once per section
 6. **check_service_status** - API health check (all services)
 7. **search_location** - Location search/geocoding (Nominatim/OSM)
 8. **get_air_quality** - AQI + pollutants (Open-Meteo, global); pollen keyless in Europe (CAMS grains/m³), worldwide as a Universal Pollen Index with the optional `GOOGLE_POLLEN_API_KEY`
@@ -197,6 +200,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 - **Garnish** (records, normals, composited images, pollen, fire-weather dryness lines): wrapped in one try/catch, degrades silently to "no section" or a one-line note; **no retries** (must not add latency on failure); plain `Error`s. The only garnish failure that *must* surface is a **rejected API key** — silence would hide a misconfiguration from someone who deliberately configured one.
 - **Contract** (alerts, model comparison, ensemble spread, river/wildfire routing): failures **propagate** with the service's fixed sanitized message. A fabricated "✅ no alerts" from a failed fetch is a dangerous lie on safety data. Incompatible flag combinations are **validation errors thrown before any request**, never a silent downgrade to a different answer.
+- **A positive-assertion-only element may fail silently; nothing that claims coverage may.** The critical-alert banner (`src/utils/criticalAlert.ts` for the gate and copy, `src/handlers/criticalAlertBanner.ts` for the one fetch) omits itself on any failure with a single `securityEvent` warn and no retry — safe *only* because its absence asserts nothing. The moment a description, schema or doc says these tools "check for alerts", absence becomes an implied all-clear and the posture is no longer defensible. Keep the failure posture in one module rather than at each render site.
 - **Distinguish "empty" from "not covered."** HTTP 200 with all-null arrays, HTTP 404 for an uncovered region, and a real empty result mean different things; render them differently (honest-empty with a coverage caveat vs "no coverage here — not an all-clear") and cache the not-covered answer (typed null sentinel) so it isn't re-probed.
 - **A runtime dependency may legitimately be absent, and the server must still boot.** A dependency reached by a single tool is declared `optionalDependencies` and loaded through a **memoised, single-flight dynamic `import()` at its one call site** — never statically, because `src/index.ts` imports every service unconditionally above the tool gate, so a static import turns a missing package into a server that cannot start rather than one unavailable tool. Its absence is a **contract** failure: a distinct error naming the package and the remedy, never an empty result. Only the "module not found" code counts as absent — any other import failure is a real fault, propagates unchanged, and is **not** memoised, so it is retried rather than cached as an absence. The resolution must happen before any connection state is touched: an `await` between a synchronously-set in-flight guard and the check that reads it silently lets every concurrent caller past (`mqtt`, v1.25.0).
 
@@ -597,15 +601,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.27.1 — Production Ready ✅
-- **Test Coverage:** 3,132 tests, 100% pass rate
+- **Version:** 1.28.0 — Production Ready ✅
+- **Test Coverage:** 3,250 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.28.0:** A life-threatening NWS alert is surfaced above the answer on get_forecast, get_current_conditions and get_weather_summary
 - **New in v1.27.1:** A JMA index revalidation that returns nothing now says so, instead of reporting malformed XML
 - **New in v1.27.0:** Keyless Japanese weather warnings from JMA
-- **New in v1.26.0:** Great Britain river requests now return Environment Agency observed gauge levels instead of modeled discharge
 
 ## Useful References
 
@@ -628,7 +632,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-03 (v1.27.1)
+**Last Updated:** 2026-09-04 (v1.28.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

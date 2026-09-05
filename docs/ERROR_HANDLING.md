@@ -215,6 +215,33 @@ only**, never to the report. Nothing about the broker — its URL included — r
 No action is usually needed. If every lightning query reports an outage, check outbound access to
 the broker on port 1883, or set `BLITZORTUNG_MQTT_URL` to a reachable one.
 
+### Life-Threatening Alert Banner Failures
+
+The one failure on this page that renders **nothing at all**, deliberately.
+
+`get_forecast`, `get_current_conditions` and `get_weather_summary` surface a banner when the
+National Weather Service has a life-threatening alert active for a US point (see
+[Life-threatening alert banner](TOOLS.md#life-threatening-alert-banner)). When that lookup fails —
+NOAA unreachable, a timeout, a malformed response — the banner is **omitted silently**. No note, no
+placeholder, no "could not check". The weather report itself is unaffected and answers the question
+as asked.
+
+**This is the deliberate posture, not a swallowed error.** The banner is a *positive assertion
+only*: it appears when there is something to say and is absent otherwise. A "could not check the
+alerts" note would appear during every upstream hiccup and teach readers to skip the slot; worse,
+announcing that the tool had *checked* would turn every silence into an implied all-clear. So the
+banner's absence carries no information in either direction, whether the lookup succeeded and found
+nothing or failed outright.
+
+**Call `get_alerts` for the authoritative answer.** That tool reports alert coverage under full
+contract rules — a fetch failure there *propagates* as an error rather than rendering an empty
+result, and an uncovered region is reported as uncovered rather than as quiet.
+
+The failure is recorded once to the **stderr log** as a `securityEvent` warning carrying only the
+HTTP status and error type — never a URL and never the raw upstream error — and is **not retried**,
+so a slow or dead NOAA alerts endpoint never adds latency to a forecast. Nothing about the failure
+reaches the tool result.
+
 ## Service Status Tool
 
 ### Usage
