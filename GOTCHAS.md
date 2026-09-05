@@ -4113,6 +4113,48 @@ get wrong). Lintable: a test asserting `isCriticalAlert` is false for a
 
 ---
 
+## G78 — A feature whose failure renders nothing still has an error-handling docs surface, and `## Docs impact` will not name it
+
+**Trigger:** shipping anything with a **silent** failure posture — a garnish
+section that degrades to nothing, a positive-assertion-only element that omits
+itself — or writing a design plan's `## Docs impact` for one.
+
+**Rule:** walk `docs/ERROR_HANDLING.md` for every feature that can fail, not
+only for the ones that print something when they do. "It renders nothing" is
+itself the thing a reader needs told, and it is a decision worth defending in
+prose, not an absence of content.
+
+**Why:** `## Docs impact` is written by asking *what will the user see that is
+new*, and the honest answer for a silent failure is "nothing" — so the bullet
+never gets written and the page never gets touched. But a reader who asks "what
+happens if the alerts lookup fails during a forecast?" gets no answer anywhere,
+and the plausible guesses are all wrong: that it errors, that it retries, that
+the absence means quiet. The silence is load-bearing and undocumented silence
+reads as an oversight rather than a design.
+
+**Verify:** for each new failure path, find the sentence in
+`docs/ERROR_HANDLING.md` that a user hitting it would land on. If the answer is
+"there is none because nothing renders", that is the finding, not the
+justification.
+
+**Evidence:** 2026-09-04, v1.28.0 release, step 4b. The critical-alert banner's
+plan set documented the silent-omit posture thoroughly — `docs/TOOLS.md` has a
+whole section on why absence is not an all-clear, and `CLAUDE.md` carries it as
+a convention — but `docs/ERROR_HANDLING.md`, the page that exists to say what a
+user sees when something breaks, said nothing. That page already documents the
+lightning feed's in-result ⚪ at length, which is the same class of question with
+the opposite answer, so the gap was visible only by walking the page rather than
+the changelog. Caught by the release-stage backstop, which is the last reader
+who could still fix it cheaply.
+
+**Status:** active. Related: [G73] (the docs task runs before the diff-review
+fixes, so shipped prose can describe pre-fix behaviour — same page, different
+cause), [G31] (the architecture map's completeness loop, which catches a missing
+*module* but not a missing *page*). Lintable: no — nothing mechanical can tell
+a deliberate silence from an undocumented one.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
