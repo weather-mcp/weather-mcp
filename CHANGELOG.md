@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-09-08
+
 ### Added
 
 - **A NOAA hourly forecast now says what kind of product it is, and points at the faster alternative.** `source: "auto"` routes on geography alone — `isInUS` decides, and granularity is not a term in that decision. That is fine for a day-ahead question and misleading at hourly resolution, where NOAA and Open-Meteo can disagree enough to change what someone does. The case that prompted this: during an active thunderstorm with lightning 10.5 km out, `get_forecast` auto-routed to NOAA and returned 56% and 32% for the next two hours, while the same tool with `source: "openmeteo"` returned 20% and 16% — and a future-radar cross-check agreed with the second. Both numbers are honest. NOAA's gridded probability is human-adjusted over the whole grid box on the forecaster's publish cadence; Open-Meteo's comes straight off the model on the model's own faster cadence. The tool was picking one silently. Every NOAA hourly response now carries one line, above the horizon disclosure and below `**Showing:**`:
@@ -1731,7 +1733,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.1...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.0...HEAD
+[1.29.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.1...v1.29.0
 [1.28.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.0...v1.28.1
 [1.28.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.1...v1.28.0
 [1.27.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.0...v1.27.1
