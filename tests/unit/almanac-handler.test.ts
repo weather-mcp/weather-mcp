@@ -147,7 +147,6 @@ function buildForecastPeriod(overrides: Partial<ForecastPeriod>): ForecastPeriod
 function buildNoaaForecastResponse(periods: ForecastPeriod[]) {
   return {
     properties: {
-      updated: '2026-08-12T00:00:00-07:00',
       units: 'us',
       forecastGenerator: 'test',
       generatedAt: '2026-08-12T00:00:00-07:00',

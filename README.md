@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-3%2C292%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-3%2C313%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Three optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 3,292 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 3,313 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -96,7 +96,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 ## Feature highlights
 
-- **Smart source selection** — US queries use NOAA (detailed, includes forecaster narratives); everywhere else uses Open-Meteo. You never pick; it just works.
+- **Smart source selection** — US queries use NOAA (detailed, includes forecaster narratives); everywhere else uses Open-Meteo. You never have to pick — and on a US *hourly* forecast the answer tells you which product you got and when NOAA last published it, so reaching for `source="openmeteo"` is a choice you can make rather than one made silently for you.
 - **International weather alerts** — `get_alerts` routes by country: NOAA in the US, Environment and Climate Change Canada alerts in Canada, the official national warnings of 38 European countries via EUMETNET MeteoAlarm, the national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG), and the Japan Meteorological Agency's own disaster-prevention feed in Japan — shown unmodified, with the issuing service credited. Where a feed publishes geometry inline, warnings are matched to your exact point by the alert's own polygon rather than to the whole country (the Philippines and Indonesia today; Europe remains country-level). Japanese warnings are matched to your point by JMA warning area, with the Japanese name shown as published and an English gloss beside it. Border cities like Toronto get the right country's alerts, not the nearest bounding box's.
 - **Real observations worldwide** — ask for what a station is *actually reporting* and `get_current_conditions` will read the nearest airport's METAR (`source="metar"`): a genuine instrument reading anywhere on earth, with the station, its distance, and the observation age always stated. Outside the US this is the difference between a measurement and a model estimate.
 - **Model agreement** — ask *"how confident is this forecast?"* and `compare_models=true` compares five global models (GFS, ECMWF, ICON, GEM, UKMO) in one request, summarizing where they agree and where they split rather than dumping five forecasts. Spread across models is a proxy for uncertainty, not a guarantee — a tight spread can still be wrong, and the output says so.
@@ -367,6 +367,7 @@ Being honest about what free public data can and can't do:
 | Fire weather | ✅ (computed Fosberg index + dryness context) | NOAA-published Haines, grassland, red-flag indices |
 | Pollen | 🇪🇺 Europe keyless (CAMS, grains/m³); elsewhere needs an optional key | Universal Pollen Index with `GOOGLE_POLLEN_API_KEY` |
 
+- **A US hourly forecast and a US daily forecast come from the same NOAA product, and that product is human-adjusted.** Its precipitation probability is a chance over the whole grid box, republished on the forecaster's cadence rather than a model run's, so at hourly resolution it can legitimately disagree with `source="openmeteo"`'s faster model view — neither is wrong. `source="auto"` picks NOAA on geography alone and now says so on every hourly response, with the `**Updated:**` header line showing when NOAA last published the grid. Daily forecasts are unaffected.
 - European alerts are matched at **country level** — the keyless MeteoAlarm feeds carry no region polygons, so warnings for a large country may not affect the requested point; the output says so. Canadian alerts use a real bbox query with polygon-backed features.
 - **Philippine and Indonesian alerts are matched by the alert's own polygon**, and **Japanese alerts by JMA warning area**, so a warning is shown only when it actually covers the requested point — finer than Europe's country-level matching. Japan resolves to one of the 143 areas JMA itself publishes warnings for; a point outside all of them, or one whose area is missing from the office's own bulletin, says so rather than reporting an all-clear. **Indian alerts are currently country-level**: SACHET publishes each alert's geometry from a separate endpoint that is not reliably reachable from servers, so Indian warnings are listed with an explicit note that they may not affect your exact location, exactly as Europe's are. Any alert whose geometry cannot be loaded is always listed rather than dropped — never silently treated as "not near you".
 - Outside the US, Canada, Europe, India, the Philippines, Indonesia, and Japan, alerts need an optional [`GOOGLE_WEATHER_API_KEY`](#optional-api-keys); without one `get_alerts` says plainly that the region isn't covered rather than guessing. With a key, Google aggregates official national feeds for roughly 45 more territories — Australia, Brazil and Mexico among them, with [Google's coverage page](https://developers.google.com/maps/documentation/weather/coverage) as the authoritative list. Matching is by **provider polygon**, so coverage alignment may not be exact and an empty answer means "no alerts found", not a guarantee of coverage; the output says so both ways. Alert text appears in the publisher's source language. **The US, Canada, Europe, India, the Philippines, Indonesia, and Japan never contact Google** — those authorities stay first choice, key or no key — and a key failure surfaces loudly rather than degrading to a possibly-false all-clear.
@@ -386,7 +387,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 3,292 tests
+npm test               # Run all 3,313 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

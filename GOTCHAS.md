@@ -345,6 +345,17 @@ had rendered; the fix is the same construct check the live half uses, one line p
 (`expect(textOf(a)).toContain('# Weather Forecast')`). **Generalise the rule as: a hash or a
 `toBe` is a claim about two things being equal, never a claim that either exists.**
 
+**The normalisation itself can fabricate a difference, 2026-09-08** (`f5d51a3`/`c4626a7`,
+forecast-auto-source-contract T5). Where the sweep's job is "prove the diff set is *exactly*
+these N lines" rather than "prove no diff", the natural method is to strip the expected lines
+and hash the remainder. Stripping a rendered line's **text** with `grep -v` leaves the blank
+line that line appends, so two probes whose only real difference was the two expected lines
+still hashed differently, and the first reading was "there is a third change". There is no such
+change; `cat -s` on both sides resolves it. **Use `diff` as the authority on *what* changed and
+the hash only to summarise it** — a hash tells you two things differ, never where, and a
+line-oriented normalisation has to account for a rendered line's surrounding whitespace as well
+as its text.
+
 **Status:** active, **extended 2026-08-27, 2026-09-02 and 2026-09-03**, **re-run 2026-09-01**
 (openmeteo-nullable-scalar-types T1–T3: the plan told the sweep in advance that
 a probe landing on a wire null would differ from base by exactly the omitted
@@ -470,7 +481,7 @@ test must task the doc update, and a plan asserting the count does not move shou
 be tested against the suite rather than believed.
 
 **Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
-2026-08-25**, **Verify line re-run 2026-09-03, second time** (`4cac538`, critical-alert-banner diff-triage MAJOR-5 — the count moved 3,132 → 3,250 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,250`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3250`, `✅ CLAUDE.md test count: 3250`, `✅ README.md tests badge: 3250` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-03** (`99cc032`, jma-service-residuals T4 — the count moved 3,130 → 3,132 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,132`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3132`, `✅ CLAUDE.md test count: 3132`, `✅ README.md tests badge: 3132` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **extended 2026-08-29**, **Verify line re-run 2026-09-02** (`d65ef25`, noaa-forecast-horizon-disclosure T2 — the count moved 2,933 → 2,941 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,941`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01, second time** (`f48eda3`, openmeteo-nullable-scalar-types T6 — the count moved 2,917 → 2,933 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,933`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2933`, `✅ CLAUDE.md test count: 2933`, `✅ README.md tests badge: 2933` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
+2026-08-25**, **Verify line re-run 2026-09-08** (`f4115f2`, forecast-auto-source-contract T7 — the count moved 3,292 -> 3,304 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,304`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3304`, `✅ CLAUDE.md test count: 3304`, `✅ README.md tests badge: 3304` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-03, second time** (`4cac538`, critical-alert-banner diff-triage MAJOR-5 — the count moved 3,132 → 3,250 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,250`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3250`, `✅ CLAUDE.md test count: 3250`, `✅ README.md tests badge: 3250` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-03** (`99cc032`, jma-service-residuals T4 — the count moved 3,130 → 3,132 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,132`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3132`, `✅ CLAUDE.md test count: 3132`, `✅ README.md tests badge: 3132` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **extended 2026-08-29**, **Verify line re-run 2026-09-02** (`d65ef25`, noaa-forecast-horizon-disclosure T2 — the count moved 2,933 → 2,941 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,941`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01, second time** (`f48eda3`, openmeteo-nullable-scalar-types T6 — the count moved 2,917 → 2,933 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,933`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2933`, `✅ CLAUDE.md test count: 2933`, `✅ README.md tests badge: 2933` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
 band-rounding T2 — the count moved 2,611 → 2,660 and all five sites were edited
 by content; with both unvalidated sites then set to `9,999` against the real
 `2,660`, `./scripts/check-doc-versions.sh` still printed `✅ README.md test
@@ -2658,6 +2669,20 @@ routing assumption by calling the live resolver at the exact coordinate, the
 same way this entry's original instance checks a fixture's value; a probe aimed
 at that branch otherwise comes back a plausible clean negative ([G28]).
 
+**A third instance, closed 2026-09-08** (`f5d51a3` + `da29508`,
+forecast-auto-source-contract). This entry in its purest form, and the longest-lived:
+**four** NOAA forecast fixtures supplied `properties.updated`, a key the live NWS forecast
+API does not send and never has — the wire's key set is exactly `elevation,
+forecastGenerator, generatedAt, periods, units, updateTime, validTimes` on both products.
+So `formatNOAAForecast`'s `**Updated:**` line was gated on a field that never arrived, and
+it had therefore **never rendered in production for the project's entire history** while the
+suite stayed green. The mutation check was available and would have proved nothing: the
+fixtures and the handler shared the same false premise. Two details worth carrying: the
+fixture that mattered most was an **integration** fake feeding the real handler
+(`tests/integration/almanac.test.ts`), found only by enumerating the whole repo rather than
+the three unit builders a plan had named; and the sweep's **base** column stated the defect
+in one line — `**Updated:**` grep count `0` at every probe including both US points.
+
 **Status:** active — the rule, with its original instance closed. Related: [G45] (a mutation only goes red where the contract can
 reach it — this is the case where it goes red for the wrong reason), [G32] (mutating
 to the rejected implementation, which shares the fixture's premise and so cannot
@@ -2796,6 +2821,16 @@ reach these lines yet — this becomes reachable once T5 lands the wider types"*
 Open-Meteo answers HTTP 200 with JSON `null` past a model's horizon regardless
 of what `src/types/openmeteo.ts` says; T5 changed what the compiler permits,
 never what the wire sends.
+
+**A second shape, 2026-09-08** (`f5d51a3`, forecast-auto-source-contract T1): not a
+nullability widening but a **field-name** one. `ForecastProperties.updated` was declared
+`updated: string` — required — for a field the wire has never sent, so the compiler
+certified the guard reading it as safe while the guard was silently false in production
+from the day it was written. The plan wrote the rule into the task text in advance and the
+changelog bullet was written in the past tense; nothing "became" reachable. The general
+form is worth stating: **a required declaration is as much a false claim about the wire as
+a non-nullable one**, and `makeRequest<T>` performs no runtime validation, so the generic
+is an assertion over the axios body rather than a check on it.
 
 **Status:** active. **Re-confirmed live 2026-09-01** (`0e63f8c`, `3adc2d2`,
 openmeteo-nullable-scalar-types T1/T3): the raw Open-Meteo marine body carried
@@ -3121,6 +3156,26 @@ time (extract every decimal in the answer blocks, grep the capture beneath):
 two of six blocks were clean, four needed rewriting, and the one residual miss
 was a deliberate rounding (`88 miles` for `87.9 mi`). It is cheap enough to run
 on every regeneration.
+
+**The script regenerates everything, so "only N files should change" is not an
+acceptance criterion, 2026-09-08** (`2209ac6`, forecast-auto-source-contract T6).
+`npm run examples` is a single full sweep, not a per-file refresh: it re-captures
+all ten example files against live upstreams, so **every** file changes on every
+run regardless of what the branch did. A plan predicting "the diff shows only the
+two expected files" is predicting something the script cannot produce. Decide by
+**structure, not by file count** — for each changed file, diff for the construct
+the branch actually adds (`git diff -U0 -- <f> | grep '^+' | grep -c '<construct>'`)
+and separate structural change from live drift. Here two files gained the new line
+and eight were pure drift (temperatures, radar frame URLs, an alert's county list);
+the eight were restored, matching the repo's targeted-refresh precedent (`a0faa5c`).
+Per-file `<!-- capture-stamp -->` markers make that honest — each file states its own
+capture date. **And a third instance of this entry's own trap came with it:**
+`severe-weather-day.md`'s narrative was already stale against the capture committed on
+`main` — 104°F against a captured 99°F, day-of-week claims naming Friday and Sunday for a
+Tuesday-to-Wednesday window, and a "105 to 110" heat-index range that appeared in no alert
+text — and one claim was wrong in *kind* rather than in number ("no rain in sight" against
+a capture reading `Showers And Thunderstorms Likely`). Worth noting for scope: the eight
+restored captures were last regenerated three minor releases earlier, at v1.25.18.
 
 **Status:** active, **second instance 2026-09-01**. Related: [G46] (a docs task writes the plan's promise, not the
 code's behaviour — this is its sibling, where the docs describe an *older run* of
@@ -4405,6 +4460,58 @@ was still describing the pre-move wording at release and was corrected there
 **Status:** active. Related: [G81], [G82] (the same release's other two), [G12]
 (one edit, every site). Lintable: partly — reach is mechanically checkable by
 dumping `tools/list` per preset; span is not.
+
+---
+
+## G84 — A hand `curl` of `api.weather.gov` without the service's own `Accept` header reads a staler document than production does
+
+**Trigger:** checking a rendered NWS value by hand — confirming a timestamp,
+a field's presence, or a payload's key set with `curl`, `jq`, or a browser,
+to verify what the server rendered.
+
+**Rule:** send the header the service sends. `NOAAService` requests forecast
+and gridpoint documents with `Accept: application/geo+json`
+(`src/services/noaa.ts:65-66`); a bare `curl` sends `*/*` and can be served a
+**materially older cached copy from the same URL**. Before calling a rendered
+value wrong, re-issue the probe with the service's header — and if the two
+disagree, the header is the first suspect, not the renderer.
+
+**Why:** the failure looks exactly like a rendering bug, and it points the wrong
+way with confidence. There is no error, no cache header worth reading in the
+output, and both responses are well-formed, correctly-shaped, plausible JSON —
+so the natural conclusion is that the handler formatted the wrong field or the
+wrong timezone. The gap is not a few seconds of drift either; it is large enough
+to survive every sanity check a person would apply to a timestamp.
+
+**Verify:**
+
+```bash
+curl -s "https://api.weather.gov/gridpoints/LWX/97,71/forecast" | jq -r .properties.updateTime
+curl -s -H "Accept: application/geo+json" \
+  "https://api.weather.gov/gridpoints/LWX/97,71/forecast" | jq -r .properties.updateTime
+```
+
+Two different values from the same URL in the same minute means this entry is
+live. Confirm against the service itself by constructing `NOAAService` and
+calling `getForecast` directly — that is the value production renders.
+
+**Evidence:** 2026-09-08 (`f5d51a3`, forecast-auto-source-contract T1). The
+built dist rendered `**Updated:** Sep 8, 2026, 1:33 PM` for Washington DC. A
+bare `curl` of the daily gridpoint endpoint reported
+`updateTime: 2026-09-08T16:52:27+00:00` — 12:52 PM local, **41 minutes
+earlier** — and the render was nearly filed as a defect on that basis. Five
+repeats of the bare form all returned `16:52:27Z`; five with
+`Accept: application/geo+json` all returned `17:33:11+00:00`, matching the
+render exactly, as did `NOAAService.getForecast` invoked directly. Adding
+`?units=us` (which the service also sends) made no difference; the `Accept`
+header was the whole of it.
+
+**Status:** active. Related: [G10] (a probe that is not testing what you think
+it is — this is the hand-probe twin of the base-worktree configuration trap),
+[G11] (read the real output — and make sure the thing you compare it against is
+real too), [G48] (a fixture supplying a value the live resolver never produces;
+here it is the *verification* that reads a value production never saw). Not
+lintable — it is a property of a CDN, not of the code.
 
 ---
 

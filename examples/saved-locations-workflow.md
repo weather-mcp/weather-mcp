@@ -153,7 +153,7 @@ list_saved_locations({})
 **Country:** US
 **Region:** California
 **Activities:** boating, fishing, hiking
-**Saved:** 9/2/2026
+**Saved:** 9/8/2026
 
 ---
 
@@ -174,7 +174,7 @@ get_forecast(location_name="cabin")
 **Claude Code answered** (using `get_forecast` with `location_name: "cabin"` — no coordinates needed):
 
 <!-- answer -->
-Since you boat there, timing matters this weekend: **this afternoon has a 36% chance of showers and thunderstorms** (high 67°F at the cabin's 6,200 ft elevation), so keep an eye on the sky if you're on the water. **Friday looks like your day** — sunny, high 67°F, with only a slight chance of a storm popping between 2 and 5 PM, then a clear, crisp night around 49°F. Classic Tahoe summer: pleasant days, chilly nights, and afternoon thunderstorms worth respecting on a boat.
+Good news for boating — it's dry the whole stretch: **today is sunny with a high near 72°F** (at the cabin's 6,200 ft elevation) and 0% chance of rain, dropping to a clear 57°F tonight. **Wednesday holds the same pattern** — sunny, high 76°F, with only a 3% chance of anything overnight as it cools to 59°F. Classic Tahoe summer: warm, dry days and crisp nights, no storms to plan around this time.
 <!-- /answer -->
 
 <!-- capture:forecast-by-alias -->
@@ -199,39 +199,40 @@ get_forecast({
 
 **Location:** 39.0885, -120.0504
 **Elevation:** 6227ft
+**Updated:** Sep 8, 2026, 4:31 AM
 **Showing:** 4 periods
 
-## This Afternoon
-**Temperature:** 56°F
-**Precipitation Chance:** 7%
-**Wind:** 15 mph SW
-**Forecast:** Mostly Sunny
+## Today
+**Temperature:** 72°F
+**Precipitation Chance:** 0%
+**Wind:** 0 mph
+**Forecast:** Sunny
 
-Mostly sunny, with a high near 56. Southwest wind around 15 mph, with gusts as high as 30 mph.
+Sunny, with a high near 72. North wind around 0 mph.
 
 ## Tonight
-**Temperature:** 43°F
-**Precipitation Chance:** 7%
-**Wind:** 10 to 15 mph SW
+**Temperature:** 57°F
+**Precipitation Chance:** 0%
+**Wind:** 0 mph
 **Forecast:** Partly Cloudy
 
-Partly cloudy, with a low around 43. Southwest wind 10 to 15 mph, with gusts as high as 25 mph.
+Partly cloudy, with a low around 57. Northwest wind around 0 mph.
 
-## Thursday
-**Temperature:** 56°F
-**Precipitation Chance:** 47%
-**Wind:** 10 to 15 mph SW
-**Forecast:** Mostly Sunny then Chance Rain Showers
+## Wednesday
+**Temperature:** 76°F
+**Precipitation Chance:** 0%
+**Wind:** 0 to 5 mph N
+**Forecast:** Mostly Sunny
 
-A chance of rain showers after 2pm. Mostly sunny, with a high near 56. Southwest wind 10 to 15 mph, with gusts as high as 30 mph. Chance of precipitation is 50%.
+Mostly sunny, with a high near 76. North wind 0 to 5 mph.
 
-## Thursday Night
-**Temperature:** 44°F
-**Precipitation Chance:** 56%
-**Wind:** 10 to 20 mph SW
-**Forecast:** Rain Showers Likely
+## Wednesday Night
+**Temperature:** 59°F
+**Precipitation Chance:** 3%
+**Wind:** 0 to 5 mph SW
+**Forecast:** Partly Cloudy
 
-Rain showers likely. Mostly cloudy, with a low around 44. Southwest wind 10 to 20 mph, with gusts as high as 40 mph. Chance of precipitation is 60%.
+Partly cloudy, with a low around 59. Southwest wind 0 to 5 mph.
 
 ---
 *Data source: NOAA National Weather Service (US)*
@@ -265,7 +266,7 @@ get_saved_location({
 **Region:** California
 **County:** Placer County
 **Activities:** boating, fishing, hiking
-**Saved:** 9/2/2026, 5:05:23 PM
+**Saved:** 9/8/2026, 2:21:07 PM
 
 ---
 
@@ -318,5 +319,5 @@ Use `save_location` to save new locations.
 *The activities you save travel with the location — ask "can we fish at the cabin Saturday?" and the assistant knows what and where "the cabin" is.*
 
 <!-- capture-stamp -->
-*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-08 with weather-mcp v1.28.1 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

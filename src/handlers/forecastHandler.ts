@@ -534,10 +534,47 @@ async function formatNOAAForecast(
   let output = `# Weather Forecast (${granularity === 'hourly' ? 'Hourly' : 'Daily'})\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Elevation:** ${formatElevationFromM(forecast.properties.elevation.value, prefs)}\n`;
-  if (forecast.properties.updated) {
-    output += `**Updated:** ${formatInTimezone(forecast.properties.updated, timezone, 'medium', prefs.timeFormat)}\n`;
+  // Truthiness alone is not enough: `formatInTimezone` returns the literal
+  // string "Invalid Date" for a non-empty value `Date.parse` cannot read, and
+  // the hourly note below points at this line as the forecaster's cadence — so
+  // a garbage tick would be a contradiction, not just noise. Newly reachable
+  // in production: the field read here used to be `properties.updated`, which
+  // the live NWS API never sends, so the branch never ran; `updateTime` always
+  // does. Never observed malformed from NWS, but "never trust the HTTP 200
+  // alone" is this project's own rule, and omitting the line is the honest
+  // failure — the header simply carries no tick, exactly as when the field is
+  // absent.
+  const updateTime = forecast.properties.updateTime;
+  if (updateTime && !Number.isNaN(Date.parse(updateTime))) {
+    output += `**Updated:** ${formatInTimezone(updateTime, timezone, 'medium', prefs.timeFormat)}\n`;
   }
   output += `**Showing:** ${periods.length} ${granularity === 'hourly' ? 'hours' : 'periods'}\n\n`;
+  // Say what NOAA's hourly product *is*, so `source: "auto"` is not a silent
+  // meteorological choice. At hourly resolution the two authorities answer
+  // differently enough that the caller needs to know which one spoke: NOAA's
+  // gridded *PoP* is a human-adjusted probability over the whole grid box on
+  // the forecaster's publish cadence (the `**Updated:**` line above is that
+  // cadence), while Open-Meteo serves a model view on the model's own faster
+  // cadence. Neither is wrong, so this discloses rather than re-routes.
+  //
+  // The probability claim is scoped to precipitation on purpose. It is the
+  // only value in the response that IS a probability, and the line renders
+  // directly above a temperature and a wind speed — an unscoped "each value"
+  // would be false of the two lines under it. Nor does this name a model on
+  // the Open-Meteo side: `buildForecastParams` sends no `models` parameter,
+  // so that path serves Best Match (a blend chosen per location), not HRRR.
+  //
+  // Hourly only — the daily product is the forecaster's own on a cadence that
+  // suits a day-ahead question, and nothing about it is misleading. Not gated
+  // on `detail`, for the same reason the horizon lines below are not: it is a
+  // fact about the upstream product, invariant under verbosity. It lives here
+  // inside `formatNOAAForecast` rather than beside the `isInUS` routing
+  // predicate so it can only render when NOAA actually answered — `isInUS` is
+  // true for Toronto, Vancouver and Windsor, which NOAA rejects and which fall
+  // back to Open-Meteo above (GOTCHAS G53).
+  if (granularity === 'hourly') {
+    output += `*NOAA's hourly forecast is a human-adjusted grid product: its precipitation probability is a chance over the whole grid box, republished on the forecaster's cadence rather than the model's. For a faster-cadence model view use source: "openmeteo".*\n\n`;
+  }
   // Disclose NOAA's own horizon when the request asked for more than NOAA
   // published. Not gated on `detail` — the horizon is a fact about the upstream
   // product, invariant under verbosity — and every number comes from the
