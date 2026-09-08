@@ -2044,6 +2044,18 @@ construction, and both invite editing correct work to satisfy them.
   adds** — "zero hits anywhere" is only satisfiable when nothing upstream ever
   names the host, which for a transport error is never.
 
+**A fourth direction, found 2026-09-08** (`b4e4823`, tools-list-slimming T5):
+**a prescribed mutation too small to trip the check it is meant to redden.** T5's
+acceptance said to demonstrate the byte budget red by "lowering one constant by
+1". The constant is the measured payload *rounded up to the next 1,000*, so it
+carries up to 999 bytes of deliberate headroom — 21, as it happened. A `-1` edit
+stays green, and a builder who performs it and reports "confirmed red" has
+rubber-stamped a lock nobody demonstrated. The mutation's magnitude has to be
+derived from the *measured* value, not from the threshold: one byte below what
+was actually measured. Read as an instance of the rule above — the criterion was
+wrong, not the code — and the right move is to say so and use the smallest
+mutation that genuinely reddens, which is what happened.
+
 **Verify:** with an uncommitted new file under `tests/`, run
 `git diff --stat main...HEAD -- tests/` and confirm it prints nothing, then
 `git status --short tests/` and confirm the file is listed as `??`. The first
@@ -3220,8 +3232,14 @@ the artifact emits, not the one the plan describes).
 
 ## G61 — Importing anything from `src/index.ts` runs `main()`, because there is no `import.meta.url` guard
 
-**Trigger:** writing a unit test that imports any symbol from `src/index.ts` —
-`TOOL_DEFINITIONS`, a schema fragment, or anything else added to it later.
+**Trigger:** importing any symbol from `src/index.ts` — or from the built
+`dist/index.js` — anywhere: a unit test (`TOOL_DEFINITIONS`, a schema fragment,
+anything added to it later), and equally a throwaway `node -e` one-liner used to
+check what the build produced. The verification one-liner is the easy one to
+forget, because it does not feel like a test; it starts a real server, opens an
+MQTT subscription, and does not exit ([G37]). To inspect the built schema, spawn
+the dist as a child and speak JSON-RPC to it, or read the source — never import
+it into the checking process.
 
 **Rule:** `src/index.ts` calls `main()` unconditionally at module scope, so the
 import *is* a server start: it constructs a `StdioServerTransport`, calls
@@ -4152,6 +4170,101 @@ fixes, so shipped prose can describe pre-fix behaviour — same page, different
 cause), [G31] (the architecture map's completeness loop, which catches a missing
 *module* but not a missing *page*). Lintable: no — nothing mechanical can tell
 a deliberate silence from an undocumented one.
+
+---
+
+## G79 — A lock whose expected value is read from a gitignored path passes locally off an untracked artifact and dies on a fresh clone
+
+**Trigger:** a new test whose expected value is a *generated* artifact — a
+fingerprint, a golden payload, a captured baseline — that an earlier step of the
+same run wrote somewhere convenient, typically `.claude/scratch/`.
+
+**Rule:** **inline the generated literal into the test file.** A test may read a
+fixture only from a path the repo actually carries (`tests/fixtures/`). Before
+trusting a green run on any test with an external expected value, move the file
+aside and re-run: if the suite errors rather than fails, the expected value was
+never in the repo.
+
+**Why:** the artifact is real, correct, and provably derived from the right
+side — every property the lock needs — and it is still absent everywhere except
+the machine that made it. `.claude/` is gitignored wholesale
+(`.gitignore:26`, slashless), so the file is invisible to `git status`, survives
+every local run, and is simply not there on a clone or in CI. The failure is not
+a wrong assertion but an `ENOENT` at import, which takes the **whole suite
+file** down before a single assertion runs — so the contract the file was added
+to enforce is not weakened, it is entirely absent, and the local green run says
+nothing about either.
+
+This is [G10]'s vacuity trap arriving from a new direction. G10 warns about a
+baseline taken from the *wrong side*; here the baseline is taken from exactly
+the right side (a `git worktree` at `main`, which is the hard part and was done
+correctly) and then made unreachable. Provenance and availability are separate
+properties and getting the first right does nothing for the second.
+
+**Verify:** `git check-ignore -v <every path a test reads>` — any hit is the
+bug. Then `mv` the file aside and re-run the suite; it must still be green.
+
+**Evidence:** 2026-09-08 (`b4e4823`, tools-list-slimming T5). The shape
+fingerprint was correctly generated from a `main` worktree and hashed identical
+to the branch — then sourced with
+`readFileSync(new URL('../../.claude/scratch/fingerprint-from-main.json', …))`.
+41/41 green locally, including the CI-shaped `HOME=$(mktemp -d)
+DOTENV_CONFIG_PATH=/nonexistent` run, which pins the *environment* and says
+nothing about the *filesystem*. With the file moved aside:
+`Error: ENOENT … open '.../.claude/scratch/fingerprint-from-main.json'`,
+`Test Files 1 failed`. Fixed by inlining the literal.
+
+**Status:** active. Related: [G10] (baseline provenance — the other half of the
+same question), [G26] (the repo's own gitignored `.env` making a local run
+unrepresentative), [G41] (a check that cannot fail). Lintable: **yes** — a grep
+for string literals under `tests/` containing `.claude/` or `../..` outside
+`tests/fixtures/` would catch this mechanically.
+
+---
+
+## G80 — The alerts coverage sentence names authorities and mechanisms in one list, and a trim or an insertion silently re-attaches the wrong mechanism
+
+**Trigger:** editing `get_alerts`'s coverage sentence — in
+`src/index.ts`'s `TOOL_DEFINITIONS`, in `docs/TOOLS.md` §`get_alerts`, or in a
+`CHANGELOG.md` bullet — whether to add a country or to shorten the list.
+
+**Rule:** each authority must sit with **its own** mechanism, and the mechanism
+clause must not be able to slide onto a neighbour. Keep the CAP-feed countries
+in one bracketed group (`— via their official national CAP feeds — India …, the
+Philippines … and Indonesia …`) and every non-CAP authority outside it. After
+any edit, read the sentence back and name, for each country, which feed type it
+just claimed.
+
+**Why:** the sentence is a mixed list — some entries are authorities (NOAA,
+ECCC, MeteoAlarm, JMA), some are authority-plus-mechanism (the three national
+CAP feeds) — and English conjunction lets a trailing conjunct inherit the
+preceding prepositional phrase for free. Deleting the sub-national matching
+narrative leaves `…Indonesia (BMKG) via their official national CAP feeds, and
+Japan (JMA)`, which asserts JMA publishes CAP. It does not: JMA publishes the
+H27 disaster-prevention XML schema, which is precisely why `src/services/jma.ts`
+exists separately from `src/services/nationalCap.ts` and why `src/types/jma.ts`
+says "JMA H27 schema, not CAP". The result is a **false coverage claim on the
+safety surface**, produced by an edit that removed text rather than adding any,
+and no test can see it — nothing in `tests/` asserts on description text at all.
+
+**Verify:** `grep -n "CAP" src/index.ts docs/TOOLS.md` and check that every
+country inside a CAP clause is one of IN, PH, ID, and that no other authority
+trails one.
+
+**Evidence:** 2026-09-08 (`62521ba` and `f78f6da`, tools-list-slimming T4/T6).
+It happened **twice on one branch, from two different causes**. T3's trim
+produced it in the tool description; the coherence read caught it. T6's G46
+re-read then found `docs/TOOLS.md:368` carrying an independent instance that
+predated the branch — `…38 European MeteoAlarm member countries …, via their
+official national CAP feeds, India …, and Japan …` — where the misplaced clause
+attaches CAP to *Europe* as well. Two authorities mis-described on one page, on
+the alerts surface, shipped and unnoticed.
+
+**Status:** active. Related: [G53] (a routing heuristic promoted to a rendered
+claim inherits every edge it was allowed to get wrong), [G46] (a docs task
+writes the plan's promise, not the code's behaviour — which is how the
+`docs/TOOLS.md` instance was found), [G11] (only reading the rendered text
+catches it). Lintable: partially — the Verify grep is mechanical.
 
 ---
 
