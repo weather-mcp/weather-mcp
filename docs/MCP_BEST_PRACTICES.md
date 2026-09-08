@@ -346,16 +346,21 @@ description: 'Get weather forecast'
 
 ✅ **Do:** Guide AI behavior in tool descriptions
 ```typescript
-// Good - includes guidance
-description: 'Get weather forecast. If errors occur, use check_service_status to verify API availability.'
+// Good - the pointer lives once, on the status tool itself
+description: 'Check whether the upstream weather APIs (NOAA, Open-Meteo) are reachable. Call this after any weather tool returns an error, or before a batch of requests. Returns per-service status and links to the official status pages.'
 ```
+
+Put the error-handling pointer on `check_service_status`, not on every weather tool.
+A model reads the description of every enabled tool, so one pointer reaches it — and
+repeating the clause per tool costs bytes in every client's context on every turn while
+pointing at a tool the model cannot call at all when `ENABLED_TOOLS` omits it.
 
 ## Conclusion
 
 The best practice for MCP servers is to use a **layered approach**:
 
 1. **Tool-level errors** with `isError: true` and detailed messages
-2. **Enhanced tool descriptions** that guide AI error handling
+2. **`check_service_status`'s own description**, which is where the error-handling guidance lives — a single pointer rather than a clause repeated on every tool
 3. **Dedicated status check tools** for proactive monitoring
 4. **Optional: Resources** for real-time status without tool calls
 

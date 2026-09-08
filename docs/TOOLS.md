@@ -365,7 +365,7 @@ it is gated on the location rather than on the source, so a US airport queried
 with `source="metar"` gets it like any other US request.
 
 ### 3. get_alerts
-Get active weather alerts, watches, warnings, and advisories. Coverage is routed by country: the United States (NOAA), Canada (Environment and Climate Change Canada via MSC GeoMet), 38 European MeteoAlarm member countries (each country's official national warnings), via their official national CAP feeds, India (NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG), and Japan (the Japan Meteorological Agency), matched to the requested point by JMA warning area. Elsewhere, an optional `GOOGLE_WEATHER_API_KEY` adds official alerts for ~45+ more territories via the Google Weather API; without that key those regions receive a clean "not yet covered" message.
+Get active weather alerts, watches, warnings, and advisories. Coverage is routed by country: the United States (NOAA), Canada (Environment and Climate Change Canada via MSC GeoMet), 38 European MeteoAlarm member countries (each country's official national warnings), Japan (the Japan Meteorological Agency, matched to the requested point by JMA warning area), and — via their official national CAP feeds — India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG). Elsewhere, an optional `GOOGLE_WEATHER_API_KEY` adds official alerts for ~45+ more territories via the Google Weather API; without that key those regions receive a clean "not yet covered" message.
 
 **Parameters:**
 - `latitude` (required*): Latitude coordinate (-90 to 90)

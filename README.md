@@ -88,7 +88,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_saved_location` | Details for one saved location | — |
 | `remove_saved_location` | Delete a saved location | — |
 
-> **Default preset:** with no configuration, the server exposes 17 tools led by `get_weather_summary` (one call covers most "what's the weather?" questions), plus `forecast`, `current_conditions`, `alerts`, `search_location`, and `check_service_status`. Enable everything with one environment variable — see [Tool Selection](#tool-selection).
+> **Default preset:** with no configuration, the server exposes 6 tools led by `get_weather_summary` (one call covers most "what's the weather?" questions), plus `forecast`, `current_conditions`, `alerts`, `search_location`, and `check_service_status`. Enable everything with one environment variable — see [Tool Selection](#tool-selection).
 
 > **Consistent location input:** every location-based tool accepts the same three forms — `latitude`+`longitude`, a saved `location_name` (e.g. `"home"`), or a free-text `city_name` (e.g. `"Bend, Oregon"`, geocoded automatically). When a name is used, the response echoes the resolved place and coordinates.
 
@@ -225,6 +225,12 @@ Control which tools are exposed to reduce context overhead:
 | `standard` | basic + historical_weather, air_quality, and saved-location tools |
 | `full` | everything — standard + marine, imagery, lightning, rivers, wildfire (same as `all`) |
 | `all` | all 17 tools |
+
+**Context cost.** Every MCP client puts the `tools/list` result into model context on
+every turn, so the preset you choose is a standing cost on every request. Measured on
+the built server: `basic` **12,979 bytes** (~3.2k tokens), `standard` **20,948** (~5.2k),
+`full`/`all` **30,812** (~7.7k). It scales with the number of **tools**, not the number of
+data sources — adding Japan and India as alert authorities added zero tools and zero bytes.
 
 ```bash
 ENABLED_TOOLS=all                               # Use a preset
