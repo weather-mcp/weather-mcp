@@ -167,4 +167,25 @@ describe('get_forecast — NOAA **Updated:** line', () => {
     expect(text).toContain('# Weather Forecast (Hourly)');
     expect(text).not.toContain('**Updated:**');
   });
+
+  // A truthy value `Date.parse` cannot read is a different case from an absent
+  // one, and truthiness alone used to let it through: `formatInTimezone`
+  // returns the literal string "Invalid Date", which the header would then
+  // print as the forecaster's publish tick. Unreachable before this branch —
+  // the formatter read `properties.updated`, which the live API never sends —
+  // and always reachable now that it reads `updateTime`.
+  it.each([
+    ['a non-date string', 'not-a-date'],
+    ['an empty-ish placeholder', '   '],
+    ['a truncated timestamp', '2026-13-45T99:99:99Z'],
+  ])('omits **Updated:** rather than rendering "Invalid Date" for %s', async (_label, bad) => {
+    const periods = [buildForecastPeriod({})];
+    const noaa = buildNoaaForecastFake(periods, bad);
+    const result = await callForecast({ ...US_COORDS, days: 1 }, noaa);
+    const text = textOf(result);
+    // Positive control first (GOTCHAS G10).
+    expect(text).toContain('# Weather Forecast (Daily)');
+    expect(text).not.toContain('Invalid Date');
+    expect(text).not.toContain('**Updated:**');
+  });
 });

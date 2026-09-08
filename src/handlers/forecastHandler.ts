@@ -534,8 +534,19 @@ async function formatNOAAForecast(
   let output = `# Weather Forecast (${granularity === 'hourly' ? 'Hourly' : 'Daily'})\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Elevation:** ${formatElevationFromM(forecast.properties.elevation.value, prefs)}\n`;
-  if (forecast.properties.updateTime) {
-    output += `**Updated:** ${formatInTimezone(forecast.properties.updateTime, timezone, 'medium', prefs.timeFormat)}\n`;
+  // Truthiness alone is not enough: `formatInTimezone` returns the literal
+  // string "Invalid Date" for a non-empty value `Date.parse` cannot read, and
+  // the hourly note below points at this line as the forecaster's cadence — so
+  // a garbage tick would be a contradiction, not just noise. Newly reachable
+  // in production: the field read here used to be `properties.updated`, which
+  // the live NWS API never sends, so the branch never ran; `updateTime` always
+  // does. Never observed malformed from NWS, but "never trust the HTTP 200
+  // alone" is this project's own rule, and omitting the line is the honest
+  // failure — the header simply carries no tick, exactly as when the field is
+  // absent.
+  const updateTime = forecast.properties.updateTime;
+  if (updateTime && !Number.isNaN(Date.parse(updateTime))) {
+    output += `**Updated:** ${formatInTimezone(updateTime, timezone, 'medium', prefs.timeFormat)}\n`;
   }
   output += `**Showing:** ${periods.length} ${granularity === 'hourly' ? 'hours' : 'periods'}\n\n`;
   // Say what NOAA's hourly product *is*, so `source: "auto"` is not a silent
