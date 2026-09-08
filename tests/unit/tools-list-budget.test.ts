@@ -15,8 +15,8 @@
  *                  stays under TOOLS_LIST_BYTE_BUDGET (src/config/tools.ts).
  *   2. Guidance  — a fixed set of hand-tuned phrases survive at a fixed count
  *                  in the `full` payload (tool AND parameter descriptions).
- *   3. Shape     — the params/required/enums shape of all 17 tools' input
- *                  schemas matches a fingerprint generated from `main`
+ *   3. Shape     — the params/required/enums/defaults shape of all 17 tools'
+ *                  input schemas matches a fingerprint generated from `main`
  *                  (80d901a), so T1-T4 are proven to have changed no
  *                  parameter, enum, default, or `required` entry.
  *
@@ -85,7 +85,8 @@ import { PRESETS, TOOLS_LIST_BYTE_BUDGET } from '../../src/config/tools.js';
 
 type JsonSchemaProperty = {
   enum?: unknown[];
-  items?: { enum?: unknown[] };
+  default?: unknown;
+  items?: { enum?: unknown[]; default?: unknown };
 };
 
 type ToolDefinitionShape = {
@@ -204,17 +205,24 @@ type FingerprintEntry = {
   params: string[];
   required: string[];
   enums: Record<string, string[]>;
+  defaults: Record<string, unknown>;
 };
 
 /**
  * Generated from `main` (80d901a), NOT from this branch. G10 applies: a
  * fingerprint generated from the branch under test would only assert that
  * the branch equals itself — precisely the accidental-parameter-removal
- * class of bug this test exists to catch. The orchestrator built a
- * `git worktree` at main, compiled it, spawned it, and dumped this
- * fingerprint, which was byte-identical (md5 e89936404a98c25d766f860deec07f7c)
- * to the same dump taken from this branch — the proof that T1-T4 changed no
- * parameter, enum, default, or `required` entry.
+ * class of bug this test exists to catch. A `git worktree` at main was
+ * compiled and its TOOL_DEFINITIONS dumped, and that dump was byte-identical
+ * (md5 469c2ba0a73c9501d230d4d4aa89a5d5) to the same dump taken from this
+ * branch — the proof that T1-T4 changed no parameter, enum, default, or
+ * `required` entry.
+ *
+ * The four projected fields are exactly what `deriveFingerprint` below
+ * derives. Nothing else is locked: descriptions are Contract 2's job, and
+ * `type`/`minimum`/`maximum` are deliberately outside the fingerprint — say
+ * so here rather than letting the next editor infer coverage from the word
+ * "shape".
  *
  * The literal is inlined here on purpose. An earlier draft read it from
  * .claude/scratch/, which is gitignored: the suite passed locally off an
@@ -226,17 +234,25 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
     params: [],
     required: [],
     enums: {},
+    defaults: {},
   },
   get_air_quality: {
     params: ['city_name', 'forecast', 'forecast_days', 'latitude', 'location_name', 'longitude'],
     required: [],
     enums: {},
+    defaults: {
+      forecast: false,
+      forecast_days: 5,
+    },
   },
   get_alerts: {
     params: ['active_only', 'city_name', 'detail', 'latitude', 'location_name', 'longitude'],
     required: [],
     enums: {
       detail: ['full', 'standard', 'summary'],
+    },
+    defaults: {
+      active_only: true,
     },
   },
   get_current_conditions: {
@@ -251,6 +267,11 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
       time_format: ['12h', '24h'],
       units: ['imperial', 'metric'],
       wind_speed_unit: ['kmh', 'kn', 'mph', 'ms'],
+    },
+    defaults: {
+      include_fire_weather: false,
+      include_normals: false,
+      source: 'auto',
     },
   },
   get_forecast: {
@@ -268,6 +289,17 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
       units: ['imperial', 'metric'],
       wind_speed_unit: ['kmh', 'kn', 'mph', 'ms'],
     },
+    defaults: {
+      compare_models: false,
+      days: 7,
+      ensemble_spread: false,
+      granularity: 'daily',
+      include_astronomy: false,
+      include_normals: false,
+      include_precipitation_probability: true,
+      include_severe_weather: false,
+      source: 'auto',
+    },
   },
   get_historical_weather: {
     params: ['city_name', 'distance_unit', 'end_date', 'latitude', 'limit', 'location_name', 'longitude', 'precipitation_unit', 'pressure_unit', 'start_date', 'temperature_unit', 'time_format', 'units', 'wind_speed_unit'],
@@ -281,6 +313,9 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
       units: ['imperial', 'metric'],
       wind_speed_unit: ['kmh', 'kn', 'mph', 'ms'],
     },
+    defaults: {
+      limit: 168,
+    },
   },
   get_lightning_activity: {
     params: ['city_name', 'detail', 'latitude', 'location_name', 'longitude', 'radius', 'timeWindow'],
@@ -288,11 +323,19 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
     enums: {
       detail: ['full', 'standard', 'summary'],
     },
+    defaults: {
+      radius: 100,
+      timeWindow: 60,
+    },
   },
   get_marine_conditions: {
     params: ['city_name', 'forecast', 'forecast_days', 'latitude', 'location_name', 'longitude'],
     required: [],
     enums: {},
+    defaults: {
+      forecast: false,
+      forecast_days: 5,
+    },
   },
   get_river_conditions: {
     params: ['city_name', 'detail', 'forecast_days', 'latitude', 'location_name', 'longitude', 'radius', 'source'],
@@ -301,11 +344,17 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
       detail: ['full', 'standard', 'summary'],
       source: ['auto', 'ea', 'noaa', 'openmeteo'],
     },
+    defaults: {
+      forecast_days: 7,
+      radius: 50,
+      source: 'auto',
+    },
   },
   get_saved_location: {
     params: ['alias'],
     required: ['alias'],
     enums: {},
+    defaults: {},
   },
   get_weather_imagery: {
     params: ['animated', 'city_name', 'composite', 'detail', 'latitude', 'location_name', 'longitude', 'type'],
@@ -313,6 +362,11 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
     enums: {
       detail: ['full', 'standard', 'summary'],
       type: ['precipitation', 'radar', 'satellite'],
+    },
+    defaults: {
+      animated: false,
+      composite: false,
+      type: 'precipitation',
     },
   },
   get_weather_summary: {
@@ -329,6 +383,9 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
       units: ['imperial', 'metric'],
       wind_speed_unit: ['kmh', 'kn', 'mph', 'ms'],
     },
+    defaults: {
+      days: 7,
+    },
   },
   get_wildfire_info: {
     params: ['city_name', 'day_range', 'detail', 'latitude', 'location_name', 'longitude', 'radius', 'source'],
@@ -337,26 +394,37 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
       detail: ['full', 'standard', 'summary'],
       source: ['auto', 'firms', 'nifc'],
     },
+    defaults: {
+      day_range: 1,
+      radius: 100,
+      source: 'auto',
+    },
   },
   list_saved_locations: {
     params: [],
     required: [],
     enums: {},
+    defaults: {},
   },
   remove_saved_location: {
     params: ['alias'],
     required: ['alias'],
     enums: {},
+    defaults: {},
   },
   save_location: {
     params: ['activities', 'alias', 'alternateNames', 'description', 'latitude', 'location_query', 'longitude', 'name', 'notes'],
     required: ['alias'],
     enums: {},
+    defaults: {},
   },
   search_location: {
     params: ['limit', 'query'],
     required: ['query'],
     enums: {},
+    defaults: {
+      limit: 5,
+    },
   },
 };
 
@@ -365,17 +433,31 @@ function deriveFingerprint(def: ToolDefinitionShape): FingerprintEntry {
   const params = Object.keys(properties).sort();
   const required = (def.inputSchema.required ?? []).slice().sort();
   const enums: Record<string, string[]> = {};
+  const defaults: Record<string, unknown> = {};
 
-  for (const [key, value] of Object.entries(properties)) {
+  // Iterate the SORTED keys, not Object.entries: `defaults` is compared with
+  // toEqual, which ignores key order, but a sorted literal is the one a human
+  // can diff against the generated dump when this lock goes red.
+  for (const key of params) {
+    const value = properties[key];
     if (value.enum) {
       enums[key] = value.enum.slice().sort() as string[];
     } else if (value.items?.enum) {
       enums[`${key}.items`] = value.items.enum.slice().sort() as string[];
     }
-    // properties with neither contribute nothing
+    // hasOwnProperty, not `!== undefined`: `default: undefined` is a declared
+    // default whose value happens to be undefined, and dropping it silently
+    // would be exactly the class of loss this fingerprint exists to catch.
+    if (Object.prototype.hasOwnProperty.call(value, 'default')) {
+      defaults[key] = value.default;
+    }
+    if (value.items && Object.prototype.hasOwnProperty.call(value.items, 'default')) {
+      defaults[`${key}.items`] = value.items.default;
+    }
+    // properties with none of the three contribute nothing
   }
 
-  return { params, required, enums };
+  return { params, required, enums, defaults };
 }
 
 describe('tools/list shape fingerprint (vs main 80d901a)', () => {
