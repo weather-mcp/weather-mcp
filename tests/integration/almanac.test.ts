@@ -94,7 +94,7 @@ function buildNoaaFake() {
     }),
     getForecast: vi.fn().mockResolvedValue({
       properties: {
-        updated: '2026-08-12T06:00:00-07:00',
+        updateTime: '2026-08-12T06:00:00-07:00',
         elevation: { unitCode: 'wmoUnit:m', value: 56 },
         periods: [
           {
@@ -204,6 +204,12 @@ describe('Almanac integration — ACIS records through the real handler (mocked,
     expect(recordsLine).not.toContain('Low');
     expect(recordsLine).toContain('records since 1945');
     expect(text).toContain('Records: NOAA Regional Climate Centers (ACIS)');
+
+    // The **Updated:** line renders from the fake's updateTime
+    // (2026-08-12T06:00:00-07:00, in the point's America/Los_Angeles zone),
+    // so this fixture's correctness is observed rather than assumed — see
+    // GOTCHAS G48.
+    expect(text).toContain('**Updated:** Aug 12, 2026, 6:00 AM');
   });
 });
 
