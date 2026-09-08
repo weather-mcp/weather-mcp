@@ -276,6 +276,12 @@ describe('get_forecast — NOAA hourly source-character note (T4)', () => {
     expect(text).toContain('*Data source: Open-Meteo (Global)*');
     expect(noaa.getPointData).not.toHaveBeenCalled();
     expect(text).not.toContain(NOTE_ANCHOR);
+    // `**Updated:**` is NOAA's publish tick. It lives inside
+    // `formatNOAAForecast`, so the Open-Meteo path cannot render it today and
+    // this is a future-regression guard, not a present defect — but the note
+    // above points at that line as the cadence, so a leak would be a claim
+    // about a cadence Open-Meteo never published.
+    expect(text).not.toContain('**Updated:**');
   });
 
   it('is absent on the Open-Meteo path (non-US point) at granularity: "hourly"', async () => {
@@ -286,6 +292,7 @@ describe('get_forecast — NOAA hourly source-character note (T4)', () => {
     expect(text).toContain('*Data source: Open-Meteo (Global)*');
     expect(noaa.getPointData).not.toHaveBeenCalled();
     expect(text).not.toContain(NOTE_ANCHOR);
+    expect(text).not.toContain('**Updated:**');
   });
 
   it('is absent on the auto-fallback path (NOAA rejects, routes to Open-Meteo) — GOTCHAS G53', async () => {
@@ -298,6 +305,10 @@ describe('get_forecast — NOAA hourly source-character note (T4)', () => {
     expect(text).toContain('*NOAA does not cover this location; showing Open-Meteo model data instead.*');
     expect(text).toContain('*Data source: Open-Meteo (Global)*');
     expect(text).not.toContain(NOTE_ANCHOR);
+    // The fallback is the sharpest case: NOAA was called and declined, so a
+    // stray `**Updated:**` here would carry a tick from the source that did
+    // not answer.
+    expect(text).not.toContain('**Updated:**');
   });
 
   it.each(['summary', 'standard', 'full'] as const)(
