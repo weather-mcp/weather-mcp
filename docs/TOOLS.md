@@ -365,7 +365,7 @@ it is gated on the location rather than on the source, so a US airport queried
 with `source="metar"` gets it like any other US request.
 
 ### 3. get_alerts
-Get active weather alerts, watches, warnings, and advisories. Coverage is routed by country: the United States (NOAA), Canada (Environment and Climate Change Canada via MSC GeoMet), 38 European MeteoAlarm member countries (each country's official national warnings), via their official national CAP feeds, India (NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG), and Japan (the Japan Meteorological Agency), matched to the requested point by JMA warning area. Elsewhere, an optional `GOOGLE_WEATHER_API_KEY` adds official alerts for ~45+ more territories via the Google Weather API; without that key those regions receive a clean "not yet covered" message.
+Get active weather alerts, watches, warnings, and advisories. Coverage is routed by country: the United States (NOAA), Canada (Environment and Climate Change Canada via MSC GeoMet), 38 European MeteoAlarm member countries (each country's official national warnings), Japan (the Japan Meteorological Agency, matched to the requested point by JMA warning area), and — via their official national CAP feeds — India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG). Elsewhere, an optional `GOOGLE_WEATHER_API_KEY` adds official alerts for ~45+ more territories via the Google Weather API; without that key those regions receive a clean "not yet covered" message.
 
 **Parameters:**
 - `latitude` (required*): Latitude coordinate (-90 to 90)
@@ -544,7 +544,7 @@ Check the operational status of weather APIs and cache performance.
 **Parameters:** None
 
 **Description:**
-Performs health checks on both NOAA and Open-Meteo APIs to verify they are operational. Use this tool when experiencing errors or to proactively verify service availability before making weather data requests. Returns current status, helpful messages, links to official status pages, and cache statistics.
+Checks whether the upstream weather APIs (NOAA and Open-Meteo) are reachable. **This is the tool to call after any weather tool returns an error** — the recovery pointer lives here, on the status tool itself, rather than repeated in every weather tool's description. It is also useful before a batch of requests. Note the scope: it checks NOAA and Open-Meteo, the two general-purpose providers; a failure in a specialist upstream (RainViewer, JMA, NIFC, FIRMS, NWPS, Blitzortung) is not diagnosable here, and the reply says which two services it checked. Returns current status, helpful messages, links to official status pages, and cache statistics.
 
 **Example:**
 ```

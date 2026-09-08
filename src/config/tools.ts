@@ -317,3 +317,17 @@ export const toolConfig = new ToolConfig();
 // Export preset definitions for documentation
 export const PRESETS = TOOL_PRESETS;
 export const ALIASES = TOOL_ALIASES;
+
+/**
+ * Ceiling on the JSON size of the `tools/list` result, per preset, in bytes.
+ * Every MCP client puts this payload into model context on every turn, so it is
+ * a standing context cost. Each value is the measured payload rounded up to the
+ * next 1,000 bytes, so growth past it is a deliberate edit of this file rather
+ * than a description that quietly grew. Measured 2026-09-08 in UTF-8 bytes
+ * (Buffer.byteLength, not String.length — the descriptions carry em-dashes, and
+ * a code-unit count under-reports): basic 12,987, full 30,836.
+ */
+export const TOOLS_LIST_BYTE_BUDGET: Record<'basic' | 'full', number> = {
+  basic: 13000,
+  full: 31000,
+};

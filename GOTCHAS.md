@@ -2044,6 +2044,18 @@ construction, and both invite editing correct work to satisfy them.
   adds** — "zero hits anywhere" is only satisfiable when nothing upstream ever
   names the host, which for a transport error is never.
 
+**A fourth direction, found 2026-09-08** (`b4e4823`, tools-list-slimming T5):
+**a prescribed mutation too small to trip the check it is meant to redden.** T5's
+acceptance said to demonstrate the byte budget red by "lowering one constant by
+1". The constant is the measured payload *rounded up to the next 1,000*, so it
+carries up to 999 bytes of deliberate headroom — 21, as it happened. A `-1` edit
+stays green, and a builder who performs it and reports "confirmed red" has
+rubber-stamped a lock nobody demonstrated. The mutation's magnitude has to be
+derived from the *measured* value, not from the threshold: one byte below what
+was actually measured. Read as an instance of the rule above — the criterion was
+wrong, not the code — and the right move is to say so and use the smallest
+mutation that genuinely reddens, which is what happened.
+
 **Verify:** with an uncommitted new file under `tests/`, run
 `git diff --stat main...HEAD -- tests/` and confirm it prints nothing, then
 `git status --short tests/` and confirm the file is listed as `??`. The first
@@ -3220,8 +3232,14 @@ the artifact emits, not the one the plan describes).
 
 ## G61 — Importing anything from `src/index.ts` runs `main()`, because there is no `import.meta.url` guard
 
-**Trigger:** writing a unit test that imports any symbol from `src/index.ts` —
-`TOOL_DEFINITIONS`, a schema fragment, or anything else added to it later.
+**Trigger:** importing any symbol from `src/index.ts` — or from the built
+`dist/index.js` — anywhere: a unit test (`TOOL_DEFINITIONS`, a schema fragment,
+anything added to it later), and equally a throwaway `node -e` one-liner used to
+check what the build produced. The verification one-liner is the easy one to
+forget, because it does not feel like a test; it starts a real server, opens an
+MQTT subscription, and does not exit ([G37]). To inspect the built schema, spawn
+the dist as a child and speak JSON-RPC to it, or read the source — never import
+it into the checking process.
 
 **Rule:** `src/index.ts` calls `main()` unconditionally at module scope, so the
 import *is* a server start: it constructs a `StdioServerTransport`, calls
@@ -4152,6 +4170,193 @@ fixes, so shipped prose can describe pre-fix behaviour — same page, different
 cause), [G31] (the architecture map's completeness loop, which catches a missing
 *module* but not a missing *page*). Lintable: no — nothing mechanical can tell
 a deliberate silence from an undocumented one.
+
+---
+
+## G79 — A lock whose expected value is read from a gitignored path passes locally off an untracked artifact and dies on a fresh clone
+
+**Trigger:** a new test whose expected value is a *generated* artifact — a
+fingerprint, a golden payload, a captured baseline — that an earlier step of the
+same run wrote somewhere convenient, typically `.claude/scratch/`.
+
+**Rule:** **inline the generated literal into the test file.** A test may read a
+fixture only from a path the repo actually carries (`tests/fixtures/`). Before
+trusting a green run on any test with an external expected value, move the file
+aside and re-run: if the suite errors rather than fails, the expected value was
+never in the repo.
+
+**Why:** the artifact is real, correct, and provably derived from the right
+side — every property the lock needs — and it is still absent everywhere except
+the machine that made it. `.claude/` is gitignored wholesale
+(`.gitignore:26`, slashless), so the file is invisible to `git status`, survives
+every local run, and is simply not there on a clone or in CI. The failure is not
+a wrong assertion but an `ENOENT` at import, which takes the **whole suite
+file** down before a single assertion runs — so the contract the file was added
+to enforce is not weakened, it is entirely absent, and the local green run says
+nothing about either.
+
+This is [G10]'s vacuity trap arriving from a new direction. G10 warns about a
+baseline taken from the *wrong side*; here the baseline is taken from exactly
+the right side (a `git worktree` at `main`, which is the hard part and was done
+correctly) and then made unreachable. Provenance and availability are separate
+properties and getting the first right does nothing for the second.
+
+**Verify:** `git check-ignore -v <every path a test reads>` — any hit is the
+bug. Then `mv` the file aside and re-run the suite; it must still be green.
+
+**Evidence:** 2026-09-08 (`b4e4823`, tools-list-slimming T5). The shape
+fingerprint was correctly generated from a `main` worktree and hashed identical
+to the branch — then sourced with
+`readFileSync(new URL('../../.claude/scratch/fingerprint-from-main.json', …))`.
+41/41 green locally, including the CI-shaped `HOME=$(mktemp -d)
+DOTENV_CONFIG_PATH=/nonexistent` run, which pins the *environment* and says
+nothing about the *filesystem*. With the file moved aside:
+`Error: ENOENT … open '.../.claude/scratch/fingerprint-from-main.json'`,
+`Test Files 1 failed`. Fixed by inlining the literal.
+
+**Status:** active. Related: [G10] (baseline provenance — the other half of the
+same question), [G26] (the repo's own gitignored `.env` making a local run
+unrepresentative), [G41] (a check that cannot fail). Lintable: **yes** — a grep
+for string literals under `tests/` containing `.claude/` or `../..` outside
+`tests/fixtures/` would catch this mechanically.
+
+---
+
+## G80 — The alerts coverage sentence names authorities and mechanisms in one list, and a trim or an insertion silently re-attaches the wrong mechanism
+
+**Trigger:** editing `get_alerts`'s coverage sentence — in
+`src/index.ts`'s `TOOL_DEFINITIONS`, in `docs/TOOLS.md` §`get_alerts`, or in a
+`CHANGELOG.md` bullet — whether to add a country or to shorten the list.
+
+**Rule:** each authority must sit with **its own** mechanism, and the mechanism
+clause must not be able to slide onto a neighbour. Keep the CAP-feed countries
+in one bracketed group (`— via their official national CAP feeds — India …, the
+Philippines … and Indonesia …`) and every non-CAP authority outside it. After
+any edit, read the sentence back and name, for each country, which feed type it
+just claimed.
+
+**Why:** the sentence is a mixed list — some entries are authorities (NOAA,
+ECCC, MeteoAlarm, JMA), some are authority-plus-mechanism (the three national
+CAP feeds) — and English conjunction lets a trailing conjunct inherit the
+preceding prepositional phrase for free. Deleting the sub-national matching
+narrative leaves `…Indonesia (BMKG) via their official national CAP feeds, and
+Japan (JMA)`, which asserts JMA publishes CAP. It does not: JMA publishes the
+H27 disaster-prevention XML schema, which is precisely why `src/services/jma.ts`
+exists separately from `src/services/nationalCap.ts` and why `src/types/jma.ts`
+says "JMA H27 schema, not CAP". The result is a **false coverage claim on the
+safety surface**, produced by an edit that removed text rather than adding any,
+and no test can see it — nothing in `tests/` asserts on description text at all.
+
+**Verify:** `grep -n "CAP" src/index.ts docs/TOOLS.md` and check that every
+country inside a CAP clause is one of IN, PH, ID, and that no other authority
+trails one.
+
+**Evidence:** 2026-09-08 (`62521ba` and `f78f6da`, tools-list-slimming T4/T6).
+It happened **twice on one branch, from two different causes**. T3's trim
+produced it in the tool description; the coherence read caught it. T6's G46
+re-read then found `docs/TOOLS.md:368` carrying an independent instance that
+predated the branch — `…38 European MeteoAlarm member countries …, via their
+official national CAP feeds, India …, and Japan …` — where the misplaced clause
+attaches CAP to *Europe* as well. Two authorities mis-described on one page, on
+the alerts surface, shipped and unnoticed.
+
+**Status:** active. Related: [G53] (a routing heuristic promoted to a rendered
+claim inherits every edge it was allowed to get wrong), [G46] (a docs task
+writes the plan's promise, not the code's behaviour — which is how the
+`docs/TOOLS.md` instance was found), [G11] (only reading the rendered text
+catches it). Lintable: partially — the Verify grep is mechanical.
+
+---
+
+## G81 — `String.length` is a count of UTF-16 code units, so a budget named in bytes under-reports and always in the unsafe direction
+
+**Trigger:** any assertion, constant or published figure that states a **size in
+bytes** and gets that size from `JSON.stringify(x).length`, `str.length`, or a
+`.length` on anything that is not already a `Buffer`/`Uint8Array`.
+
+**Rule:** measure with **`Buffer.byteLength(s, 'utf8')`**. Then add a positive
+control asserting the payload actually contains non-ASCII, so the two rulers
+provably differ and a later "simplification" back to `.length` cannot pass every
+test in the file.
+
+**Why:** `.length` counts UTF-16 code units. Every character outside ASCII costs
+more bytes than code units — an em-dash (U+2014) is one code unit and **three**
+UTF-8 bytes, a degree sign two — so a code-unit count is always **less than or
+equal to** the byte count. That direction is the whole problem: a budget checked
+with the short ruler reads green while the real payload is over the ceiling. It
+cannot fail loudly, only quietly, and the gap widens with every non-ASCII
+character an editor adds. The error is small enough to look like rounding
+(8 bytes on `basic`, 24 on `full` — about 0.06%) and is therefore invisible to
+exactly the review that would catch a large one.
+
+The trap is not the arithmetic, which everyone knows. It is that a name can
+carry the claim: a constant called `TOOLS_LIST_BYTE_BUDGET` compared against a
+`.length` reads as correct at every call site, and the three published figures
+downstream of it inherit the wrong unit without anyone restating it.
+
+**Verify:** `grep -rn "\.length" --include="*.ts" src tests | grep -i byte` —
+any hit where a byte-named thing is measured by `.length` is the bug. Then, in
+the test itself, assert `Buffer.byteLength(payload, 'utf8') > payload.length`;
+if that fails the payload is pure ASCII and the two metrics are indistinguishable,
+which is worth knowing too.
+
+**Evidence:** 2026-09-08 (tools-list-slimming, codex-DR-2). `TOOLS_LIST_BYTE_BUDGET`
+and `tests/unit/tools-list-budget.test.ts` measured `JSON.stringify(...).length`;
+`README.md`, `CHANGELOG.md` and the `src/config/tools.ts` comment all published
+those numbers as bytes. Remeasured: `basic` 12,979 → **12,987**, `full` 30,812 →
+**30,836**, and the `main` baselines 17,442 → 17,458 and 40,212 → 40,254. Both
+presets pass on either ruler, so nothing shipped wrong — the defect was the unit
+on a number four places claim.
+
+**Status:** active. Related: [G4] (never trust the 200/the green alone), [G47]
+(a control that proves the measurement happened at all), [G62] (assert the
+construct, not a vocabulary word), [G82] (a fingerprint documenting fields it
+never derives — the same release's other instance of a name outrunning what the
+code does). Lintable: **yes** — the Verify grep is mechanical.
+
+---
+
+## G82 — A fingerprint's comment can claim fields the derivation never projects, and the lock still passes
+
+**Trigger:** a golden/fingerprint test whose header comment enumerates what it
+covers, where the projection function and the comment were written at different
+times — or where the expected literal was generated by a *separate* script that
+projected a different field set.
+
+**Rule:** the comment lists **exactly** what the derivation function projects,
+and names what is deliberately outside it. When you add a claim to the comment,
+add the field to the projection in the same commit, and prove the new field red
+by flipping one value of each type it can hold ([G41]).
+
+**Why:** a fingerprint is a lock the *next* editor reads rather than re-derives.
+Its comment is the interface; the projection is the implementation; and nothing
+compares them. A comment claiming coverage the code does not have is worse than
+no comment, because it converts an absent check into a believed one — the editor
+who changes a default reads "no parameter, enum, default or `required` entry
+changed" and concludes the lock has their back.
+
+The failure is invisible from the green run in both directions: the lock passes
+because the values it *does* project are unchanged, and it would also pass if
+every unprojected field were rewritten.
+
+**Verify:** read the projection function and the comment side by side, then
+mutate one value of every field the comment names. Any mutation that does not
+turn the suite red is a field the comment claims and the code does not check.
+
+**Evidence:** 2026-09-08 (tools-list-slimming, codex-DR-1). The Contract 3 header
+and the expected literal's own comment both said the fingerprint proved "no
+parameter, enum, default, or `required` entry" changed, while `deriveFingerprint`
+projected `params`/`required`/`enums` only — all 31 defaults across 12 tools were
+outside it. Nothing wrong shipped (a line-diff of every `default:` key between
+`main` and the branch was empty), but flipping
+`get_forecast.include_severe_weather`, `get_current_conditions.source` and
+`search_location.limit` all passed. With `defaults` derived, those same three
+flips fail exactly their three tools.
+
+**Status:** active. Related: [G41] (a check that cannot fail), [G10] (baseline
+provenance), [G79] (the same lock's other trap), [G81] (the same release's other
+name-outruns-code instance). Lintable: no — it needs a human to compare prose
+against a projection.
 
 ---
 

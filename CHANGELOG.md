@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.28.1] - 2026-09-08
+
+### Changed
+
+- **The `tools/list` payload is 23-26% smaller, and no tuned guidance left with it.** Every MCP client puts that payload into model context on every turn, so it is a standing cost on every request, and nothing measured it. The default install now pays **12,987 bytes** instead of 17,458 (~4.4k -> ~3.2k tokens); `standard` **20,961** instead of 26,917; `full`/`all` **30,836** instead of 40,254 (~10k -> ~7.7k tokens). Tool-level description text fell 39%.
+
+  What left was text the schema already carried or the first call demonstrates: the location instruction restated on all eleven location-based tools (the four location parameters carry it), the `(global coverage)` tag where a routing clause already said where the tool works, the seven unit overrides restating their own enums, and lists of the fields a result will contain - the pollen species, the river crest history, the FIRMS radiative-power figures, the twilight kinds. All of it is in [`docs/TOOLS.md`](docs/TOOLS.md), which is where per-tool detail belongs.
+
+  What stayed, deliberately: every routing cue and sibling cross-reference, every `SAFETY-CRITICAL` tag, and every coverage caveat - including the ones that share a sentence with a removed output list, such as `no official flood-stage thresholds exist for model data` and `no fire names or containment exist in satellite data`. A clause that discloses what a source *cannot* tell you is not an output enumeration.
+
+- **The error-handling pointer moved to `check_service_status`.** Four tools each carried a clause telling the model to call the status tool on error. A model reads every enabled tool's description, so one pointer reaches it - and on an `ENABLED_TOOLS` list without the status tool, those clauses pointed at a tool the model could not call. `check_service_status`'s own description now says plainly that it is the tool to call after any weather tool returns an error, and [`docs/MCP_BEST_PRACTICES.md`](docs/MCP_BEST_PRACTICES.md) shows the single-pointer form as the pattern.
+
+### Added
+
+- **`TOOLS_LIST_BYTE_BUDGET` and a test that enforces it.** `src/config/tools.ts` now carries a ceiling for the `basic` and `full` presets, each the measured payload rounded up to the next 1,000 bytes, so growth past one is a deliberate edit of that file rather than a description that quietly grew. `tests/unit/tools-list-budget.test.ts` asserts the budget in-process, pins the sixteen tuned guidance phrases the trim had to protect (four of them by exact count), and fingerprints every tool's parameters, enums, defaults and `required` list against `main` - so an accidentally removed parameter fails the gate. Sizes throughout are UTF-8 bytes.
+
+### Fixed
+
+- **`get_alerts` no longer implies Japan's warnings arrive over CAP.** They do not - JMA publishes the H27 disaster-prevention XML schema, which is why it has its own service. Also: `README.md` said the default configuration exposes 17 tools directly above a list of the six it actually exposes, and `search_location`'s description read as an instruction to geocode before every weather call, when every location-based tool accepts `city_name` and geocodes it itself.
+
+Measurement, and the rule that a tool description should describe what JSON Schema cannot express, are adopted from [@divot](https://github.com/divot)'s fork commit [`cc5c401`](https://github.com/weather-mcp/weather-mcp/commit/cc5c401) (`codex/compact-tool-definitions`). Closes [#94](https://github.com/weather-mcp/weather-mcp/issues/94).
+
 ## [1.28.0] - 2026-09-04
 
 ### Added
@@ -1693,7 +1715,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.1...HEAD
+[1.28.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.0...v1.28.1
 [1.28.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.1...v1.28.0
 [1.27.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.0...v1.27.1
 [1.27.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.26.0...v1.27.0

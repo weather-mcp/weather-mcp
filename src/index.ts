@@ -253,37 +253,37 @@ const server = new Server(
 const UNIT_SCHEMA_PROPERTIES = {
   units: {
     type: 'string' as const,
-    description: 'Unit system for output: "imperial" (°F, mph, inHg) or "metric" (°C, km/h, hPa). Defaults to the server setting (imperial unless configured otherwise). Individual *_unit overrides below take precedence.',
+    description: 'Unit system for output. Defaults to the server setting; individual *_unit overrides take precedence.',
     enum: ['imperial', 'metric']
   },
   temperature_unit: {
     type: 'string' as const,
-    description: 'Override temperature unit: "F" or "C".',
+    description: 'Override the temperature unit.',
     enum: ['F', 'C']
   },
   wind_speed_unit: {
     type: 'string' as const,
-    description: 'Override wind speed unit: "mph", "kmh", "ms", or "kn" (knots).',
+    description: 'Override the wind speed unit ("kn" is knots).',
     enum: ['mph', 'kmh', 'ms', 'kn']
   },
   precipitation_unit: {
     type: 'string' as const,
-    description: 'Override precipitation unit: "inch" or "mm".',
+    description: 'Override the precipitation unit.',
     enum: ['inch', 'mm']
   },
   pressure_unit: {
     type: 'string' as const,
-    description: 'Override pressure unit: "inHg" or "hPa".',
+    description: 'Override the pressure unit.',
     enum: ['inHg', 'hPa']
   },
   distance_unit: {
     type: 'string' as const,
-    description: 'Override distance/visibility/elevation unit: "mi" or "km".',
+    description: 'Override the distance, visibility and elevation unit.',
     enum: ['mi', 'km']
   },
   time_format: {
     type: 'string' as const,
-    description: 'Clock format for times: "12h" or "24h".',
+    description: 'Clock format for times.',
     enum: ['12h', '24h']
   }
 };
@@ -305,23 +305,23 @@ const DEFAULT_LOCATION_HINT = getDefaultLocation()
 const LOCATION_SCHEMA_PROPERTIES = {
   latitude: {
     type: 'number' as const,
-    description: `Latitude of the location (-90 to 90). Not required if location_name or city_name is provided.${DEFAULT_LOCATION_HINT}`,
+    description: `Latitude (-90 to 90). Not required if location_name or city_name is provided.${DEFAULT_LOCATION_HINT}`,
     minimum: -90,
     maximum: 90
   },
   longitude: {
     type: 'number' as const,
-    description: 'Longitude of the location (-180 to 180). Not required if location_name or city_name is provided.',
+    description: 'Longitude (-180 to 180). Not required if location_name or city_name is provided.',
     minimum: -180,
     maximum: 180
   },
   location_name: {
     type: 'string' as const,
-    description: 'Name of a saved location (e.g., "home", "cabin"). Use instead of coordinates to reference a saved location. List them with list_saved_locations.'
+    description: 'A saved location alias, e.g. "home". List them with list_saved_locations.'
   },
   city_name: {
     type: 'string' as const,
-    description: 'Free-text place name to geocode (e.g., "Paris, France", "Bend, Oregon"). Use instead of coordinates when you only have a place name and it is not a saved location. Include state/country for disambiguation when possible.'
+    description: 'A place name to geocode, e.g. "Paris, France". Include state or country to disambiguate.'
   }
 };
 
@@ -331,7 +331,7 @@ const LOCATION_SCHEMA_PROPERTIES = {
 const DETAIL_SCHEMA_PROPERTY = {
   detail: {
     type: 'string' as const,
-    description: 'Output verbosity: "summary" (shortest), "standard" (default, balanced), or "full" (everything the source provides, e.g. full alert descriptions, uncapped hourly forecast, embedded imagery).',
+    description: 'Output verbosity: "summary" (shortest), "standard" (default, balanced), or "full" (everything the source provides).',
     enum: ['summary', 'standard', 'full']
   }
 };
@@ -342,7 +342,7 @@ const DETAIL_SCHEMA_PROPERTY = {
 export const TOOL_DEFINITIONS = {
   get_forecast: {
     name: 'get_forecast' as const,
-    description: 'Get future weather forecast for a location (global coverage). Use this for upcoming weather predictions (e.g., "tomorrow", "this week", "next 7 days", "hourly forecast"). Returns forecast data including temperature, precipitation, wind, conditions, and sunrise/sunset times. Supports both daily and hourly granularity. Automatically selects best data source: NOAA for US locations (more detailed), Open-Meteo for international locations. For current weather, use get_current_conditions. For past weather, use get_historical_weather. Provide the location in ONE of three ways: coordinates (latitude+longitude), a saved location name (location_name="home"), or a free-text city name (city_name="Paris, France") which is geocoded automatically. Can compare multiple global weather models with compare_models=true to gauge forecast confidence, or ensemble_spread=true for one model\'s own spread. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get future weather forecast for a location. Use this for upcoming weather predictions (e.g., "tomorrow", "this week", "next 7 days", "hourly forecast"). Automatically selects the best data source: NOAA for US locations (more detailed), Open-Meteo for international locations. For current weather, use get_current_conditions. For past weather, use get_historical_weather.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -372,12 +372,12 @@ export const TOOL_DEFINITIONS = {
         },
         include_normals: {
           type: 'boolean' as const,
-          description: 'Include climate normals (30-year averages) for comparison with forecasted temperatures (default: false, daily forecasts only). Shows normal high/low and departure from normal for the first forecast day. For US locations, also shows the record high/low for the date and the year it was set.',
+          description: 'Include climate normals (30-year averages) for comparison with forecasted temperatures, plus US daily records (default: false, daily forecasts only).',
           default: false
         },
         include_astronomy: {
           type: 'boolean' as const,
-          description: 'Include astronomy details for each forecast day (default: false, daily forecasts only). Use when asked about the moon phase, a full moon or new moon, moonrise/moonset, golden hour, twilight, or "when does it get dark". Adds moon phase, illumination, moonrise/moonset, civil/nautical/astronomical twilight times, and the next full/new moon dates.',
+          description: 'Include astronomy details for each forecast day (default: false, daily forecasts only). Use when asked about the moon phase, a full moon or new moon, moonrise/moonset, golden hour, twilight, or "when does it get dark".',
           default: false
         },
         source: {
@@ -405,7 +405,7 @@ export const TOOL_DEFINITIONS = {
 
   get_current_conditions: {
     name: 'get_current_conditions' as const,
-    description: 'Get the most recent weather observation for a location (global coverage). Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns NOAA station observations for US locations and Open-Meteo model data for international locations. Optionally includes fire weather indices: NOAA fire-weather indices (Haines Index, Grassland Fire Danger, Red Flag Threat) for US locations, or a computed Fosberg Fire Weather Index with dryness context elsewhere, when requested. Automatically includes frostbite-risk and heat-stress (WBGT) context when conditions are extreme. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For specific past dates or date ranges, use get_historical_weather instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get the most recent weather observation for a location. Use this for current weather or when asking about "today\'s weather", "right now", or recent conditions without a specific historical date range. Returns NOAA station observations for US locations and Open-Meteo model data for international locations. Automatically includes frostbite-risk and heat-stress (WBGT) context when conditions are extreme. For specific past dates or date ranges, use get_historical_weather instead.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -417,7 +417,7 @@ export const TOOL_DEFINITIONS = {
         },
         include_normals: {
           type: 'boolean' as const,
-          description: 'Include climate normals (30-year averages) for comparison with current conditions (default: false). Shows normal high/low temperatures and precipitation, with departure from normal. For US locations, also shows the record high/low for the date and the year it was set.',
+          description: 'Include climate normals (30-year averages) for comparison with current conditions, plus US daily records (default: false).',
           default: false
         },
         source: {
@@ -434,7 +434,7 @@ export const TOOL_DEFINITIONS = {
 
   get_alerts: {
     name: 'get_alerts' as const,
-    description: 'Get active weather alerts, watches, warnings, and advisories for a location. Coverage: the United States (NOAA), Canada (Environment and Climate Change Canada), European MeteoAlarm member countries (official national warnings, matched at country level — regional filtering within a European country is not yet available), and India (NDMA SACHET), the Philippines (PAGASA), and Indonesia (BMKG) via their official national CAP feeds — matched to your exact point by the alert polygon in the Philippines and Indonesia, and listed at country level with an explicit note in India, whose geometry is published from a separate endpoint that is not reliably reachable — and Japan (JMA), matched to your exact point by warning area. All of the above are keyless. With an optional `GOOGLE_WEATHER_API_KEY`, official alerts are also available for ~45+ more territories (Australia, Brazil, Mexico, and others) via the Google Weather API. Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". Returns severity, urgency, certainty, effective/expiration times, and affected areas where the source provides them. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For forecast data, use get_forecast instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability.',
+    description: 'Get active weather alerts, watches, warnings, and advisories for a location. Coverage: the United States (NOAA), Canada (Environment and Climate Change Canada), European MeteoAlarm member countries, Japan (JMA), and the official national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG). All of the above are keyless. With an optional `GOOGLE_WEATHER_API_KEY`, official alerts are also available for ~45+ more territories (Australia, Brazil, Mexico, and others) via the Google Weather API. Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". For forecast data, use get_forecast instead.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -452,7 +452,7 @@ export const TOOL_DEFINITIONS = {
 
   get_historical_weather: {
     name: 'get_historical_weather' as const,
-    description: 'Get historical weather data for a specific date range in the past. Use this when the user asks about weather on specific past dates (e.g., "yesterday", "last week", "November 4, 2024", "30 years ago"). Automatically uses NOAA API for recent dates (last 7 days, US only) or Open-Meteo API for older dates (worldwide, back to 1940). Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. Do NOT use for current conditions - use get_current_conditions instead. If this tool returns an error, check the error message for status page links and consider using check_service_status to verify API availability. Dates are interpreted as UTC calendar days; for US timezones the range may include the prior local evening.',
+    description: 'Get historical weather data for a specific date range in the past. Use this when the user asks about weather on specific past dates (e.g., "yesterday", "last week", "November 4, 2024", "30 years ago"). Automatically uses NOAA API for recent dates (last 7 days, US only) or Open-Meteo API for older dates (worldwide, back to 1940). Do NOT use for current conditions - use get_current_conditions instead. Dates are interpreted as UTC calendar days; for US timezones the range may include the prior local evening.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -480,7 +480,7 @@ export const TOOL_DEFINITIONS = {
 
   get_weather_summary: {
     name: 'get_weather_summary' as const,
-    description: 'Get a combined weather overview for a location in a SINGLE call. Best for broad questions like "What\'s the weather like in Seattle?", "Is it safe to hike today?", or "Give me a weather rundown". Aggregates current conditions, forecast, and active alerts by default, and can also include air quality and lightning. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For a single specific data product (just the forecast, just alerts, etc.), call that specialized tool directly. Sections that are unavailable for a location (e.g. alerts in a country not yet covered) are noted rather than failing the whole summary.',
+    description: 'Get a combined weather overview for a location in a SINGLE call — current conditions, forecast and alerts, optionally air quality and lightning. Best for broad questions like "What\'s the weather like in Seattle?", "Is it safe to hike today?", or "Give me a weather rundown". For a single specific data product (just the forecast, just alerts, etc.), call that specialized tool directly. Sections that are unavailable for a location (e.g. alerts in a country not yet covered) are noted rather than failing the whole summary.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -509,7 +509,7 @@ export const TOOL_DEFINITIONS = {
 
   check_service_status: {
     name: 'check_service_status' as const,
-    description: 'Check the operational status of the NOAA and Open-Meteo weather APIs. Use this when experiencing errors or to proactively verify service availability before making weather data requests. Returns current status, helpful messages, and links to official status pages.',
+    description: 'Check whether the upstream weather APIs (NOAA, Open-Meteo) are reachable. Call this after any weather tool returns an error, or before a batch of requests. Returns per-service status and links to the official status pages.',
     inputSchema: {
       type: 'object' as const,
       properties: {},
@@ -519,7 +519,7 @@ export const TOOL_DEFINITIONS = {
 
   search_location: {
     name: 'search_location' as const,
-    description: 'Search for locations by name to get coordinates for weather queries. Uses Nominatim (OpenStreetMap) for excellent coverage of cities, towns, villages, and hamlets worldwide. Use this when the user provides a location name instead of coordinates (e.g., "Paris", "New York", "Tokyo", "San Francisco, CA", "Small Village, County"). Returns location matches with coordinates, timezone, elevation, and other metadata. Enables natural language location queries like "What\'s the weather in Paris?" by converting location names to coordinates.',
+    description: 'Search for locations by name and get their coordinates. Uses Nominatim (OpenStreetMap) for coverage of cities, towns, villages and hamlets worldwide. The weather tools geocode city_name themselves, so use this to disambiguate an ambiguous place name or to show the candidate matches (e.g., "Springfield", "San Francisco, CA", "Small Village, County") — not as a required first step before a weather call.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -541,7 +541,7 @@ export const TOOL_DEFINITIONS = {
 
   get_air_quality: {
     name: 'get_air_quality' as const,
-    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location (global coverage). Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", "pollen count", "allergy day", or health-related environmental conditions. Returns current conditions and an optional forecast grouped by day (up to 7 days / 168 hours via forecast_days). Shows appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. Pollutants include PM2.5, PM10, ozone, NO2, SO2, and CO. For European locations, current pollen levels (alder, birch, grass, mugwort, olive, ragweed) are included automatically in grains/m³ and no API key is required; elsewhere, a grass/tree/weed Universal Pollen Index (0–5) is included when an optional GOOGLE_POLLEN_API_KEY is configured; without that key, pollen data is not available outside Europe. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name.',
+    description: 'Get air quality data including AQI (Air Quality Index), pollutant concentrations, and UV index for a location, worldwide. Use this when asked about "air quality", "pollution", "AQI", "UV index", "safe to exercise outside", "pollen count", "allergy day", or health-related environmental conditions. Shows the appropriate AQI scale (US AQI for US locations, European EAQI elsewhere) with health recommendations. In Europe, pollen is included automatically in grains/m³ with no API key; elsewhere a grass/tree/weed Universal Pollen Index (0–5) is included only when an optional GOOGLE_POLLEN_API_KEY is configured, and without that key pollen is not available outside Europe.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -565,7 +565,7 @@ export const TOOL_DEFINITIONS = {
 
   get_marine_conditions: {
     name: 'get_marine_conditions' as const,
-    description: 'Get marine conditions including wave height, swell, ocean currents, and sea state for a location (global coverage). Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Returns current conditions and an optional daily forecast (up to 16 days via forecast_days; the marine model typically provides ~10 days). Includes significant wave height, wind waves, swell, wave period, and ocean currents. Shows safety assessment for maritime activities. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
+    description: 'Get marine conditions including wave height, swell, ocean currents and sea state for any ocean or coastal point worldwide. Use this when asked about "ocean conditions", "wave height", "surf conditions", "safe to boat", "marine forecast", "swell", or "sea state". Shows a safety assessment for maritime activities. NOTE: Data has limited accuracy in coastal areas and is NOT suitable for coastal navigation - always consult official marine forecasts.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -589,7 +589,7 @@ export const TOOL_DEFINITIONS = {
 
   get_weather_imagery: {
     name: 'get_weather_imagery' as const,
-    description: 'Get weather imagery including radar, satellite, and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Returns image URLs with timestamps for current or animated weather visualization, plus an interactive-map link for viewing the imagery over a base map in a browser. Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. By default returns direct image URLs; use detail="full" to embed Markdown images and list every animation frame (lower detail levels show 3 representative frames of longer animations). Use composite=true for radar/precipitation to also receive a finished map image — the radar overlay rendered onto a base map with a location marker — as an image content block you can look at and describe. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. For numerical forecast data, use get_forecast instead.',
+    description: 'Get weather imagery including radar, satellite and precipitation maps for a location. Use this when asked about "show radar", "satellite image", "precipitation map", "weather map", "animated radar", or "what does radar show". Precipitation/radar is global via RainViewer; satellite is GOES GeoColor (Western Hemisphere) via NASA GIBS. For numerical forecast data, use get_forecast instead.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -607,7 +607,7 @@ export const TOOL_DEFINITIONS = {
         },
         composite: {
           type: 'boolean' as const,
-          description: 'Return a finished radar map — the radar overlay composited onto a NASA GIBS base map with a marker at the requested location — as an MCP image content block alongside the text. Radar/precipitation only, and the latest frame only (animation stays URL-based). You always receive the image and can describe what it shows; whether it displays inline depends on the client. Default: false',
+          description: 'Return a finished radar map — the overlay rendered onto a base map with a marker — as an MCP image content block alongside the text. Radar/precipitation only, and the latest frame only (animation stays URL-based). You always receive the image and can describe it; whether it displays inline depends on the client. Default: false',
           default: false
         },
         ...DETAIL_SCHEMA_PROPERTY
@@ -618,7 +618,7 @@ export const TOOL_DEFINITIONS = {
 
   get_lightning_activity: {
     name: 'get_lightning_activity' as const,
-    description: 'Get real-time lightning strike activity and safety assessment for a location (global coverage). Use this when asked about "lightning nearby", "lightning strikes", "thunderstorm activity", "is it safe from lightning", or "lightning danger". Returns recent strikes within specified radius and time window, including distance, polarity, intensity, and critical safety recommendations. Provides 4-level safety assessment (safe/elevated/high/extreme) based on proximity. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for outdoor activities and severe weather monitoring.',
+    description: 'Get real-time lightning strike activity and a safety assessment for a location, worldwide. Use this when asked about "lightning nearby", "lightning strikes", "thunderstorm activity", "is it safe from lightning", or "lightning danger". Provides a 4-level safety assessment (safe/elevated/high/extreme) based on proximity. SAFETY-CRITICAL tool for outdoor activities and severe weather monitoring.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -645,7 +645,7 @@ export const TOOL_DEFINITIONS = {
 
   get_river_conditions: {
     name: 'get_river_conditions' as const,
-    description: 'Monitor river levels and flood status for a location (global coverage). Use this when asked about "river flooding", "river level", "flood stage", "streamflow", "safe to kayak", or "river conditions". Three data modes: for US locations, returns NOAA NWPS gauge observations within the search radius — river stage, flow rate, official flood categories (action/minor/moderate/major), crest history, and forecasts. In Great Britain, returns Environment Agency gauge observations — observed river level and the published typical range where one exists, with no forecast and no flood categories. Everywhere else, returns Open-Meteo Flood API (GloFAS v4) modeled river discharge in m³/s, snapped to the nearest modeled river channel and presented against its own recent history and forecast ensemble; no official flood-stage thresholds exist for model data. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for flood-prone areas and water recreation.',
+    description: 'Monitor river levels and flood status for a location, worldwide. Use this when asked about "river flooding", "river level", "flood stage", "streamflow", "safe to kayak", or "river conditions". Three data modes: US locations return NOAA NWPS gauge observations within the search radius, with official flood categories and forecasts. Great Britain returns Environment Agency gauge observations, with no forecast and no flood categories. Everywhere else returns Open-Meteo Flood (GloFAS v4) modeled river discharge in m³/s, snapped to the nearest modeled river channel; no official flood-stage thresholds exist for model data. SAFETY-CRITICAL tool for flood-prone areas and water recreation.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -678,7 +678,7 @@ export const TOOL_DEFINITIONS = {
 
   get_wildfire_info: {
     name: 'get_wildfire_info' as const,
-    description: 'Monitor active wildfires and fire activity for a location, worldwide. Use this when asked about "wildfires nearby", "fire danger", "active fires", "wildfire smoke", "fire perimeters", or "evacuation risk". Two data modes routed by country: US locations return NIFC named incidents (fire name, size in acres, containment percentage, distance, safety assessment); locations outside the US return NASA FIRMS satellite heat detections (VIIRS, near real-time), clustered with count, distance, bearing, intensity (fire radiative power), and a safety assessment — no fire names or containment exist in satellite data, and detections can include industrial heat sources or agricultural burns. Provides critical evacuation awareness and air quality impact information. Provide the location as coordinates (latitude+longitude), a saved location_name, or a free-text city_name. SAFETY-CRITICAL tool for wildfire-prone areas.',
+    description: 'Monitor active wildfires and fire activity for a location, worldwide. Use this when asked about "wildfires nearby", "fire danger", "active fires", "wildfire smoke", "fire perimeters", or "evacuation risk". Two data modes routed by country: US locations return NIFC named incidents; locations outside the US return NASA FIRMS satellite heat detections (VIIRS, near real-time), clustered by proximity — no fire names or containment exist in satellite data, and detections can include industrial heat sources or agricultural burns. SAFETY-CRITICAL tool for wildfire-prone areas.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -711,7 +711,7 @@ export const TOOL_DEFINITIONS = {
 
   save_location: {
     name: 'save_location' as const,
-    description: 'Save a location for easy reuse in weather queries. Use this when a user wants to save a frequently used location like "home", "work", "cabin", or "aunt lisa\'s house". Accepts either a location query (which will be geocoded automatically) or direct coordinates. Saved locations can be used with all weather tools by providing location_name instead of coordinates. Makes it easy to ask "What\'s the weather forecast at home?" without repeatedly providing coordinates. SMART UPDATES: If the alias already exists, any field you omit is preserved (including description, alternateNames, and notes) — provide only what you want to change (e.g. just name/activities, without location details, to update those while preserving coordinates and metadata). Pass an empty value ("" or []) to explicitly clear a field.',
+    description: 'Save a location for easy reuse in weather queries. Use this when a user wants to save a frequently used location like "home", "work", "cabin", or "aunt lisa\'s house". Accepts either a location query (which will be geocoded automatically) or direct coordinates. Saved locations can then be used with any weather tool by providing location_name instead of coordinates. SMART UPDATES: If the alias already exists, any field you omit is preserved (including description, alternateNames, and notes) — provide only what you want to change (e.g. just name/activities, without location details, to update those while preserving coordinates and metadata). Pass an empty value ("" or []) to explicitly clear a field.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -769,7 +769,7 @@ export const TOOL_DEFINITIONS = {
 
   list_saved_locations: {
     name: 'list_saved_locations' as const,
-    description: 'List all saved locations. Use this when a user wants to see their saved locations or asks "what locations do I have saved?" or "show my saved places". Returns all saved locations with their aliases, names, coordinates, and other metadata. Helpful for reminding users what location names they can use with weather tools.',
+    description: 'List all saved locations. Use this when a user wants to see their saved locations or asks "what locations do I have saved?" or "show my saved places". Helpful for reminding users what location names they can use with weather tools.',
     inputSchema: {
       type: 'object' as const,
       properties: {},
