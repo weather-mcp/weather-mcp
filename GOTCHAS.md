@@ -4515,6 +4515,99 @@ lintable — it is a property of a CDN, not of the code.
 
 ---
 
+## G85 — A handler that forwards `...args` to a sibling handler passes keys the forwarding tool never declared
+
+**Trigger:** adding a parameter to a tool whose handler is also reached through
+a composite tool (`get_weather_summary` fans out to the forecast, current-
+conditions and alerts handlers), or reading a composite's pass-through spread.
+
+**Rule:** a composite handler that builds its sub-call arguments with a raw
+spread forwards **every** key the caller sent, including ones absent from the
+composite's own `inputSchema`. `src/index.ts` does no per-tool schema
+validation, so an undeclared key is not rejected at the boundary — it arrives
+at the sub-handler and behaves exactly as if the sub-tool had been called with
+it. When you add a parameter to a fanned-out handler, decide explicitly whether
+the composite should expose it, null it out, or inherit it silently, and write
+the answer down. Do not assume the composite's schema is the gate; it is not.
+
+**Why:** the composite's schema reads as a contract and is not one, so the
+reachable surface is larger than the declared surface and nothing says so. The
+gap is invisible from either end — the sub-handler sees a normal argument, and
+the composite's schema looks complete — which means the behaviour is discovered
+by a user, not by a test or a reviewer reading one file.
+
+**Verify:**
+
+```bash
+grep -n 'subArgs' src/handlers/weatherSummaryHandler.ts
+```
+
+The spread plus an explicit null-out list is the shape: whatever is **not** in
+that list is forwarded. Compare it against `get_weather_summary`'s
+`inputSchema.properties` in `src/index.ts` — every key in the second that is
+not nulled in the first is declared, and every key in neither is an
+undeclared pass-through.
+
+**Evidence:** 2026-09-08, `codex-MAJOR-1` on the forecast-auto-source-contract
+diff review, downgraded to minor and deferred at triage. `weatherSummaryHandler.ts`
+nulls only `location_name`, `city_name`, `compare_models` and `ensemble_spread`,
+so `granularity` — never declared on `get_weather_summary` — reaches the
+forecast handler and produces an hourly forecast inside a summary. The spread
+dates to `1e960b9` (2026-07-13), so this pre-dates the branch that found it by
+two months; v1.29.0's new hourly source note simply made the path visible, where
+it is correct about the product it labels. Removing the capability is a scope
+decision, not a bug fix, which is why the entry is here rather than a patch.
+
+**Status:** active. Related: [G19] (the sub-handler contract a composite
+inherits without restating). Partially lintable — a test could assert that the
+null-out list plus the declared properties covers every key any sub-handler
+reads, but nothing does today.
+
+---
+
+## G86 — A captured example stamps the version in `package.json` at capture time, which is never the version it ships under
+
+**Trigger:** reading a version number inside `examples/`, or deciding whether
+`npm run examples` needs to run during `/release`.
+
+**Rule:** `scripts/capture-examples.mjs:326` interpolates
+`require('./package.json').version` into each file's `*Captured <date> with
+weather-mcp v<version>*` footer. During feature work that is the **previous**
+release's number — the code that rendered the output is unreleased and has no
+number yet — and after `/release` bumps the version it is stale in the other
+direction unless the captures are regenerated, which drifts every file against
+live upstreams. Read the stamp as *"captured on this date, from a tree at
+roughly this version"*, never as a claim that the shipped release renders it.
+The stamps across `examples/` are legitimately mixed and are not a defect.
+
+**Why:** it invites two opposite wrong conclusions. A reader who trusts the
+stamp will check out the named tag, find code that cannot produce the captured
+output, and conclude the example is fabricated. A release operator who tries to
+fix it by regenerating pays fresh live drift across every capture — and here
+specifically reintroduces trailing-whitespace bytes, because
+`forecastHandler.ts:624` renders `${period.windSpeed} ${period.windDirection}`
+and NOAA sends an empty direction at 0 mph, so `git diff --check` goes red.
+
+**Verify:**
+
+```bash
+grep -rn 'Captured .* with weather-mcp v' examples/ | sed 's/.*weather-mcp //'
+```
+
+More than one version across the set is the normal, expected state.
+
+**Evidence:** 2026-09-08, `codex-MINOR-2` on the forecast-auto-source-contract
+diff review, deferred at triage and dispositioned at `/release` v1.29.0 as
+**ship as captured**. `git show v1.28.1:src/handlers/forecastHandler.ts` still
+reads the dead `properties.updated`, so the two files stamped `v1.28.1` quote
+output that tag cannot render; the other seven read `v1.25.18`.
+
+**Status:** active. Related: [G12] (the doc anchors a release rewrites),
+[G11] (read the real output). Not lintable — the stamp is honest about capture
+time and wrong only if read as a release claim.
+
+---
+
 ---
 
 ## Graveyard
