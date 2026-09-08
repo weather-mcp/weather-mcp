@@ -67,8 +67,35 @@ const TORONTO = { latitude: 43.6532, longitude: -79.3832 };
 const TIMEZONE = 'America/Los_Angeles';
 
 /** The one substring the T2 note is guaranteed to contain and nothing else in
- * the codebase renders (GOTCHAS G62). */
+ * the codebase renders (GOTCHAS G62). Used for the `not.toContain` absence
+ * assertions, where the cheapest unique probe is the right instrument. */
 const NOTE_ANCHOR = 'human-adjusted grid product';
+
+/** The note, verbatim. The presence assertions lock THIS, not `NOTE_ANCHOR`.
+ *
+ * Locking only the anchor is what let a wrong sentence ship green: the note
+ * once read "each value is a probability over the whole grid box" while
+ * rendering directly above a temperature and a wind speed, and every test
+ * here passed because the anchor was still in it. A diff-review leg proved
+ * the gap by reducing the production line to the anchor alone with all eight
+ * tests still green. The whole sentence is the contract — its scope, its
+ * cadence clause and its escape hatch are each load-bearing (see
+ * NOTE_CLAIMS) — so the whole sentence is what gets asserted. */
+const NOTE_SENTENCE =
+  `*NOAA's hourly forecast is a human-adjusted grid product: its precipitation ` +
+  `probability is a chance over the whole grid box, republished on the ` +
+  `forecaster's cadence rather than the model's. For a faster-cadence model ` +
+  `view use source: "openmeteo".*`;
+
+/** The individually load-bearing claims, so a reword that silently drops one
+ * fails on that claim rather than on an opaque whole-string mismatch. */
+const NOTE_CLAIMS: ReadonlyArray<readonly [string, string]> = [
+  ['names the product as human-adjusted', 'human-adjusted grid product'],
+  ['scopes the probability to precipitation', 'precipitation probability'],
+  ['keeps the grid-box scope', 'over the whole grid box'],
+  ["names the forecaster's cadence", "republished on the forecaster's cadence"],
+  ['offers the openmeteo alternative', 'use source: "openmeteo"'],
+];
 
 function textOf(result: { content: Array<{ type: string; text: string }> }): string {
   return result.content.map(b => b.text).join('\n');
@@ -226,7 +253,7 @@ describe('get_forecast — NOAA hourly source-character note (T4)', () => {
     const result = await callForecast({ ...US_COORDS, granularity: 'hourly' }, noaa, openMeteo);
     const text = textOf(result);
     expect(text).toContain('# Weather Forecast (Hourly)');
-    expect(text).toContain(NOTE_ANCHOR);
+    expect(text).toContain(NOTE_SENTENCE);
   });
 
   it('is absent on the NOAA path at granularity: "daily"', async () => {
@@ -286,7 +313,30 @@ describe('get_forecast — NOAA hourly source-character note (T4)', () => {
       );
       const text = textOf(result);
       expect(text).toContain('# Weather Forecast (Hourly)');
-      expect(text).toContain(NOTE_ANCHOR);
+      expect(text).toContain(NOTE_SENTENCE);
     }
   );
+
+  it.each(NOTE_CLAIMS)('%s', async (_label, claim) => {
+    const periods = [buildForecastPeriod({})];
+    const noaa = buildNoaaForecastFake(periods);
+    const openMeteo = buildOpenMeteoFake(buildOpenMeteoDailyResponse());
+    const result = await callForecast({ ...US_COORDS, granularity: 'hourly' }, noaa, openMeteo);
+    const text = textOf(result);
+    expect(text).toContain('# Weather Forecast (Hourly)');
+    expect(text).toContain(claim);
+  });
+
+  it('does not generalise the probability claim beyond precipitation', async () => {
+    // The regression this file failed to catch once. The note renders above a
+    // temperature and a wind speed, neither of which is a probability, so an
+    // unscoped claim is false of the lines under it.
+    const periods = [buildForecastPeriod({})];
+    const noaa = buildNoaaForecastFake(periods);
+    const openMeteo = buildOpenMeteoFake(buildOpenMeteoDailyResponse());
+    const result = await callForecast({ ...US_COORDS, granularity: 'hourly' }, noaa, openMeteo);
+    const text = textOf(result);
+    expect(text).toContain(NOTE_ANCHOR);
+    expect(text).not.toContain('each value is a probability');
+  });
 });
