@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.28.1] - 2026-09-08
+
 ### Changed
 
 - **The `tools/list` payload is 23-26% smaller, and no tuned guidance left with it.** Every MCP client puts that payload into model context on every turn, so it is a standing cost on every request, and nothing measured it. The default install now pays **12,987 bytes** instead of 17,458 (~4.4k -> ~3.2k tokens); `standard` **20,961** instead of 26,917; `full`/`all` **30,836** instead of 40,254 (~10k -> ~7.7k tokens). Tool-level description text fell 39%.
@@ -1713,7 +1715,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.1...HEAD
+[1.28.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.0...v1.28.1
 [1.28.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.1...v1.28.0
 [1.27.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.0...v1.27.1
 [1.27.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.26.0...v1.27.0

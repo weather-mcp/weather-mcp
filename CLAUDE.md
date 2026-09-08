@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.28.0 (Production Ready)
+- **Version:** 1.28.1 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -87,7 +87,8 @@ src/
 ├── config/
 │   ├── cache.ts             # Cache TTLs + CACHE_*/API_TIMEOUT_MS parsing
 │   ├── units.ts             # WEATHER_UNITS and per-unit overrides
-│   ├── tools.ts             # ENABLED_TOOLS presets (basic/standard/full) and tool names
+│   ├── tools.ts             # ENABLED_TOOLS presets (basic/standard/full), tool names, and
+│   │                        #   TOOLS_LIST_BYTE_BUDGET — the tools/list size ceiling per preset
 │   ├── defaultLocation.ts   # WEATHER_DEFAULT_LOCATION
 │   ├── api.ts               # Optional API keys (NCEI, FIRMS, Google)
 │   └── displayThresholds.ts # Display logic constants
@@ -601,15 +602,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.28.0 — Production Ready ✅
+- **Version:** 1.28.1 — Production Ready ✅
 - **Test Coverage:** 3,292 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.28.1:** The tools/list payload every MCP client loads into model context is 23-26% smaller, with a test that locks the size
 - **New in v1.28.0:** A life-threatening NWS alert is surfaced above the answer on get_forecast, get_current_conditions and get_weather_summary
 - **New in v1.27.1:** A JMA index revalidation that returns nothing now says so, instead of reporting malformed XML
-- **New in v1.27.0:** Keyless Japanese weather warnings from JMA
 
 ## Useful References
 
@@ -632,7 +633,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-04 (v1.28.0)
+**Last Updated:** 2026-09-08 (v1.28.1)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
