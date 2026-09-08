@@ -4358,6 +4358,56 @@ provenance), [G79] (the same lock's other trap), [G81] (the same release's other
 name-outruns-code instance). Lintable: no — it needs a human to compare prose
 against a projection.
 
+## G83 — Centralizing a per-tool pointer makes it configurable away, and lets its wording outrun the capability it points at
+
+**Trigger:** consolidating guidance repeated across many tool descriptions onto
+one tool ("call X when Y happens"), or widening the wording of a pointer that
+already exists.
+
+**Rule:** before moving a pointer onto one tool, answer both halves. **Reach** —
+can the tool it now lives on be switched off? If a preset or a hand-composed
+`ENABLED_TOOLS` can omit it, the pointer disappears for that install, and the
+model never learns the tool exists. **Span** — does the destination tool's
+*capability* cover everything the new wording claims? A sentence that widens from
+"this tool errored" to "any tool errored" has just promised coverage the handler
+may not have. Bound the claim in its own first clause, name the scope in
+`docs/TOOLS.md`, and file the widening as its own item rather than smuggling it
+into the consolidation.
+
+**Why:** the per-tool form is redundant but self-carrying — each tool's pointer
+ships with that tool, so it is present exactly when it is relevant. Centralizing
+trades bytes in every client's context for a single point of failure that is also
+a *configuration* surface. And the trade is invisible in the default install,
+which is the one anybody tests: every preset here keeps the status tool, so only
+a hand-composed list loses the pointer, and nothing fails loudly when it does.
+
+**Verify:** enumerate the configurations that omit the destination tool and check
+the pointer's reachability in each (the presets *and* a hand-composed list, both
+sides of the change). Then read the destination handler and count the upstreams
+it actually probes against the number the new sentence implies.
+
+**Evidence:** 2026-09-08 (tools-list-slimming, v1.28.1). Four weather tools each
+carried "use `check_service_status` on error"; the clause moved onto
+`check_service_status` itself, which now reads `Call this after any weather tool
+returns an error`. Measured both ways. **Reach:** `ENABLED_TOOLS=get_forecast`
+and `get_forecast,get_alerts` reach the pointer on `main` and not on the branch;
+all four presets keep it. Accepted, because on `main` that pointer named a tool
+the model could not call. **Span:** the sentence now spans 17 tools while
+`src/handlers/statusHandler.ts` probes NOAA and Open-Meteo only, so a RainViewer,
+JMA, NIFC, FIRMS, NWPS or Blitzortung failure is not diagnosable there
+(`codex-DR-3`, deferred to a design item). Worst case is one wasted call
+returning a truthful two-service report, never a false all-clear — which held
+only because the description bounds itself in its first clause, `Check whether
+the upstream weather APIs (NOAA, Open-Meteo) are reachable`. `docs/TOOLS.md` §7
+was still describing the pre-move wording at release and was corrected there
+(`226eb27`).
+
+**Status:** active. Related: [G81], [G82] (the same release's other two), [G12]
+(one edit, every site). Lintable: partly — reach is mechanically checkable by
+dumping `tools/list` per preset; span is not.
+
+---
+
 ---
 
 ## Graveyard
