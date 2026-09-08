@@ -4,7 +4,7 @@
  *
  * The MCP `tools/list` result goes into model context on every turn of every
  * client session, so its byte size is a standing context cost. T1-T4 cut it
- * from 40,212 to 30,812 bytes (`full`) and 17,442 to 12,979 (`basic`) by
+ * from 40,254 to 30,836 bytes (`full`) and 17,458 to 12,987 (`basic`) by
  * removing schema restatement and output enumeration from tool and parameter
  * descriptions. Before this file, nothing in the repo measured that payload
  * and nothing asserted on any tool or parameter description text, so nothing
@@ -12,7 +12,9 @@
  *
  * This file carries three contracts:
  *   1. Budget    — the stringified `tools/list` payload for `basic` and `full`
- *                  stays under TOOLS_LIST_BYTE_BUDGET (src/config/tools.ts).
+ *                  stays under TOOLS_LIST_BYTE_BUDGET (src/config/tools.ts),
+ *                  measured in UTF-8 BYTES. See payloadBytes below for why
+ *                  String.length is the wrong ruler here.
  *   2. Guidance  — a fixed set of hand-tuned phrases survive at a fixed count
  *                  in the `full` payload (tool AND parameter descriptions).
  *   3. Shape     — the params/required/enums/defaults shape of all 17 tools'
@@ -122,31 +124,59 @@ function payloadFor(preset: readonly string[]): string {
   return JSON.stringify(preset.map((name) => DEFS[name]));
 }
 
+/**
+ * The size of a payload in UTF-8 BYTES, which is what TOOLS_LIST_BYTE_BUDGET,
+ * README.md and CHANGELOG.md all claim to state.
+ *
+ * `String.length` counts UTF-16 code units, not bytes, and the descriptions are
+ * full of em-dashes (U+2014 — one code unit, three UTF-8 bytes). On today's text
+ * the two rulers differ by only 8 bytes (`basic`) and 24 (`full`), but the error
+ * grows with every non-ASCII character added and always in the unsafe direction:
+ * `.length` under-reports, so a payload could cross the real ceiling while the
+ * lock still read green.
+ */
+function payloadBytes(preset: readonly string[]): number {
+  return Buffer.byteLength(payloadFor(preset), 'utf8');
+}
+
 describe('tools/list byte budget', () => {
   it(`basic payload stays within TOOLS_LIST_BYTE_BUDGET.basic (${TOOLS_LIST_BYTE_BUDGET.basic})`, () => {
-    const size = payloadFor(PRESETS.basic).length;
+    const size = payloadBytes(PRESETS.basic);
     expect(size, `basic tools/list payload is ${size} bytes, budget is ${TOOLS_LIST_BYTE_BUDGET.basic}`)
       .toBeLessThanOrEqual(TOOLS_LIST_BYTE_BUDGET.basic);
   });
 
   it(`full payload stays within TOOLS_LIST_BYTE_BUDGET.full (${TOOLS_LIST_BYTE_BUDGET.full})`, () => {
-    const size = payloadFor(PRESETS.full).length;
+    const size = payloadBytes(PRESETS.full);
     expect(size, `full tools/list payload is ${size} bytes, budget is ${TOOLS_LIST_BYTE_BUDGET.full}`)
       .toBeLessThanOrEqual(TOOLS_LIST_BYTE_BUDGET.full);
   });
 
   it('all payload (same 17 tools, different order) stays within TOOLS_LIST_BYTE_BUDGET.full', () => {
-    const size = payloadFor(PRESETS.all).length;
+    const size = payloadBytes(PRESETS.all);
     expect(size, `all tools/list payload is ${size} bytes, budget is ${TOOLS_LIST_BYTE_BUDGET.full}`)
       .toBeLessThanOrEqual(TOOLS_LIST_BYTE_BUDGET.full);
   });
 
   // standard is deliberately unbudgeted — measured and reported, not asserted.
   it('standard payload is measured and reported (no assertion — deliberately unbudgeted)', () => {
-    const size = payloadFor(PRESETS.standard).length;
+    const size = payloadBytes(PRESETS.standard);
     // eslint-disable-next-line no-console
     console.log(`standard tools/list payload: ${size} bytes (unbudgeted)`);
     expect(size).toBeGreaterThan(0);
+  });
+
+  // Positive control for the ruler itself. If the payload were pure ASCII the
+  // two metrics would agree, payloadBytes would be indistinguishable from
+  // String.length, and a later "simplification" back to .length would pass
+  // every test above while silently under-reporting again. This asserts the
+  // construct (G62): non-ASCII is present, and bytes exceed code units.
+  it('the payload contains non-ASCII, so bytes and code units genuinely differ', () => {
+    const payload = payloadFor(PRESETS.full);
+    const nonAscii = payload.match(/[^\x00-\x7F]/g) ?? [];
+    expect(nonAscii.length, 'expected non-ASCII characters (em-dashes, degree signs) in the payload')
+      .toBeGreaterThan(0);
+    expect(Buffer.byteLength(payload, 'utf8')).toBeGreaterThan(payload.length);
   });
 });
 

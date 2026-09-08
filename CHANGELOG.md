@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **The `tools/list` payload is 23-26% smaller, and no tuned guidance left with it.** Every MCP client puts that payload into model context on every turn, so it is a standing cost on every request, and nothing measured it. The default install now pays **12,979 bytes** instead of 17,442 (~4.4k -> ~3.2k tokens); `standard` **20,948** instead of 26,894; `full`/`all` **30,812** instead of 40,212 (~10k -> ~7.7k tokens). Tool-level description text fell 39%.
+- **The `tools/list` payload is 23-26% smaller, and no tuned guidance left with it.** Every MCP client puts that payload into model context on every turn, so it is a standing cost on every request, and nothing measured it. The default install now pays **12,987 bytes** instead of 17,458 (~4.4k -> ~3.2k tokens); `standard` **20,961** instead of 26,917; `full`/`all` **30,836** instead of 40,254 (~10k -> ~7.7k tokens). Tool-level description text fell 39%.
 
   What left was text the schema already carried or the first call demonstrates: the location instruction restated on all eleven location-based tools (the four location parameters carry it), the `(global coverage)` tag where a routing clause already said where the tool works, the seven unit overrides restating their own enums, and lists of the fields a result will contain - the pollen species, the river crest history, the FIRMS radiative-power figures, the twilight kinds. All of it is in [`docs/TOOLS.md`](docs/TOOLS.md), which is where per-tool detail belongs.
 
@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`TOOLS_LIST_BYTE_BUDGET` and a test that enforces it.** `src/config/tools.ts` now carries a ceiling for the `basic` and `full` presets, each the measured payload rounded up to the next 1,000 bytes, so growth past one is a deliberate edit of that file rather than a description that quietly grew. `tests/unit/tools-list-budget.test.ts` asserts the budget in-process, pins the sixteen tuned guidance phrases the trim had to protect (four of them by exact count), and fingerprints every tool's parameters, enums and `required` list against `main` - so an accidentally removed parameter fails the gate.
+- **`TOOLS_LIST_BYTE_BUDGET` and a test that enforces it.** `src/config/tools.ts` now carries a ceiling for the `basic` and `full` presets, each the measured payload rounded up to the next 1,000 bytes, so growth past one is a deliberate edit of that file rather than a description that quietly grew. `tests/unit/tools-list-budget.test.ts` asserts the budget in-process, pins the sixteen tuned guidance phrases the trim had to protect (four of them by exact count), and fingerprints every tool's parameters, enums, defaults and `required` list against `main` - so an accidentally removed parameter fails the gate. Sizes throughout are UTF-8 bytes.
 
 ### Fixed
 
