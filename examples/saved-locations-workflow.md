@@ -205,7 +205,7 @@ get_forecast({
 ## Today
 **Temperature:** 72°F
 **Precipitation Chance:** 0%
-**Wind:** 0 mph 
+**Wind:** 0 mph
 **Forecast:** Sunny
 
 Sunny, with a high near 72. North wind around 0 mph.
@@ -213,7 +213,7 @@ Sunny, with a high near 72. North wind around 0 mph.
 ## Tonight
 **Temperature:** 57°F
 **Precipitation Chance:** 0%
-**Wind:** 0 mph 
+**Wind:** 0 mph
 **Forecast:** Partly Cloudy
 
 Partly cloudy, with a low around 57. Northwest wind around 0 mph.
