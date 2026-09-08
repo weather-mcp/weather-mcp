@@ -538,6 +538,26 @@ async function formatNOAAForecast(
     output += `**Updated:** ${formatInTimezone(forecast.properties.updateTime, timezone, 'medium', prefs.timeFormat)}\n`;
   }
   output += `**Showing:** ${periods.length} ${granularity === 'hourly' ? 'hours' : 'periods'}\n\n`;
+  // Say what NOAA's hourly product *is*, so `source: "auto"` is not a silent
+  // meteorological choice. At hourly resolution the two authorities answer
+  // differently enough that the caller needs to know which one spoke: NOAA's
+  // grid is a human-adjusted probability over the whole grid box on the
+  // forecaster's publish cadence (the `**Updated:**` line above is that
+  // cadence), while Open-Meteo serves the raw high-resolution model that also
+  // drives the radar loops users cross-check against. Neither is wrong, so
+  // this discloses rather than re-routes.
+  //
+  // Hourly only — the daily product is the forecaster's own on a cadence that
+  // suits a day-ahead question, and nothing about it is misleading. Not gated
+  // on `detail`, for the same reason the horizon lines below are not: it is a
+  // fact about the upstream product, invariant under verbosity. It lives here
+  // inside `formatNOAAForecast` rather than beside the `isInUS` routing
+  // predicate so it can only render when NOAA actually answered — `isInUS` is
+  // true for Toronto, Vancouver and Windsor, which NOAA rejects and which fall
+  // back to Open-Meteo above (GOTCHAS G53).
+  if (granularity === 'hourly') {
+    output += `*NOAA's hourly forecast is a human-adjusted grid product: each value is a probability over the whole grid box, republished on the forecaster's cadence rather than the model's. For a faster-cadence model view use source: "openmeteo".*\n\n`;
+  }
   // Disclose NOAA's own horizon when the request asked for more than NOAA
   // published. Not gated on `detail` — the horizon is a fact about the upstream
   // product, invariant under verbosity — and every number comes from the
