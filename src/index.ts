@@ -253,37 +253,37 @@ const server = new Server(
 const UNIT_SCHEMA_PROPERTIES = {
   units: {
     type: 'string' as const,
-    description: 'Unit system for output: "imperial" (°F, mph, inHg) or "metric" (°C, km/h, hPa). Defaults to the server setting (imperial unless configured otherwise). Individual *_unit overrides below take precedence.',
+    description: 'Unit system for output. Defaults to the server setting; individual *_unit overrides take precedence.',
     enum: ['imperial', 'metric']
   },
   temperature_unit: {
     type: 'string' as const,
-    description: 'Override temperature unit: "F" or "C".',
+    description: 'Override the temperature unit.',
     enum: ['F', 'C']
   },
   wind_speed_unit: {
     type: 'string' as const,
-    description: 'Override wind speed unit: "mph", "kmh", "ms", or "kn" (knots).',
+    description: 'Override the wind speed unit ("kn" is knots).',
     enum: ['mph', 'kmh', 'ms', 'kn']
   },
   precipitation_unit: {
     type: 'string' as const,
-    description: 'Override precipitation unit: "inch" or "mm".',
+    description: 'Override the precipitation unit.',
     enum: ['inch', 'mm']
   },
   pressure_unit: {
     type: 'string' as const,
-    description: 'Override pressure unit: "inHg" or "hPa".',
+    description: 'Override the pressure unit.',
     enum: ['inHg', 'hPa']
   },
   distance_unit: {
     type: 'string' as const,
-    description: 'Override distance/visibility/elevation unit: "mi" or "km".',
+    description: 'Override the distance, visibility and elevation unit.',
     enum: ['mi', 'km']
   },
   time_format: {
     type: 'string' as const,
-    description: 'Clock format for times: "12h" or "24h".',
+    description: 'Clock format for times.',
     enum: ['12h', '24h']
   }
 };
@@ -305,23 +305,23 @@ const DEFAULT_LOCATION_HINT = getDefaultLocation()
 const LOCATION_SCHEMA_PROPERTIES = {
   latitude: {
     type: 'number' as const,
-    description: `Latitude of the location (-90 to 90). Not required if location_name or city_name is provided.${DEFAULT_LOCATION_HINT}`,
+    description: `Latitude (-90 to 90). Not required if location_name or city_name is provided.${DEFAULT_LOCATION_HINT}`,
     minimum: -90,
     maximum: 90
   },
   longitude: {
     type: 'number' as const,
-    description: 'Longitude of the location (-180 to 180). Not required if location_name or city_name is provided.',
+    description: 'Longitude (-180 to 180). Not required if location_name or city_name is provided.',
     minimum: -180,
     maximum: 180
   },
   location_name: {
     type: 'string' as const,
-    description: 'Name of a saved location (e.g., "home", "cabin"). Use instead of coordinates to reference a saved location. List them with list_saved_locations.'
+    description: 'A saved location alias, e.g. "home". List them with list_saved_locations.'
   },
   city_name: {
     type: 'string' as const,
-    description: 'Free-text place name to geocode (e.g., "Paris, France", "Bend, Oregon"). Use instead of coordinates when you only have a place name and it is not a saved location. Include state/country for disambiguation when possible.'
+    description: 'A place name to geocode, e.g. "Paris, France". Include state or country to disambiguate.'
   }
 };
 
@@ -331,7 +331,7 @@ const LOCATION_SCHEMA_PROPERTIES = {
 const DETAIL_SCHEMA_PROPERTY = {
   detail: {
     type: 'string' as const,
-    description: 'Output verbosity: "summary" (shortest), "standard" (default, balanced), or "full" (everything the source provides, e.g. full alert descriptions, uncapped hourly forecast, embedded imagery).',
+    description: 'Output verbosity: "summary" (shortest), "standard" (default, balanced), or "full" (everything the source provides).',
     enum: ['summary', 'standard', 'full']
   }
 };
