@@ -534,8 +534,8 @@ async function formatNOAAForecast(
   let output = `# Weather Forecast (${granularity === 'hourly' ? 'Hourly' : 'Daily'})\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Elevation:** ${formatElevationFromM(forecast.properties.elevation.value, prefs)}\n`;
-  if (forecast.properties.updated) {
-    output += `**Updated:** ${formatInTimezone(forecast.properties.updated, timezone, 'medium', prefs.timeFormat)}\n`;
+  if (forecast.properties.updateTime) {
+    output += `**Updated:** ${formatInTimezone(forecast.properties.updateTime, timezone, 'medium', prefs.timeFormat)}\n`;
   }
   output += `**Showing:** ${periods.length} ${granularity === 'hourly' ? 'hours' : 'periods'}\n\n`;
   // Disclose NOAA's own horizon when the request asked for more than NOAA

@@ -92,11 +92,11 @@ export interface ForecastPeriod {
  * Response from forecast endpoints
  */
 export interface ForecastProperties {
-  updated: string;
+  updated?: string;
   units: string;
   forecastGenerator: string;
   generatedAt: string;
-  updateTime: string;
+  updateTime?: string;
   validTimes: string;
   elevation: {
     unitCode: string;
