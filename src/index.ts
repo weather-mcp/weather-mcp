@@ -434,7 +434,7 @@ export const TOOL_DEFINITIONS = {
 
   get_alerts: {
     name: 'get_alerts' as const,
-    description: 'Get active weather alerts, watches, warnings, and advisories for a location. Coverage: the United States (NOAA), Canada (Environment and Climate Change Canada), European MeteoAlarm member countries, India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG) via their official national CAP feeds, and Japan (JMA). All of the above are keyless. With an optional `GOOGLE_WEATHER_API_KEY`, official alerts are also available for ~45+ more territories (Australia, Brazil, Mexico, and others) via the Google Weather API. Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". For forecast data, use get_forecast instead.',
+    description: 'Get active weather alerts, watches, warnings, and advisories for a location. Coverage: the United States (NOAA), Canada (Environment and Climate Change Canada), European MeteoAlarm member countries, Japan (JMA), and the official national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG). All of the above are keyless. With an optional `GOOGLE_WEATHER_API_KEY`, official alerts are also available for ~45+ more territories (Australia, Brazil, Mexico, and others) via the Google Weather API. Use this for safety-critical weather information when asked about "any alerts?", "weather warnings?", "is it safe?", "dangerous weather?", or "weather watches?". For forecast data, use get_forecast instead.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -519,7 +519,7 @@ export const TOOL_DEFINITIONS = {
 
   search_location: {
     name: 'search_location' as const,
-    description: 'Search for locations by name to get coordinates for weather queries. Uses Nominatim (OpenStreetMap) for coverage of cities, towns, villages and hamlets worldwide. Use this when the user provides a location name instead of coordinates (e.g., "Paris", "New York", "Tokyo", "San Francisco, CA", "Small Village, County").',
+    description: 'Search for locations by name and get their coordinates. Uses Nominatim (OpenStreetMap) for coverage of cities, towns, villages and hamlets worldwide. The weather tools geocode city_name themselves, so use this to disambiguate an ambiguous place name or to show the candidate matches (e.g., "Springfield", "San Francisco, CA", "Small Village, County") — not as a required first step before a weather call.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -678,7 +678,7 @@ export const TOOL_DEFINITIONS = {
 
   get_wildfire_info: {
     name: 'get_wildfire_info' as const,
-    description: 'Monitor active wildfires and fire activity for a location, worldwide. Use this when asked about "wildfires nearby", "fire danger", "active fires", "wildfire smoke", "fire perimeters", or "evacuation risk". Two data modes routed by country: US locations return NIFC named incidents; locations outside the US return NASA FIRMS satellite heat detections (VIIRS, near real-time), clustered — no fire names or containment exist in satellite data, and detections can include industrial heat sources or agricultural burns. SAFETY-CRITICAL tool for wildfire-prone areas.',
+    description: 'Monitor active wildfires and fire activity for a location, worldwide. Use this when asked about "wildfires nearby", "fire danger", "active fires", "wildfire smoke", "fire perimeters", or "evacuation risk". Two data modes routed by country: US locations return NIFC named incidents; locations outside the US return NASA FIRMS satellite heat detections (VIIRS, near real-time), clustered by proximity — no fire names or containment exist in satellite data, and detections can include industrial heat sources or agricultural burns. SAFETY-CRITICAL tool for wildfire-prone areas.',
     inputSchema: {
       type: 'object' as const,
       properties: {
