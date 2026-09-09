@@ -20,30 +20,6 @@ echo ""
 
 ERRORS=0
 
-# Function to check version in file
-check_version_in_file() {
-  local file=$1
-  local pattern=$2
-  local description=$3
-
-  if [ -f "$file" ]; then
-    local found_version=$(grep -oE "$pattern" "$file" | head -1)
-    if [ -n "$found_version" ]; then
-      if [[ "$found_version" == *"$PACKAGE_VERSION"* ]]; then
-        echo "✅ $description: ${GREEN}$found_version${NC}"
-      else
-        echo "❌ $description: ${RED}$found_version${NC} (expected $PACKAGE_VERSION)"
-        ERRORS=$((ERRORS+1))
-      fi
-    else
-      echo "⚠️  $description: ${YELLOW}Version not found${NC}"
-    fi
-  else
-    echo "❌ $description: ${RED}File not found${NC}"
-    ERRORS=$((ERRORS+1))
-  fi
-}
-
 # Check CLAUDE.md
 CLAUDE_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' CLAUDE.md | head -1)
 if [ -n "$CLAUDE_VERSION" ]; then
