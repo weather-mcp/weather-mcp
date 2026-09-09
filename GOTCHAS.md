@@ -2044,6 +2044,18 @@ by the executing subagent as a Surprise after its first full-suite run went red
 on a test the task had told it did not exist. Confirmed by reading the file: two
 `it` blocks, identical titles, identical defect-naming comments, one per ladder.
 
+**The grep that proved the claim can stop proving it, because of your own work**
+(2026-09-09, `dfde51a`, issue-88-tool-count-source). The design asserted that no
+test said anything about the two release shell scripts, evidenced by
+`grep -rln 'check-doc-versions\|update-docs-for-release' tests/` returning
+nothing. It returned nothing on the base and returns the plan's **own new test
+file** afterwards — whose header comment names both scripts while asserting
+nothing about either. The substantive claim survived; the evidence for it did
+not. Re-run such a grep *before* writing the file, record the base result, and
+expect the post-run result to differ by exactly your own additions — otherwise a
+later reader re-runs it, sees a hit, and cannot tell a documentation comment from
+a real assertion without opening the file.
+
 **Status:** active. **Re-confirmed 2026-09-01** (`f48eda3`,
 openmeteo-nullable-scalar-types T6): the executing subagent pinned
 `wind_wave_peak_period` and missed its `swell_wave_peak_period` twin twenty
@@ -2207,6 +2219,23 @@ plan.
    check until release. The honest resolution is to report which sub-checks pass — tool counts,
    description length, README links, the CHANGELOG link block — rather than to satisfy the
    literal line by breaking [G12].
+
+**A second shape, 2026-09-09** (`dfde51a`, issue-88-tool-count-source T8): a
+**spurious** acceptance check — one that fails on correct code. The plan's
+"Done when" required `grep -rn "as const" scripts/` to return nothing, on the
+reasoning that all three consumers had been counting a `name: '…' as const`
+spelling and none should any more. That is unsatisfiable by construction: the
+module doing the consolidating has to *quote the token it replaced*, both in the
+comment explaining what it replaced and in the regex that matches the block
+terminator `] as const;` in `src/config/tools.ts`. The check came back `3`, and
+all three hits were in the new module. **The generalisation: an acceptance grep
+that bans a token repo-wide will fail the moment the consolidating module must
+name that token.** Scope the ban to everything *except* the new module
+(`--exclude`), or state the invariant the ban was standing in for — here, "no
+consumer re-derives from the `src/index.ts` spelling", which measured 0 outside
+the module and was the thing actually wanted. Vacuous checks pass when they
+should fail; spurious ones fail when they should pass, and the second kind wastes
+a run arguing with correct code.
 
 **Status:** active, **extended twice on 2026-09-01 and again 2026-09-03**. Lint candidate on the vacuous half — a plan-authoring check
 could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
@@ -2788,6 +2817,32 @@ citation `deriveFloodCategory:739` was read as the function definition and re-ba
 (now `:817`). And the long-standing `catch`-boundary citation `:311` was not the
 `catch` at all — that was at `:306` (now `:346`) — but the coverage sentence inside it
 (now `:351`). Caught only by grepping the file to check a number already written down.
+
+**Evidence, 2026-09-09** (`dfde51a`, issue-88-tool-count-source T8): the largest
+sample this entry has. Deleting 24 lines from `check-doc-versions.sh` and editing
+`update-docs-for-release.sh`'s steps 4-5 shifted **18** citations across five
+entries (G12, G14, G15, G38, G42). Every one was re-measured by grepping its
+construct in both the new file and the base. **Four of the eighteen were already
+stale on the base**, before the run touched anything — which is exactly the case
+this entry's Verify line tells you to test for, and it fired at 22%:
+
+- G14's `update-docs-for-release.sh:139` named a line inside the CHANGELOG
+  link-block heredoc, not the suite run. The suite run was at `:154` on the base
+  and is *still* at `:154` — arithmetic would have "corrected" a citation that
+  never needed moving, to a line that was never right.
+- G14's and G15's `:257` was 15 lines short of the checker invocation at `:272`.
+- G12's `README.md:346` was 44 lines short of `:390`, while that same entry's
+  Status line already recorded the comment as having "moved twice (346 → 381)" —
+  the entry knew, and its own Why paragraph kept the oldest value anyway.
+- G12's `update-docs-for-release.sh:219-222` was **mis-attributed rather than
+  merely shifted**: on the base that range is the `CLAUDE.md` sed block, and the
+  `docs/README.md` block it claimed to name was at `:229-232`. No amount of
+  re-basing arithmetic recovers a citation pointing at the wrong construct.
+
+The inverse also happened once and is worth the same weight: the implementation
+plan *predicted* G42's `:167` would be stale, and it was **accurate** — it moved
+only because of the run's own edit. So a plan's guess about which citations have
+rotted is itself a claim to measure, in both directions.
 
 **Status:** active. Related: [G11] (read the real thing rather than trusting a
 derivation), [G46] (a docs task writes the plan's promise rather than the code's
