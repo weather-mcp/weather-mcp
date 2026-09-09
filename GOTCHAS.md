@@ -4960,6 +4960,52 @@ parallel-safe pass. Related: [G89] (the other edge a task graph forgets), [G50].
 
 ---
 
+## G91 — Filtering `commit-identity.sh` through `grep` turns its refusal into silence, and the commit proceeds
+
+**Trigger:** running `.claude/scripts/commit-identity.sh` and piping it through
+`grep`/`awk` to keep the output short — `| grep -E "^class"` — anywhere a command
+is about to commit. Most acutely when the commit targets a **different**
+repository (`--repo <internal-repo>`), which is the case the flag exists for.
+
+**Rule:** the guard's **exit status** is the signal, not a line in its output.
+Capture it: run the script, keep its output, and branch on `$?` — or at minimum
+`grep ... || { echo "IDENTITY CHECK DID NOT RUN"; }`. And run it with the cwd
+**inside the dev-workflow project**, passing `--repo` to name the other
+repository; these scripts anchor on the project, not on their own location or on
+your cwd, so `cd`-ing into the target repo first makes the script refuse.
+
+**Why:** a refusal and a clean pass are indistinguishable through a filter — both
+print no `class` line, and no-output reads as nothing-to-report. The script's
+whole job is to stop a command before it writes, and a `grep` that matches
+nothing is a check that cannot fail ([G41]). The failure is silent in the worst
+place: an identity guard that did not run looks exactly like one that passed, and
+the commit lands either way, because the `&&` is usually on the `git add` rather
+than on the guard.
+
+**Verify:** run the check with a deliberately wrong anchor — from inside a
+directory with no `.claude/dev-workflow.conf` above it — through your usual
+filter. If you see nothing and would have proceeded, the filter is the defect.
+The script prints a multi-line `ERROR: not inside a dev-workflow project.` to
+which `^class` cannot match.
+
+**Evidence:** 2026-09-09 (issue-95-server-factory, `/run-plan` archive step). The
+six in-repo commits were each guarded correctly (`class ok`). The seventh — the
+`Archive plan set` commit in `weather-mcp-internal` — was run after `cd`-ing into
+that repo, so the script exited with `ERROR: not inside a dev-workflow project.`,
+the `| grep -E "^class"` printed nothing, and the commit was made unguarded. It
+happened to carry the right identity (verified afterwards with `git log -1
+--format=%an/%ae/%cn/%ce`, and the check re-run correctly from the project root
+returned `class ok`), so nothing was wrong — but nothing had checked, on the one
+commit of the run that went to a different repository with its own config.
+
+**Status:** active. Lintable in the weak sense that a command body can be grepped
+for `commit-identity.sh` piped into anything; the real fix is for the calling
+command to test the exit status. Related: [G41] (a check that cannot fail), [G47]
+(a control that proves the measurement happened at all), [G28] (a probe that fails
+reporting as a clean negative), [G88] (the other worktree/repo-boundary trap).
+
+---
+
 ---
 
 ## Graveyard
