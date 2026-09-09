@@ -63,16 +63,19 @@ echo "🧪 Checking test count consistency..."
 # parenthetical total is the count the docs quote in both cases, so anchor
 # on it — reading the first number in the line makes one flaky live-network
 # test report a suite of 1 and three phantom doc mismatches.
+# That parse is shared with the release writer through
+# scripts/lib/derived-facts.mjs, so the two scripts cannot disagree about how
+# many tests there are; this script keeps its own pick of the summary line.
 # `|| true` keeps a red suite from aborting the script under `set -e`.
 TEST_OUTPUT=$(npm test 2>&1 || true)
 TEST_SUMMARY=$(echo "$TEST_OUTPUT" | grep -E "Tests[[:space:]]+[0-9]" | tail -1)
-TEST_COUNT=$(echo "$TEST_SUMMARY" | grep -oE '\([0-9]+\)' | tail -1 | tr -d '()')
+TEST_COUNT=$(node scripts/lib/derived-facts.mjs test-count "$TEST_SUMMARY" || true)
 if [ -n "$TEST_COUNT" ]; then
   echo "📊 Actual test count: ${GREEN}${TEST_COUNT}${NC}"
 
   # Documentation can be perfectly consistent while the suite is red — that
   # is a test problem, not a doc problem, so say so without failing here.
-  if echo "$TEST_SUMMARY" | grep -q "failed"; then
+  if node scripts/lib/derived-facts.mjs is-red "$TEST_SUMMARY"; then
     echo "⚠️  ${YELLOW}Test suite is not green${NC} — counts checked against the total; run 'npm test'"
   fi
 
@@ -106,11 +109,13 @@ else
   echo "⚠️  Could not determine test count (npm test failed?)"
 fi
 
-# Check tool count consistency (source of truth: TOOL_DEFINITIONS in src/index.ts)
+# Check tool count consistency (source of truth: TOOL_NAMES in src/config/tools.ts,
+# read through scripts/lib/derived-facts.mjs — the same derivation the release
+# writer and the stress harness use, so the three cannot disagree)
 echo ""
 echo "🔧 Checking tool count consistency..."
-TOOL_COUNT=$(grep -cE "name: '[a-z_]+' as const" src/index.ts)
-echo "📊 Tools defined in src/index.ts: ${GREEN}${TOOL_COUNT}${NC}"
+TOOL_COUNT=$(node scripts/lib/derived-facts.mjs tool-count)
+echo "📊 Tools declared in src/config/tools.ts: ${GREEN}${TOOL_COUNT}${NC}"
 
 check_tool_count() {
   local file=$1
