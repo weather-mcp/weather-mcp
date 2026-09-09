@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.1] - 2026-09-09
+
 ### Changed
 
 - **The release tooling and the stress harness now derive the MCP tool count once, from the source that declares it.** `CLAUDE.md` has said for a long time that `TOOL_NAMES` in `src/config/tools.ts` is the single source of the tool-name set, and `tests/unit/tool-name-parity.test.ts` already pins both `TOOL_DEFINITIONS` and the dispatch to it. The tooling never got that memo. `scripts/check-doc-versions.sh`, `scripts/update-docs-for-release.sh` and `scripts/stress-harness.mjs` each counted a `name: '…' as const` spelling inside `src/index.ts` privately — three independent answers to "how many tools are there", none of them pointed at the declared source, and two of them carrying a comment that named `TOOL_DEFINITIONS` as the source of truth. They agreed on 17, so nothing was wrong; the divergence was latent, and the third copy in the harness was the one neither issue that filed this noticed. All three now call `toolCount()` in the new `scripts/lib/derived-facts.mjs`, which parses the `TOOL_NAMES` block. It parses rather than imports because every import path has a precondition this has none of: `--experimental-strip-types` needs Node 22.6 against a Node 18 floor, and importing the built module needs a build the checker never makes. A fake entry added to the array was shown to move all three consumers to 18 together while the parity test went red and the build stopped compiling. The same module now owns the one parse of the Vitest summary line that the two shell scripts used to do separately — the parenthetical total, plus a `failed` predicate — while each script keeps its own failure posture: the writer still refuses to prepare a release from a red suite, the checker still warns and continues, because documentation can be consistent while the suite is red. One input class changes what the writer writes: on a green suite that *skips* tests, it now records the parenthetical total rather than the passed count, which is the number its own step-9 checker then verifies. The suite skips nothing today. `tests/unit/derived-facts.test.ts` pins the derivation to `TOOL_NAMES` by name, order and count, so the two can no longer drift apart in silence, and a never-called `check_version_in_file` was deleted from the checker. **No tool, parameter or server output moves, and the tool count is 17 before and after.** (`scripts/lib/derived-facts.mjs`, `scripts/check-doc-versions.sh`, `scripts/update-docs-for-release.sh`, `scripts/stress-harness.mjs`, `tests/unit/derived-facts.test.ts`, `GOTCHAS.md`)
@@ -1743,7 +1745,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.1...HEAD
+[1.29.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.0...v1.29.1
 [1.29.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.1...v1.29.0
 [1.28.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.0...v1.28.1
 [1.28.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.1...v1.28.0
