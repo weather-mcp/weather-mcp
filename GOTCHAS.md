@@ -4766,6 +4766,60 @@ lock reading a path that does not exist on a fresh clone), [G82] (a derivation
 whose comment outruns what it projects). Lintable in principle — a grep for
 `\\n` in a `*.mjs` regex would find it — but there is one such parser today.
 
+## G88 — A linked worktree shares `.git/config`, so a `git config` run inside one changes every checkout of the repository
+
+**Trigger:** setting any `git config` value from inside a `git worktree` — most
+often `core.autocrlf`, `core.eol` or a hook path — while probing a portability
+or checkout-shaped question.
+
+**Rule:** a linked worktree isolates the **working tree**, not the
+configuration. `git config <k> <v>` inside one writes the shared `.git/config`
+of the main repository, so it applies to the main checkout and to every other
+worktree from that moment on. Scope the experiment to the worktree with
+`git -c <k>=<v> <command>`, or set it and unset it in the same breath and then
+read `.git/config` back to confirm. Never leave a checkout-affecting setting
+behind at the end of a probe.
+
+**Why:** the damage is delayed and the symptom names the wrong problem. The
+setting does nothing until something is re-checked-out, so the worktree that set
+it behaves correctly and looks clean. The *next* worktree created inherits it,
+checks out the shell scripts with `#!/bin/bash\r` shebangs, and every one of
+them fails as:
+
+```
+env: './scripts/update-docs-for-release.sh': No such file or directory
+```
+
+Exit 127, `No such file or directory`, on a file that plainly exists and is
+executable — the kernel is reporting the missing interpreter `/bin/bash\r`, not
+the missing script. Nothing in that message points at `core.autocrlf`, and
+nothing points back at the worktree three steps earlier that set it.
+
+**Verify:**
+
+```bash
+git worktree add /tmp/probe HEAD && cd /tmp/probe
+git config core.autocrlf true
+grep -n autocrlf "$(git rev-parse --git-common-dir)/config"   # the SHARED config
+```
+
+A hit is the trap. `git config --unset core.autocrlf` and re-read before doing
+anything else.
+
+**Evidence:** 2026-09-09, the `/test-drive` for issue-88-tool-count-source
+(Observation 2). Setting `core.autocrlf true` inside the CRLF probe worktree
+landed six lines into the real repository's `.git/config`; the writer dry-run
+worktree created next inherited it and died at exit 127 with the message above.
+The main working tree was undamaged only because its files were never
+re-checked-out — `file(1)` confirmed LF throughout and `git status` stayed empty.
+A `core.autocrlf` probe is exactly the shape of the next test drive that touches
+[G87]'s parser, so this will recur.
+
+**Status:** active, method-level — there is no code fix, only the scoping
+discipline above. Related: [G87] (the parser that makes a CRLF probe necessary
+in the first place), [G42] (a release tool that mutates before it aborts, which
+is why these probes belong in a throwaway worktree at all).
+
 ---
 
 ---
