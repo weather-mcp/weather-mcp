@@ -46,7 +46,7 @@ runs `build` before `test`; the trap is reading only the second result.
 
 ---
 
-## G2 — Long tool descriptions in `src/index.ts` are single-quoted
+## G2 — Long tool descriptions in `src/server/weatherServer.ts` are single-quoted
 
 **Trigger:** editing any `description:` string in `TOOL_DEFINITIONS`.
 
@@ -58,13 +58,16 @@ Never introduce a raw `'` — rewrite the phrase (`the alert polygon`, not
 and the resulting error points at a *different* line hundreds of lines away
 (the next string literal that gets mis-paired).
 
-**Verify:** `grep -n "description: '" src/index.ts` and confirm none of the
-matched strings contains an unescaped `'`.
+**Verify:** `grep -n "description: '" src/server/weatherServer.ts` and confirm
+none of the matched strings contains an unescaped `'`.
 
 **Evidence:** 2026-08-23 (`e612a74`) — the reported errors were at
-`src/index.ts:783,785,789`, while the actual defect was at `:417`.
+`src/index.ts:783,785,789`, while the actual defect was at `:417` — line numbers
+in the file as it was then.
 
-**Status:** active. Related: [G1].
+**Status:** active; **file moved 2026-09-09** (issue-95) — `TOOL_DEFINITIONS` was
+carried byte-for-byte from `src/index.ts` into `src/server/weatherServer.ts`, so
+the rule is unchanged and only the path moved. Related: [G1].
 
 ---
 
@@ -784,8 +787,8 @@ work, which touches the same dependency block.
 any section `get_weather_summary` can render — `current`, `forecast`, `alerts`,
 `air_quality`, `lightning`.
 
-**Rule:** grep **both** the tool dispatch in `src/index.ts` and the summary's
-own `switch` in `weatherSummaryHandler.ts`. Exercise the change through both
+**Rule:** grep **both** the tool dispatch in `src/server/weatherServer.ts` and
+the summary's own `switch` in `weatherSummaryHandler.ts`. Exercise the change through both
 tools, and document both user-visible consequences. **Read what the summary
 passes down before assuming the sub-tool's own default applies** — it does not
 forward an absent parameter, it substitutes its own.
@@ -830,7 +833,7 @@ path. Both cross-vendor prep-review legs filed it independently as this plan's
 only blocker. Proved by running the built dist both ways: with the parameter
 threaded a Japanese point rendered JMA and Google's `isKeyAvailable()` was never
 called; with it omitted, Google **was** contacted for the same point. So the
-grep is two greps — `src/index.ts` for the dispatch **and**
+grep is two greps — `src/server/weatherServer.ts` for the dispatch **and**
 `weatherSummaryHandler.ts` for the summary switch — and the acceptance check is
 that both chains pass the new argument, not that the build is clean.
 
@@ -908,8 +911,9 @@ the edit. On a plan already at `standard` the floor is satisfied and touching on
 description string buys no extra ceremony. **Check whether the floor is actually
 costing anything before deferring on it.**
 
-**Verify:** for any parameter the summary forwards, `grep -n "description: '" src/index.ts`
-and read the specialized tool's declaration against the summary's. They should
+**Verify:** for any parameter the summary forwards,
+`grep -n "description: '" src/server/weatherServer.ts` and read the specialized
+tool's declaration against the summary's. They should
 express the same constraint or say why they differ.
 
 **Evidence:** raised as `copilot-R1` in the plan review, re-rated to minor by
@@ -1476,9 +1480,10 @@ must never run in parallel. Not lintable.
 
 ## G31 — A new module under `src/` has no changelog bullet to hang off, so the architecture map is missed
 
-**Trigger:** a task adds a file to `src/utils/`, `src/services/`, or `src/config/`
-— especially a small pure helper introduced as an internal refactor rather than
-as a user-visible feature.
+**Trigger:** a task adds a file to `src/utils/`, `src/services/`, `src/config/`
+or `src/server/` — especially a small pure helper introduced as an internal
+refactor rather than as a user-visible feature — **or adds a directory under
+`src/` that the map has no row for at all**.
 
 **Rule:** adding a module is a **docs touch** on `CLAUDE.md`, and the design
 plan's `## Docs impact` must say so. Two edits, not one: a line in the
@@ -1495,8 +1500,10 @@ gate or the release procedure fails. The map simply goes quietly stale, one
 module at a time, and the file that new contributors and AI assistants read first
 stops describing the tree.
 
-**Verify:** `for f in src/utils/*.ts src/services/*.ts src/config/*.ts; do
+**Verify:** `for f in src/utils/*.ts src/services/*.ts src/config/*.ts src/server/*.ts; do
 grep -q "$(basename "$f")" CLAUDE.md || echo "MISSING FROM MAP: $f"; done`
+Extend the glob whenever a new directory appears under `src/` — the loop can only
+report a file in a directory it was told to look in.
 
 **Evidence:** 2026-08-26 (v1.25.2 release, step 4b) — `src/utils/displayBanding.ts`
 shipped on `feat/issue-80-lightning-band-rounding` with a design plan, an impl
@@ -1508,10 +1515,15 @@ same position: it already stated "bands and categories are computed from the
 rounded display value" and now had a shared helper enforcing it, with nothing
 naming it.
 
-**Status:** active. Load-bearing for plans 2 and 3 of the band-rounding sequence,
-which consume this same helper and may add their own. Lintable — the `Verify`
-loop above is a two-line check that belongs in `check-doc-versions.sh`; until it
-is there, it is a manual step in `## Docs impact`.
+**Status:** active; **widened 2026-09-09** (issue-95), which added a whole new
+directory rather than a file in an existing one — `src/server/`. That is the worse
+case for this entry, because the `Verify` loop is a fixed glob list and a directory
+it does not name cannot produce a `MISSING FROM MAP` line: the check passes by not
+looking. The glob now names `src/server/*.ts` and the Trigger says to extend it.
+Also load-bearing for plans 2 and 3 of the band-rounding sequence, which consume
+the same helper and may add their own. Lintable — the `Verify` loop above is a
+two-line check that belongs in `check-doc-versions.sh`; until it is there, it is a
+manual step in `## Docs impact`.
 
 ---
 
@@ -3400,15 +3412,20 @@ the artifact emits, not the one the plan describes).
 ## G61 — Importing anything from `src/index.ts` runs `main()`, because there is no `import.meta.url` guard
 
 **Trigger:** importing any symbol from `src/index.ts` — or from the built
-`dist/index.js` — anywhere: a unit test (`TOOL_DEFINITIONS`, a schema fragment,
-anything added to it later), and equally a throwaway `node -e` one-liner used to
-check what the build produced. The verification one-liner is the easy one to
+`dist/index.js` — anywhere: a unit test, and equally a throwaway `node -e`
+one-liner used to check what the build produced. **Since the factory split
+(issue-95, 2026-09-09) nothing in the tree does this**, and there is little left
+to want: `TOOL_DEFINITIONS`, the schema fragments and the dispatch now live in
+`src/server/weatherServer.ts`, whose import is inert but for the analytics
+singleton. See the **residue** paragraph under the Rule for the two points that
+still apply to *that* import. The verification one-liner is the easy one to
 forget, because it does not feel like a test; it starts a real server, opens an
 MQTT subscription, and does not exit ([G37]). To inspect the built schema, spawn
 the dist as a child and speak JSON-RPC to it, or read the source — never import
 it into the checking process.
 
-**Rule:** `src/index.ts` calls `main()` unconditionally at module scope, so the
+**Rule.** The four points below apply to an import of the **entry**,
+`src/index.ts`. `src/index.ts` calls `main()` unconditionally at module scope, so the
 import *is* a server start: it constructs a `StdioServerTransport`, calls
 `server.connect()`, and registers `SIGTERM`/`SIGINT` handlers. Four things, all
 required together:
@@ -3442,21 +3459,41 @@ required together:
    — `HOME=$(mktemp -d) DOTENV_CONFIG_PATH=/nonexistent npx vitest run <file>` —
    because the repo `.env` masks the write ([G26]).
 
+**Residue — what an import of `src/server/weatherServer.ts` needs instead.** The
+factory constructs no transport, registers no signal handler and calls no
+`process.exit`, so points 1 and 4's first half do not apply and neither does
+`WEATHER_LIGHTNING_PREWARM` (the prewarm stayed in the entry). What survives is
+point 2's **two analytics pins** and point 3. The factory imports `withAnalytics`
+from `src/analytics/index.js`, which re-exports the singleton built at module
+load in `src/analytics/config.ts:193`; `loadAnalyticsConfig()` calls
+`getOrGenerateAnalyticsSalt()` at `:167` regardless of `ANALYTICS_ENABLED`, and a
+fixed `ANALYTICS_SALT` returns at `:94-95` before any filesystem access. So:
+`ANALYTICS_ENABLED='false'` and `ANALYTICS_SALT='<any fixed string>'`, hoisted;
+and import once, statically, never under `vi.resetModules()` — that re-runs
+sixteen service constructors and their `Cache` timers ([G21] point 3).
+
 **Why:** the import is silent when it works and confusing when it does not — a
 real transport reading the worker's stdin produces a hang or a protocol error
 attributed to whatever test happens to be running, not to the import. It is also
 easy to conclude the module is simply untestable and to relocate the symbol
 instead; that is a much larger diff than the four lines above, and unnecessary.
-Everything else in the module is already inert at import: the fifteen service
-constructors do no I/O (`LocationStore` resolves its path and touches nothing
-until a read or write) and `Cache` timers already run throughout the suite.
+Everything else reached by the import is already inert: the sixteen service
+constructors — which since the factory split live in `src/server/weatherServer.ts`,
+reached transitively — do no I/O (`LocationStore`, still constructed by the entry,
+resolves its path and touches nothing until a read or write) and `Cache` timers
+already run throughout the suite.
 Note that `import 'dotenv/config'` (`src/index.ts:9`) means the import **does**
 load the repo's own `.env` ([G26]), so nothing such a test asserts may depend on
 a key or on `ENABLED_TOOLS`.
 
-**Verify:** `tests/unit/tool-name-parity.test.ts` — the first test in the repo to
-import `src/index.ts`, whose header and import block document all four points.
-Delete the `vi.mock` and run it: the worker takes over stdin.
+**Verify:** `tests/unit/tool-name-parity.test.ts` no longer imports the entry, so
+it now verifies the **residue** rather than the four points: delete its two
+`ANALYTICS_*` pins and run it CI-shaped (`HOME=$(mktemp -d)
+DOTENV_CONFIG_PATH=/nonexistent npx vitest run <file>`) — the suite stays green
+and `analytics-salt` appears under the temp `HOME`, which is the whole point (the
+pin's absence is invisible to the assertions and visible only on the filesystem).
+Measured 2026-09-09: 64 bytes, mode 0600. For the four points themselves there is
+no live example left — nothing imports the entry.
 
 **Evidence:** 2026-09-01 (`a4252ca`, tool-name-single-source T3). Until that
 commit **no test imported `src/index.ts` at all**, so the trap had never been
@@ -3471,12 +3508,15 @@ temp `HOME` — the test created `analytics-salt` (64 bytes, mode 0600) on every
 run until the hoisted `ANALYTICS_SALT` of point 2 landed (diff-review copilot
 DR-1, 2026-09-01).
 
-**Status:** active. The standing alternative — relocating `TOOL_DEFINITIONS` into
-its own `src/toolDefinitions.ts` — was considered and rejected for tripling the
-diff and adding a module ([G31]); revisit it if a second test needs a second
-symbol from this file and the mock set has to grow. Related: [G21] (why point 3
-is not optional), [G26] (the `.env` the import loads), [G37] (a driver that
-constructs services and never exits).
+**Status:** active, **narrowed 2026-09-09** (issue-95). The relocation this
+entry's Status once rejected has shipped, as `src/server/weatherServer.ts` — and
+the trigger it named was the wrong one. It said *revisit if a second test needs a
+second symbol from this file*; what actually forced it was a second **transport**,
+which needs a `Server` the caller connects. The entry is **not** retired: the rule
+about the entry is still true of the entry, and it is the reason nothing may import
+it. Related: [G21] (why point 3 is not optional), [G26] (the `.env` the entry
+loads — still exactly one importer), [G37] (a driver that constructs services and
+never exits), [G31] (the new directory this created).
 
 ---
 
@@ -4392,7 +4432,7 @@ for string literals under `tests/` containing `.claude/` or `../..` outside
 ## G80 — The alerts coverage sentence names authorities and mechanisms in one list, and a trim or an insertion silently re-attaches the wrong mechanism
 
 **Trigger:** editing `get_alerts`'s coverage sentence — in
-`src/index.ts`'s `TOOL_DEFINITIONS`, in `docs/TOOLS.md` §`get_alerts`, or in a
+`src/server/weatherServer.ts`'s `TOOL_DEFINITIONS`, in `docs/TOOLS.md` §`get_alerts`, or in a
 `CHANGELOG.md` bullet — whether to add a country or to shorten the list.
 
 **Rule:** each authority must sit with **its own** mechanism, and the mechanism
@@ -4414,7 +4454,7 @@ says "JMA H27 schema, not CAP". The result is a **false coverage claim on the
 safety surface**, produced by an edit that removed text rather than adding any,
 and no test can see it — nothing in `tests/` asserts on description text at all.
 
-**Verify:** `grep -n "CAP" src/index.ts docs/TOOLS.md` and check that every
+**Verify:** `grep -n "CAP" src/server/weatherServer.ts docs/TOOLS.md` and check that every
 country inside a CAP clause is one of IN, PH, ID, and that no other authority
 trails one.
 
@@ -4635,7 +4675,7 @@ conditions and alerts handlers), or reading a composite's pass-through spread.
 
 **Rule:** a composite handler that builds its sub-call arguments with a raw
 spread forwards **every** key the caller sent, including ones absent from the
-composite's own `inputSchema`. `src/index.ts` does no per-tool schema
+composite's own `inputSchema`. `src/server/weatherServer.ts` does no per-tool schema
 validation, so an undeclared key is not rejected at the boundary — it arrives
 at the sub-handler and behaves exactly as if the sub-tool had been called with
 it. When you add a parameter to a fanned-out handler, decide explicitly whether
@@ -4656,7 +4696,7 @@ grep -n 'subArgs' src/handlers/weatherSummaryHandler.ts
 
 The spread plus an explicit null-out list is the shape: whatever is **not** in
 that list is forwarded. Compare it against `get_weather_summary`'s
-`inputSchema.properties` in `src/index.ts` — every key in the second that is
+`inputSchema.properties` in `src/server/weatherServer.ts` — every key in the second that is
 not nulled in the first is declared, and every key in neither is an
 undeclared pass-through.
 
