@@ -6,14 +6,14 @@
  * `criticalAlertBanner?: boolean` and does nothing at all when it is absent.
  * The ONLY thing that turns the feature on for real callers is the literal
  * `true` passed at three arms of the `switch (name)` dispatch in
- * `src/index.ts`. Every handler-level suite passes that flag directly, and
- * `tool-name-parity.test.ts` reads only `case` labels — so before this file,
- * flipping all three literals to `false` disabled the feature for every real
- * caller with the whole suite still green.
+ * `src/server/weatherServer.ts`. Every handler-level suite passes that flag
+ * directly, and `tool-name-parity.test.ts` reads only `case` labels — so
+ * before this file, flipping all three literals to `false` disabled the
+ * feature for every real caller with the whole suite still green.
  *
  * Why a text scrape, again: a `switch` statement has no runtime
- * representation, so no amount of importing `src/index.ts` lets a test
- * enumerate its arms structurally (the same trade-off `tool-name-parity.test.ts`
+ * representation, so no amount of importing `src/server/weatherServer.ts`
+ * lets a test enumerate its arms structurally (the same trade-off `tool-name-parity.test.ts`
  * documents and accepts). This file does not regex the argument list, though —
  * it matches parentheses, so reformatting the call across lines does not break
  * it while removing or negating the flag does.
@@ -26,7 +26,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 
-const SOURCE = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8');
+const SOURCE = readFileSync(new URL('../../src/server/weatherServer.ts', import.meta.url), 'utf8');
 
 /**
  * The full argument text of the first call to `fnName` in `source`, found by
@@ -36,7 +36,7 @@ const SOURCE = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf
 function argumentsOf(source: string, fnName: string): string {
   const open = source.indexOf(`${fnName}(`);
   if (open === -1) {
-    throw new Error(`no call to ${fnName} found in src/index.ts`);
+    throw new Error(`no call to ${fnName} found in src/server/weatherServer.ts`);
   }
   let depth = 0;
   const start = open + fnName.length;

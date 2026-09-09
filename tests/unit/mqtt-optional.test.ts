@@ -224,7 +224,7 @@ describe('optional mqtt dependency resolution (blitzortung.ts)', () => {
     // single-flight guard: by the second call the memo is already `null` and
     // every caller short-circuits before ever touching mqttLoadPromise. This
     // starts several calls without awaiting between them — the shape
-    // src/index.ts:967-969 actually ships (a non-awaiting `void
+    // src/index.ts:64-66 actually ships (a non-awaiting `void
     // prewarmLocation(...)` loop over saved locations) — and holds the
     // mocked import open behind a deferred rejection so all of them are
     // guaranteed to observe the in-flight import before it settles.

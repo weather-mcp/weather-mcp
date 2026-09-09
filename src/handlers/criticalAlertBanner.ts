@@ -157,7 +157,7 @@ const CRITICAL_ALERT_BANNER = Symbol.for('weather-mcp.critical-alert-banner');
  * `get_forecast` and `get_current_conditions` resolve the banner concurrently
  * with the weather body. When the body fails, the warning is the half the
  * caller most needs, so it travels with the error to the one place that renders
- * errors (`src/index.ts`) instead of being dropped. This keeps error formatting
+ * errors (`src/server/weatherServer.ts`) instead of being dropped. This keeps error formatting
  * and error logging at that single site rather than duplicating either here.
  *
  * An empty banner attaches nothing at all, so a failure with no critical alert

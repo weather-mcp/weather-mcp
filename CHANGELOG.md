@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.2] - 2026-09-09
+
+### Changed
+
+- **Tool registration and the dispatch moved out of `src/index.ts` into `src/server/weatherServer.ts`, behind `createWeatherServer({ locationStore })`.** The factory returns an **unconnected** `Server` — the caller chooses the transport — and `src/index.ts` is now a thin stdio wrapper that exports nothing and is the only file in the tree that loads `.env`. That is the load-bearing half: the file whose import starts a server is now a file nothing has a reason to import, so reading `TOOL_DEFINITIONS` or the dispatch in-process no longer costs the ceremony `GOTCHAS.md` G61 describes. The factory is **not** a published API — `package.json` has no `exports` map and `main` stays `dist/index.js`, so the path is reachable, unsupported and undocumented until a consumer exists. The sixteen upstream services stay module-level singletons, so two instances in one process share one set of caches, which is what a per-session transport wants and what per-call construction would forfeit. The entry's shutdown reaches them through one named seam, `clearServiceCaches()`, rather than through two exported singletons. `SERVER_VERSION` now comes from `src/utils/version.ts` instead of a second private `package.json` read, which from `dist/server/` would have resolved to a path that does not exist. The three tests anchored to the entry moved their path and lost a transport mock that no longer mocks anything; a new `tests/unit/weather-server-factory.test.ts` drives the factory over `InMemoryTransport` with a real SDK client — the first in-process MCP client here, and the pattern a future transport should copy. **No tool, parameter, description or output moves — the `tools/list` payload and every rendered response are byte-identical, and the tool count is 17 before and after.**
+
+  The module boundary, the unconnected-`Server` contract, the required `locationStore` option and the `VERSION` import are adopted from [@kamiljune](https://github.com/kamiljune)'s fork commit [`1fdeac4`](https://github.com/kamiljune/weather-mcp/commit/1fdeac4ab3a239010e1219760d392d80ba7771be) (`claude/streamable-http-mcp-api-v4ufo9`); the HTTP transport in that commit stays out of scope by agreement with its author. Closes [#95](https://github.com/weather-mcp/weather-mcp/issues/95). (`src/server/weatherServer.ts`, `src/index.ts`, `tests/unit/weather-server-factory.test.ts`, `tests/unit/tool-name-parity.test.ts`, `tests/unit/critical-alert-dispatch.test.ts`, `tests/unit/tools-list-budget.test.ts`, `tests/unit/mqtt-optional.test.ts`, `src/config/tools.ts`, `src/handlers/criticalAlertBanner.ts`, `CLAUDE.md`, `CONTRIBUTING.md`, `docs/ERROR_HANDLING.md`, `docs/analytics/MCP_ANALYTICS_SECURITY_GUIDE.md`, `GOTCHAS.md`)
+
 ## [1.29.1] - 2026-09-09
 
 ### Changed
@@ -1745,7 +1753,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.1...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.2...HEAD
+[1.29.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.1...v1.29.2
 [1.29.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.0...v1.29.1
 [1.29.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.1...v1.29.0
 [1.28.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.0...v1.28.1

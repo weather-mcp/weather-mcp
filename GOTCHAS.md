@@ -46,7 +46,7 @@ runs `build` before `test`; the trap is reading only the second result.
 
 ---
 
-## G2 — Long tool descriptions in `src/index.ts` are single-quoted
+## G2 — Long tool descriptions in `src/server/weatherServer.ts` are single-quoted
 
 **Trigger:** editing any `description:` string in `TOOL_DEFINITIONS`.
 
@@ -58,13 +58,16 @@ Never introduce a raw `'` — rewrite the phrase (`the alert polygon`, not
 and the resulting error points at a *different* line hundreds of lines away
 (the next string literal that gets mis-paired).
 
-**Verify:** `grep -n "description: '" src/index.ts` and confirm none of the
-matched strings contains an unescaped `'`.
+**Verify:** `grep -n "description: '" src/server/weatherServer.ts` and confirm
+none of the matched strings contains an unescaped `'`.
 
 **Evidence:** 2026-08-23 (`e612a74`) — the reported errors were at
-`src/index.ts:783,785,789`, while the actual defect was at `:417`.
+`src/index.ts:783,785,789`, while the actual defect was at `:417` — line numbers
+in the file as it was then.
 
-**Status:** active. Related: [G1].
+**Status:** active; **file moved 2026-09-09** (issue-95) — `TOOL_DEFINITIONS` was
+carried byte-for-byte from `src/index.ts` into `src/server/weatherServer.ts`, so
+the rule is unchanged and only the path moved. Related: [G1].
 
 ---
 
@@ -617,6 +620,9 @@ to test.
 are changing into a scratch harness — `awk` it out of the real file by its
 sentinel comment so the two cannot diverge — and exercise every case there.
 Run the real script only to confirm the pass and one deliberate failure.
+**Capture the exit code and the output on that first invocation** — redirect to a
+file and echo `$?` in the same command. There is no cheap second look, and
+re-running it only to find out whether it passed costs another full suite.
 
 **Why:** `check-doc-versions.sh` shells out to `npm test` to get the count it
 validates against (`:70`), so every invocation costs ~65 s. `update-docs-for-release.sh`
@@ -784,8 +790,8 @@ work, which touches the same dependency block.
 any section `get_weather_summary` can render — `current`, `forecast`, `alerts`,
 `air_quality`, `lightning`.
 
-**Rule:** grep **both** the tool dispatch in `src/index.ts` and the summary's
-own `switch` in `weatherSummaryHandler.ts`. Exercise the change through both
+**Rule:** grep **both** the tool dispatch in `src/server/weatherServer.ts` and
+the summary's own `switch` in `weatherSummaryHandler.ts`. Exercise the change through both
 tools, and document both user-visible consequences. **Read what the summary
 passes down before assuming the sub-tool's own default applies** — it does not
 forward an absent parameter, it substitutes its own.
@@ -830,7 +836,7 @@ path. Both cross-vendor prep-review legs filed it independently as this plan's
 only blocker. Proved by running the built dist both ways: with the parameter
 threaded a Japanese point rendered JMA and Google's `isKeyAvailable()` was never
 called; with it omitted, Google **was** contacted for the same point. So the
-grep is two greps — `src/index.ts` for the dispatch **and**
+grep is two greps — `src/server/weatherServer.ts` for the dispatch **and**
 `weatherSummaryHandler.ts` for the summary switch — and the acceptance check is
 that both chains pass the new argument, not that the build is clean.
 
@@ -908,8 +914,9 @@ the edit. On a plan already at `standard` the floor is satisfied and touching on
 description string buys no extra ceremony. **Check whether the floor is actually
 costing anything before deferring on it.**
 
-**Verify:** for any parameter the summary forwards, `grep -n "description: '" src/index.ts`
-and read the specialized tool's declaration against the summary's. They should
+**Verify:** for any parameter the summary forwards,
+`grep -n "description: '" src/server/weatherServer.ts` and read the specialized
+tool's declaration against the summary's. They should
 express the same constraint or say why they differ.
 
 **Evidence:** raised as `copilot-R1` in the plan review, re-rated to minor by
@@ -1004,11 +1011,16 @@ upgrade, and retire that clause if the wrapper stops discarding `.code`.
 ## G22 — Re-measure a published number at the scope you publish it
 
 **Trigger:** putting a measured quantity — package counts, sizes, timings — into
-`README.md`, `CHANGELOG.md`, or an issue.
+`README.md`, `CHANGELOG.md`, or an issue — **or copying a count out of a design
+or implementation plan into a code comment, a doc line or a commit body.**
 
 **Rule:** measure it again, in the form the reader will reproduce, before
 writing it down. Prefer the number the tool itself reports over one you derive.
 A figure inherited from a design document is an assumption, not a measurement.
+That holds for a count a plan states about the code as much as for a benchmark:
+a plan is written before the work and nothing re-checks its arithmetic, so the
+executor is the last reader who can. Measure it with the one-line grep and write
+what you measured.
 
 **Why:** the same quantity legitimately differs by scope, and the discrepancy is
 silent. The optional-`mqtt` design plan measured `110 → 72 packages, 38 removed`
@@ -1476,9 +1488,10 @@ must never run in parallel. Not lintable.
 
 ## G31 — A new module under `src/` has no changelog bullet to hang off, so the architecture map is missed
 
-**Trigger:** a task adds a file to `src/utils/`, `src/services/`, or `src/config/`
-— especially a small pure helper introduced as an internal refactor rather than
-as a user-visible feature.
+**Trigger:** a task adds a file to `src/utils/`, `src/services/`, `src/config/`
+or `src/server/` — especially a small pure helper introduced as an internal
+refactor rather than as a user-visible feature — **or adds a directory under
+`src/` that the map has no row for at all**.
 
 **Rule:** adding a module is a **docs touch** on `CLAUDE.md`, and the design
 plan's `## Docs impact` must say so. Two edits, not one: a line in the
@@ -1495,8 +1508,10 @@ gate or the release procedure fails. The map simply goes quietly stale, one
 module at a time, and the file that new contributors and AI assistants read first
 stops describing the tree.
 
-**Verify:** `for f in src/utils/*.ts src/services/*.ts src/config/*.ts; do
+**Verify:** `for f in src/utils/*.ts src/services/*.ts src/config/*.ts src/server/*.ts; do
 grep -q "$(basename "$f")" CLAUDE.md || echo "MISSING FROM MAP: $f"; done`
+Extend the glob whenever a new directory appears under `src/` — the loop can only
+report a file in a directory it was told to look in.
 
 **Evidence:** 2026-08-26 (v1.25.2 release, step 4b) — `src/utils/displayBanding.ts`
 shipped on `feat/issue-80-lightning-band-rounding` with a design plan, an impl
@@ -1508,10 +1523,15 @@ same position: it already stated "bands and categories are computed from the
 rounded display value" and now had a shared helper enforcing it, with nothing
 naming it.
 
-**Status:** active. Load-bearing for plans 2 and 3 of the band-rounding sequence,
-which consume this same helper and may add their own. Lintable — the `Verify`
-loop above is a two-line check that belongs in `check-doc-versions.sh`; until it
-is there, it is a manual step in `## Docs impact`.
+**Status:** active; **widened 2026-09-09** (issue-95), which added a whole new
+directory rather than a file in an existing one — `src/server/`. That is the worse
+case for this entry, because the `Verify` loop is a fixed glob list and a directory
+it does not name cannot produce a `MISSING FROM MAP` line: the check passes by not
+looking. The glob now names `src/server/*.ts` and the Trigger says to extend it.
+Also load-bearing for plans 2 and 3 of the band-rounding sequence, which consume
+the same helper and may add their own. Lintable — the `Verify` loop above is a
+two-line check that belongs in `check-doc-versions.sh`; until it is there, it is a
+manual step in `## Docs impact`.
 
 ---
 
@@ -2895,8 +2915,12 @@ the run: serialized T2→T3→T4 with `mktemp`+`trap` backups, and every restore
 verified clean (`7e946d7`, `8b87f0b`, `dc4b8be`). This project had already lost
 orchestrator edits once to a subagent mutating the shared tree.
 
-**Status:** active. Related: [G27] (restore by file copy, never `git checkout --`
-— the same backup discipline for the uncommitted-fix case).
+**Status:** active; **narrowed by [G89] 2026-09-09** — this entry covers a
+temporary write to a file in *neither* task's list. When the mutated file is in
+the mutating task's own list and the sibling merely *runs the suite*, the pair
+still looks disjoint and G89 is the entry that catches it. Related: [G27]
+(restore by file copy, never `git checkout --` — the same backup discipline for
+the uncommitted-fix case), [G89], [G90].
 
 ---
 
@@ -3400,15 +3424,20 @@ the artifact emits, not the one the plan describes).
 ## G61 — Importing anything from `src/index.ts` runs `main()`, because there is no `import.meta.url` guard
 
 **Trigger:** importing any symbol from `src/index.ts` — or from the built
-`dist/index.js` — anywhere: a unit test (`TOOL_DEFINITIONS`, a schema fragment,
-anything added to it later), and equally a throwaway `node -e` one-liner used to
-check what the build produced. The verification one-liner is the easy one to
+`dist/index.js` — anywhere: a unit test, and equally a throwaway `node -e`
+one-liner used to check what the build produced. **Since the factory split
+(issue-95, 2026-09-09) nothing in the tree does this**, and there is little left
+to want: `TOOL_DEFINITIONS`, the schema fragments and the dispatch now live in
+`src/server/weatherServer.ts`, whose import is inert but for the analytics
+singleton. See the **residue** paragraph under the Rule for the two points that
+still apply to *that* import. The verification one-liner is the easy one to
 forget, because it does not feel like a test; it starts a real server, opens an
 MQTT subscription, and does not exit ([G37]). To inspect the built schema, spawn
 the dist as a child and speak JSON-RPC to it, or read the source — never import
 it into the checking process.
 
-**Rule:** `src/index.ts` calls `main()` unconditionally at module scope, so the
+**Rule.** The four points below apply to an import of the **entry**,
+`src/index.ts`. `src/index.ts` calls `main()` unconditionally at module scope, so the
 import *is* a server start: it constructs a `StdioServerTransport`, calls
 `server.connect()`, and registers `SIGTERM`/`SIGINT` handlers. Four things, all
 required together:
@@ -3442,21 +3471,41 @@ required together:
    — `HOME=$(mktemp -d) DOTENV_CONFIG_PATH=/nonexistent npx vitest run <file>` —
    because the repo `.env` masks the write ([G26]).
 
+**Residue — what an import of `src/server/weatherServer.ts` needs instead.** The
+factory constructs no transport, registers no signal handler and calls no
+`process.exit`, so points 1 and 4's first half do not apply and neither does
+`WEATHER_LIGHTNING_PREWARM` (the prewarm stayed in the entry). What survives is
+point 2's **two analytics pins** and point 3. The factory imports `withAnalytics`
+from `src/analytics/index.js`, which re-exports the singleton built at module
+load in `src/analytics/config.ts:193`; `loadAnalyticsConfig()` calls
+`getOrGenerateAnalyticsSalt()` at `:167` regardless of `ANALYTICS_ENABLED`, and a
+fixed `ANALYTICS_SALT` returns at `:94-95` before any filesystem access. So:
+`ANALYTICS_ENABLED='false'` and `ANALYTICS_SALT='<any fixed string>'`, hoisted;
+and import once, statically, never under `vi.resetModules()` — that re-runs
+sixteen service constructors and their `Cache` timers ([G21] point 3).
+
 **Why:** the import is silent when it works and confusing when it does not — a
 real transport reading the worker's stdin produces a hang or a protocol error
 attributed to whatever test happens to be running, not to the import. It is also
 easy to conclude the module is simply untestable and to relocate the symbol
 instead; that is a much larger diff than the four lines above, and unnecessary.
-Everything else in the module is already inert at import: the fifteen service
-constructors do no I/O (`LocationStore` resolves its path and touches nothing
-until a read or write) and `Cache` timers already run throughout the suite.
+Everything else reached by the import is already inert: the sixteen service
+constructors — which since the factory split live in `src/server/weatherServer.ts`,
+reached transitively — do no I/O (`LocationStore`, still constructed by the entry,
+resolves its path and touches nothing until a read or write) and `Cache` timers
+already run throughout the suite.
 Note that `import 'dotenv/config'` (`src/index.ts:9`) means the import **does**
 load the repo's own `.env` ([G26]), so nothing such a test asserts may depend on
 a key or on `ENABLED_TOOLS`.
 
-**Verify:** `tests/unit/tool-name-parity.test.ts` — the first test in the repo to
-import `src/index.ts`, whose header and import block document all four points.
-Delete the `vi.mock` and run it: the worker takes over stdin.
+**Verify:** `tests/unit/tool-name-parity.test.ts` no longer imports the entry, so
+it now verifies the **residue** rather than the four points: delete its two
+`ANALYTICS_*` pins and run it CI-shaped (`HOME=$(mktemp -d)
+DOTENV_CONFIG_PATH=/nonexistent npx vitest run <file>`) — the suite stays green
+and `analytics-salt` appears under the temp `HOME`, which is the whole point (the
+pin's absence is invisible to the assertions and visible only on the filesystem).
+Measured 2026-09-09: 64 bytes, mode 0600. For the four points themselves there is
+no live example left — nothing imports the entry.
 
 **Evidence:** 2026-09-01 (`a4252ca`, tool-name-single-source T3). Until that
 commit **no test imported `src/index.ts` at all**, so the trap had never been
@@ -3471,12 +3520,15 @@ temp `HOME` — the test created `analytics-salt` (64 bytes, mode 0600) on every
 run until the hoisted `ANALYTICS_SALT` of point 2 landed (diff-review copilot
 DR-1, 2026-09-01).
 
-**Status:** active. The standing alternative — relocating `TOOL_DEFINITIONS` into
-its own `src/toolDefinitions.ts` — was considered and rejected for tripling the
-diff and adding a module ([G31]); revisit it if a second test needs a second
-symbol from this file and the mock set has to grow. Related: [G21] (why point 3
-is not optional), [G26] (the `.env` the import loads), [G37] (a driver that
-constructs services and never exits).
+**Status:** active, **narrowed 2026-09-09** (issue-95). The relocation this
+entry's Status once rejected has shipped, as `src/server/weatherServer.ts` — and
+the trigger it named was the wrong one. It said *revisit if a second test needs a
+second symbol from this file*; what actually forced it was a second **transport**,
+which needs a `Server` the caller connects. The entry is **not** retired: the rule
+about the entry is still true of the entry, and it is the reason nothing may import
+it. Related: [G21] (why point 3 is not optional), [G26] (the `.env` the entry
+loads — still exactly one importer), [G37] (a driver that constructs services and
+never exits), [G31] (the new directory this created).
 
 ---
 
@@ -4392,7 +4444,7 @@ for string literals under `tests/` containing `.claude/` or `../..` outside
 ## G80 — The alerts coverage sentence names authorities and mechanisms in one list, and a trim or an insertion silently re-attaches the wrong mechanism
 
 **Trigger:** editing `get_alerts`'s coverage sentence — in
-`src/index.ts`'s `TOOL_DEFINITIONS`, in `docs/TOOLS.md` §`get_alerts`, or in a
+`src/server/weatherServer.ts`'s `TOOL_DEFINITIONS`, in `docs/TOOLS.md` §`get_alerts`, or in a
 `CHANGELOG.md` bullet — whether to add a country or to shorten the list.
 
 **Rule:** each authority must sit with **its own** mechanism, and the mechanism
@@ -4414,7 +4466,7 @@ says "JMA H27 schema, not CAP". The result is a **false coverage claim on the
 safety surface**, produced by an edit that removed text rather than adding any,
 and no test can see it — nothing in `tests/` asserts on description text at all.
 
-**Verify:** `grep -n "CAP" src/index.ts docs/TOOLS.md` and check that every
+**Verify:** `grep -n "CAP" src/server/weatherServer.ts docs/TOOLS.md` and check that every
 country inside a CAP clause is one of IN, PH, ID, and that no other authority
 trails one.
 
@@ -4635,7 +4687,7 @@ conditions and alerts handlers), or reading a composite's pass-through spread.
 
 **Rule:** a composite handler that builds its sub-call arguments with a raw
 spread forwards **every** key the caller sent, including ones absent from the
-composite's own `inputSchema`. `src/index.ts` does no per-tool schema
+composite's own `inputSchema`. `src/server/weatherServer.ts` does no per-tool schema
 validation, so an undeclared key is not rejected at the boundary — it arrives
 at the sub-handler and behaves exactly as if the sub-tool had been called with
 it. When you add a parameter to a fanned-out handler, decide explicitly whether
@@ -4656,7 +4708,7 @@ grep -n 'subArgs' src/handlers/weatherSummaryHandler.ts
 
 The spread plus an explicit null-out list is the shape: whatever is **not** in
 that list is forwarded. Compare it against `get_weather_summary`'s
-`inputSchema.properties` in `src/index.ts` — every key in the second that is
+`inputSchema.properties` in `src/server/weatherServer.ts` — every key in the second that is
 not nulled in the first is declared, and every key in neither is an
 undeclared pass-through.
 
@@ -4819,6 +4871,138 @@ A `core.autocrlf` probe is exactly the shape of the next test drive that touches
 discipline above. Related: [G87] (the parser that makes a CRLF probe necessary
 in the first place), [G42] (a release tool that mutates before it aborts, which
 is why these probes belong in a throwaway worktree at all).
+
+---
+
+## G89 — A full-suite gate is a reader of every test file, not just the task's declared files
+
+**Trigger:** two tasks marked `parallel-safe` on disjoint `Files:` lists, where
+one of them **temporarily** edits and restores a live test file — a G41 control,
+a mutation probe, a "prove the pin is load-bearing" step — while the other runs
+the full suite, or runs a script that runs the full suite
+(`scripts/check-doc-versions.sh:70` shells out to `npm test`).
+
+**Rule:** decide `parallel-safe` on the **read set at acceptance**, not on the
+declared write sets. A suite discovers tests tree-wide, so every task whose
+acceptance runs it is a reader of every test file in the tree. Serialize the
+pair, or run one in an isolated worktree. Disjoint `Files:` lists are not
+sufficient and never were.
+
+**Why:** three distinct failures, none of which looks like a scheduling problem
+when it lands. The reader can load the deliberately mutated test and execute with
+its filesystem pins removed — writing state outside its own touch set. It can
+catch a non-atomic `cp` restore halfway and see a half-written file. And a
+sibling's own F12 lock (`git diff --quiet HEAD -- <the anchored test files>`) goes
+**red on work that is correct**, because the mutation is in flight. All three are
+nondeterministic and all three get attributed to the diff.
+
+This is the case [G50] does not reach. G50 fires when a temporary write lands on
+a file in *neither* task's list; here the mutated files are in the mutating
+task's **own** declared list, which is exactly what makes the pair look safe.
+
+**Verify:** for each `parallel-safe` pair, list what each task's acceptance
+*reads*, not what it writes. If either acceptance step is `npm test`, the full
+gate, or a script that runs them, the read set is the whole tree and the pair is
+only safe if neither task touches anything under `tests/` — including
+temporarily.
+
+**Evidence:** 2026-09-09 (issue-95-server-factory). Filed as `codex-R2` by the
+plan review and confirmed against the tree by triage: T2's G41 control blanked
+the two `ANALYTICS_SALT` pins in `tests/unit/tool-name-parity.test.ts` and
+`tests/unit/tools-list-budget.test.ts` — the exact files T3's full-suite
+acceptance reads, directly and again through the doc checker. The plan was
+amended to serialize T3 after T2 before the run started. The same reasoning then
+fired a **second** time during execution, on a pair the amended plan still
+permitted in parallel: T5's acceptance runs the doc checker over `src/` comment
+files T4 was editing, so `/run-plan` serialized T4 and T5 as well. Twice in one
+plan, on pairs a `Files:`-list check called disjoint.
+
+**Status:** active. Related: [G50] (the narrower case, a write outside both
+lists), [G14] (why a checker run is a suite run), [G27] (restore by `cp`, which
+is what makes the window non-atomic), [G90] (the other edge a task graph forgets).
+
+---
+
+## G90 — A task after a parallel fork needs an explicit join edge
+
+**Trigger:** two or more tasks may run in parallel, and a later task — final QA,
+a byte-identity sweep, a release-notes or version step, anything that records the
+finished state — declares a dependency on only one of them.
+
+**Rule:** make the downstream task depend explicitly on **every** branch whose
+output belongs in the state it describes. Grouping the siblings under one phase
+heading is prose; the dependency edge is what the orchestrator schedules from.
+
+**Why:** the downstream task captures the wrong artifact, and the wrong artifact
+is the **durable** one. A QA record or a byte-identity sweep names a SHA, requires
+a clean tree, and is what `/release` reads afterwards — so a task that starts
+after one sibling and before the other can record a pre-sibling build, read the
+other sibling's in-flight edits as a dirty tree, or describe a branch that is not
+yet final. Nothing goes red; the artifact is simply wrong, and it is trusted later
+precisely because it was written by the verification step.
+
+**Verify:** for every task in a graph, ask which tasks must have **committed**
+before its first command runs, and check that each is named in its `depends on`.
+A task whose job is to describe the finished branch depends on every task that
+changes the branch.
+
+**Evidence:** 2026-09-09 (issue-95-server-factory). Filed as `codex-R1` by the
+plan review. T4 and T5 were an explicit parallel fork; T6 — the byte-identity
+sweep that records both SHAs, requires a clean tree and writes the QA record
+`/release` reads — declared `depends on T5` alone. Amended to `depends on T4 and
+T5` before the run, and named in the task graph as the Phase 2 join. It was the
+less likely of the two review findings to fire (T4 is `haiku`-sized, T5 is not),
+and it was the one whose failure would have been permanent.
+
+**Status:** active, method-level — this is a plan-authoring check, not a code
+fix, so it belongs in `/impl-plan`'s graph construction and `/plan-review`'s
+parallel-safe pass. Related: [G89] (the other edge a task graph forgets), [G50].
+
+---
+
+## G91 — Filtering `commit-identity.sh` through `grep` turns its refusal into silence, and the commit proceeds
+
+**Trigger:** running `.claude/scripts/commit-identity.sh` and piping it through
+`grep`/`awk` to keep the output short — `| grep -E "^class"` — anywhere a command
+is about to commit. Most acutely when the commit targets a **different**
+repository (`--repo <internal-repo>`), which is the case the flag exists for.
+
+**Rule:** the guard's **exit status** is the signal, not a line in its output.
+Capture it: run the script, keep its output, and branch on `$?` — or at minimum
+`grep ... || { echo "IDENTITY CHECK DID NOT RUN"; }`. And run it with the cwd
+**inside the dev-workflow project**, passing `--repo` to name the other
+repository; these scripts anchor on the project, not on their own location or on
+your cwd, so `cd`-ing into the target repo first makes the script refuse.
+
+**Why:** a refusal and a clean pass are indistinguishable through a filter — both
+print no `class` line, and no-output reads as nothing-to-report. The script's
+whole job is to stop a command before it writes, and a `grep` that matches
+nothing is a check that cannot fail ([G41]). The failure is silent in the worst
+place: an identity guard that did not run looks exactly like one that passed, and
+the commit lands either way, because the `&&` is usually on the `git add` rather
+than on the guard.
+
+**Verify:** run the check with a deliberately wrong anchor — from inside a
+directory with no `.claude/dev-workflow.conf` above it — through your usual
+filter. If you see nothing and would have proceeded, the filter is the defect.
+The script prints a multi-line `ERROR: not inside a dev-workflow project.` to
+which `^class` cannot match.
+
+**Evidence:** 2026-09-09 (issue-95-server-factory, `/run-plan` archive step). The
+six in-repo commits were each guarded correctly (`class ok`). The seventh — the
+`Archive plan set` commit in `weather-mcp-internal` — was run after `cd`-ing into
+that repo, so the script exited with `ERROR: not inside a dev-workflow project.`,
+the `| grep -E "^class"` printed nothing, and the commit was made unguarded. It
+happened to carry the right identity (verified afterwards with `git log -1
+--format=%an/%ae/%cn/%ce`, and the check re-run correctly from the project root
+returned `class ok`), so nothing was wrong — but nothing had checked, on the one
+commit of the run that went to a different repository with its own config.
+
+**Status:** active. Lintable in the weak sense that a command body can be grepped
+for `commit-identity.sh` piped into anything; the real fix is for the calling
+command to test the exit status. Related: [G41] (a check that cannot fail), [G47]
+(a control that proves the measurement happened at all), [G28] (a probe that fails
+reporting as a clean negative), [G88] (the other worktree/repo-boundary trap).
 
 ---
 

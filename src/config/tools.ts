@@ -15,7 +15,7 @@
  * Available tool names in the Weather MCP Server
  */
 // The single source of truth for the tool-name set. TOOL_DEFINITIONS and the
-// CallToolRequestSchema dispatch in src/index.ts are pinned to this list by
+// CallToolRequestSchema dispatch in src/server/weatherServer.ts are pinned to this list by
 // tests/unit/tool-name-parity.test.ts — add a tool here and that test names
 // every other place you still have to edit.
 export const TOOL_NAMES = [
