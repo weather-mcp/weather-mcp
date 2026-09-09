@@ -4720,6 +4720,54 @@ time and wrong only if read as a release claim.
 
 ---
 
+## G87 — A parser that anchors on `\n` reads a repository that has no EOL policy, and a Windows clone is the input nobody tests
+
+**Trigger:** writing or reviewing a regex that reads *source text* — a `.ts`, a
+`.json`, a script — rather than an API response, in a repo with no
+`.gitattributes`.
+
+**Rule:** anchor block boundaries as `\r?\n`, never a bare `\n`. There is no
+`.gitattributes` in this repo, so an ordinary Windows clone under
+`core.autocrlf=true` checks every text file out with CRLF endings, and any
+parser anchored on `\n` alone throws on that checkout. Character classes are the
+quiet exception that hides the bug: `\s` and `[\s\S]` already absorb a `\r`, so a
+parser can be *mostly* CRLF-safe and fail on the one literal `\n` in it.
+
+**Why:** the blast radius is larger than "a bash script a Windows contributor
+cannot run anyway". `scripts/lib/derived-facts.mjs` is read back by
+`tests/unit/derived-facts.test.ts` through `toolNames()`, which opens the real
+`src/config/tools.ts` — so a CRLF checkout turns a portability nit into a red
+`npm test`. It is also a *regression* introduced by centralization: the
+`grep -cE` derivation this module replaced counted lines and was line-ending
+agnostic by construction. Moving a derivation from a line-counting tool to a
+block-matching regex silently adds an EOL dependency the old code never had.
+
+**Verify:**
+
+```bash
+node -e "import('./scripts/lib/derived-facts.mjs').then(async m => {
+  const src = (await import('node:fs')).readFileSync('src/config/tools.ts','utf8');
+  console.log(m.parseToolNames(src).length,
+              m.parseToolNames(src.replace(/\n/g,'\r\n')).length);
+})"
+```
+
+Two equal numbers is the fixed state; a throw on the second is the trap.
+
+**Evidence:** 2026-09-09, `codex-m1` on the issue-88-tool-count-source diff
+review, dispositioned **fix now**. `BLOCK_RE` at `scripts/lib/derived-facts.mjs:36`
+read `\[\n`; under CRLF `parseToolNames` threw `TOOL_NAMES block not found`
+while the LF path returned 17. `ENTRY_RE` on the next lines needed no change —
+its `\s*` was already tolerant, which is exactly why one literal `\n` was easy to
+miss in review.
+
+**Status:** active, fixed at the one site. Related: [G79] (the same module's
+lock reading a path that does not exist on a fresh clone), [G82] (a derivation
+whose comment outruns what it projects). Lintable in principle — a grep for
+`\\n` in a `*.mjs` regex would find it — but there is one such parser today.
+
+---
+
 ---
 
 ## Graveyard

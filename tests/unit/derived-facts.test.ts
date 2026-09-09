@@ -59,6 +59,17 @@ const TOOL_PRESETS = {
       expect(parseToolNames(FIXTURE)).toEqual(['get_forecast', 'get_alerts']);
     });
 
+    // No .gitattributes, so an ordinary Windows clone under core.autocrlf=true
+    // checks src/config/tools.ts out with CRLF endings and this module reads it
+    // back through toolNames(). The pre-centralization `grep -cE` derivation was
+    // line-ending agnostic; this pins that the shared parse is too.
+    it('parses the same names from a CRLF checkout', () => {
+      expect(parseToolNames(FIXTURE.replace(/\n/g, '\r\n'))).toEqual([
+        'get_forecast',
+        'get_alerts',
+      ]);
+    });
+
     it('throws the fixed message when the block is not found', () => {
       expect(() => parseToolNames('export const SOMETHING_ELSE = [];')).toThrow(
         'TOOL_NAMES block not found in src/config/tools.ts'

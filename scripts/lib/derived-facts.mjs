@@ -32,8 +32,14 @@ import { resolve } from 'node:path';
  */
 const TOOLS_TS = new URL('../../src/config/tools.ts', import.meta.url);
 
-/** Locates the `export const TOOL_NAMES = [ … ] as const;` block. */
-const BLOCK_RE = /^export const TOOL_NAMES = \[\n([\s\S]*?)^\] as const;/m;
+/**
+ * Locates the `export const TOOL_NAMES = [ … ] as const;` block. The opening
+ * anchor tolerates `\r\n`: there is no `.gitattributes`, so an ordinary Windows
+ * clone under `core.autocrlf=true` checks the file out with CRLF endings, and a
+ * bare `\n` here made the parser throw on that checkout. `ENTRY_RE` needs no
+ * change — its `\s*` already absorbs a trailing `\r`.
+ */
+const BLOCK_RE = /^export const TOOL_NAMES = \[\r?\n([\s\S]*?)^\] as const;/m;
 
 /**
  * One entry per line: a single-quoted name, an optional trailing comma, and an
