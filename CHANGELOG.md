@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.1] - 2026-09-09
+
+### Changed
+
+- **The release tooling and the stress harness now derive the MCP tool count once, from the source that declares it.** `CLAUDE.md` has said for a long time that `TOOL_NAMES` in `src/config/tools.ts` is the single source of the tool-name set, and `tests/unit/tool-name-parity.test.ts` already pins both `TOOL_DEFINITIONS` and the dispatch to it. The tooling never got that memo. `scripts/check-doc-versions.sh`, `scripts/update-docs-for-release.sh` and `scripts/stress-harness.mjs` each counted a `name: '…' as const` spelling inside `src/index.ts` privately — three independent answers to "how many tools are there", none of them pointed at the declared source, and two of them carrying a comment that named `TOOL_DEFINITIONS` as the source of truth. They agreed on 17, so nothing was wrong; the divergence was latent, and the third copy in the harness was the one neither issue that filed this noticed. All three now call `toolCount()` in the new `scripts/lib/derived-facts.mjs`, which parses the `TOOL_NAMES` block. It parses rather than imports because every import path has a precondition this has none of: `--experimental-strip-types` needs Node 22.6 against a Node 18 floor, and importing the built module needs a build the checker never makes. A fake entry added to the array was shown to move all three consumers to 18 together while the parity test went red and the build stopped compiling. The same module now owns the one parse of the Vitest summary line that the two shell scripts used to do separately — the parenthetical total, plus a `failed` predicate — while each script keeps its own failure posture: the writer still refuses to prepare a release from a red suite, the checker still warns and continues, because documentation can be consistent while the suite is red. One input class changes what the writer writes: on a green suite that *skips* tests, it now records the parenthetical total rather than the passed count, which is the number its own step-9 checker then verifies. The suite skips nothing today. `tests/unit/derived-facts.test.ts` pins the derivation to `TOOL_NAMES` by name, order and count, so the two can no longer drift apart in silence, and a never-called `check_version_in_file` was deleted from the checker. **No tool, parameter or server output moves, and the tool count is 17 before and after.** (`scripts/lib/derived-facts.mjs`, `scripts/check-doc-versions.sh`, `scripts/update-docs-for-release.sh`, `scripts/stress-harness.mjs`, `tests/unit/derived-facts.test.ts`, `GOTCHAS.md`)
+
+### Fixed
+
+- **`scripts/lib/derived-facts.mjs` threw on a Windows checkout, taking `npm test` down with it.** The block anchor that locates `TOOL_NAMES` matched a bare `\n`, and this repository declares no `.gitattributes`, so an ordinary clone under `core.autocrlf=true` gets CRLF line endings and `parseToolNames` threw `TOOL_NAMES block not found`. The reach is wider than the shell scripts a Windows contributor could not run anyway: `tests/unit/derived-facts.test.ts` reads the real `src/config/tools.ts` back through `toolNames()`. The `grep -cE` derivation this module replaced counted lines and was line-ending agnostic, so centralizing the parse is what introduced the dependency. The anchor now reads `\r?\n`; the entry regex needed no change, its `\s*` already absorbed the `\r`, which is why the one literal `\n` was easy to miss. A CRLF case pins it. (`scripts/lib/derived-facts.mjs`, `tests/unit/derived-facts.test.ts`, `GOTCHAS.md` G87)
+
+- **The README's default-preset sentence claimed the server exposes 17 tools with no configuration; it exposes six.** `TOOL_PRESETS.basic` holds six entries, `docs/TOOLS.md` has said six all along, and the sentence's own list names six — one plus five. The release writer authored the error: `git log -L` on that line shows `1e960b9` (v1.11.0) writing `6 tools` correctly and `db84d03`, an automated `chore: Release v1.14.0` commit, replacing it with `17 tools`. The mechanism is the writer's README pattern, which substitutes the derived count for every `N tools` occurrence in the file — the block's only global replacement, and it cannot tell a preset count from a total. The front page stated a falsehood for every release from v1.14.0 to v1.29.0 and no check caught it, because `check-doc-versions.sh` validates only the first `N tools` occurrence in the file. The sentence now names the `basic` preset instead of a number, which puts the site permanently out of the writer's reach rather than leaving a `6 tools` for the next release to overwrite again. Every remaining `N tools` occurrence in the README states the total and still reads 17. (`README.md`)
+
 ## [1.29.0] - 2026-09-08
 
 ### Added
@@ -1733,7 +1745,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.1...HEAD
+[1.29.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.0...v1.29.1
 [1.29.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.1...v1.29.0
 [1.28.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.0...v1.28.1
 [1.28.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.27.1...v1.28.0

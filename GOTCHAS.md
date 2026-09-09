@@ -413,10 +413,11 @@ passed and the exit code was 0; only reading the line caught it.
 
 ---
 
-## G12 — `check-doc-versions.sh` validates three of the **five** test-count sites
+## G12 — `check-doc-versions.sh` validates fewer test-count and tool-count sites than `update-docs-for-release.sh` rewrites
 
 **Trigger:** any change that moves the test count — i.e. every commit that adds
-or removes a test.
+or removes a test — or the tool count, i.e. every commit that adds or removes a
+tool.
 
 **Rule:** when the count moves, **five** places change: `README.md`'s shields
 badge (line ~6), `README.md`'s "N tests" body line (~61), `README.md`'s
@@ -430,17 +431,57 @@ green checker.
 **Why:** two separate gaps. The checker's README test-count grep
 (`[0-9,]+ (automated )?tests`) takes `head -1`, which lands on the body line at
 ~61 and never reaches the `Run all N tests` comment 320 lines further down. And
-the script reads `docs/README.md` only for `Current Version:` (`:60-70`) — it has
-exactly three test-count checks (`:104` README body, `:113` `CLAUDE.md`, `:122`
+the script reads `docs/README.md` only for `Current Version:` (`:36-46`) — it has
+exactly three test-count checks (`:83` README body, `:92` `CLAUDE.md`, `:101`
 the badge) and never looks at that file's count at all. Both failures are silent
 and read as success: `✅ README.md test count` while the comment is stale, and no
 line at all about `docs/README.md`. `docs/README.md` is the more insidious of the
-two, because `update-docs-for-release.sh:219-222` silently repairs it at the next
+two, because `update-docs-for-release.sh:234-237` silently repairs it at the next
 release — so the inconsistency is invisible until someone reads the file.
+
+**The tool count has the same shape, and the asymmetry is worse.** Measured
+2026-09-09 — re-measure rather than copying these; they moved once already on
+the very branch that widened this entry. The writer rewrites `README.md` with a
+global substitution (`grep -oE '\b[0-9]+ tools\b' README.md | wc -l` occurrences
+— **6**, and 7 before the correction recorded in Evidence below), plus exactly
+one site each in `CLAUDE.md`, `docs/TOOLS.md`, `package.json`, `server.json` and
+`.github/social-preview.html`. Eleven sites. The checker validates **one
+occurrence per file** across six files (`head -1` inside `check_tool_count`), so
+**six of eleven are validated and the README's other five are not.** A wrong
+number in any of those five reads as a clean run.
+
+Two things this plan **closed**, so do not re-file them: the derivation is now a
+single module (`scripts/lib/derived-facts.mjs`) reading `TOOL_NAMES` in
+`src/config/tools.ts`, rather than three private greps over `src/index.ts`; and
+a drift between that array and the derivation is now a **red test**
+(`tests/unit/derived-facts.test.ts`). What stays open is the site table — issue
+#88's remaining half — which is what this entry is about.
+
+**Two tool-count consumers neither script manages at all.**
+`examples/README.md:22` (*"All 17 tools appear across these examples"*) and
+`.env.example:21` (*"All 10 tools…"*) both state a tool count, and neither the
+writer nor the checker reads either file. `examples/README.md` happens to be
+right today. `.env.example` is stale from v1.5.0 and wrong in four places: `:15`
+calls `basic` five tools, `:17` omits `get_weather_summary` from the `basic`
+list, and `:18-19` describe pre-1.11 `standard`/`full` memberships — the real
+sizes are 6 / 12 / 17 (`src/config/tools.ts`). Both are consumers the future
+site table must either manage or explicitly declare out of scope. **The
+`.env.example` staleness is deliberately not fixed here** — it is a docs rewrite
+with no bearing on the derivation, and it is filed for a standalone fix or #88's
+site half.
 
 **Verify:** set `Run all N tests` in `README.md` **and** the `N tests, 100% pass
 rate` line in `docs/README.md` to deliberately wrong numbers, then run
 `./scripts/check-doc-versions.sh` — it still reports all checks passed.
+
+**Verify, tool-count twin:** set the README `all 17 tools` table cell (`:227`)
+to `99 tools` and run the checker — it still passes, because `head -1` reads
+only README's *first* occurrence at `:9`. **Run 2026-09-09**
+(issue-88-tool-count-source T8): with `:227` reading `| \`all\` | all 99 tools |`
+and `:9` untouched, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` printed
+`✅ README.md tool count: 17` and `✅ All documentation checks passed!` at
+**exit 0**. The trap is live on the tool count exactly as it is on the test
+count. Restore from a file copy, never `git checkout --`.
 **Verify line re-run 2026-08-28** (openmeteo-nullable-series-types curation, on a
 tree whose count had just moved 2,809 → 2,814): both sites set to `9,999`, and
 the script still printed `✅ README.md test count: 2814`, `✅ CLAUDE.md test
@@ -449,13 +490,28 @@ unchanged. (The same
 experiment on the **badge** now correctly fails; do not use the badge to test this
 entry.)
 
+**Evidence — this trap has already fired in production, on the front page.**
+`README.md`'s default-preset sentence was authored `6 tools` correctly at
+`1e960b9` (v1.11.0) and silently rewritten to `17 tools` by
+`db84d03 chore: Release v1.14.0`, an automated release commit, because the
+writer's README substitution is global and cannot tell a preset count from a
+total. The `basic` preset holds six; the sentence's own list names six. It
+stated a falsehood on the project's front page for **every release from v1.14.0
+to v1.29.0**, and no check ever caught it, because the checker's `head -1` reads
+only README's first occurrence (`:9`) and never reached `:91`. Corrected
+2026-09-09 by rewording the sentence to name the `basic` preset instead of a
+number, which puts the site permanently out of the writer's reach. Re-derive
+with `git log -L '/\*\*Default preset:\*\*/,+1:README.md'`. This is the
+strongest evidence this entry carries, because it is the entry's own
+hypothetical actually happening.
+
 **Evidence:** first recorded 2026-08-24 (`338c2b0`) as "the badge is never
 validated". Re-running that Verify line on 2026-08-24 during the
 changelog-link-refs run **falsified the badge half**: `tests-9%2C999%20passing`
 extracts `9999` and reports `❌`, because `31ce822` (2026-07-07) had already
 added the encoded-badge check this entry's own Status line had proposed as its
 lint candidate — the entry was written against a stale reading of the script.
-The `head -1` gap at `README.md:346` is real and survives, confirmed by the same
+The `head -1` gap at `README.md:390` is real and survives, confirmed by the same
 deliberate-wrong-value experiment: `9,999` there still reports `✅`.
 
 **Broadened 2026-08-25** (`99ba469`, lightning-safe-message-coherence): a
@@ -480,7 +536,7 @@ them again, but it is not the first or only writer. A plan that adds or removes 
 test must task the doc update, and a plan asserting the count does not move should
 be tested against the suite rather than believed.
 
-**Status:** active, **narrowed** 2026-08-24, **broadened and re-verified
+**Status:** active, **widened 2026-09-09 (issue-88 source half)** — the entry now covers the tool count as well as the test count; the lint candidate below is half-closed, since the *derivation* half is now a single module with a red test behind it while the *site* half is untouched. **narrowed** 2026-08-24, **broadened and re-verified
 2026-08-25**, **Verify line re-run 2026-09-08** (`f4115f2`, forecast-auto-source-contract T7 — the count moved 3,292 -> 3,304 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,304`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3304`, `✅ CLAUDE.md test count: 3304`, `✅ README.md tests badge: 3304` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-03, second time** (`4cac538`, critical-alert-banner diff-triage MAJOR-5 — the count moved 3,132 → 3,250 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,250`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3250`, `✅ CLAUDE.md test count: 3250`, `✅ README.md tests badge: 3250` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-03** (`99cc032`, jma-service-residuals T4 — the count moved 3,130 → 3,132 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `3,132`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 3132`, `✅ CLAUDE.md test count: 3132`, `✅ README.md tests badge: 3132` and `✅ All documentation checks passed!` at exit 0, never once naming `docs/README.md` — the trap is intact and both gaps are still exactly the two this entry names), **extended 2026-08-29**, **Verify line re-run 2026-09-02** (`d65ef25`, noaa-forecast-horizon-disclosure T2 — the count moved 2,933 → 2,941 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,941`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01, second time** (`f48eda3`, openmeteo-nullable-scalar-types T6 — the count moved 2,917 → 2,933 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,933`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2933`, `✅ CLAUDE.md test count: 2933`, `✅ README.md tests badge: 2933` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-09-01** (`18489ed`, marine-sea-state-taxonomy T4 — the count moved 2,900 → 2,917 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,917`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2917`, `✅ CLAUDE.md test count: 2917`, `✅ README.md tests badge: 2917` and `✅ All documentation checks passed!` — the trap is intact and both gaps are still exactly the two this entry names), **Verify line re-run 2026-08-27** (`7a1e65d`, wildfire
 band-rounding T2 — the count moved 2,611 → 2,660 and all five sites were edited
 by content; with both unvalidated sites then set to `9,999` against the real
@@ -501,7 +557,8 @@ to `9,999` against the real `2,742`, `env -u FORCE_COLOR
 naming the two it does not read — the trap is intact and both gaps are still
 exactly the two this entry names). **Verify line re-run again 2026-08-28** (`b4d8722`, issue-83 absent-strike-distance T2 — the count moved 2,759 → 2,772 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,772`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count`, `✅ CLAUDE.md test count` and `✅ All documentation checks passed!`, never once naming the two it does not read — the trap is intact and both gaps are still exactly the two this entry names). **Verify line re-run again 2026-08-29** (`17b2699`, issue-86 territory NWPS coverage T4 — the count moved 2,815 → 2,822 and all five sites were edited by content; with both unvalidated sites then set to `9,999` against the real `2,822`, `env -u FORCE_COLOR ./scripts/check-doc-versions.sh` still printed `✅ README.md test count: 2822`, `✅ CLAUDE.md test count: 2822`, `✅ README.md tests badge: 2822` and `✅ All documentation checks passed!`, never once naming the two it does not read — the trap is intact and both gaps are still exactly the two this entry names). Match every site by
 content, never by line number — the `npm test`
-comment has moved twice (346 → 381). Lint candidate — anchoring a check on
+comment has moved three times (346 → 381 → 390), and this entry's own citation
+of it was stale by 44 lines until 2026-09-09. Lint candidate — anchoring a check on
 `Run all [0-9,]+ tests` and one on `docs/README.md`'s count would close both gaps
 mechanically and let this entry retire. Standing lesson beyond the specific gaps:
 an entry asserting that a checker *misses* something has a shelf life, so run its
@@ -562,8 +619,8 @@ sentinel comment so the two cannot diverge — and exercise every case there.
 Run the real script only to confirm the pass and one deliberate failure.
 
 **Why:** `check-doc-versions.sh` shells out to `npm test` to get the count it
-validates against (`:91`), so every invocation costs ~65 s. `update-docs-for-release.sh`
-runs the suite itself (`:139`) **and** then invokes the checker (`:257`), which
+validates against (`:70`), so every invocation costs ~65 s. `update-docs-for-release.sh`
+runs the suite itself (`:154`) **and** then invokes the checker (`:277`), which
 runs it again — so a release dry run is ~2.5 minutes, and neither cost is
 visible from reading the script's top. A five-case truth table iterated against
 the real checker is half an hour that a harness does in under a second.
@@ -595,7 +652,7 @@ companion on the marker being **absent**, so the two rules partition the cases
 instead of double-reporting the same defect.
 
 **Why:** `check-doc-versions.sh`'s R1 ("every tagged heading has a definition")
-runs at `update-docs-for-release.sh:257`, step 9 of release prep — before the
+runs at `update-docs-for-release.sh:277`, step 9 of release prep — before the
 human cuts the tag at step 4 of the printed "Next steps". The version being
 released therefore has no tag, so it was the single version R1 could not check,
 and the only one the run existed to verify. The exemption that lets the gate pass
@@ -1842,7 +1899,7 @@ edits a published registry field to satisfy a broken comparison.
 
 **Why:** the check reads the length with
 `DESC_LEN=$(node -p "require('./server.json').description.length")`
-(`scripts/check-doc-versions.sh:163`). `node -p` inspects its result, and under
+(`scripts/check-doc-versions.sh:144`). `node -p` inspects its result, and under
 `FORCE_COLOR` it wraps the number in ANSI colour codes, so `DESC_LEN` becomes
 `\033[33m98\033[39m` rather than `98`. Bash's `[ "$DESC_LEN" -le 100 ]` then
 fails on a non-integer, control falls through to the `else` branch, and the
@@ -1986,6 +2043,18 @@ hit means more than one lock.
 by the executing subagent as a Surprise after its first full-suite run went red
 on a test the task had told it did not exist. Confirmed by reading the file: two
 `it` blocks, identical titles, identical defect-naming comments, one per ladder.
+
+**The grep that proved the claim can stop proving it, because of your own work**
+(2026-09-09, `dfde51a`, issue-88-tool-count-source). The design asserted that no
+test said anything about the two release shell scripts, evidenced by
+`grep -rln 'check-doc-versions\|update-docs-for-release' tests/` returning
+nothing. It returned nothing on the base and returns the plan's **own new test
+file** afterwards — whose header comment names both scripts while asserting
+nothing about either. The substantive claim survived; the evidence for it did
+not. Re-run such a grep *before* writing the file, record the base result, and
+expect the post-run result to differ by exactly your own additions — otherwise a
+later reader re-runs it, sees a hit, and cannot tell a documentation comment from
+a real assertion without opening the file.
 
 **Status:** active. **Re-confirmed 2026-09-01** (`f48eda3`,
 openmeteo-nullable-scalar-types T6): the executing subagent pinned
@@ -2151,6 +2220,23 @@ plan.
    description length, README links, the CHANGELOG link block — rather than to satisfy the
    literal line by breaking [G12].
 
+**A second shape, 2026-09-09** (`dfde51a`, issue-88-tool-count-source T8): a
+**spurious** acceptance check — one that fails on correct code. The plan's
+"Done when" required `grep -rn "as const" scripts/` to return nothing, on the
+reasoning that all three consumers had been counting a `name: '…' as const`
+spelling and none should any more. That is unsatisfiable by construction: the
+module doing the consolidating has to *quote the token it replaced*, both in the
+comment explaining what it replaced and in the regex that matches the block
+terminator `] as const;` in `src/config/tools.ts`. The check came back `3`, and
+all three hits were in the new module. **The generalisation: an acceptance grep
+that bans a token repo-wide will fail the moment the consolidating module must
+name that token.** Scope the ban to everything *except* the new module
+(`--exclude`), or state the invariant the ban was standing in for — here, "no
+consumer re-derives from the `src/index.ts` spelling", which measured 0 outside
+the module and was the thing actually wanted. Vacuous checks pass when they
+should fail; spurious ones fail when they should pass, and the second kind wastes
+a run arguing with correct code.
+
 **Status:** active, **extended twice on 2026-09-01 and again 2026-09-03**. Lint candidate on the vacuous half — a plan-authoring check
 could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
 contains a file marked **new**. Related: [G10] (prove the hash is not vacuous —
@@ -2177,10 +2263,10 @@ npm test                       # green ⇒ flake; red twice ⇒ real regression
 ./scripts/update-docs-for-release.sh patch "<summary>"
 ```
 
-**Why:** the abort sits at step 4 (`:167`), but steps 1–3 have already run —
+**Why:** the abort sits at step 4 (`:173`), but steps 1–3 have already run —
 `npm version` has rewritten `package.json` and `package-lock.json` (`:39`),
 `server.json` is synced (`:44`), and `[Unreleased]` is already promoted into a
-dated `## [X.Y.Z]` section with its compare-link definition emitted (`:52-147`).
+dated `## [X.Y.Z]` section with its compare-link definition emitted (`:52-146`).
 So a "failed" run leaves a **half-prepared release in the working tree**, and the
 script's own precondition at `:32` (`git diff --quiet package.json server.json
 CHANGELOG.md`) then refuses the obvious retry with *"has uncommitted changes.
@@ -2209,7 +2295,7 @@ you a test failed and **discards its name**, so you cannot tell a flake from a
 regression without reproducing it. Capture to a file (`npm test 2>&1 | tee
 <scratch>/t.log`) and grep the file, not the stream.
 
-**Verify:** `sed -n '32,34p;148,172p' scripts/update-docs-for-release.sh` — the
+**Verify:** `sed -n '32,34p;148,178p' scripts/update-docs-for-release.sh` — the
 precondition guard and the red-suite abort, with steps 1–3 between them.
 
 **Status:** active. Script candidate: move the test run ahead of the first write,
@@ -2731,6 +2817,32 @@ citation `deriveFloodCategory:739` was read as the function definition and re-ba
 (now `:817`). And the long-standing `catch`-boundary citation `:311` was not the
 `catch` at all — that was at `:306` (now `:346`) — but the coverage sentence inside it
 (now `:351`). Caught only by grepping the file to check a number already written down.
+
+**Evidence, 2026-09-09** (`dfde51a`, issue-88-tool-count-source T8): the largest
+sample this entry has. Deleting 24 lines from `check-doc-versions.sh` and editing
+`update-docs-for-release.sh`'s steps 4-5 shifted **18** citations across five
+entries (G12, G14, G15, G38, G42). Every one was re-measured by grepping its
+construct in both the new file and the base. **Four of the eighteen were already
+stale on the base**, before the run touched anything — which is exactly the case
+this entry's Verify line tells you to test for, and it fired at 22%:
+
+- G14's `update-docs-for-release.sh:139` named a line inside the CHANGELOG
+  link-block heredoc, not the suite run. The suite run was at `:154` on the base
+  and is *still* at `:154` — arithmetic would have "corrected" a citation that
+  never needed moving, to a line that was never right.
+- G14's and G15's `:257` was 15 lines short of the checker invocation at `:272`.
+- G12's `README.md:346` was 44 lines short of `:390`, while that same entry's
+  Status line already recorded the comment as having "moved twice (346 → 381)" —
+  the entry knew, and its own Why paragraph kept the oldest value anyway.
+- G12's `update-docs-for-release.sh:219-222` was **mis-attributed rather than
+  merely shifted**: on the base that range is the `CLAUDE.md` sed block, and the
+  `docs/README.md` block it claimed to name was at `:229-232`. No amount of
+  re-basing arithmetic recovers a citation pointing at the wrong construct.
+
+The inverse also happened once and is worth the same weight: the implementation
+plan *predicted* G42's `:167` would be stale, and it was **accurate** — it moved
+only because of the run's own edit. So a plan's guess about which citations have
+rotted is itself a claim to measure, in both directions.
 
 **Status:** active. Related: [G11] (read the real thing rather than trusting a
 derivation), [G46] (a docs task writes the plan's promise rather than the code's
@@ -4605,6 +4717,54 @@ output that tag cannot render; the other seven read `v1.25.18`.
 **Status:** active. Related: [G12] (the doc anchors a release rewrites),
 [G11] (read the real output). Not lintable — the stamp is honest about capture
 time and wrong only if read as a release claim.
+
+---
+
+## G87 — A parser that anchors on `\n` reads a repository that has no EOL policy, and a Windows clone is the input nobody tests
+
+**Trigger:** writing or reviewing a regex that reads *source text* — a `.ts`, a
+`.json`, a script — rather than an API response, in a repo with no
+`.gitattributes`.
+
+**Rule:** anchor block boundaries as `\r?\n`, never a bare `\n`. There is no
+`.gitattributes` in this repo, so an ordinary Windows clone under
+`core.autocrlf=true` checks every text file out with CRLF endings, and any
+parser anchored on `\n` alone throws on that checkout. Character classes are the
+quiet exception that hides the bug: `\s` and `[\s\S]` already absorb a `\r`, so a
+parser can be *mostly* CRLF-safe and fail on the one literal `\n` in it.
+
+**Why:** the blast radius is larger than "a bash script a Windows contributor
+cannot run anyway". `scripts/lib/derived-facts.mjs` is read back by
+`tests/unit/derived-facts.test.ts` through `toolNames()`, which opens the real
+`src/config/tools.ts` — so a CRLF checkout turns a portability nit into a red
+`npm test`. It is also a *regression* introduced by centralization: the
+`grep -cE` derivation this module replaced counted lines and was line-ending
+agnostic by construction. Moving a derivation from a line-counting tool to a
+block-matching regex silently adds an EOL dependency the old code never had.
+
+**Verify:**
+
+```bash
+node -e "import('./scripts/lib/derived-facts.mjs').then(async m => {
+  const src = (await import('node:fs')).readFileSync('src/config/tools.ts','utf8');
+  console.log(m.parseToolNames(src).length,
+              m.parseToolNames(src.replace(/\n/g,'\r\n')).length);
+})"
+```
+
+Two equal numbers is the fixed state; a throw on the second is the trap.
+
+**Evidence:** 2026-09-09, `codex-m1` on the issue-88-tool-count-source diff
+review, dispositioned **fix now**. `BLOCK_RE` at `scripts/lib/derived-facts.mjs:36`
+read `\[\n`; under CRLF `parseToolNames` threw `TOOL_NAMES block not found`
+while the LF path returned 17. `ENTRY_RE` on the next lines needed no change —
+its `\s*` was already tolerant, which is exactly why one literal `\n` was easy to
+miss in review.
+
+**Status:** active, fixed at the one site. Related: [G79] (the same module's
+lock reading a path that does not exist on a fresh clone), [G82] (a derivation
+whose comment outruns what it projects). Lintable in principle — a grep for
+`\\n` in a `*.mjs` regex would find it — but there is one such parser today.
 
 ---
 
