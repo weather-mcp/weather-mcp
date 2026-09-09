@@ -335,7 +335,7 @@ async checkServiceStatus(): Promise<{
 
 ### MCP Tool Integration
 
-The `check_service_status` tool in `index.ts`:
+The `check_service_status` tool in `src/server/weatherServer.ts`:
 - Calls both service status checkers in parallel
 - Formats results with markdown for AI client display
 - Provides overall system status summary

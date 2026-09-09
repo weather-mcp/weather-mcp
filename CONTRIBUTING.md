@@ -92,7 +92,8 @@ npx tsx tests/test_noaa_api.ts
 ```
 weather-mcp/
 ├── src/
-│   ├── index.ts           # Main MCP server
+│   ├── index.ts           # Stdio entry point
+│   ├── server/weatherServer.ts  # Tool registration, dispatch, services
 │   ├── services/
 │   │   ├── noaa.ts        # NOAA API service
 │   │   └── openmeteo.ts   # Open-Meteo historical weather API service

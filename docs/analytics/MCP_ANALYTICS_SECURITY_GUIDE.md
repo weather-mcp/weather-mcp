@@ -453,7 +453,7 @@ export interface AnalyticsEvent {
 #### 3.3 Integration in MCP Server
 
 ```typescript
-// src/index.ts
+// src/server/weatherServer.ts
 import { AnalyticsService } from './services/analytics.js';
 
 const analytics = new AnalyticsService();

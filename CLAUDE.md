@@ -18,7 +18,8 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 
 ```
 src/
-├── index.ts                 # MCP server entry point, TOOL_DEFINITIONS registry, dispatch
+├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning prewarm, main(), shutdown
+├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
 ├── handlers/                # One handler per MCP tool (saved locations share one file)
 │   ├── forecastHandler.ts           # get_forecast (+ compare_models, ensemble_spread, normals, astronomy)
 │   ├── currentConditionsHandler.ts  # get_current_conditions (NOAA / Open-Meteo / METAR; fire weather, thermal stress)
@@ -143,7 +144,7 @@ Full per-tool parameter reference: `docs/TOOLS.md`.
 2. **Validation:** Add validators to `src/utils/validation.ts`
 3. **Handler:** Create or extend a handler in `src/handlers/` following existing patterns
 4. **Service (if needed):** Add API methods to an existing service or create a new one in `src/services/`
-5. **Tool Registration:** Register in `src/index.ts` (`TOOL_DEFINITIONS` and the `CallToolRequestSchema` dispatch)
+5. **Tool Registration:** Register in `src/server/weatherServer.ts` (`TOOL_DEFINITIONS` and the `CallToolRequestSchema` dispatch)
 6. **Tests:** Write comprehensive tests (see Testing section below)
 7. **Documentation:** `CHANGELOG.md` `[Unreleased]`, `docs/TOOLS.md`, `README.md` feature list, `.devdocs/ROADMAP.md` status row; this file only if architecture or a convention changed
 
@@ -203,7 +204,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 - **Contract** (alerts, model comparison, ensemble spread, river/wildfire routing): failures **propagate** with the service's fixed sanitized message. A fabricated "✅ no alerts" from a failed fetch is a dangerous lie on safety data. Incompatible flag combinations are **validation errors thrown before any request**, never a silent downgrade to a different answer.
 - **A positive-assertion-only element may fail silently; nothing that claims coverage may.** The critical-alert banner (`src/utils/criticalAlert.ts` for the gate and copy, `src/handlers/criticalAlertBanner.ts` for the one fetch) omits itself on any failure with a single `securityEvent` warn and no retry — safe *only* because its absence asserts nothing. The moment a description, schema or doc says these tools "check for alerts", absence becomes an implied all-clear and the posture is no longer defensible. Keep the failure posture in one module rather than at each render site.
 - **Distinguish "empty" from "not covered."** HTTP 200 with all-null arrays, HTTP 404 for an uncovered region, and a real empty result mean different things; render them differently (honest-empty with a coverage caveat vs "no coverage here — not an all-clear") and cache the not-covered answer (typed null sentinel) so it isn't re-probed.
-- **A runtime dependency may legitimately be absent, and the server must still boot.** A dependency reached by a single tool is declared `optionalDependencies` and loaded through a **memoised, single-flight dynamic `import()` at its one call site** — never statically, because `src/index.ts` imports every service unconditionally above the tool gate, so a static import turns a missing package into a server that cannot start rather than one unavailable tool. Its absence is a **contract** failure: a distinct error naming the package and the remedy, never an empty result. Only the "module not found" code counts as absent — any other import failure is a real fault, propagates unchanged, and is **not** memoised, so it is retried rather than cached as an absence. The resolution must happen before any connection state is touched: an `await` between a synchronously-set in-flight guard and the check that reads it silently lets every concurrent caller past (`mqtt`, v1.25.0).
+- **A runtime dependency may legitimately be absent, and the server must still boot.** A dependency reached by a single tool is declared `optionalDependencies` and loaded through a **memoised, single-flight dynamic `import()` at its one call site** — never statically, because `src/server/weatherServer.ts` imports every service unconditionally above the tool gate, and the entry imports it, so a static import turns a missing package into a server that cannot start rather than one unavailable tool. Its absence is a **contract** failure: a distinct error naming the package and the remedy, never an empty result. Only the "module not found" code counts as absent — any other import failure is a real fault, propagates unchanged, and is **not** memoised, so it is retried rather than cached as an absence. The resolution must happen before any connection state is touched: an `await` between a synchronously-set in-flight guard and the check that reads it silently lets every concurrent caller past (`mqtt`, v1.25.0).
 
 ### Upstream data hygiene
 
@@ -460,7 +461,7 @@ The saved locations feature allows users to save frequently used locations with 
 
 Every location-based tool already accepts `location_name` / `city_name` / `latitude`+`longitude`
 via the shared `resolveLocationAsync` helper and the `LOCATION_SCHEMA_PROPERTIES` schema
-fragment in `src/index.ts`. A new tool follows the same pattern:
+fragment in `src/server/weatherServer.ts`. A new tool follows the same pattern:
 
 ```typescript
 // 1. Args interface
@@ -477,7 +478,7 @@ import { resolveLocationAsync } from '../utils/locationResolver.js';
 const resolved = await resolveLocationAsync(args as YourToolArgs, locationStore, geocodingService);
 const { latitude, longitude } = resolved;
 
-// 3. Spread LOCATION_SCHEMA_PROPERTIES into the tool's inputSchema.properties in src/index.ts
+// 3. Spread LOCATION_SCHEMA_PROPERTIES into the tool's inputSchema.properties in src/server/weatherServer.ts
 //    and leave `required: []`.
 ```
 
@@ -543,7 +544,7 @@ tools use to skip the reverse-geocode lookup.
 1. Create handler: `src/handlers/newFeatureHandler.ts`
 2. Define types: `src/types/<upstream>.ts`
 3. Add service method if needed: `src/services/`
-4. Register tool in `src/index.ts` (`TOOL_DEFINITIONS` + dispatch) and in `src/config/tools.ts` (`TOOL_NAMES`, presets).
+4. Register tool in `src/server/weatherServer.ts` (`TOOL_DEFINITIONS` + dispatch) and in `src/config/tools.ts` (`TOOL_NAMES`, presets).
    `TOOL_NAMES` is the single source — `ToolName` is derived from it and cannot be edited — and
    `tests/unit/tool-name-parity.test.ts` pins the registry and the dispatch to it. That test reads
    the dispatch **as text**, so write the arm as `case 'your_tool':` on one line, single-quoted:
