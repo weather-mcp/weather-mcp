@@ -620,6 +620,9 @@ to test.
 are changing into a scratch harness — `awk` it out of the real file by its
 sentinel comment so the two cannot diverge — and exercise every case there.
 Run the real script only to confirm the pass and one deliberate failure.
+**Capture the exit code and the output on that first invocation** — redirect to a
+file and echo `$?` in the same command. There is no cheap second look, and
+re-running it only to find out whether it passed costs another full suite.
 
 **Why:** `check-doc-versions.sh` shells out to `npm test` to get the count it
 validates against (`:70`), so every invocation costs ~65 s. `update-docs-for-release.sh`
@@ -1008,11 +1011,16 @@ upgrade, and retire that clause if the wrapper stops discarding `.code`.
 ## G22 — Re-measure a published number at the scope you publish it
 
 **Trigger:** putting a measured quantity — package counts, sizes, timings — into
-`README.md`, `CHANGELOG.md`, or an issue.
+`README.md`, `CHANGELOG.md`, or an issue — **or copying a count out of a design
+or implementation plan into a code comment, a doc line or a commit body.**
 
 **Rule:** measure it again, in the form the reader will reproduce, before
 writing it down. Prefer the number the tool itself reports over one you derive.
 A figure inherited from a design document is an assumption, not a measurement.
+That holds for a count a plan states about the code as much as for a benchmark:
+a plan is written before the work and nothing re-checks its arithmetic, so the
+executor is the last reader who can. Measure it with the one-line grep and write
+what you measured.
 
 **Why:** the same quantity legitimately differs by scope, and the discrepancy is
 silent. The optional-`mqtt` design plan measured `110 → 72 packages, 38 removed`
@@ -2907,8 +2915,12 @@ the run: serialized T2→T3→T4 with `mktemp`+`trap` backups, and every restore
 verified clean (`7e946d7`, `8b87f0b`, `dc4b8be`). This project had already lost
 orchestrator edits once to a subagent mutating the shared tree.
 
-**Status:** active. Related: [G27] (restore by file copy, never `git checkout --`
-— the same backup discipline for the uncommitted-fix case).
+**Status:** active; **narrowed by [G89] 2026-09-09** — this entry covers a
+temporary write to a file in *neither* task's list. When the mutated file is in
+the mutating task's own list and the sibling merely *runs the suite*, the pair
+still looks disjoint and G89 is the entry that catches it. Related: [G27]
+(restore by file copy, never `git checkout --` — the same backup discipline for
+the uncommitted-fix case), [G89], [G90].
 
 ---
 
@@ -4859,6 +4871,92 @@ A `core.autocrlf` probe is exactly the shape of the next test drive that touches
 discipline above. Related: [G87] (the parser that makes a CRLF probe necessary
 in the first place), [G42] (a release tool that mutates before it aborts, which
 is why these probes belong in a throwaway worktree at all).
+
+---
+
+## G89 — A full-suite gate is a reader of every test file, not just the task's declared files
+
+**Trigger:** two tasks marked `parallel-safe` on disjoint `Files:` lists, where
+one of them **temporarily** edits and restores a live test file — a G41 control,
+a mutation probe, a "prove the pin is load-bearing" step — while the other runs
+the full suite, or runs a script that runs the full suite
+(`scripts/check-doc-versions.sh:70` shells out to `npm test`).
+
+**Rule:** decide `parallel-safe` on the **read set at acceptance**, not on the
+declared write sets. A suite discovers tests tree-wide, so every task whose
+acceptance runs it is a reader of every test file in the tree. Serialize the
+pair, or run one in an isolated worktree. Disjoint `Files:` lists are not
+sufficient and never were.
+
+**Why:** three distinct failures, none of which looks like a scheduling problem
+when it lands. The reader can load the deliberately mutated test and execute with
+its filesystem pins removed — writing state outside its own touch set. It can
+catch a non-atomic `cp` restore halfway and see a half-written file. And a
+sibling's own F12 lock (`git diff --quiet HEAD -- <the anchored test files>`) goes
+**red on work that is correct**, because the mutation is in flight. All three are
+nondeterministic and all three get attributed to the diff.
+
+This is the case [G50] does not reach. G50 fires when a temporary write lands on
+a file in *neither* task's list; here the mutated files are in the mutating
+task's **own** declared list, which is exactly what makes the pair look safe.
+
+**Verify:** for each `parallel-safe` pair, list what each task's acceptance
+*reads*, not what it writes. If either acceptance step is `npm test`, the full
+gate, or a script that runs them, the read set is the whole tree and the pair is
+only safe if neither task touches anything under `tests/` — including
+temporarily.
+
+**Evidence:** 2026-09-09 (issue-95-server-factory). Filed as `codex-R2` by the
+plan review and confirmed against the tree by triage: T2's G41 control blanked
+the two `ANALYTICS_SALT` pins in `tests/unit/tool-name-parity.test.ts` and
+`tests/unit/tools-list-budget.test.ts` — the exact files T3's full-suite
+acceptance reads, directly and again through the doc checker. The plan was
+amended to serialize T3 after T2 before the run started. The same reasoning then
+fired a **second** time during execution, on a pair the amended plan still
+permitted in parallel: T5's acceptance runs the doc checker over `src/` comment
+files T4 was editing, so `/run-plan` serialized T4 and T5 as well. Twice in one
+plan, on pairs a `Files:`-list check called disjoint.
+
+**Status:** active. Related: [G50] (the narrower case, a write outside both
+lists), [G14] (why a checker run is a suite run), [G27] (restore by `cp`, which
+is what makes the window non-atomic), [G90] (the other edge a task graph forgets).
+
+---
+
+## G90 — A task after a parallel fork needs an explicit join edge
+
+**Trigger:** two or more tasks may run in parallel, and a later task — final QA,
+a byte-identity sweep, a release-notes or version step, anything that records the
+finished state — declares a dependency on only one of them.
+
+**Rule:** make the downstream task depend explicitly on **every** branch whose
+output belongs in the state it describes. Grouping the siblings under one phase
+heading is prose; the dependency edge is what the orchestrator schedules from.
+
+**Why:** the downstream task captures the wrong artifact, and the wrong artifact
+is the **durable** one. A QA record or a byte-identity sweep names a SHA, requires
+a clean tree, and is what `/release` reads afterwards — so a task that starts
+after one sibling and before the other can record a pre-sibling build, read the
+other sibling's in-flight edits as a dirty tree, or describe a branch that is not
+yet final. Nothing goes red; the artifact is simply wrong, and it is trusted later
+precisely because it was written by the verification step.
+
+**Verify:** for every task in a graph, ask which tasks must have **committed**
+before its first command runs, and check that each is named in its `depends on`.
+A task whose job is to describe the finished branch depends on every task that
+changes the branch.
+
+**Evidence:** 2026-09-09 (issue-95-server-factory). Filed as `codex-R1` by the
+plan review. T4 and T5 were an explicit parallel fork; T6 — the byte-identity
+sweep that records both SHAs, requires a clean tree and writes the QA record
+`/release` reads — declared `depends on T5` alone. Amended to `depends on T4 and
+T5` before the run, and named in the task graph as the Phase 2 join. It was the
+less likely of the two review findings to fire (T4 is `haiku`-sized, T5 is not),
+and it was the one whose failure would have been permanent.
+
+**Status:** active, method-level — this is a plan-authoring check, not a code
+fix, so it belongs in `/impl-plan`'s graph construction and `/plan-review`'s
+parallel-safe pass. Related: [G89] (the other edge a task graph forgets), [G50].
 
 ---
 
