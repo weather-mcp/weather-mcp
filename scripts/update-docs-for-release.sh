@@ -162,30 +162,35 @@ fi
 # because the summary then reads "Tests  1 failed | 2273 passed (2274)", the
 # old "first number on the line" extraction wrote the **failure count** into
 # the README badge and CLAUDE.md ("1 tests, 100% pass rate"). Both halves are
-# fixed here: abort on failures, and read the number attached to "passed".
-if printf '%s' "$TEST_SUMMARY" | grep -qE "[0-9]+ failed"; then
+# fixed here: abort on failures, and read a number that survives that shape.
+# Both parses now live in scripts/lib/derived-facts.mjs, shared with
+# check-doc-versions.sh, and read the **parenthetical total** rather than the
+# "passed" figure. On every input this script accepts — a green suite — the two
+# are the same number. They differ only on a green suite with skipped tests,
+# where the total is what the checker validates and what the docs quote, so it
+# is the right one to write.
+if node scripts/lib/derived-facts.mjs is-red "$TEST_SUMMARY"; then
   echo "❌ Test suite is red — refusing to prepare a release:"
   echo "   ${TEST_SUMMARY}"
   echo "   (Six files under tests/integration/ make live network calls and flake."
   echo "    Re-run npm test to tell a flake from a real regression.)"
   exit 1
 fi
-TEST_COUNT=$(printf '%s' "$TEST_SUMMARY" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' | head -1 || true)
+TEST_COUNT=$(node scripts/lib/derived-facts.mjs test-count "$TEST_SUMMARY" || true)
 if [ -z "$TEST_COUNT" ]; then
-  echo "❌ Could not parse a passing-test count from: ${TEST_SUMMARY}"
+  echo "❌ Could not parse a test count from: ${TEST_SUMMARY}"
   exit 1
 fi
 TEST_COUNT_FMT=$(node -p "(${TEST_COUNT}).toLocaleString('en-US')")
 TEST_COUNT_BADGE=${TEST_COUNT_FMT//,/%2C}   # shields.io URL-encodes the comma
 echo "   ${TEST_COUNT_FMT} tests passing"
 
-# --- 5. Tool count (from the TOOL_DEFINITIONS registry in src/index.ts) --------
-TOOL_COUNT=$(grep -cE "name: '[a-z_]+' as const" src/index.ts)
-if [ "$TOOL_COUNT" -eq 0 ]; then
-  echo "❌ Could not count tools in src/index.ts — did the TOOL_DEFINITIONS format change?"
+# --- 5. Tool count (from TOOL_NAMES in src/config/tools.ts, via scripts/lib/derived-facts.mjs) ---
+TOOL_COUNT=$(node scripts/lib/derived-facts.mjs tool-count) || {
+  echo "❌ Could not count tools — is the TOOL_NAMES block in src/config/tools.ts intact?"
   exit 1
-fi
-echo "🔧 ${TOOL_COUNT} MCP tools defined in src/index.ts"
+}
+echo "🔧 ${TOOL_COUNT} MCP tools declared in src/config/tools.ts"
 
 # --- 6. Doc reference updates --------------------------------------------------
 SUMMARY_TEXT=${SUMMARY:-"See CHANGELOG.md"}
