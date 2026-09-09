@@ -16,7 +16,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { toolCount } from './lib/derived-facts.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -99,14 +100,12 @@ async function main() {
     // tools/list sanity
     const tools = await client.listTools();
     const names = tools.tools.map((t) => t.name);
-    // Source of truth is TOOL_DEFINITIONS in src/index.ts, counted the same
-    // way scripts/check-doc-versions.sh counts it. Hardcoding the number here
-    // made this check go stale the moment a tool was added, and a permanently
-    // red sweep is worse than no check at all.
-    const expectedTools = (
-      readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-        .match(/name: '[a-z_]+' as const/g) ?? []
-    ).length;
+    // The expected count comes from TOOL_NAMES in src/config/tools.ts through the
+    // same derivation the release scripts use (scripts/lib/derived-facts.mjs), so
+    // this check and the docs cannot disagree. Hardcoding the number here made it
+    // go stale the moment a tool was added, and a permanently red sweep is worse
+    // than no check at all.
+    const expectedTools = toolCount();
     record('default(imperial)', `tools/list exposes all ${expectedTools} defined tools`, names.length === expectedTools ? 'PASS' : 'FAIL', `${names.length} tools`);
     const fSchema = tools.tools.find((t) => t.name === 'get_forecast');
     const props = Object.keys(fSchema?.inputSchema?.properties || {});
