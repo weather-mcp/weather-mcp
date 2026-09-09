@@ -11,10 +11,10 @@
  * instead of shipping silently.
  *
  * The dispatch `switch` cannot be reflected on: a `switch` statement has no
- * runtime representation, so no amount of importing `src/index.ts` lets a
- * test enumerate its `case` arms structurally. This file instead reads
- * `src/index.ts` as a string and matches the dispatch region and its `case`
- * labels with regular expressions. That is weaker than a structural
+ * runtime representation, so no amount of importing `src/server/weatherServer.ts`
+ * lets a test enumerate its `case` arms structurally. This file instead reads
+ * `src/server/weatherServer.ts` as a string and matches the dispatch region and
+ * its `case` labels with regular expressions. That is weaker than a structural
  * assertion and will break if someone reformats a `case` label (e.g. adds a
  * blank line inside the label, or changes quote style) even though the
  * dispatch itself did not change. This trade-off is accepted deliberately:
@@ -28,39 +28,26 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect, vi } from 'vitest';
 import type { ToolName } from '../../src/config/tools.js';
 
-// src/index.ts calls main() unconditionally at module scope, which constructs a
-// StdioServerTransport and calls server.connect(). Stub the transport so connect()
-// has something to call start() on, rather than attaching to this worker's stdin.
-vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
-  StdioServerTransport: class {
-    async start() {}
-    async close() {}
-    async send() {}
-  }
-}));
-
-// All three must be set before the static import below evaluates: WEATHER_LIGHTNING_PREWARM
-// skips main()'s fire-and-forget MQTT subscribe (which would otherwise open a live
-// connection during a unit test), ANALYTICS_ENABLED keeps the analytics client from
-// doing anything beyond its in-memory no-op path, and ANALYTICS_SALT keeps the import off
-// the filesystem: src/index.ts imports ./analytics/index.js, which builds the analytics
-// singleton at module load, and loadAnalyticsConfig() calls getOrGenerateAnalyticsSalt()
-// regardless of ANALYTICS_ENABLED — writing ~/.weather-mcp/analytics-salt when it is
-// absent. A fixed salt returns at src/analytics/config.ts:94 before any filesystem
-// access. The repo .env masks the write on a dev machine; CI and a fresh clone have no
-// .env and did create the file (G26).
+// Both must be set before the static import below evaluates: ANALYTICS_ENABLED keeps
+// the analytics client from doing anything beyond its in-memory no-op path, and
+// ANALYTICS_SALT keeps the import off the filesystem: src/server/weatherServer.ts
+// imports ../analytics/index.js, which re-exports the analytics singleton built at
+// module load in src/analytics/config.ts:193 — loadAnalyticsConfig() calls
+// getOrGenerateAnalyticsSalt() at src/analytics/config.ts:167 regardless of
+// ANALYTICS_ENABLED, writing ~/.weather-mcp/analytics-salt when it is absent. A fixed
+// salt returns at src/analytics/config.ts:94-95 before any filesystem access.
 vi.hoisted(() => {
-  process.env.WEATHER_LIGHTNING_PREWARM = 'false';
   process.env.ANALYTICS_ENABLED = 'false';
   process.env.ANALYTICS_SALT = 'tool-name-parity-test';
 });
 
-// Import src/index.js exactly once, statically. Never re-import it under
-// vi.resetModules() — that re-runs main().
+// Import src/server/weatherServer.js once, statically. The import is inert but for
+// the analytics singleton; never re-import it under vi.resetModules() — that
+// re-constructs sixteen services and their Cache timers (G21 point 3).
 import { TOOL_DEFINITIONS } from '../../src/server/weatherServer.js';
 import { TOOL_NAMES } from '../../src/config/tools.js';
 
-const INDEX_TS_SOURCE = readFileSync(new URL('../../src/server/weatherServer.ts', import.meta.url), 'utf8');
+const FACTORY_SOURCE = readFileSync(new URL('../../src/server/weatherServer.ts', import.meta.url), 'utf8');
 
 describe('Tool name parity', () => {
   it('TOOL_NAMES has no duplicates', () => {
@@ -87,12 +74,12 @@ describe('Tool name parity', () => {
     expect(mismatches, `key/name mismatch for: ${mismatches.join(', ')}`).toEqual([]);
   });
 
-  describe('dispatch switch region (src/index.ts, read as text)', () => {
+  describe('dispatch switch region (src/server/weatherServer.ts, read as text)', () => {
     const switchStart = /^\s*switch \(name\) \{$/m;
     const defaultLabel = /^\s*default:$/m;
 
-    const switchMatches = INDEX_TS_SOURCE.match(new RegExp(switchStart, 'gm')) ?? [];
-    const defaultMatches = INDEX_TS_SOURCE.match(new RegExp(defaultLabel, 'gm')) ?? [];
+    const switchMatches = FACTORY_SOURCE.match(new RegExp(switchStart, 'gm')) ?? [];
+    const defaultMatches = FACTORY_SOURCE.match(new RegExp(defaultLabel, 'gm')) ?? [];
 
     it('the switch(name) and default: anchors are each found exactly once', () => {
       expect(switchMatches.length, 'switch (name) { anchor').toBe(1);
@@ -102,8 +89,8 @@ describe('Tool name parity', () => {
       expect(defaultMatches.length, 'default: anchor').toBe(1);
     });
 
-    const startIdx = INDEX_TS_SOURCE.search(switchStart);
-    const sourceAfterStart = startIdx === -1 ? '' : INDEX_TS_SOURCE.slice(startIdx);
+    const startIdx = FACTORY_SOURCE.search(switchStart);
+    const sourceAfterStart = startIdx === -1 ? '' : FACTORY_SOURCE.slice(startIdx);
     const relativeDefaultIdx = sourceAfterStart.search(defaultLabel);
     const dispatchRegion = startIdx === -1 || relativeDefaultIdx === -1
       ? ''
@@ -162,8 +149,8 @@ describe('Tool name parity', () => {
   describe('ENABLED_TOOLS round trip (the defect this plan fixes)', () => {
     // Mirrors tests/unit/tool-config.test.ts's createToolConfig helper exactly: set
     // env, reset modules, re-import src/config/tools.js only, restore env. This is
-    // safe to re-import under vi.resetModules() because, unlike src/index.js, it has
-    // no top-level side effects (no main(), no singleton MQTT/server construction).
+    // safe to re-import under vi.resetModules() because, unlike src/server/weatherServer.js, it has
+    // no top-level side effects (no module-scope service singletons to re-construct).
     async function createToolConfig(envValue: string | undefined): Promise<{
       getEnabledTools: () => ToolName[];
       isEnabled: (tool: ToolName) => boolean;

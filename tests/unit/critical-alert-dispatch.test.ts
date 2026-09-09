@@ -6,14 +6,14 @@
  * `criticalAlertBanner?: boolean` and does nothing at all when it is absent.
  * The ONLY thing that turns the feature on for real callers is the literal
  * `true` passed at three arms of the `switch (name)` dispatch in
- * `src/index.ts`. Every handler-level suite passes that flag directly, and
- * `tool-name-parity.test.ts` reads only `case` labels — so before this file,
- * flipping all three literals to `false` disabled the feature for every real
- * caller with the whole suite still green.
+ * `src/server/weatherServer.ts`. Every handler-level suite passes that flag
+ * directly, and `tool-name-parity.test.ts` reads only `case` labels — so
+ * before this file, flipping all three literals to `false` disabled the
+ * feature for every real caller with the whole suite still green.
  *
  * Why a text scrape, again: a `switch` statement has no runtime
- * representation, so no amount of importing `src/index.ts` lets a test
- * enumerate its arms structurally (the same trade-off `tool-name-parity.test.ts`
+ * representation, so no amount of importing `src/server/weatherServer.ts`
+ * lets a test enumerate its arms structurally (the same trade-off `tool-name-parity.test.ts`
  * documents and accepts). This file does not regex the argument list, though —
  * it matches parentheses, so reformatting the call across lines does not break
  * it while removing or negating the flag does.

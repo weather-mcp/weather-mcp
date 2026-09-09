@@ -22,33 +22,34 @@
  *                  (80d901a), so T1-T4 are proven to have changed no
  *                  parameter, enum, default, or `required` entry.
  *
- * --- G61: importing src/index.ts runs main() ---
+ * --- G61 no longer applies to this import ---
  *
- * src/index.ts calls main() unconditionally at module scope, which constructs
- * a StdioServerTransport and calls server.connect(). Stub the transport so
- * connect() has something to call start() on, rather than attaching to this
- * worker's stdin. Import it exactly once, statically — never re-import it
- * under vi.resetModules(), which would re-run main().
+ * G61 (importing `src/index.ts` runs `main()` unconditionally at module
+ * scope) still describes the stdio entry point, but nothing in this file
+ * imports it. `src/server/weatherServer.ts` constructs no transport, calls
+ * no `server.connect()`, and registers no signal handler — importing it is
+ * inert but for the analytics singleton (see the pins below).
  *
- * --- Why this file needs a FOURTH vi.hoisted pin beyond the usual three ---
+ * --- Why this file needs a THIRD vi.hoisted pin beyond the usual two ---
  *
- * WEATHER_LIGHTNING_PREWARM / ANALYTICS_ENABLED / ANALYTICS_SALT are the
- * standard three (see tests/unit/tool-name-parity.test.ts for why each is
- * needed). This file adds a fourth: WEATHER_DEFAULT_LOCATION = ''. The reason
- * is a three-link chain:
+ * ANALYTICS_ENABLED / ANALYTICS_SALT are the standard two (see
+ * tests/unit/tool-name-parity.test.ts for why each is needed). This file
+ * adds a third: WEATHER_DEFAULT_LOCATION = ''. The reason is a two-link
+ * chain:
  *
- *   1. DEFAULT_LOCATION_HINT (src/index.ts:301-303) is folded into
- *      `latitude`'s description at MODULE LOAD, so it is baked into eleven
- *      tools' schemas before any test in this file runs.
- *   2. src/index.ts:9 is `import 'dotenv/config'`, so the import reads the
- *      repo's own gitignored .env (G26). A developer machine with
- *      WEATHER_DEFAULT_LOCATION set in .env would measure a larger payload
- *      than CI does. dotenv does NOT overwrite a key already present in
- *      process.env, which is exactly why this pin must be hoisted (set
- *      before the import evaluates) rather than set in a beforeEach.
- *   3. getDefaultLocation() (src/config/defaultLocation.ts:22-27) trims and
+ *   1. DEFAULT_LOCATION_HINT (src/server/weatherServer.ts:285-287) is folded
+ *      into `latitude`'s description at MODULE LOAD, so it is baked into
+ *      eleven tools' schemas before any test in this file runs.
+ *   2. getDefaultLocation() (src/config/defaultLocation.ts:22-27) trims and
  *      treats a blank string as unset, so '' is a clean "no default" and not
  *      a default literally named "".
+ *
+ * `dotenv/config` is no longer in this import chain — that import lives only
+ * in the entry, src/index.ts (which this file does not import) — so the
+ * repo's own gitignored .env cannot reach WEATHER_DEFAULT_LOCATION here. A
+ * shell that **exports** the variable still can, though, which is why the
+ * pin stays, and stays hoisted (set before the static import evaluates)
+ * rather than set in a beforeEach.
  *
  * If this pin silently failed, and the byte-budget constants had been
  * measured in the same broken environment, every assertion here would pass
@@ -61,27 +62,19 @@
 
 import { describe, it, expect, vi } from 'vitest';
 
-// src/index.ts calls main() unconditionally at module scope, which constructs a
-// StdioServerTransport and calls server.connect(). Stub the transport so connect()
-// has something to call start() on, rather than attaching to this worker's stdin.
-vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
-  StdioServerTransport: class {
-    async start() {}
-    async close() {}
-    async send() {}
-  }
-}));
-
-// All four must be set before the static import below evaluates.
+// All three must be set before the static import below evaluates: ANALYTICS_ENABLED
+// and ANALYTICS_SALT are the standard pins (see tests/unit/tool-name-parity.test.ts
+// for why each is needed); WEATHER_DEFAULT_LOCATION is this file's own third pin —
+// see header comment.
 vi.hoisted(() => {
-  process.env.WEATHER_LIGHTNING_PREWARM = 'false';
   process.env.ANALYTICS_ENABLED = 'false';
   process.env.ANALYTICS_SALT = 'tools-list-budget-test';
-  process.env.WEATHER_DEFAULT_LOCATION = ''; // the fourth pin — see header comment
+  process.env.WEATHER_DEFAULT_LOCATION = ''; // the third pin — see header comment
 });
 
-// Import src/index.js exactly once, statically. Never re-import it under
-// vi.resetModules() — that re-runs main().
+// Import src/server/weatherServer.js once, statically. The import is inert but for
+// the analytics singleton; never re-import it under vi.resetModules() — that
+// re-constructs sixteen services and their Cache timers (G21 point 3).
 import { TOOL_DEFINITIONS } from '../../src/server/weatherServer.js';
 import { PRESETS, TOOLS_LIST_BYTE_BUDGET } from '../../src/config/tools.js';
 
