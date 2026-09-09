@@ -82,7 +82,7 @@ vi.hoisted(() => {
 
 // Import src/index.js exactly once, statically. Never re-import it under
 // vi.resetModules() — that re-runs main().
-import { TOOL_DEFINITIONS } from '../../src/index.js';
+import { TOOL_DEFINITIONS } from '../../src/server/weatherServer.js';
 import { PRESETS, TOOLS_LIST_BYTE_BUDGET } from '../../src/config/tools.js';
 
 type JsonSchemaProperty = {

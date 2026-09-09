@@ -57,10 +57,10 @@ vi.hoisted(() => {
 
 // Import src/index.js exactly once, statically. Never re-import it under
 // vi.resetModules() — that re-runs main().
-import { TOOL_DEFINITIONS } from '../../src/index.js';
+import { TOOL_DEFINITIONS } from '../../src/server/weatherServer.js';
 import { TOOL_NAMES } from '../../src/config/tools.js';
 
-const INDEX_TS_SOURCE = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8');
+const INDEX_TS_SOURCE = readFileSync(new URL('../../src/server/weatherServer.ts', import.meta.url), 'utf8');
 
 describe('Tool name parity', () => {
   it('TOOL_NAMES has no duplicates', () => {

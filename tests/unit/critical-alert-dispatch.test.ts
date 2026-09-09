@@ -26,7 +26,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 
-const SOURCE = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8');
+const SOURCE = readFileSync(new URL('../../src/server/weatherServer.ts', import.meta.url), 'utf8');
 
 /**
  * The full argument text of the first call to `fnName` in `source`, found by
@@ -36,7 +36,7 @@ const SOURCE = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf
 function argumentsOf(source: string, fnName: string): string {
   const open = source.indexOf(`${fnName}(`);
   if (open === -1) {
-    throw new Error(`no call to ${fnName} found in src/index.ts`);
+    throw new Error(`no call to ${fnName} found in src/server/weatherServer.ts`);
   }
   let depth = 0;
   const start = open + fnName.length;
