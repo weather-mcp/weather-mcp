@@ -34,6 +34,15 @@ if ! git diff --quiet package.json server.json CHANGELOG.md 2>/dev/null; then
   exit 1
 fi
 
+# Every doc count site must match exactly once BEFORE anything is written. The
+# site write at step 6 validates again, but by then steps 1-3 have rewritten
+# package.json, package-lock.json, server.json and CHANGELOG.md (GOTCHAS G42) —
+# failing here leaves the tree untouched instead of half-prepared.
+node scripts/lib/derived-facts.mjs validate-sites || {
+  echo "❌ A doc count site was reworded or duplicated — fix DOC_SITES or the doc, then re-run."
+  exit 1
+}
+
 # --- 1. Bump package.json (+ lockfile) ---------------------------------------
 OLD_VERSION=$(node -p "require('./package.json').version")
 NEW_VERSION=$(npm version "$BUMP" --no-git-tag-version | tr -d 'v')
@@ -181,9 +190,7 @@ if [ -z "$TEST_COUNT" ]; then
   echo "❌ Could not parse a test count from: ${TEST_SUMMARY}"
   exit 1
 fi
-TEST_COUNT_FMT=$(node -p "(${TEST_COUNT}).toLocaleString('en-US')")
-TEST_COUNT_BADGE=${TEST_COUNT_FMT//,/%2C}   # shields.io URL-encodes the comma
-echo "   ${TEST_COUNT_FMT} tests passing"
+echo "   ${TEST_COUNT} tests passing"
 
 # --- 5. Tool count (from TOOL_NAMES in src/config/tools.ts, via scripts/lib/derived-facts.mjs) ---
 TOOL_COUNT=$(node scripts/lib/derived-facts.mjs tool-count) || {
@@ -226,44 +233,37 @@ awk -v keep="$CLAUDE_RELEASE_LINES" '
 
 sed -i -E \
   -e "s/\*\*Version:\*\* [0-9]+\.[0-9]+\.[0-9]+/**Version:** ${NEW_VERSION}/g" \
-  -e "s/\*\*Test Coverage:\*\* [0-9,]+ tests/**Test Coverage:** ${TEST_COUNT_FMT} tests/" \
-  -e "s/[0-9]+ MCP Tools/${TOOL_COUNT} MCP Tools/" \
   -e "s/^\*\*Last Updated:\*\* .*/**Last Updated:** ${TODAY} (v${NEW_VERSION})/" \
   CLAUDE.md
+sed -i -E -e "s/- \*\*Current Version:\*\* .*/- **Current Version:** ${NEW_VERSION}/" docs/README.md
+echo "📝 Updated the version in CLAUDE.md and docs/README.md"
 
-sed -i -E \
-  -e "s/- \*\*Current Version:\*\* .*/- **Current Version:** ${NEW_VERSION}/" \
-  -e "s/\*\*Test Coverage:\*\* [0-9,]+ tests/**Test Coverage:** ${TEST_COUNT_FMT} tests/" \
-  docs/README.md
-
-# README: tests badge, test-count prose, and "N tools" mentions
-sed -i -E \
-  -e "s/tests-[0-9%C]+%20passing/tests-${TEST_COUNT_BADGE}%20passing/" \
-  -e "s/TypeScript, [0-9,]+ tests/TypeScript, ${TEST_COUNT_FMT} tests/" \
-  -e "s/Run all [0-9,]+ tests/Run all ${TEST_COUNT_FMT} tests/" \
-  -e "s/\b[0-9]+ tools\b/${TOOL_COUNT} tools/g" \
-  README.md
-
-sed -i -E "s/all [0-9]+ MCP tools/all ${TOOL_COUNT} MCP tools/" docs/TOOLS.md
-
-# npm and MCP registry descriptions mention the tool count
-sed -i -E "s/[0-9]+ weather tools/${TOOL_COUNT} weather tools/" package.json server.json
-
-echo "📝 Updated CLAUDE.md, docs/README.md, README.md, docs/TOOLS.md, package.json, server.json"
+# Every tool-count and test-count site, from the one table the checker
+# validates (DOC_SITES in scripts/lib/derived-facts.mjs). Two-phase inside the
+# verb: every row is checked exactly-once first and nothing is written if any
+# row fails. Replacement is a function, never a string (GOTCHAS G35).
+SITES_OUT=$(node scripts/lib/derived-facts.mjs write-sites "$TEST_COUNT") || {
+  printf '%s\n' "$SITES_OUT"
+  echo "❌ Doc count sites failed validation — no count was written."
+  exit 1
+}
+printf '%s\n' "$SITES_OUT"
+CHANGED_FILES=$(printf '%s\n' "$SITES_OUT" | sed -n 's/^changed: //p')
 
 # --- 7. Social preview image (tool count in the tagline) ------------------------
-if ! grep -q "${TOOL_COUNT} weather tools" .github/social-preview.html; then
-  sed -i -E "s/[0-9]+ weather tools/${TOOL_COUNT} weather tools/" .github/social-preview.html
-  CHROME=$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)
-  if [ -n "$CHROME" ]; then
-    "$CHROME" --headless --disable-gpu --no-sandbox --hide-scrollbars --window-size=1280,640 \
-      --screenshot=.github/social-preview.png "file://$PWD/.github/social-preview.html" >/dev/null 2>&1
-    echo "🖼️  Social preview PNG re-rendered with ${TOOL_COUNT} tools"
-  else
-    echo "⚠️  .github/social-preview.html updated, but no Chrome found to re-render the PNG"
-  fi
-  echo "   ⚠️  Manual step: upload .github/social-preview.png at GitHub → Settings → Social preview"
-fi
+case " ${CHANGED_FILES} " in
+  *" .github/social-preview.html "*)
+    CHROME=$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)
+    if [ -n "$CHROME" ]; then
+      "$CHROME" --headless --disable-gpu --no-sandbox --hide-scrollbars --window-size=1280,640 \
+        --screenshot=.github/social-preview.png "file://$PWD/.github/social-preview.html" >/dev/null 2>&1
+      echo "🖼️  Social preview PNG re-rendered with ${TOOL_COUNT} tools"
+    else
+      echo "⚠️  .github/social-preview.html updated, but no Chrome found to re-render the PNG"
+    fi
+    echo "   ⚠️  Manual step: upload .github/social-preview.png at GitHub → Settings → Social preview"
+    ;;
+esac
 
 # --- 8. SECURITY.md supported-versions row (minor/major bumps) -----------------
 MAJOR_MINOR=$(echo "$NEW_VERSION" | cut -d. -f1-2)
