@@ -8,10 +8,8 @@ Quick reference guide for the Weather MCP test suite.
 
 | Metric | Value |
 |--------|-------|
-| **Total Tests** | 1,070 |
+| **Total Tests** | 3,339 |
 | **Pass Rate** | 99.6% - 99.9% |
-| **Unit Tests** | 1,008 (27 files) |
-| **Integration Tests** | 62 (4 files) |
 | **Execution Time (Unit)** | ~2 seconds |
 | **Execution Time (Full)** | ~4-5 minutes |
 
@@ -48,7 +46,7 @@ npm run test:ui
 
 ```
 tests/
-├── unit/                    27 test files (1,008 tests)
+├── unit/
 │   ├── Core Utilities       cache, validation, units, errors
 │   ├── Weather Domain       airQuality, fireWeather, snow, marine
 │   ├── Geospatial          distance, geohash, geography, timezone
@@ -58,7 +56,7 @@ tests/
 │   ├── Services            ncei, rainviewer, retry-logic
 │   └── Version-specific    v1.6.1-fixes, bounds-checking, alert-sorting
 │
-├── integration/             4 test files (62 tests)
+├── integration/
 │   ├── error-recovery.test.ts
 │   ├── great-lakes-marine.test.ts
 │   ├── visualization-lightning.test.ts
@@ -238,7 +236,7 @@ describe('Feature Name', () => {
 ## Test Metrics & Goals
 
 ### Current Performance
-- ✅ 1,070 total tests
+- ✅ 3,339 total tests
 - ✅ 99.6% pass rate
 - ✅ <2s unit test execution
 - ⚠️ ~4-5min full suite execution
