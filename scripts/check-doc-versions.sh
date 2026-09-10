@@ -78,33 +78,6 @@ if [ -n "$TEST_COUNT" ]; then
   if node scripts/lib/derived-facts.mjs is-red "$TEST_SUMMARY"; then
     echo "⚠️  ${YELLOW}Test suite is not green${NC} — counts checked against the total; run 'npm test'"
   fi
-
-  # Check README.md test count
-  README_TEST_COUNT=$(grep -E "[0-9,]+ (automated )?tests" README.md | head -1 | tr -d ',' | grep -oE '[0-9]+' | head -1)
-  if [ "$README_TEST_COUNT" == "$TEST_COUNT" ]; then
-    echo "✅ README.md test count: ${GREEN}${README_TEST_COUNT}${NC}"
-  else
-    echo "❌ README.md test count: ${RED}${README_TEST_COUNT}${NC} (expected ${TEST_COUNT})"
-    ERRORS=$((ERRORS+1))
-  fi
-
-  # Check CLAUDE.md test count
-  CLAUDE_TEST_COUNT=$(grep -E "Test Coverage.*[0-9,]+ tests" CLAUDE.md | head -1 | tr -d ',' | grep -oE '[0-9]+' | head -1)
-  if [ "$CLAUDE_TEST_COUNT" == "$TEST_COUNT" ]; then
-    echo "✅ CLAUDE.md test count: ${GREEN}${CLAUDE_TEST_COUNT}${NC}"
-  else
-    echo "❌ CLAUDE.md test count: ${RED}${CLAUDE_TEST_COUNT}${NC} (expected ${TEST_COUNT})"
-    ERRORS=$((ERRORS+1))
-  fi
-
-  # Check README.md tests badge (shields.io URL-encodes the comma as %2C)
-  BADGE_TEST_COUNT=$(grep -oE 'tests-[0-9%C]+%20passing' README.md | head -1 | sed 's/^tests-//;s/%20passing$//;s/%2C//g')
-  if [ "$BADGE_TEST_COUNT" == "$TEST_COUNT" ]; then
-    echo "✅ README.md tests badge: ${GREEN}${BADGE_TEST_COUNT}${NC}"
-  else
-    echo "❌ README.md tests badge: ${RED}${BADGE_TEST_COUNT:-not found}${NC} (expected ${TEST_COUNT})"
-    ERRORS=$((ERRORS+1))
-  fi
 else
   echo "⚠️  Could not determine test count (npm test failed?)"
 fi
@@ -117,24 +90,26 @@ echo "🔧 Checking tool count consistency..."
 TOOL_COUNT=$(node scripts/lib/derived-facts.mjs tool-count)
 echo "📊 Tools declared in src/config/tools.ts: ${GREEN}${TOOL_COUNT}${NC}"
 
-check_tool_count() {
-  local file=$1
-  local pattern=$2
-  local found=$(grep -oE "$pattern" "$file" | head -1 | grep -oE '[0-9]+')
-  if [ "$found" == "$TOOL_COUNT" ]; then
-    echo "✅ $file tool count: ${GREEN}${found}${NC}"
-  else
-    echo "❌ $file tool count: ${RED}${found:-not found}${NC} (expected ${TOOL_COUNT})"
-    ERRORS=$((ERRORS+1))
-  fi
-}
-
-check_tool_count README.md '[0-9]+ tools'
-check_tool_count CLAUDE.md '[0-9]+ MCP Tools'
-check_tool_count docs/TOOLS.md '[0-9]+ MCP tools'
-check_tool_count package.json '[0-9]+ weather tools'
-check_tool_count server.json '[0-9]+ weather tools'
-check_tool_count .github/social-preview.html '[0-9]+ weather tools'
+# Every tool-count and test-count site in the docs, from the one table the
+# release writer rewrites from (DOC_SITES in scripts/lib/derived-facts.mjs).
+# The checker cannot cover less ground than the writer because there is one
+# list; each row must match exactly once, so a reworded or duplicated site
+# fails here instead of escaping it. test-count rows are skipped, with a
+# warning, when the suite produced no count — tool counts are still checked
+# then.
+echo ""
+echo "📋 Checking every doc count site..."
+SITES_RC=0
+SITES_OUT=$(node scripts/lib/derived-facts.mjs check-sites "$TEST_COUNT") || SITES_RC=$?
+printf '%s\n' "$SITES_OUT"
+SITE_FAILURES=$(printf '%s\n' "$SITES_OUT" | sed -nE 's/^📊 Doc count sites: .* ([0-9]+) failed.*/\1/p')
+if [ -z "$SITE_FAILURES" ]; then
+  # No summary line means the verb did not run to completion — never read that as clean.
+  echo "❌ Doc count sites: ${RED}check-sites produced no summary (exit ${SITES_RC})${NC}"
+  ERRORS=$((ERRORS+1))
+else
+  ERRORS=$((ERRORS+SITE_FAILURES))
+fi
 
 # Check MCP registry field constraints on server.json (enforced only at
 # `mcp-publisher publish` time, so a violation otherwise surfaces mid-publish).
