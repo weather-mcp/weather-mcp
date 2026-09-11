@@ -49,6 +49,8 @@ src/
 │   ├── googlePollen.ts      # Google Pollen API — optional keyed global pollen fallback
 │   ├── environmentAgency.ts # EA flood-monitoring — GB river gauges, levels, typical ranges (keyless, OGL v3)
 │   ├── jma.ts               # JMA disaster-prevention XML — Japanese warnings; conditional index revalidation
+│   ├── metno.ts             # MET Norway Locationforecast — Open-Meteo outage fallback for get_forecast;
+│   │                        #   If-Modified-Since revalidation, contact-bearing UA, 4-decimal coords
 │   ├── nifc.ts              # NIFC wildfire incidents (US)
 │   ├── firms.ts             # NASA FIRMS satellite fire detections (global)
 │   ├── acis.ts              # RCC ACIS — US daily temperature records
@@ -80,6 +82,7 @@ src/
 │   ├── eaGauges.ts          # EA station filter, measure selection, level banding (pure)
 │   ├── capParse.ts / pointInPolygon.ts  # CAP 1.2 XML → records, active filter, feed-URL allowlist; ray-casting point-in-ring (pure)
 │   ├── jmaParse.ts          # JMA index + warning-document parsers; class10 level selection (pure)
+│   ├── metnoParse.ts        # met.no timeseries → daily across the 1 h/6 h seam; symbol gloss (pure, SI in/SI out)
 │   ├── jmaAreaResolver.ts   # Coordinate → class10 area (pure) + the artifact's one lazy load site
 │   ├── jmaWarningNames.ts   # JMA warning-name English gloss and tier classification (pure)
 │   ├── composite.ts         # PNG stitch/blend/marker/encode (pure)
@@ -604,7 +607,7 @@ npm audit             # No critical vulnerabilities
 ## Project Status
 
 - **Version:** 1.29.3 — Production Ready ✅
-- **Test Coverage:** 3,350 tests, 100% pass rate
+- **Test Coverage:** 3,417 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
