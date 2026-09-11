@@ -29,6 +29,9 @@ import {
   noaaUnitsParam,
   formatElevationFromM,
   formatLuxonTime,
+  formatTemperatureFromC,
+  formatWindFromMps,
+  formatPrecipFromMm,
 } from '../utils/unitFormat.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -65,11 +68,24 @@ import type {
   EnsembleSpreadResult,
   EnsembleDay,
 } from '../utils/ensembleSpread.js';
-import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
+import { DataNotFoundError, InvalidLocationError, isRetryableError } from '../errors/ApiError.js';
+import { MetnoService } from '../services/metno.js';
+import { describeMetnoSymbol } from '../utils/metnoParse.js';
 
 /** Note shown when an auto-routed NOAA request falls back to Open-Meteo. */
 const NOAA_FALLBACK_NOTE =
   '*NOAA does not cover this location; showing Open-Meteo model data instead.*';
+
+/**
+ * Note shown when a transient Open-Meteo failure is answered by MET Norway.
+ *
+ * Same register as `NOAA_FALLBACK_NOTE` above — it names who failed and who
+ * answered — and deliberately says "is not responding" rather than "is down":
+ * this fires on one request's transient failure, which is not a claim about the
+ * service as a whole.
+ */
+const METNO_FALLBACK_NOTE =
+  '*Open-Meteo is not responding; showing MET Norway model data instead.*';
 
 /**
  * Insert a note line directly under the output's top heading (first line),
@@ -239,7 +255,17 @@ export async function handleGetForecast(
   geocodingService: GeocodingService,
   nceiService?: NCEIService,
   acisService?: AcisService,
-  criticalAlertBanner?: boolean
+  criticalAlertBanner?: boolean,
+  // Trailing and optional, so all 38 pre-existing call sites across `src/` and
+  // `tests/` pass `undefined` and compile unedited. Reordering to put it
+  // somewhere more natural would break every one of them.
+  //
+  // **A caller that forwards a shortened argument list does not get this for
+  // free.** `handleGetWeatherSummary` calls this function with six positional
+  // arguments, dropping `acisService` and `criticalAlertBanner`, so it has to
+  // pass `undefined, undefined, metnoService` to reach this slot — appending
+  // one argument there would bind the service to `acisService`.
+  metnoService?: MetnoService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as ForecastArgs, locationStore, geocodingService);
@@ -437,20 +463,79 @@ export async function handleGetForecast(
       }
     } else {
       // Use Open-Meteo for international locations
-      result = await formatOpenMeteoForecast(
-        openMeteoService,
-        nceiService,
-        latitude,
-        longitude,
-        days,
-        granularity,
-        include_precipitation_probability,
-        include_normals,
-        include_astronomy,
-        prefs,
-        detail,
-        acisService
-      );
+      try {
+        result = await formatOpenMeteoForecast(
+          openMeteoService,
+          nceiService,
+          latitude,
+          longitude,
+          days,
+          granularity,
+          include_precipitation_probability,
+          include_normals,
+          include_astronomy,
+          prefs,
+          detail,
+          acisService
+        );
+      } catch (error) {
+        // **The complement of the NOAA fallback's guard above, and getting it
+        // backwards is the whole failure mode.** That one answers "NOAA does
+        // not cover this point" — a permanent rejection. This one answers
+        // "Open-Meteo is not answering right now" — a transient failure. Swap
+        // them and we would fall back on a bad coordinate, hiding our own 400
+        // forever, while propagating the outage this exists to cover.
+        //
+        // Keyed on `isRetryableError`, **not** on `instanceof
+        // ServiceUnavailableError || instanceof RateLimitError`: the
+        // `instanceof` pair reads as the obvious choice and misses the
+        // unclassified-network case, which Open-Meteo maps to a plain
+        // `ApiError` with `isRetryable: true`.
+        //
+        // The `requestedSource !== 'auto'` arm is a copy of the NOAA
+        // fallback's own line: a forced `source: "openmeteo"` keeps its error
+        // contract, because the caller named that authority.
+        if (
+          requestedSource !== 'auto' ||
+          !metnoService ||
+          !(error instanceof Error) ||
+          !isRetryableError(error)
+        ) {
+          throw error;
+        }
+
+        let fallback: { content: Array<{ type: string; text: string }> };
+        try {
+          fallback = await formatMetnoForecast(
+            metnoService,
+            latitude,
+            longitude,
+            days,
+            granularity,
+            include_precipitation_probability,
+            prefs
+          );
+        } catch {
+          // Both down. The **original Open-Meteo error** propagates, not
+          // met.no's: the user's error contract is unchanged and met.no's
+          // message never surfaces. No fabricated forecast, no
+          // empty-but-cheerful render.
+          throw error;
+        }
+
+        // Logged after the fallback succeeded, so a `fallback: true` warn
+        // naming MET Norway means it was actually served — which is the signal
+        // the design's revisit trigger reads.
+        logger.warn('Open-Meteo failed transiently; fell back to MET Norway', {
+          latitude,
+          longitude,
+          fallback: true
+        });
+        result = fallback;
+        if (result.content.length > 0 && result.content[0]?.type === 'text' && result.content[0].text) {
+          result.content[0].text = insertNoteAfterHeading(result.content[0].text, METNO_FALLBACK_NOTE);
+        }
+      }
     }
   } catch (error) {
     // The forecast failed, but the banner may still have resolved. Carry it on
@@ -764,6 +849,122 @@ async function formatNOAAForecast(
 /**
  * Format Open-Meteo forecast data for display
  */
+/**
+ * Render a MET Norway forecast, for the Open-Meteo outage fallback only.
+ *
+ * **This never routes through `formatOpenMeteoForecast`**, which hard-codes
+ * `*Data source: Open-Meteo (Global)*` in its footer. Feeding met.no data
+ * through it would misattribute the source and breach CC BY at the same time.
+ *
+ * It matches that formatter's register closely — the same heading, the same
+ * `**Location:**` / `**Elevation:**` / `**Timezone:**` / `**Forecast Days:**`
+ * block, one `## <weekday, month day>` per day — and carries three things it
+ * does not:
+ *
+ * - **The CC BY attribution footer**, which the licence requires.
+ * - **A short-horizon disclosure.** `days` validates to 1-16 and Open-Meteo
+ *   serves all 16; met.no serves nine or ten, so a `days: 14` request answered
+ *   here is short by a third. The number comes from the aggregate, never from a
+ *   constant, so if met.no extends its horizon the line says the new number
+ *   with no code change. Silently returning 9 days for 14 is the failure
+ *   v1.25.18 already fixed once on the NOAA path.
+ * - **Unit conversion.** Open-Meteo is *asked* in the caller's display units
+ *   and its formatter therefore rounds without converting. met.no serves SI
+ *   unconditionally, so this is the only formatter in this file that must
+ *   convert — and it converts before it rounds, through the shared helpers,
+ *   rather than hand-rolling arithmetic (G69).
+ *
+ * Normals and astronomy are not rendered. Both are garnish, and garnish that is
+ * absent degrades to no section at all rather than to an apology.
+ */
+async function formatMetnoForecast(
+  metnoService: MetnoService,
+  latitude: number,
+  longitude: number,
+  days: number,
+  granularity: 'daily' | 'hourly',
+  include_precipitation_probability: boolean,
+  prefs: UnitPreferences
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  // met.no publishes UTC timestamps and no timezone of its own, and on this
+  // path Open-Meteo — which normally supplies one — is the thing that just
+  // failed. `tz-lookup` resolves the real IANA zone from the coordinates, so
+  // the days are bucketed in the caller's own local time and the header names
+  // the zone exactly as the Open-Meteo path does.
+  const timezone = guessTimezoneFromCoords(latitude, longitude);
+  const aggregate = await metnoService.getForecast(latitude, longitude, timezone);
+
+  const served = aggregate.days.slice(0, days);
+
+  let output = `# Weather Forecast (Daily)\n\n`;
+  output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
+  if (aggregate.elevationM != null) {
+    output += `**Elevation:** ${formatElevationFromM(aggregate.elevationM, prefs)}\n`;
+  }
+  output += `**Timezone:** ${aggregate.timezone}\n`;
+  output += `**Forecast Days:** ${served.length}\n\n`;
+
+  // An hourly request answered here renders the daily view and says so. met.no
+  // publishes six-hourly steps beyond about two and a half days, so a
+  // fabricated hourly series off that tail would be an invention; a downgrade
+  // the caller is told about is the honest answer.
+  if (granularity === 'hourly') {
+    output += `*MET Norway publishes no hourly product through this fallback; showing the daily forecast instead.*\n\n`;
+  }
+
+  // Computed from what was served, never from a constant — same rule as the
+  // NOAA horizon disclosure this mirrors, minus its `source: "openmeteo"`
+  // pointer, which would be wrong advice when Open-Meteo is what just failed.
+  if (served.length < days) {
+    output += `*MET Norway publishes a ${served.length}-day forecast; showing all ${served.length} of the ${days} days requested.*\n\n`;
+  }
+
+  for (const day of served) {
+    const dt = DateTime.fromISO(day.date, { zone: aggregate.timezone });
+    output += `## ${dt.toLocaleString({ weekday: 'long', month: 'long', day: 'numeric' })}\n`;
+
+    // A day the model did not publish a half of drops only that half; the
+    // survivor still renders, matching the Open-Meteo formatter's behaviour.
+    if (day.temperatureMaxC != null || day.temperatureMinC != null) {
+      let line = `**Temperature:**`;
+      if (day.temperatureMaxC != null) {
+        line += ` High ${formatTemperatureFromC(day.temperatureMaxC, prefs)}`;
+      }
+      if (day.temperatureMaxC != null && day.temperatureMinC != null) line += ` /`;
+      if (day.temperatureMinC != null) {
+        line += ` Low ${formatTemperatureFromC(day.temperatureMinC, prefs)}`;
+      }
+      output += `${line}\n`;
+    }
+
+    if (include_precipitation_probability && day.precipitationProbabilityMaxPct != null) {
+      output += `**Precipitation Chance:** ${Math.round(day.precipitationProbabilityMaxPct)}%\n`;
+    }
+
+    if (day.precipitationMm != null && day.precipitationMm > 0) {
+      output += `**Precipitation:** ${formatPrecipFromMm(day.precipitationMm, prefs)}\n`;
+    }
+
+    if (day.windSpeedMaxMps != null) {
+      const windDir = day.windFromDirectionDeg != null
+        ? ` ${getWindDirection(day.windFromDirectionDeg)}`
+        : '';
+      output += `**Wind:** ${formatWindFromMps(day.windSpeedMaxMps, prefs)}${windDir}\n`;
+    }
+
+    if (day.symbolCode != null) {
+      output += `**Conditions:** ${describeMetnoSymbol(day.symbolCode)}\n`;
+    }
+
+    output += `\n`;
+  }
+
+  output += `---\n`;
+  output += `*Forecast data by MET Norway (CC BY 4.0)*\n`;
+
+  return { content: [{ type: 'text', text: output }] };
+}
+
 async function formatOpenMeteoForecast(
   openMeteoService: OpenMeteoService,
   nceiService: NCEIService | undefined,

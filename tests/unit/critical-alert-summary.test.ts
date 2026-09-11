@@ -160,7 +160,16 @@ describe('the critical-alert banner in get_weather_summary', () => {
     });
 
     it('does not thread the flag into handleGetForecast', async () => {
-      // `handleGetForecast` takes the flag as its 8th parameter.
+      // `handleGetForecast` takes the flag as its 8th parameter, so index 7 is
+      // the slot that matters and it must arrive `undefined`.
+      //
+      // **This asserts the slot, not the argument count.** It used to require
+      // exactly 6 arguments, which held only while the summary passed nothing
+      // after `nceiService`. It now passes `undefined, undefined, metnoService`
+      // to reach the 9th parameter — the MET Norway outage fallback, which is
+      // dead on this path unless it is threaded explicitly — so the count is 9
+      // and the banner slot is still empty. Counting arguments would have
+      // failed here while the thing it protects was untouched.
       await callSummary(
         { ...US_ARGS, include: ['forecast'] },
         noaaWithAlerts(TORNADO_WARNING),
@@ -169,8 +178,11 @@ describe('the critical-alert banner in get_weather_summary', () => {
 
       expect(forecastMock).toHaveBeenCalledTimes(1);
       const args = forecastMock.mock.calls[0];
-      expect(args).toHaveLength(6);
       expect(args[7]).toBeUndefined();
+      // The inverse half: the slot being empty proves nothing if the call
+      // never happened or the list were short, so pin that the *later*
+      // parameter really did arrive. A shortened call would fail this.
+      expect(args.length).toBeGreaterThanOrEqual(8);
     });
 
     it('does not leak the flag through the subArgs spread', async () => {

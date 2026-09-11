@@ -531,6 +531,19 @@ describe('aggregateMetnoDaily — timezone', () => {
     expect(tokyo.days[0]!.startsAt).toContain('T09:00');
   });
 
+  it('reads elevation from the third slot of a GeoJSON coordinate tuple', () => {
+    // `[longitude, latitude, altitude]` — the reverse of every other coordinate
+    // pair here, so it is read positionally rather than by convention.
+    const aggregate = aggregateMetnoDaily(buildSeries(53, 120), 'UTC');
+    expect(aggregate.elevationM).toBe(3);
+  });
+
+  it('leaves elevation absent when the tuple carries no altitude', () => {
+    const response = buildSeries(53, 120);
+    response.geometry = { type: 'Point', coordinates: [10.7522, 59.9139] };
+    expect(aggregateMetnoDaily(response, 'UTC').elevationM).toBeUndefined();
+  });
+
   it('rejects an unrecognized timezone rather than silently falling back to one', () => {
     expect(() => aggregateMetnoDaily(buildSeries(53, 120), 'Mars/Olympus')).toThrow(
       /unrecognized timezone/i

@@ -41,6 +41,7 @@ import { GooglePollenService } from '../services/googlePollen.js';
 import { GoogleWeatherService } from '../services/googleWeather.js';
 import { NationalCapService } from '../services/nationalCap.js';
 import { JmaService } from '../services/jma.js';
+import { MetnoService } from '../services/metno.js';
 import { EnvironmentAgencyService } from '../services/environmentAgency.js';
 import { GeocodingService } from '../services/geocoding.js';
 import type { LocationStore } from '../services/locationStore.js';
@@ -211,6 +212,18 @@ const nationalCapService = new NationalCapService();
  * through a committed class10 area geometry artifact (src/data/jmaAreas.ts).
  */
 const jmaService = new JmaService();
+
+/**
+ * Initialize the MET Norway Locationforecast service.
+ *
+ * Not a source any caller can ask for: it answers only when Open-Meteo fails
+ * transiently on an `auto`-routed non-US `get_forecast`, so the tool schema is
+ * unchanged and no `source` value names it. Keyless, and passed to **both**
+ * public paths through the forecast handler — `get_forecast` and
+ * `get_weather_summary`. Passing it to only the first would leave the fallback
+ * dead on the path a default install actually exercises.
+ */
+const metnoService = new MetnoService();
 
 /**
  * Initialize the Google Weather API service for global alerts fallback.
@@ -853,7 +866,7 @@ export function createWeatherServer(options: WeatherServerOptions): Server {
       switch (name) {
         case 'get_forecast':
           return await withAnalytics('get_forecast', async () =>
-            handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService, acisService, true)
+            handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService, acisService, true, metnoService)
           );
 
         case 'get_current_conditions':
@@ -876,7 +889,7 @@ export function createWeatherServer(options: WeatherServerOptions): Server {
             handleGetWeatherSummary(
               args, noaaService, openMeteoService, nceiService, locationStore, geocodingService,
               meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService,
-              jmaService, true
+              jmaService, true, metnoService
             )
           );
 

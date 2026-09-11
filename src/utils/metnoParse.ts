@@ -124,6 +124,14 @@ export interface MetnoDailyForecast {
 export interface MetnoDailyAggregate {
   /** The timezone every `date` and `startsAt` above is expressed in. */
   timezone: string;
+  /**
+   * Model elevation of the point, metres, from `geometry.coordinates[2]`.
+   *
+   * The tuple is GeoJSON order — **longitude, latitude, altitude** — which is
+   * the reverse of every other coordinate pair in this project, so it is read
+   * positionally at index 2 and not by convention.
+   */
+  elevationM?: number;
   /** The days served, in ascending order, trailing incomplete days already dropped. */
   days: MetnoDailyForecast[];
   /** How many of `days` cover a whole day. Never larger than `days.length`. */
@@ -333,8 +341,11 @@ export function aggregateMetnoDaily(
     throw new Error('MET Norway forecast covers no complete day');
   }
 
+  const elevationM = finiteNumber(response.geometry?.coordinates?.[2]);
+
   return {
     timezone,
+    ...(elevationM !== undefined ? { elevationM } : {}),
     days,
     completeDayCount: days.filter(day => day.complete).length,
     entriesSeen,

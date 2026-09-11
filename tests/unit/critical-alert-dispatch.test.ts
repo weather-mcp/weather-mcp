@@ -51,13 +51,31 @@ function argumentsOf(source: string, fnName: string): string {
   throw new Error(`unbalanced parentheses in the call to ${fnName}`);
 }
 
-/** The last comma-separated argument, trimmed of whitespace and comments. */
-function lastArgumentOf(source: string, fnName: string): string {
-  const args = argumentsOf(source, fnName)
+/** The comma-separated arguments, trimmed of whitespace and comments. */
+function argumentListOf(source: string, fnName: string): string[] {
+  return argumentsOf(source, fnName)
     .replace(/\/\/[^\n]*/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '');
-  const parts = args.split(',');
-  return (parts[parts.length - 1] ?? '').trim();
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split(',')
+    .map(part => part.trim());
+}
+
+/**
+ * Whether one of the call's arguments is the bare literal `true` — which is
+ * how a dispatch site enables the banner.
+ *
+ * **This pins the contract, not the position, and that is the whole point.**
+ * It used to read the *last* argument, which was true only for as long as the
+ * banner flag happened to be the final parameter of all three handlers. Adding
+ * one trailing optional service to `handleGetForecast` (the MET Norway outage
+ * fallback, v1.30.0) moved the flag off the end at two of the three sites and
+ * broke this file while the banner behaviour was completely unchanged — a test
+ * failing for a reason that has nothing to do with what it protects. A
+ * positional assertion on a signature that takes trailing optional parameters
+ * is a tripwire for the next such parameter, not a lock on the banner.
+ */
+function hasBareTrueArgument(source: string, fnName: string): boolean {
+  return argumentListOf(source, fnName).some(part => part === 'true');
 }
 
 /**
@@ -75,7 +93,7 @@ describe('critical-alert banner enablement on the public dispatch (MAJOR-2)', ()
   it.each(BANNER_ENABLED_HANDLERS)(
     '%s is called with the banner flag enabled',
     handler => {
-      expect(lastArgumentOf(SOURCE, handler)).toBe('true');
+      expect(hasBareTrueArgument(SOURCE, handler)).toBe(true);
     }
   );
 
@@ -83,7 +101,7 @@ describe('critical-alert banner enablement on the public dispatch (MAJOR-2)', ()
     // The inverse half of the assertion above (G10): three identical `true`s
     // prove nothing if `argumentsOf` silently returned an empty string. A
     // handler that is deliberately NOT banner-enabled must come back different.
-    expect(lastArgumentOf(SOURCE, 'handleGetAlerts')).not.toBe('true');
+    expect(hasBareTrueArgument(SOURCE, 'handleGetAlerts')).toBe(false);
     expect(argumentsOf(SOURCE, 'handleGetForecast')).toContain('noaaService');
   });
 
