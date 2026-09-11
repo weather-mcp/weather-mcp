@@ -5,9 +5,12 @@ describe('Cache', () => {
   let cache: Cache<string>;
 
   beforeEach(() => {
-    // Create cache with max size of 3 for testing
-    // Use a very large number instead of Infinity to avoid Node.js timeout warnings
-    cache = new Cache<string>(3, Number.MAX_SAFE_INTEGER);
+    // Create cache with max size of 3 for testing. The second argument is the
+    // cleanup *interval*, not a TTL, so it reaches setInterval: anything above
+    // 2^31-1 overflows Node's 32-bit timer and is clamped to 1ms, which is the
+    // opposite of the "effectively never" this wants (and emits a
+    // TimeoutOverflowWarning per construction).
+    cache = new Cache<string>(3, 2_147_483_647);
   });
 
   afterEach(() => {
