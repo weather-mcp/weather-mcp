@@ -89,11 +89,11 @@
   "devDependencies": {
     "@types/luxon": "^3.7.5",
     "@types/ngeohash": "^0.6.8",
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.5.0",
     "@types/pngjs": "^6.0.5",
     "@types/tz-lookup": "^6.1.2",
     "@vitest/coverage-v8": "^5.0.0",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   }
