@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.3] - 2026-09-11
+
+### Fixed
+
+- **`scripts/check-doc-versions.sh` validated nine of the sixteen doc count sites `scripts/update-docs-for-release.sh` rewrites, so any site the checker did not list was unguarded.** The checker was a hand-maintained subset of the writer, and five sites in four files — `examples/README.md`, `.env.example`, `docs/testing/TEST_SUITE_README.md` twice and `docs/publishing/PUBLISHING.md` — were managed by neither. Three of those five had already drifted: the test-suite page the README badge links to said 1,070 tests and the publishing checklist said 446, against a real suite of 3,339. Both scripts now read one table, `DOC_SITES` in `scripts/lib/derived-facts.mjs` — **twenty-one sites in eleven files**, thirteen tool-count and eight test-count — which the checker validates and the writer writes from. The table is per-site, not per-fact, and that is the whole mechanism: each row is anchored to its own sentence and must match **exactly once**, so a reworded or duplicated site fails the check instead of escaping it, and the total's rewrite cannot reach a preset count. One pattern per fact applied globally is what put `17 tools` where `6 tools` belonged on the README front page at v1.14.0, unnoticed for fifteen releases. Proven by mutation rather than asserted: with an eighteenth tool injected into `TOOL_NAMES`, all thirteen tool-count rows report the mismatch, one sweep moves all eight tool-count files together, and `docs/TOOLS.md` line 3 goes to 18 while line 5 still reads `6 tools`; a reworded row makes all three verbs refuse with the tree untouched. The writer now validates every row **before** it writes anything, so a reworded site aborts release prep ahead of the version bump rather than half-way through it. Alongside, the three stale hand-maintained test counts are corrected and now managed, `SECURITY.md`'s qualitative coverage claim drops a numeric lower bound it was never going to keep current, and `.env.example`'s preset block — stale since v1.5.0, where it called `basic` five tools and described pre-1.11 memberships — names the real presets. `tests/unit/derived-facts.test.ts` pins all twenty-one rows to their real files, so rewording any one of those sentences now fails `npm test`, not merely the checker. **No tool, parameter or server output moves, and the tool count is 17 before and after.** (`scripts/lib/derived-facts.mjs`, `scripts/check-doc-versions.sh`, `scripts/update-docs-for-release.sh`, `tests/unit/derived-facts.test.ts`, `.env.example`, `docs/testing/TEST_SUITE_README.md`, `docs/publishing/PUBLISHING.md`, `SECURITY.md`, `GOTCHAS.md` G12 retired)
+
 ## [1.29.2] - 2026-09-09
 
 ### Changed
@@ -1753,7 +1759,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.2...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.3...HEAD
+[1.29.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.2...v1.29.3
 [1.29.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.1...v1.29.2
 [1.29.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.0...v1.29.1
 [1.29.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.28.1...v1.29.0

@@ -173,7 +173,7 @@ This MCP server uses public weather APIs (NOAA and Open-Meteo) that do not requi
 - Strong TypeScript typing with strict mode
 - Graceful shutdown and resource cleanup
 - Structured logging
-- Comprehensive test coverage (131+ tests)
+- Comprehensive automated test coverage
 
 ### Recommended Security Testing
 
