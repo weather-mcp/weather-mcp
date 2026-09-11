@@ -87,7 +87,16 @@ export interface MetnoDailyForecast {
   date: string;
   /** ISO timestamp of the first entry attributed to this day, in that timezone. */
   startsAt: string;
-  /** Hours of the day covered by published aggregation windows. */
+  /**
+   * Hours of the day covered by published aggregation windows.
+   *
+   * **This can exceed 24 on the day the seam falls in**, and that is the
+   * attribution rule showing through rather than a miscount: a 6-hour window
+   * starting at 20:00 local is attributed wholly to the day it starts in, so a
+   * day holding both hourly entries and four 6-hour windows measures 26. The
+   * hours it borrows are hours the following day does not also count, so no
+   * value is read twice.
+   */
   hoursCovered: number;
   /** `hoursCovered` reaches a whole day. A leading partial day is kept; see `aggregateMetnoDaily`. */
   complete: boolean;
