@@ -1784,6 +1784,16 @@ into an integer comparison", which was right about the mechanism. `server.json`
 was byte-identical to `main` and untouched by that plan, and `main` reports the
 same ❌ from the same harness, so nothing about the branch caused it.
 
+**A second, harmless colour artifact in the same script, recorded so it is not
+chased as corruption (2026-09-11, issue-88 site half T6):** the script's own
+summary lines print their escapes **literally** — `❌ \033[0;31mFound 3
+documentation inconsistencies\033[0m` — because it uses bare `echo`, which in
+`bash` does not interpret `\033` without `-e`, and the file contains no
+`echo -e`. This is **pre-existing and identical on `main`** (verified
+byte-for-byte on both sides, and the base worktree's release dry run printed the
+same), it is unrelated to the `FORCE_COLOR` bug above, and it changes no exit
+code. Do not "fix" it as part of unrelated work.
+
 **Status:** active. **Verify line re-run 2026-09-03** (jma-service-residuals T4) — this time against the bug rather than around it: `FORCE_COLOR=1 ./scripts/check-doc-versions.sh` printed `❌ server.json description length: \033[0;31m[33m98[39m\033[0m (registry limit is 100)` and exited 1, while `env -u FORCE_COLOR` over the same unchanged `server.json` passed. The trap is intact, the mechanism is exactly as described, and `server.json` still must not be edited to satisfy it. **Not re-tested 2026-08-28** (openmeteo-nullable-series-types
 T6): the run invoked the script as `env -u FORCE_COLOR` throughout and it reported
 `server.json description length: 98 (≤ 100)` correctly. That is the workaround
@@ -4856,6 +4866,65 @@ for `commit-identity.sh` piped into anything; the real fix is for the calling
 command to test the exit status. Related: [G41] (a check that cannot fail), [G47]
 (a control that proves the measurement happened at all), [G28] (a probe that fails
 reporting as a clean negative), [G88] (the other worktree/repo-boundary trap).
+
+---
+
+## G92 — A diff-of-diffs between two trees is never empty, because `git diff` stamps each file's blob hashes into the header
+
+**Trigger:** proving two runs of the same command behaved identically by
+comparing `git diff` output from two worktrees — a branch checkout and a base
+checkout — over the files the command writes.
+
+**Rule:** compare the **hunks**, not the stream. Pipe both sides through
+`grep -v '^index '` before `diff`, and pass `--unified=0` as well. Better still,
+compare the **fact under test** rather than bytes: serialize the values the
+change actually owns (a capture manifest) and diff those, so a multi-purpose
+command that legitimately rewrites other things cannot make a correct run look
+wrong.
+
+**Why:** `git diff` emits `index <pre-image>..<post-image>` for every file, and
+those are content hashes of that file in each tree. If the two trees differ in
+the file **at all** — even on a line the command under test never touches — all
+four hashes differ and the diff-of-diffs is non-empty while both runs behaved
+identically. No context setting suppresses the header: `--unified=0` fixes the
+*adjacent-line* half of this trap, where a branch-only line near a changed line
+bleeds into the context and makes the two streams differ. They are two halves of
+one mistake — comparing the bytes of a diff instead of the behaviour it
+describes — and fixing only the half you have met leaves a check that still
+cannot pass.
+
+**The tell is that the acceptance criterion is unsatisfiable on correct work.**
+If the comparison is meant to prove "the two writers agree" and the two trees
+were *made* to differ by the very change under test, then whole-stream equality
+was never achievable. Re-measure the invariant rather than editing the tree to
+satisfy it ([G41]).
+
+**Verify:** in any two worktrees of this repo that differ in a tracked file,
+run the same command in both, then
+`diff <(git -C A diff --unified=0 -- F) <(git -C B diff --unified=0 -- F)` and
+`diff <(git -C A diff --unified=0 -- F | grep -v '^index ') <(git -C B diff --unified=0 -- F | grep -v '^index ')`
+— the first is non-empty, the second is empty.
+
+**Evidence:** 2026-09-11 (issue-88 site half, T6 E5). Two worktrees — the branch
+at `8127a1c` and `main` at `8d604bd` — each ran
+`./scripts/update-docs-for-release.sh patch`, and the plan required the
+zero-context diff-of-diffs over `CLAUDE.md`, `docs/README.md`, `package.json`,
+`package-lock.json` and `server.json` to be **empty**. It differed in exactly two
+lines, both `index` headers, for `CLAUDE.md` and `docs/README.md` — the two files
+whose test count T3 had raised on the branch. Excluding the header lines the two
+streams were byte-identical, which is the claim that was actually under test.
+The corroboration that this is header noise and not behaviour: `package.json`,
+`package-lock.json` and `server.json` carried **identical** `index` lines on both
+sides, correct because that plan never touched them. The `--unified=0` half of
+the same trap had already been caught at review time (`codex-R2`) and fixed;
+the header half survived into the run because the fix addressed the instance
+rather than the mechanism.
+
+**Status:** active. Related: [G41] (the check itself was the thing that was
+wrong), [G10] (the other "prove two runs agree" trap — an identical hash is not
+evidence until you show the construct was rendered on both sides), [G42] (the
+release writer is the multi-purpose command that makes whole-file comparison
+hopeless here).
 
 ---
 
