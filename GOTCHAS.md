@@ -3921,6 +3921,16 @@ deferral note said was the right endpoint.
 sibling endpoint on the same host as a positive control.** `last-modified` from
 the origin with a cache-buster is the cheap version:
 
+**But check the cache-buster does not suppress the header you came to read** —
+on some hosts it does, and then the check reports the failure it was built to
+detect. `api.met.no` sends `last-modified` on a plain request and **omits it
+entirely** when an unknown query parameter is appended, so the `?cb=$RANDOM`
+form below reads `<none>` at every key and looks exactly like a frozen feed.
+Take one reading with the buster and one without before trusting either: if
+they disagree about whether the header exists at all, the buster is the
+variable, not the upstream. Where the buster has to be dropped, the sibling
+control carries the whole check, so it stops being optional.
+
 ```bash
 curl -s -I "https://host/path/<key>.json?cb=$RANDOM" | grep -i '^last-modified'
 ```
@@ -4763,10 +4773,22 @@ This is the case [G50] does not reach. G50 fires when a temporary write lands on
 a file in *neither* task's list; here the mutated files are in the mutating
 task's **own** declared list, which is exactly what makes the pair look safe.
 
+**The read set is the whole tree, not just `tests/`.** The entry was written
+about a sibling mutating a test file, but a full suite compiles and exercises
+`src/` too, so a sibling mid-edit **anywhere** is enough. 2026-09-11
+(met.no fallback): T4 and T5 were a declared `parallel-safe` fork on genuinely
+disjoint file lists, and T4's acceptance — a full green gate — ran while T5 had
+three handler files half-written. T4 reported two failing critical-alert files
+as "unrelated to my work", which was the correct call and cost a round trip to
+establish; they were T5's, and they were real. A subagent that stops and reports
+rather than fixing a sibling's file is behaving well; the marker is what is
+wrong. **`parallel-safe` requires disjoint *acceptance*, not just disjoint
+files**, and a full-gate acceptance is disjoint from nothing.
+
 **Verify:** for each `parallel-safe` pair, list what each task's acceptance
 *reads*, not what it writes. If either acceptance step is `npm test`, the full
 gate, or a script that runs them, the read set is the whole tree and the pair is
-only safe if neither task touches anything under `tests/` — including
+only safe if neither task writes anything the suite loads — including
 temporarily.
 
 **Evidence:** 2026-09-09 (issue-95-server-factory). Filed as `codex-R2` by the
@@ -4927,6 +4949,67 @@ release writer is the multi-purpose command that makes whole-file comparison
 hopeless here).
 
 ---
+
+---
+
+## G93 — A trailing-optional parameter makes *position* a moving target, for every selective-forwarding caller and every positional assertion
+
+**Trigger:** appending an optional parameter to a function that already ends in
+a run of optional ones — the house pattern here for threading a new service
+into a handler without touching its existing call sites.
+
+**Rule:** appending is safe for the **signature** and unsafe for two things
+around it.
+
+- **A caller that forwards a *shortened* argument list does not reach the new
+  slot by appending.** Count the parameters that caller omits and pass an
+  explicit `undefined` for each one before the new argument. Reordering the
+  signature to put the new parameter somewhere more natural is the tempting
+  wrong remedy: it breaks every call site the trailing position exists to
+  protect.
+- **An assertion that finds a value by its position breaks while the behaviour
+  it protects is unchanged.** Pin the contract — *is this flag among the
+  arguments*, *is this slot empty* — not the index or the argument count.
+
+**Why:** the whole point of a trailing optional is that 38 call sites compile
+unedited, and that success is what hides the two exceptions. The caller case
+fails *loudly* when the types differ (a `MetnoService` will not assign to an
+`AcisService`) and **silently** when they do not — a service handed to the wrong
+parameter, which is the same shape as [G19]'s warning one level down. The
+assertion case is worse because it fails **red on correct work**: the next
+person sees a critical-alert test failing on a diff that never touched the
+banner, and the cheapest way to make it green is to change the number, which
+re-arms the same tripwire for the parameter after this one.
+
+**Verify:** for each caller of the changed function, count its actual arguments
+against the parameter list and check the new value lands in the slot you meant.
+Then `grep -rn "toHaveLength(\|mock.calls\[0\]\[" tests/` over the tests that
+exercise those callers, and `grep -rn 'last[A-Z][a-zA-Z]*Of(' tests/` for
+source-scraping helpers keyed on position.
+
+**Evidence:** 2026-09-11 (`cf102f5`, met.no fallback T5). `metnoService` became
+`handleGetForecast`'s 9th parameter and all 38 external call sites compiled
+unedited, exactly as the plan predicted. Two things it did not predict.
+`handleGetWeatherSummary` calls that function with **six** positional arguments,
+dropping `acisService` and `criticalAlertBanner`, so appending bound the service
+to the `acisService` slot — filed pre-run as `gemini-R1` and fixed with an
+explicit `undefined, undefined, metnoService`. And two pre-existing
+critical-alert tests went red on behaviour that was **provably unchanged**:
+`critical-alert-dispatch.test.ts` asserted the banner flag was the *last*
+dispatch argument, and `critical-alert-summary.test.ts` that the summary passed
+*exactly six*. Neither was among the nine lock files the plan named, and the
+plan's own enumeration grep could not have found them — it requires
+`handleGetForecast(` with a paren, and the dispatch test builds that string at
+runtime from a bare name. Both were re-pinned to the contract and three
+mutations confirm they still catch a dropped flag, a threaded flag, and the
+summary dropping the service.
+
+**Status:** active. Related: [G19] (the summary substitutes its own argument
+list rather than forwarding an absent parameter — this is the positional
+mechanic underneath that rule), [G62] (the other "a lock breaks on a change it
+was not protecting against" shape), [G45] (a mutation only goes red where the
+contract can reach it — the reason re-pinning to the contract is the fix and
+bumping the number is not).
 
 ---
 
