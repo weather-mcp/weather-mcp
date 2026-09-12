@@ -96,7 +96,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 
 ## Feature highlights
 
-- **Smart source selection** — US queries use NOAA (detailed, includes forecaster narratives); everywhere else uses Open-Meteo. You never have to pick — and on a US *hourly* forecast the answer tells you which product you got and when NOAA last published it, so reaching for `source="openmeteo"` is a choice you can make rather than one made silently for you.
+- **Smart source selection** — US queries use NOAA (detailed, includes forecaster narratives); everywhere else uses Open-Meteo. You never have to pick — and on a US *hourly* forecast the answer tells you which product you got and when NOAA last published it, so reaching for `source="openmeteo"` is a choice you can make rather than one made silently for you. If Open-Meteo is having an outage, a forecast outside the US is answered by MET Norway rather than failing, and says so.
 - **International weather alerts** — `get_alerts` routes by country: NOAA in the US, Environment and Climate Change Canada alerts in Canada, the official national warnings of 38 European countries via EUMETNET MeteoAlarm, the national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG), and the Japan Meteorological Agency's own disaster-prevention feed in Japan — shown unmodified, with the issuing service credited. Where a feed publishes geometry inline, warnings are matched to your exact point by the alert's own polygon rather than to the whole country (the Philippines and Indonesia today; Europe remains country-level). Japanese warnings are matched to your point by JMA warning area, with the Japanese name shown as published and an English gloss beside it. Border cities like Toronto get the right country's alerts, not the nearest bounding box's.
 - **Real observations worldwide** — ask for what a station is *actually reporting* and `get_current_conditions` will read the nearest airport's METAR (`source="metar"`): a genuine instrument reading anywhere on earth, with the station, its distance, and the observation age always stated. Outside the US this is the difference between a measurement and a model estimate.
 - **Model agreement** — ask *"how confident is this forecast?"* and `compare_models=true` compares five global models (GFS, ECMWF, ICON, GEM, UKMO) in one request, summarizing where they agree and where they split rather than dumping five forecasts. Spread across models is a proxy for uncertainty, not a guarantee — a tight spread can still be wrong, and the output says so.
@@ -119,6 +119,7 @@ All free, all public, no authentication required:
 |--------|----------|----------|
 | [NOAA Weather API](https://www.weather.gov/documentation/services-web-api) | US forecasts, current conditions, alerts, fire weather | US |
 | [Open-Meteo](https://open-meteo.com/) | Global forecasts, historical data (1940+), air quality, marine, geocoding, climate normals, fire-weather inputs | Global |
+| [MET Norway](https://api.met.no/weatherapi/locationforecast/2.0/documentation) | Global forecasts, used only when Open-Meteo fails transiently outside the US (about a nine-day horizon, daily only) — CC BY 4.0 | Global |
 | [NOAA NWPS](https://water.noaa.gov/) | River levels, streamflow, flood stages | US |
 | [Environment Agency](https://environment.data.gov.uk/flood-monitoring/doc/reference) | Observed river levels from the real-time gauge network, with published typical ranges — Open Government Licence v3 | Great Britain |
 | [RCC ACIS](https://www.rcc-acis.org/) | Daily record high/low temperatures | US |
@@ -429,4 +430,4 @@ Contributions are welcome — this is a single-maintainer project and issues, PR
 
 ---
 
-*Weather data provided by NOAA, Open-Meteo, USGS, NIFC, RainViewer, and Blitzortung.org. This project is not affiliated with or endorsed by any of these providers. Do not rely on this server as your sole source for safety-critical decisions — always consult official warnings and forecasts.*
+*Weather data provided by NOAA, Open-Meteo, MET Norway, USGS, NIFC, RainViewer, and Blitzortung.org. This project is not affiliated with or endorsed by any of these providers. Do not rely on this server as your sole source for safety-critical decisions — always consult official warnings and forecasts.*

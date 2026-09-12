@@ -78,6 +78,22 @@ Check:
 
 ### Open-Meteo API Errors
 
+**`get_forecast` outside the US does not show most of these.** A transient
+Open-Meteo failure — a 5xx, a rate limit, a timeout, or a network failure, after
+its own retries are spent — is answered by MET Norway instead, and you get a
+forecast rather than an error. The messages below are what you see when that
+fallback does not apply or does not help:
+
+- **Another tool asked.** Only `get_forecast` (and the forecast section of
+  `get_weather_summary`) has this fallback. `get_historical_weather`,
+  `get_air_quality` and `get_marine_conditions` surface the message directly.
+- **You forced `source: "openmeteo"`.** Naming the authority means the error
+  propagates; the server does not substitute a different one behind your back.
+- **The failure is permanent, not transient.** A 400 on a bad coordinate is
+  ours to fix, not an outage, so it is never retried elsewhere.
+- **MET Norway also failed.** The **original Open-Meteo error** is what
+  propagates — MET Norway's own message never surfaces.
+
 #### Service Outage (5xx errors)
 ```
 Open-Meteo API server error: Service temporarily unavailable
