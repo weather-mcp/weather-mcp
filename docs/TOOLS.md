@@ -57,14 +57,46 @@ Get weather forecast for any location worldwide.
 - `include_astronomy` (optional): Include a per-day astronomy block — moon phase name, illumination %, moonrise/moonset, and civil/nautical/astronomical twilight times — plus one next-full-moon / next-new-moon line per response (default: false, daily forecasts only; computed locally, no API calls). Polar days render explicit "none (polar day)" / "none (polar night)" wording
 - `compare_models` (optional): Compare five global weather models and summarize their agreement instead of returning a single forecast (default: false) — see **Model comparison** below
 - `ensemble_spread` (optional): Summarize one model's ensemble members instead of returning a single forecast (default: false) — see **Ensemble spread** below. Mutually exclusive with `compare_models`
-- `source` (optional): "auto" (default), "noaa" (US only), or "openmeteo" (global). **At `granularity: "hourly"` the choice is worth knowing about**, and `auto` now says which product answered. NOAA's hourly precipitation probability is a *human-adjusted* chance over the whole grid box, republished on the forecaster's cadence rather than a model run's — the `**Updated:**` line in the response header is that cadence's last tick. `source: "openmeteo"` gives a model view on a faster cadence. The two can legitimately disagree at hourly resolution and neither is wrong, so the tool discloses the choice rather than making it silently. Daily forecasts are unaffected: the NOAA daily product is the forecaster's own on a cadence that suits a day-ahead question
+- `source` (optional): "auto" (default), "noaa" (US only), or "openmeteo" (global). **There is no `"metno"` value** — MET Norway answers only as an outage fallback, never as a source you can ask for (see the Description below). A forced `source: "openmeteo"` therefore does **not** fall back: you named that authority and you get its error. **At `granularity: "hourly"` the choice is worth knowing about**, and `auto` now says which product answered. NOAA's hourly precipitation probability is a *human-adjusted* chance over the whole grid box, republished on the forecaster's cadence rather than a model run's — the `**Updated:**` line in the response header is that cadence's last tick. `source: "openmeteo"` gives a model view on a faster cadence. The two can legitimately disagree at hourly resolution and neither is wrong, so the tool discloses the choice rather than making it silently. Daily forecasts are unaffected: the NOAA daily product is the forecaster's own on a cadence that suits a day-ahead question
 - `units` (optional): "imperial" (default) or "metric" — see [Units & Localization](#units--localization)
 - Unit overrides (optional): `temperature_unit`, `wind_speed_unit`, `precipitation_unit`, `pressure_unit`, `distance_unit`, `time_format`
 
 *Coordinates not required when `location_name` or `city_name` is provided. Precedence: coordinates > `location_name` > `city_name`.
 
 **Description:**
-Automatically selects the best data source: NOAA for US locations (more detailed) or Open-Meteo for international locations — and on a US **hourly** request it names the product it picked, because NOAA's human-adjusted grid and Open-Meteo's model output can disagree at that resolution, with `source: "openmeteo"` one parameter away. Supports extended forecasts up to 16 days on the Open-Meteo path — NOAA publishes 7 days daily and about 6.5 days hourly, and a request beyond that renders what NOAA has plus a disclosure line naming the delivered and requested counts. Includes sunrise/sunset times, daylight duration, temperature, precipitation, wind, and UV index. When a location is resolved from `location_name` or `city_name`, the matched place is shown in a `**Location:**` header so ambiguous names are transparent.
+Automatically selects the best data source: NOAA for US locations (more detailed) or Open-Meteo for international locations, with **MET Norway as an outage fallback behind the Open-Meteo branch** — and on a US **hourly** request it names the product it picked, because NOAA's human-adjusted grid and Open-Meteo's model output can disagree at that resolution, with `source: "openmeteo"` one parameter away. Supports extended forecasts up to 16 days on the Open-Meteo path — NOAA publishes 7 days daily and about 6.5 days hourly, and a request beyond that renders what NOAA has plus a disclosure line naming the delivered and requested counts. Includes sunrise/sunset times, daylight duration, temperature, precipitation, wind, and UV index. When a location is resolved from `location_name` or `city_name`, the matched place is shown in a `**Location:**` header so ambiguous names are transparent.
+
+**Routing, including the fallback branch.** `auto` sends US points to NOAA and
+everything else to Open-Meteo. Two branches then catch a failure rather than
+propagating it, and they answer **opposite** questions:
+
+| branch | fires when | answered by |
+|---|---|---|
+| NOAA -> Open-Meteo | NOAA says it does not cover this point (a 404 or other 4xx) — a permanent rejection, and the US routing box overruns the border, so Toronto and Vancouver land here | Open-Meteo, with a note saying so |
+| Open-Meteo -> MET Norway | Open-Meteo fails **transiently** — a rate limit, a 5xx, a timeout, or a network failure, after its own retries are spent | MET Norway Locationforecast, with a note saying so |
+
+The second branch is new in v1.30.0 and has three properties worth stating
+plainly:
+
+- **It fires only on a transient failure, and only on `auto`.** An Open-Meteo
+  400 means a bad coordinate or a bug on our side, and falling back there would
+  hide that defect permanently, so a 400 still propagates. A forced
+  `source: "openmeteo"` also still propagates, because you named that authority.
+- **MET Norway's horizon is shorter.** It publishes about nine days against
+  Open-Meteo's sixteen, so a `days: 14` request answered by the fallback renders
+  nine days **and a line saying it served nine of the fourteen requested**. It
+  publishes no hourly product through this path either: a `granularity: "hourly"`
+  request renders the daily view with a sentence saying so, rather than a
+  fabricated hourly series.
+- **It carries its own attribution**, `*Forecast data by MET Norway (CC BY 4.0)*`,
+  and never Open-Meteo's — the response tells you which service answered it.
+
+If MET Norway also fails, the **original Open-Meteo error** is what you see. No
+forecast is fabricated and no empty-but-cheerful response is returned. The same
+fallback applies to the `forecast` section of `get_weather_summary`, which routes
+through this handler.
+
+Every request Open-Meteo answers normally is byte-for-byte unchanged.
 
 **Model comparison (`compare_models=true`).**
 Answers "how confident is this forecast?" — a question a single deterministic

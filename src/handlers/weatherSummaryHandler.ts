@@ -25,6 +25,7 @@ import { handleGetCurrentConditions } from './currentConditionsHandler.js';
 import { handleGetForecast } from './forecastHandler.js';
 import { handleGetAlerts } from './alertsHandler.js';
 import { JmaService } from '../services/jma.js';
+import { MetnoService } from '../services/metno.js';
 import { handleGetAirQuality } from './airQualityHandler.js';
 import { handleGetLightningActivity } from './lightningHandler.js';
 import { resolveCriticalAlertBanner } from './criticalAlertBanner.js';
@@ -123,7 +124,14 @@ export async function handleGetWeatherSummary(
   // parameter and not a member of `args`. Neither survives a future edit
   // unnoticed, which is why `tests/unit/critical-alert-summary.test.ts` counts
   // the banner's occurrences rather than merely asserting it is present.
-  criticalAlertBanner?: boolean
+  criticalAlertBanner?: boolean,
+  // Threaded *down*, like every trailing parameter above except the banner: the
+  // summary renders its forecast section through `handleGetForecast`, so the
+  // Open-Meteo outage fallback is dead on this path unless the service arrives
+  // here and is forwarded. This is the path a default install actually
+  // exercises, so "the summary inherits it through the shared formatter" is the
+  // exact assumption G19 exists to refuse.
+  metnoService?: MetnoService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   const typedArgs = (args ?? {}) as WeatherSummaryArgs;
 
@@ -191,8 +199,17 @@ export async function handleGetWeatherSummary(
           );
           break;
         case 'forecast':
+          // **The two `undefined`s are load-bearing and are not padding.**
+          // This call deliberately drops `acisService` (7th) and
+          // `criticalAlertBanner` (8th) — the banner because the summary
+          // renders it once itself, above its own header. `metnoService` is
+          // the 9th parameter, so appending it here would bind it to
+          // `acisService` instead: a strict-type failure at best, and a
+          // service handed to the wrong slot at worst. Count the omitted
+          // parameters rather than trusting the tail.
           sectionResult = await handleGetForecast(
-            { ...subArgs, days }, noaaService, openMeteoService, locationStore, geocodingService, nceiService
+            { ...subArgs, days }, noaaService, openMeteoService, locationStore, geocodingService,
+            nceiService, undefined, undefined, metnoService
           );
           break;
         case 'alerts':

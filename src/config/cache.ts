@@ -217,6 +217,21 @@ export const CacheConfig = {
     // copy each refresh and merges the volatile reading into that copy;
     // only the threshold projection is cached at this TTL.
     eaStationDetail: 24 * HOUR,
+
+    // met.no Locationforecast parse (GET /locationforecast/2.0/complete) —
+    // **retention**, not freshness, mirroring jmaIndex above.
+    //
+    // met.no's ToS mandates conditional requests, and the response carries
+    // `Last-Modified`/`Expires` but no `ETag` — an `If-Modified-Since` replay
+    // returns 304 with zero bytes. Freshness (how long the server answers
+    // without asking met.no at all) and retention (how long the parsed
+    // timeseries is kept so a 304 has something to reuse) are two different
+    // clocks; collapsing them onto one short TTL would evict the parse at
+    // exactly the moment the validator became useful, so the conditional
+    // request could never fire. Twelve hours is safe at any age — a 304
+    // means met.no itself says the parse is current — and bounds the LRU
+    // against a series that runs to ~9-10 days per point (D3).
+    metnoForecast: 12 * HOUR,
   },
 } as const;
 
