@@ -5013,6 +5013,52 @@ bumping the number is not).
 
 ---
 
+## G94 — A fallback that turns an error into an answer leaves the error-handling page overstating what fails, and adds an upstream no changelog bullet ever names
+
+**Trigger:** adding a fallback behind an existing upstream — a second service
+that answers when the first one cannot — or writing the `## Docs impact` for
+one.
+
+**Rule:** a fallback changes two pages that its own changelog bullet will not
+send you to. Walk `docs/ERROR_HANDLING.md` and narrow every error the fallback
+now prevents, naming the cases where the message still applies. Then walk the
+`README.md` **Data sources** table and the attribution footer, because the
+fallback's upstream is a new public data source even though nothing in the
+feature list changed.
+
+**Why:** the bullet for a fallback is written about *resilience* — "X no longer
+fails when Y is down" — so the docs walk goes to the tool reference and stops.
+But the error catalogue is an inventory of what a user sees when something
+breaks, and the fallback has just made one of its entries wrong; and the
+source table is an inventory of who the data comes from, which a resilience
+bullet gives no reason to open. Both pages are inventories, and a change framed
+as behaviour never points at an inventory.
+
+**Verify:** for the upstream now behind a fallback, read every error block on
+`docs/ERROR_HANDLING.md` and ask whether a user would still see it. Then
+`grep -n '<new upstream>' README.md` and confirm a hit in the sources table and
+in the attribution footer, not only in the intro sentence.
+
+**Evidence:** 2026-09-11, v1.30.0 release, step 4b. The met.no fallback's docs
+task (`817d7f3`) covered `docs/TOOLS.md` thoroughly — a routing table, the
+absent `"metno"` source value, the horizon, the attribution, the both-down
+case — and added MET Norway to the README's intro sentence. Three sites it did
+not reach. `docs/ERROR_HANDLING.md` still presented an Open-Meteo 5xx and a
+connection failure as terminal, which for `get_forecast` outside the US they no
+longer are. The README **Data sources** table had no MET Norway row, though
+every other upstream including later additions has one. And the attribution
+footer named every source but MET Norway, whose CC BY 4.0 licence is the one
+here that actually mandates attribution. All three found by the release-stage
+docs walk, the same backstop that caught [G78].
+
+**Status:** active. Related: [G78] (the other `docs/ERROR_HANDLING.md` gap, and
+the inverse case — there a failure rendered nothing, here a failure stopped
+happening), [G31] (the architecture map goes stale for the same reason: a new
+module has no user-visible bullet to hang off), [G19] (the summary path a
+fallback must be threaded into explicitly).
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
