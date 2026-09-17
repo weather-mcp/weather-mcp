@@ -258,6 +258,35 @@ HTTP status and error type — never a URL and never the raw upstream error — 
 so a slow or dead NOAA alerts endpoint never adds latency to a forecast. Nothing about the failure
 reaches the tool result.
 
+### Wildfire Containment: `not reported`
+
+`get_wildfire_info` renders `**Containment:** not reported` — with no percentage and no bar — for a
+fire the National Interagency Fire Center published no usable containment for. NIFC leaves the field
+empty for roughly a quarter of current perimeters, and an out-of-range value (a negative number, or
+one above 100) is treated the same way.
+
+**This is a gap in NIFC's data, not a server failure.** No fetch failed, nothing was swallowed, and
+the rest of the report is complete and current. There is no error to act on and no retry that would
+fill the field in.
+
+**Such a fire is still treated as uncontained by the safety assessment.** It drives the danger tier
+exactly as a 0%-contained fire would, and it is never excluded from the assessment the way a fire
+displaying `100%` is. An unknown containment is not evidence of containment, and this is deliberately
+the cautious reading.
+
+The value is **not clamped into range**. Clamping a `150` to `100` would print a figure NIFC never
+published *and* drop the fire out of the assessment — the less cautious reading of a bad value. An
+unusable value is recorded once to the **stderr log** as a data-quality warning carrying the incident
+name and the raw value; a plain empty field logs nothing, because it is the normal shape for a
+quarter of live rows.
+
+Containment is one attribute of one fire, so a bad value never fails the report and never removes
+any other fire's information. `0` is a real reading — a new fire is 0% contained — and renders as
+`**Containment:** 0% ░░░░░░░░░░`, not as `not reported`.
+
+On the FIRMS path (everywhere outside the US) containment does not exist at all: satellite heat
+detections carry no containment, so no containment line is rendered in either form.
+
 ## Service Status Tool
 
 ### Usage

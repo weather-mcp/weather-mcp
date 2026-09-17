@@ -896,15 +896,15 @@ Country routing matches `get_alerts`: saved/geocoded locations use their known c
 **Returns (US / NIFC):**
 - Active wildfire locations within search radius
 - Fire size in acres and hectares
-- Containment percentage with visual indicator
-- Distance from query location to each fire
+- Containment percentage with a ten-cell bar showing the **completed tenths of the printed figure**, so the bar is full only at `100%` and empty below `10%`. A fire NIFC publishes no usable containment for reads `not reported`, with **no bar** — and still counts as **uncontained** for the safety assessment, because an unknown containment is not evidence of containment
+- Distance from query location to each fire, in kilometres and miles — the miles figure is derived from the **displayed** kilometres at two decimals, so it can never disagree with the km figure or the tier beside it
 - Discovery date and days active
 - Fire type (Wildfire vs Prescribed Fire)
 - Location details (state, county, city)
 
 **Returns (elsewhere / FIRMS):**
 - Detection clusters within search radius, nearest first
-- Per cluster: detection count, distance + bearing, centroid, peak fire radiative power (MW), newest detection age, day/night mix, confidence summary, satellite
+- Per cluster: detection count, distance + bearing, centroid, peak fire radiative power (MW), newest detection age, day/night mix, confidence summary, satellite. As on the NIFC path, the miles figure is derived from the **displayed** kilometres at two decimals
 
 **Both modes** include the 4-level safety assessment, banded on the nearest uncontained fire's distance (NIFC) or the nearest detection cluster's distance (FIRMS) **as displayed** (rounded to 0.1 km), so the tier can never disagree with the number shown:
 - **EXTREME DANGER** (≤5 km): Evacuate if advised
