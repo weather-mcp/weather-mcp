@@ -25,7 +25,7 @@ import { GeocodingService } from '../services/geocoding.js';
 import { resolveCountryCode, resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { validateDetail } from '../utils/validation.js';
 import { guessTimezoneFromCoords, formatObservationAge } from '../utils/timezone.js';
-import { calculateDistance } from '../utils/distance.js';
+import { calculateDistance, kmToMiles } from '../utils/distance.js';
 import { displayValue } from '../utils/displayBanding.js';
 import { isInUS } from '../utils/geography.js';
 import { logger } from '../utils/logger.js';
@@ -109,6 +109,26 @@ function formatContainmentLine(containment: number | null): string {
   const cells = Math.floor(shown / 10);
   const visual = '█'.repeat(cells) + '░'.repeat(10 - cells);
   return `**Containment:** ${shown.toFixed(0)}% ${visual}\n`;
+}
+
+/**
+ * Render the `X km (Y mi)` distance fragment — the fragment only, so a caller
+ * that appends a bearing keeps its own separator.
+ *
+ * The miles figure is derived from the *displayed* kilometres, not the raw
+ * measurement, so two fires printing the same km print the same miles.
+ *
+ * Two decimals is what makes the miles figure an injective function of the
+ * displayed kilometres: adjacent displayed km differ by 0.1 km = 0.0621 mi,
+ * and a 0.01 mi grid cannot collapse two values 0.062 apart. Since the danger
+ * tier is also a function of the displayed km, no printed miles figure can
+ * span two tiers — at every seam, by construction. One decimal fails exactly
+ * this: `50.0` and `50.1 km` both print `31.1 mi`, under CAUTION and
+ * AWARENESS respectively.
+ */
+function formatDistanceFigure(km: number): string {
+  const shownKm = displayValue(km, 1);
+  return `${shownKm.toFixed(1)} km (${kmToMiles(shownKm).toFixed(2)} mi)`;
 }
 
 export async function handleGetWildfireInfo(
@@ -713,7 +733,7 @@ function formatClusterDetails(cluster: FIRMSCluster, ordinal: number): string {
   }
   output += `\n`;
 
-  output += `**Distance:** ${cluster.distanceKm.toFixed(1)} km (${(cluster.distanceKm * 0.621371).toFixed(1)} mi) ${cluster.bearing}\n`;
+  output += `**Distance:** ${formatDistanceFigure(cluster.distanceKm)} ${cluster.bearing}\n`;
   output += `**Center:** ${cluster.centroid.latitude.toFixed(4)}, ${cluster.centroid.longitude.toFixed(4)}\n`;
   output += `**Peak intensity:** ${cluster.maxFrp.toFixed(1)} MW (fire radiative power)\n`;
 
@@ -744,7 +764,7 @@ function formatFireDetails(fire: WildfireInfo, distance: number, timezone: strin
                     fire.type === 'Prescribed Fire' ? '🟦' : '⚪';
 
   output += `**Type:** ${typeEmoji} ${fire.type}\n`;
-  output += `**Distance:** ${distance.toFixed(1)} km (${(distance * 0.621371).toFixed(1)} mi)\n`;
+  output += `**Distance:** ${formatDistanceFigure(distance)}\n`;
 
   if (fire.state) {
     let location = fire.state;
