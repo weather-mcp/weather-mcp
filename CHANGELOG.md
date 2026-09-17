@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.30.1] - 2026-09-17
+
 ### Fixed
 
 - **`get_wildfire_info`'s containment bar disagreed with the percentage printed beside it.** The bar drew `Math.round(fire.containment / 10)` cells from the **raw** value while printing `toFixed(0)`, so every containment from 95 to 99 rendered a **full** ten-cell bar — the fire driving the danger assessment and the fire excluded from it, indistinguishable at a glance. The bar is now `Math.floor(shown / 10)` of the **printed** figure, so a full bar means the printed figure is `100%`, an empty bar means it is below `10%`, and each cell is a completed ten percent. The printed percentage itself is byte-identical for every value in range. Locked by the bar-coherence contract in `tests/unit/wildfire-display-coherence.test.ts`, which pins the whole rendered line rather than a prefix — a prefix stopping after `95%` is exactly how the existing assertions were blind to the bar. (`src/handlers/wildfireHandler.ts`, `tests/unit/wildfire-display-coherence.test.ts`, `docs/TOOLS.md`)
 
-- **A fire NIFC published no containment for rendered `**Containment:** 0% ░░░░░░░░░░` — a fabricated figure on a safety surface.** Ingestion read `attrs.attr_PercentContained || 0`, which collapsed an absent value and a real `0` into the same output; NIFC leaves the field empty for a substantial share of current perimeters. Containment is now parsed once into `number | null` — a finite number in `[0, 100]` passes through, and anything else becomes `null` — and renders as `**Containment:** not reported`, with no percent sign and no bar, because the whole indicator is gated on the value rather than just the number. `0` remains a real reading and still renders `0% ░░░░░░░░░░`. Such a fire **still drives the danger tier as uncontained**, exactly as the old zero-fallback made it: an unknown containment is not evidence of containment. An unusable value is logged once to stderr as a data-quality warning carrying the incident name and the raw value; a plain empty field logs nothing. Locked by the not-reported and zero-is-a-value contracts. (`src/types/wildfire.ts`, `src/handlers/wildfireHandler.ts`, `tests/unit/wildfire-display-coherence.test.ts`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`)
+- **A fire for which NIFC published no containment rendered `**Containment:** 0% ░░░░░░░░░░` — a fabricated figure on a safety surface.** Ingestion read `attrs.attr_PercentContained || 0`, which collapsed an absent value and a real `0` into the same output; NIFC leaves the field empty for a substantial share of current perimeters. Containment is now parsed once into `number | null` — a finite number in `[0, 100]` passes through, and anything else becomes `null` — and renders as `**Containment:** not reported`, with no percent sign and no bar, because the whole indicator is gated on the value rather than just the number. `0` remains a real reading and still renders `0% ░░░░░░░░░░`. Such a fire **still drives the danger tier as uncontained**, exactly as the old zero-fallback made it: an unknown containment is not evidence of containment. An unusable value is logged once to stderr as a data-quality warning carrying the incident name and the raw value; a plain empty field logs nothing. Locked by the not-reported and zero-is-a-value contracts. (`src/types/wildfire.ts`, `src/handlers/wildfireHandler.ts`, `tests/unit/wildfire-display-coherence.test.ts`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`)
 
 - **Out-of-range containment crashed the whole report.** `'░'.repeat(10 - containmentBars)` threw `RangeError` at any containment at or above 105, and `'█'.repeat(containmentBars)` at any at or below −6, so one defective upstream row would have removed every other fire's information from the report. Out-of-range values now take the same path as absent ones and are **not clamped**: a `150` is not a containment percentage, and clamping it would print a figure NIFC never published *and* exclude the fire from the assessment — the less cautious reading of a bad value. Locked by the no-throw contract, which asserts both that the report renders and that the line reads `not reported`, so a future clamp cannot satisfy it. (`src/handlers/wildfireHandler.ts`, `tests/unit/wildfire-display-coherence.test.ts`)
 
@@ -1775,7 +1777,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.1...HEAD
+[1.30.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.0...v1.30.1
 [1.30.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.3...v1.30.0
 [1.29.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.2...v1.29.3
 [1.29.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.1...v1.29.2
