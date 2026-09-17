@@ -380,6 +380,20 @@ constructs any service never exits without an explicit `process.exit(0)`, and
 parallel drivers were what first made this feed drift look like NOAA rate
 limiting), [G28] (a probe whose parse cannot see what it is looking for).
 
+**A display cap can hide a construct the data actually has, 2026-09-17**
+(wildfire-display-coherence T5). The construct is not always absent from the
+*feed* — it can be absent from the *render*. The plan's suggested subject,
+Sacramento `r=300`, carries a 97%-contained fire and so can express the
+nine-cell bar; but `get_wildfire_info` shows only the nearest **five** fires at
+default `detail`, and that fire is the **seventh**. The probe reported zero
+95-99-band fires and the subject looked wrong when it was the *view* that was
+narrow. Two other candidates each expressed one of the two constructs and never
+both. **Sweep the parameter that widens the view — `detail`, a limit, a page
+size — before rejecting a subject**: `detail="full"` turned the same coordinates
+into the verified subject carrying both constructs. Corollary for the plan
+author: "expected, given the live null share" is a claim about the feed, and the
+acceptance criterion is about the report.
+
 ---
 
 ## G11 — Read the rendered output, not just the assertions
@@ -5056,6 +5070,55 @@ the inverse case — there a failure rendered nothing, here a failure stopped
 happening), [G31] (the architecture map goes stale for the same reason: a new
 module has no user-visible bullet to hang off), [G19] (the summary path a
 fallback must be threaded into explicitly).
+
+---
+
+## G95 — A test helper's default parameter turns an "absent" fixture into a present one, silently
+
+**Trigger:** writing a fixture for an **absent** field — `undefined`, a missing
+key, "upstream did not publish this" — through a shared builder or render helper
+that declares a default for that parameter (`function renderAt(distance,
+containment = 20)`).
+
+**Rule:** a helper that must be able to produce an *absent* value takes that
+parameter **without a default**, explicitly at every call site. A JS default
+substitutes on an `undefined` **argument**, not merely on a missing one, so
+`renderAt(1.1, undefined)` and `renderAt(1.1)` are the same call — and the
+fixture you wrote to mean "NIFC published nothing" silently becomes the default.
+Widen the parameter's type (`unknown`) rather than reaching for a sentinel.
+
+**Why:** this is [G13]'s degeneracy one layer up — not a fixture that repeats a
+*value*, but a **helper that manufactures one**. It is strictly harder to see:
+the call site reads `containment: undefined`, which is exactly what the contract
+is about, and the assertion that should have gone red goes green against a
+containment of `20`. The test then reads as coverage of the absent case while
+never once exercising it. The house convention here makes it recur by
+construction — `wildfire-band-rounding.test.ts:12-15` says in its own doc comment
+that it **copied** its helpers from `wildfire-handler.test.ts` rather than
+importing them, so each new wildfire test file inherits the default along with
+the helper, and the next parameter that needs an absent case meets it again.
+
+**Verify:** for every test helper with a defaulted parameter, grep its call
+sites for that argument passed as an explicit `undefined`, `null`, or a variable
+that can hold one. Any hit is either a fixture that is not testing what it says,
+or a default that should not exist. Then drop the default and confirm the
+absent-case assertion still passes — if it now fails, it was never testing the
+absent case.
+
+**Evidence:** 2026-09-17 (`e115d84`, wildfire-display-coherence T3). The copied
+`renderNifcAt(distanceKm, containment = 20)` turned the `not reported` fixture
+for an absent containment into a containment of `20`, which renders
+`**Containment:** 20% ██░░░░░░░░` — so the contract asserting `not reported`
+would have failed against *correct* code, and a builder chasing the failure
+could plausibly have "fixed" the implementation instead. Caught by the subagent
+while writing the file; the default was dropped and `containment` made explicit
+at all five call sites. Related: [G13] (the degenerate-fixture parent), [G56]
+(two live encodings where only one is a sentinel — the defect this fixture was
+written to lock).
+
+**Status:** active. Not lintable in general — a defaulted parameter is ordinary
+and correct everywhere the absent case is not under test, so only a human can
+tell which defaults sit in front of a contract about absence.
 
 ---
 

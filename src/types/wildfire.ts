@@ -86,7 +86,13 @@ export interface WildfireInfo {
   name: string;
   distance: number; // km from query location
   acres: number;
-  containment: number; // percentage 0-100
+  /**
+   * Containment percentage 0-100, or `null` when NIFC published no usable
+   * containment for this incident. `null` means "not reported", not
+   * "missing" and not "zero": `0` is a real reading (a new fire is 0%
+   * contained) and both encodings occur live.
+   */
+  containment: number | null;
   discoveryDate: Date;
   latitude?: number;
   longitude?: number;

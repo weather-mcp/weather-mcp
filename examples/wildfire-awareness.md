@@ -11,13 +11,13 @@ you're getting.
 **Claude Code answered** (using `get_wildfire_info`):
 
 <!-- answer -->
-There are **6 active fires within 300 km of Denver, but none close enough to threaten the city** — the safety assessment comes back at the lowest "Awareness" tier.
+There are **7 active fires within 300 km of Denver, but none close enough to threaten the city** — the safety assessment comes back at the lowest "Awareness" tier.
 
 The ones worth knowing about:
 
-- **Willow** — the nearest, 88 miles away near Leadville: 7,196 acres, 80% contained.
-- **Aspen Acres** — the big one, 110 miles south near Beulah: 102,003 acres, 82% contained after 64 days.
-- One of them (310) is already **100% contained** — the server excludes fully contained fires from its danger assessment rather than letting them inflate it.
+- **Willow** — the nearest, 88 miles away near Leadville: 7,259 acres, 80% contained.
+- **Aspen Acres** — the big one, 110 miles south near Beulah: 102,003 acres, 82% contained after 80 days.
+- **Swiss Roll**, furthest out near Pagosa Springs, is **0% contained** — a real reading, not a missing one. A fire NIFC has published no containment figure for reads `not reported` instead, and either way the server treats it as uncontained when it picks the fire that drives the danger tier.
 
 For Denver itself the practical question is smoke, not flame — let's check the air quality next.
 <!-- /answer -->
@@ -44,28 +44,28 @@ get_wildfire_info({
 **Location:** 39.7392, -104.9903
 **Search Radius:** 300 km (186.4 miles)
 
-🔥 **Found 6 active fires**
-   - 6 wildfires
+🔥 **Found 7 active fires**
+   - 7 wildfires
 
 ## Willow
 
 **Type:** 🔥 Wildfire
-**Distance:** 141.5 km (87.9 mi)
+**Distance:** 141.5 km (87.92 mi)
 **Location:** US-CO, Lake County near Leadville
 **Coordinates:** 39.1872, -106.4753
 
 ### Status
-**Size:** 7196 acres (2912 hectares)
+**Size:** 7259 acres (2937 hectares)
 **Containment:** 80% ████████░░
 **Discovery Date:** 6/28/2026
-**Days Active:** 65
+**Days Active:** 80
 
 ---
 
 ## Aspen Acres
 
 **Type:** 🔥 Wildfire
-**Distance:** 177.5 km (110.3 mi)
+**Distance:** 177.5 km (110.29 mi)
 **Location:** US-CO, Custer County near Beulah
 **Coordinates:** 38.1500, -105.1855
 
@@ -73,29 +73,29 @@ get_wildfire_info({
 **Size:** 102003 acres (41279 hectares)
 **Containment:** 82% ████████░░
 **Discovery Date:** 6/29/2026
-**Days Active:** 65
+**Days Active:** 80
 
 ---
 
-## 310
+## Moonshine
 
 **Type:** 🔥 Wildfire
-**Distance:** 258.7 km (160.8 mi)
-**Location:** US-CO, Garfield County near Parachute
-**Coordinates:** 39.4448, -107.9855
+**Distance:** 247.9 km (154.04 mi)
+**Location:** US-WY, Albany County near Wheatland
+**Coordinates:** 41.9611, -105.2366
 
 ### Status
-**Size:** 603 acres (244 hectares)
-**Containment:** 100% ██████████
-**Discovery Date:** 8/6/2026
-**Days Active:** 27
+**Size:** 7321 acres (2963 hectares)
+**Containment:** 51% █████░░░░░
+**Discovery Date:** 9/7/2026
+**Days Active:** 9
 
 ---
 
 ## Elk
 
 **Type:** 🔥 Wildfire
-**Distance:** 272.2 km (169.1 mi)
+**Distance:** 272.2 km (169.14 mi)
 **Location:** US-CO, Hinsdale County near Lake City
 **Coordinates:** 38.1242, -107.3548
 
@@ -103,27 +103,27 @@ get_wildfire_info({
 **Size:** 7257 acres (2937 hectares)
 **Containment:** 73% ███████░░░
 **Discovery Date:** 7/9/2026
-**Days Active:** 55
+**Days Active:** 70
 
 ---
 
-## Gold Mountain
+## Swiss Roll
 
 **Type:** 🔥 Wildfire
-**Distance:** 299.2 km (185.9 mi)
-**Location:** US-CO, Ouray County near Ouray
-**Coordinates:** 38.0329, -107.6640
+**Distance:** 292.6 km (181.81 mi)
+**Location:** US-CO, Archuleta County near Pagosa Springs
+**Coordinates:** 37.5148, -106.7905
 
 ### Status
-**Size:** 39744 acres (16084 hectares)
-**Containment:** 92% █████████░
-**Discovery Date:** 6/27/2026
-**Days Active:** 66
+**Size:** 777 acres (314 hectares)
+**Containment:** 0% ░░░░░░░░░░
+**Discovery Date:** 8/20/2026
+**Days Active:** 28
 
 ---
 
 
-*Note: 1 additional fire found within radius (showing nearest 5 only — use detail="full" for more)*
+*Note: 2 additional fires found within radius (showing nearest 5 only — use detail="full" for more)*
 
 ## Safety Assessment
 
@@ -171,42 +171,44 @@ get_air_quality({
 **Timezone:** America/Denver
 **Elevation:** 1599m
 
-**Observation Time:** 9/2/2026, 3:00:00 PM
+**Observation Time:** 9/17/2026, 1:00:00 PM
 
-## 🟢 US Air Quality Index: 46
+## 🟡 US Air Quality Index: 55
 
-**Category:** Good (Green)
-**Description:** Air quality is satisfactory
+**Category:** Moderate (Yellow)
+**Description:** Air quality is acceptable
 
 **Health Implications:**
-Air quality is considered satisfactory, and air pollution poses little or no risk.
+Air quality is acceptable; however, unusually sensitive people may experience minor respiratory symptoms.
 
-## 🟠 UV Index: 6.0
+⚠️ **Caution:** Unusually sensitive people should consider reducing prolonged outdoor exertion.
+
+## 🟠 UV Index: 6.5
 
 **Level:** High
 **Description:** Protection essential
 **Recommendation:** Apply SPF 30+ sunscreen. Wear protective clothing, hat, and sunglasses. Reduce midday sun exposure.
 
+*Note: UV index under clear sky would be 8.1*
+
 ## Pollutant Concentrations
 
-**PM2.5 (Fine Particulate Matter):** 3.0 μg/m³
-**PM10 (Coarse Particulate Matter):** 3.8 μg/m³
-**Ozone (O₃):** 118 μg/m³
-**Nitrogen Dioxide (NO₂):** 1.1 μg/m³
-**Sulfur Dioxide (SO₂):** 0.40 μg/m³
-**Carbon Monoxide (CO):** 106 μg/m³
-**Aerosol Optical Depth:** 0.070 (atmospheric haze indicator)
+**PM2.5 (Fine Particulate Matter):** 6.1 μg/m³
+**PM10 (Coarse Particulate Matter):** 7.5 μg/m³
+**Ozone (O₃):** 96 μg/m³
+**Nitrogen Dioxide (NO₂):** 3.5 μg/m³
+**Sulfur Dioxide (SO₂):** 0.90 μg/m³
+**Carbon Monoxide (CO):** 143 μg/m³
+**Aerosol Optical Depth:** 0.140 (atmospheric haze indicator)
 
 ## 🌾 Pollen
 
 **Grass:** 1 (Very Low)
-**Weed:** 5 (Very High) — in season
-
-In season: Ragweed (Very High)
+**Weed:** 4 (High)
 
 *Universal Pollen Index (0–5) for today. Source: Includes pollen data from Google.*
 
-*European AQI: 52 (Moderate)*
+*European AQI: 38 (Fair)*
 ````
 
 </details>
@@ -242,13 +244,16 @@ get_current_conditions({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KBJC
-**Time:** Sep 2, 2026, 1:45 PM (1.3 hours ago)
+**Time:** Sep 17, 2026, 12:45 PM (56 minutes ago)
 
-**Conditions:** Clear
-**Temperature:** 88°F
-**Pressure:** 30.09 inHg
+**Conditions:** Mostly Cloudy
+**Temperature:** 72°F
+**Dewpoint:** 54°F
+**Humidity:** 53%
+**Wind:** 6 mph from 310°
+**Pressure:** 30.27 inHg
 **Visibility:** 10.0 miles (clear)
-**Cloud Cover:** Clear
+**Cloud Cover:** Broken clouds at 10991ft
 
 ## Fire Weather
 
@@ -256,8 +261,8 @@ get_current_conditions({
 Current conditions do not meet thresholds for fire weather concerns. Fire danger indices are calculated during periods of low humidity, high temperatures, and strong winds.
 
 **Atmospheric Monitoring:**
-**Mixing Height:** 109 ft (very poor dispersion)
-**Transport Wind:** 9 mph (moderate smoke transport)
+**Mixing Height:** 141 ft (very poor dispersion)
+**Transport Wind:** 7 mph (moderate smoke transport)
 
 *Fire danger indices (Haines Index, Grassland Fire Danger, Red Flag Threat) are calculated during elevated fire risk periods, typically during dry seasons or when Red Flag conditions are possible.*
 
@@ -314,15 +319,15 @@ get_wildfire_info({
 
 ⚠️ Satellite heat detections — not managed incident data. No fire names, sizes, or containment are available; detections may include industrial heat sources, gas flares, or agricultural burns.
 
-🔥 **29 satellite fire detections in the last 3 days, grouped into 4 clusters within 200 km**
+🔥 **3 satellite fire detections in the last 3 days, grouped into 3 clusters within 200 km**
 
 ## Detection Cluster 1
 
 **Detections:** 1 hotspot (0 day / 1 night)
-**Distance:** 24.1 km (15.0 mi) NW
-**Center:** 38.1299, 23.5240
-**Peak intensity:** 2.0 MW (fire radiative power)
-**Newest detection:** 3 days ago
+**Distance:** 52.6 km (32.68 mi) NE
+**Center:** 38.3762, 24.0634
+**Peak intensity:** 1.1 MW (fire radiative power)
+**Newest detection:** 19.7 hours ago
 **Confidence:** 1 nominal
 **Satellite:** Suomi NPP (VIIRS)
 
@@ -330,36 +335,24 @@ get_wildfire_info({
 
 ## Detection Cluster 2
 
-**Detections:** 9 hotspots (9 day / 0 night)
-**Distance:** 47.3 km (29.4 mi) NW
-**Center:** 38.3350, 23.4216
-**Peak intensity:** 204.7 MW (fire radiative power)
-**Newest detection:** 8.4 hours ago
-**Confidence:** 3 high, 5 nominal, 1 low
+**Detections:** 1 hotspot (0 day / 1 night)
+**Distance:** 152.8 km (94.95 mi) NNW
+**Center:** 39.1706, 22.8417
+**Peak intensity:** 2.7 MW (fire radiative power)
+**Newest detection:** 19.7 hours ago
+**Confidence:** 1 nominal
 **Satellite:** Suomi NPP (VIIRS)
 
 ---
 
 ## Detection Cluster 3
 
-**Detections:** 16 hotspots (16 day / 0 night)
-**Distance:** 57.6 km (35.8 mi) E
-**Center:** 38.0038, 24.3842
-**Peak intensity:** 66.7 MW (fire radiative power)
-**Newest detection:** 10.1 hours ago
-**Confidence:** 1 high, 14 nominal, 1 low
-**Satellite:** Suomi NPP (VIIRS)
-
----
-
-## Detection Cluster 4
-
-**Detections:** 3 hotspots (0 day / 3 night)
-**Distance:** 165.6 km (102.9 mi) NNW
-**Center:** 39.3555, 22.9841
-**Peak intensity:** 0.8 MW (fire radiative power)
-**Newest detection:** 19.8 hours ago
-**Confidence:** 3 nominal
+**Detections:** 1 hotspot (1 day / 0 night)
+**Distance:** 188.9 km (117.38 mi) NW
+**Center:** 39.3758, 22.4804
+**Peak intensity:** 1.6 MW (fire radiative power)
+**Newest detection:** 32 hours ago
+**Confidence:** 1 nominal
 **Satellite:** Suomi NPP (VIIRS)
 
 ---
@@ -367,10 +360,9 @@ get_wildfire_info({
 
 ## Safety Assessment
 
-🟠 **HIGH ALERT** - Satellite fire detections within 25 km
-- Monitor fire conditions closely
-- Prepare for possible evacuation
-- Watch for smoke and changing conditions
+ℹ️ **AWARENESS** - Satellite fire detections within 200 km
+- Stay informed about fire activity in the area
+- Air quality may be affected by smoke
 
 
 ---
@@ -414,25 +406,26 @@ get_current_conditions({
 ````markdown
 # Current Weather Conditions
 
-**Time:** Sep 3, 2026, 12:00 AM
+**Time:** Sep 17, 2026, 10:30 PM
 
 **Conditions:** Clear sky
-**Temperature:** 82°F
-**Today's Range:** High 92°F / Low 79°F
-**Dewpoint:** 48°F
-**Humidity:** 31%
-**Wind:** 4 mph from 52°, gusting to 10 mph
-**Pressure:** 29.93 inHg
-**Cloud Cover:** 6%
+**Temperature:** 69°F
+**Feels Like:** 66°F
+**Today's Range:** High 83°F / Low 65°F
+**Dewpoint:** 43°F
+**Humidity:** 39%
+**Wind:** 3 mph from 36°, gusting to 9 mph
+**Pressure:** 29.95 inHg
+**Cloud Cover:** 0%
 
 ## Fire Weather
 
-**🟢 Fosberg Fire Weather Index:** 8 (Low)
+**🟢 Fosberg Fire Weather Index:** 6 (Low)
 Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.
 
 **Dryness context:**
-- **Vapour-pressure deficit:** 2.5 kPa (high drying power)
-- **Topsoil moisture (top 1 cm):** 0.08 m³/m³ (very dry)
+- **Vapour-pressure deficit:** 1.5 kPa (moderate drying power)
+- **Topsoil moisture (top 1 cm):** 0.10 m³/m³ (dry)
 
 *Derived by this server from Open-Meteo model data — not an official fire-danger rating. Heed warnings from your national fire authority.*
 
@@ -448,5 +441,5 @@ Computed from current temperature, humidity, and sustained wind. Higher values m
 **Features shown:** `get_wildfire_info` on both paths — NIFC named incidents in the US (containment, distance, safety tier) and NASA FIRMS satellite heat detections everywhere else (clustered hotspots, no names or containment, never an all-clear) · `get_current_conditions` with `include_fire_weather` on both paths — NOAA's published indices in the US, a server-computed Fosberg index with dryness context elsewhere, each labeled for what it is · `get_air_quality` on the US path — US AQI scale, pollutant breakdown (PM2.5 is the smoke signal), UV index, health recommendations.
 
 <!-- capture-stamp -->
-*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-17 with weather-mcp v1.30.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

@@ -25,7 +25,7 @@ import { GeocodingService } from '../services/geocoding.js';
 import { resolveCountryCode, resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { validateDetail } from '../utils/validation.js';
 import { guessTimezoneFromCoords, formatObservationAge } from '../utils/timezone.js';
-import { calculateDistance } from '../utils/distance.js';
+import { calculateDistance, kmToMiles } from '../utils/distance.js';
 import { displayValue } from '../utils/displayBanding.js';
 import { isInUS } from '../utils/geography.js';
 import { logger } from '../utils/logger.js';
@@ -66,6 +66,70 @@ type HandlerResult = { content: Array<{ type: string; text: string }> };
  * to say.
  */
 const NIFC_COVERED_COUNTRIES = new Set(['us', 'pr', 'vi', 'gu']);
+
+/**
+ * Parse NIFC's `attr_PercentContained` into a containment percentage, or
+ * `null` meaning "NIFC published no usable containment for this incident".
+ *
+ * `0` is a real reading and `null` is a sentinel. Both occur live — 11 and 50
+ * rows respectively in a 200-feature sample of the current perimeters layer —
+ * and only the second is absence. A truthy guard suppresses both, which is the
+ * defect this replaces.
+ *
+ * Out-of-range values take the same path as absent ones, and are not clamped.
+ * A `150` is not a containment percentage; clamping it would print a figure
+ * NIFC never published *and* exclude the fire from the assessment — the less
+ * cautious reading of garbage.
+ *
+ * A `null` containment drives the danger tier as uncontained. An unknown
+ * containment is not evidence of containment.
+ */
+function parseContainment(raw: unknown): number | null {
+  return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 && raw <= 100
+    ? raw
+    : null;
+}
+
+/**
+ * Render the containment line, bar included.
+ *
+ * The whole indicator is gated on the value, not just the number: a bar beside
+ * "not reported" would delegate the judgement the code just declined to make.
+ *
+ * The bar is the completed tenths of the *printed* figure, so a full bar means
+ * the printed figure is `100%`, an empty bar means it is below `10%`, and each
+ * cell is a completed ten percent. `repeat` receives `0..10` by construction,
+ * because parseContainment has already confined the value to [0, 100].
+ */
+function formatContainmentLine(containment: number | null): string {
+  if (containment === null) {
+    return `**Containment:** not reported\n`;
+  }
+  const shown = displayValue(containment, 0);
+  const cells = Math.floor(shown / 10);
+  const visual = '█'.repeat(cells) + '░'.repeat(10 - cells);
+  return `**Containment:** ${shown.toFixed(0)}% ${visual}\n`;
+}
+
+/**
+ * Render the `X km (Y mi)` distance fragment — the fragment only, so a caller
+ * that appends a bearing keeps its own separator.
+ *
+ * The miles figure is derived from the *displayed* kilometres, not the raw
+ * measurement, so two fires printing the same km print the same miles.
+ *
+ * Two decimals is what makes the miles figure an injective function of the
+ * displayed kilometres: adjacent displayed km differ by 0.1 km = 0.0621 mi,
+ * and a 0.01 mi grid cannot collapse two values 0.062 apart. Since the danger
+ * tier is also a function of the displayed km, no printed miles figure can
+ * span two tiers — at every seam, by construction. One decimal fails exactly
+ * this: `50.0` and `50.1 km` both print `31.1 mi`, under CAUTION and
+ * AWARENESS respectively.
+ */
+function formatDistanceFigure(km: number): string {
+  const shownKm = displayValue(km, 1);
+  return `${shownKm.toFixed(1)} km (${kmToMiles(shownKm).toFixed(2)} mi)`;
+}
 
 export async function handleGetWildfireInfo(
   args: unknown,
@@ -266,11 +330,25 @@ async function formatNIFCWildfire(
 
         // Only include fires within radius
         if (fireDistance <= radius) {
+          // Parsed before the literal so the warn can be guarded on the result.
+          // Warn only when the value is present but unusable — a plain
+          // null/undefined is the normal wire shape for a quarter of live rows,
+          // and warning on it would emit ~50 lines per request on a healthy
+          // feed. This is a data-quality event, not a security one, so no
+          // securityEvent flag (unlike the FIRMS row cap below).
+          const containment = parseContainment(attrs.attr_PercentContained);
+          if (attrs.attr_PercentContained != null && containment === null) {
+            logger.warn('NIFC published an unusable containment value', {
+              incident: attrs.poly_IncidentName,
+              value: attrs.attr_PercentContained
+            });
+          }
+
           const fireInfo: WildfireInfo = {
             name: attrs.poly_IncidentName || 'Unknown Fire',
             distance: fireDistance,
             acres: attrs.poly_GISAcres || attrs.attr_FinalAcres || attrs.attr_CalculatedAcres || 0,
-            containment: attrs.attr_PercentContained || 0,
+            containment,
             discoveryDate: attrs.attr_FireDiscoveryDateTime
               ? new Date(attrs.attr_FireDiscoveryDateTime)
               : new Date(),
@@ -340,7 +418,13 @@ async function formatNIFCWildfire(
       // less-cautious edge in the band-rounding sequence (design plan,
       // "Containment").
       const wildfires = firesWithDistance.filter(f => f.fire.type === 'Wildfire');
-      const nearestWildfire = wildfires.find(f => displayValue(f.fire.containment, 0) < 100);
+      // A null containment drives the tier as uncontained, exactly as the
+      // old `|| 0` made it: an unknown containment is not evidence of
+      // containment. displayValue does not accept null, so the case is
+      // spelled out rather than coerced.
+      const nearestWildfire = wildfires.find(
+        f => f.fire.containment === null || displayValue(f.fire.containment, 0) < 100
+      );
 
       if (wildfires.length > 0) {
         output += `\n## Safety Assessment\n\n`;
@@ -649,7 +733,7 @@ function formatClusterDetails(cluster: FIRMSCluster, ordinal: number): string {
   }
   output += `\n`;
 
-  output += `**Distance:** ${cluster.distanceKm.toFixed(1)} km (${(cluster.distanceKm * 0.621371).toFixed(1)} mi) ${cluster.bearing}\n`;
+  output += `**Distance:** ${formatDistanceFigure(cluster.distanceKm)} ${cluster.bearing}\n`;
   output += `**Center:** ${cluster.centroid.latitude.toFixed(4)}, ${cluster.centroid.longitude.toFixed(4)}\n`;
   output += `**Peak intensity:** ${cluster.maxFrp.toFixed(1)} MW (fire radiative power)\n`;
 
@@ -680,7 +764,7 @@ function formatFireDetails(fire: WildfireInfo, distance: number, timezone: strin
                     fire.type === 'Prescribed Fire' ? '🟦' : '⚪';
 
   output += `**Type:** ${typeEmoji} ${fire.type}\n`;
-  output += `**Distance:** ${distance.toFixed(1)} km (${(distance * 0.621371).toFixed(1)} mi)\n`;
+  output += `**Distance:** ${formatDistanceFigure(distance)}\n`;
 
   if (fire.state) {
     let location = fire.state;
@@ -699,10 +783,11 @@ function formatFireDetails(fire: WildfireInfo, distance: number, timezone: strin
   output += `### Status\n`;
   output += `**Size:** ${fire.acres.toFixed(0)} acres (${(fire.acres * 0.404686).toFixed(0)} hectares)\n`;
 
-  // Containment with visual indicator
-  const containmentBars = Math.round(fire.containment / 10);
-  const containmentVisual = '█'.repeat(containmentBars) + '░'.repeat(10 - containmentBars);
-  output += `**Containment:** ${fire.containment.toFixed(0)}% ${containmentVisual}\n`;
+  // The bar is the completed tenths of the printed figure: a full bar means
+  // the printed figure is `100%`, an empty bar means it is below `10%`, and
+  // each cell is a completed ten percent. A fire NIFC published no usable
+  // containment for reads `not reported`, with no bar at all.
+  output += formatContainmentLine(fire.containment);
 
   const now = new Date();
   const daysActive = Math.floor((now.getTime() - fire.discoveryDate.getTime()) / (1000 * 60 * 60 * 24));
