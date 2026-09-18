@@ -5249,6 +5249,52 @@ regeneration moves).
 
 ---
 
+## G98 — The MCP registry publish is the one distribution channel no gate watches, and it silently fell six releases behind
+
+**Trigger:** cutting a release and treating the green `publish.yml` run plus a
+`latest` on npm as "published".
+
+**Rule:** the tag push publishes to **npm only**. The MCP registry is a
+**separate, manual, interactive** step — `./mcp-publisher login github &&
+./mcp-publisher publish` — and its credential expires silently. Before calling a
+release done, read the registry back and compare it to `package.json`:
+
+```bash
+curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp" \
+  | python3 -c "import sys,json;d=json.load(sys.stdin);print(sorted((s.get('server',s).get('version','') for s in d.get('servers',[])))[-1])"
+```
+
+A version older than `package.json`'s is a stop, not a cosmetic lag.
+
+**Why:** every other outward-facing step in this project announces its own
+failure. A red gate stops the release, a bad version pair fails `publish.yml`,
+and a failed npm publish leaves the workflow red. The registry step has none of
+that: it is run by hand after the workflow is already green, `./mcp-publisher
+publish` exits **0** while printing a `401 Invalid or expired Registry JWT
+token`, and nothing downstream reads the registry back. So the one channel whose
+failure is invisible is also the one channel nobody is watching, and the failure
+mode is not a crash but a version that simply stops advancing.
+
+**Evidence:** found while closing out **v1.31.0** (2026-09-17). npm was at
+`1.31.0` and `latest`; the registry's newest entry was **`1.25.18`, published
+2026-09-02** — so v1.25.19 through v1.31.0 had never reached it, across six
+releases and fifteen days, with every one of those releases reported as
+published. `~/.mcpregistry_*` did not exist, and `./mcp-publisher publish`
+returned `status 401: token is expired` **with exit code 0**, which is why no
+release script or shell `&&` chain ever noticed.
+
+**Status:** active. The check above is not wired into
+`scripts/check-doc-versions.sh` — doing so would make a network call part of a
+doc check that runs on every task — so for now it belongs in `/release` step 7's
+registry verification, which the bindings already name and which this trap shows
+was being satisfied by reading npm alone. Related: [G4] (never trust the status
+alone — here the status is a zero exit over a 401 body), [G28] (a probe that
+fails reports as a clean negative), [G39] (the npm half of the same publish, and
+the reason a green workflow is not evidence about the registry), [G91]
+(a guard's refusal turned into silence, the same shape one layer down).
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
