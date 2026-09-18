@@ -663,8 +663,16 @@ Provides comprehensive marine weather data with intelligent dual-source support:
 - Wind waves (locally generated) height and direction
 - Swell height, period, and direction (from distant systems)
 - Ocean current velocity and direction
-- Sea state interpretation on WMO Code Table 3700 (the Douglas sea scale), `Calm` → `Phenomenal`. The header's severity marker, the header word, the wave-line category and the legend all derive from one nine-rung table, so they cannot name different rungs; the legend's five severity rows (🟢 🟡 🟠 🔴 🟣) are generated from that table with the true combined range of each tier's rungs. ⚪ marks a report with no wave-height data — it is not a severity and appears in no legend row. The sea-state category and the safety assessment are keyed on the wave height and period **as displayed** (metres and seconds, one decimal), so the label can never disagree with the number beside it. An exact boundary height (a printed `4.0 m`) is placed in the higher rung — the cautious side — whereas WMO's own coding rule assigns it to the lower code figure. On the NOAA Great Lakes and coastal-bay path the wave line carries the same rung name; that path renders no marker and no legend.
-- Safety assessment for maritime activities
+- Sea state interpretation on WMO Code Table 3700 (the Douglas sea scale), `Calm` → `Phenomenal`. The header's severity marker, the header word, the wave-line category and the legend all derive from one nine-rung table, so they cannot name different rungs; the legend's five severity rows (🟢 🟡 🟠 🔴 🟣) are generated from that table with the true combined range of each tier's rungs. ⚪ marks a report with no wave-height data — it is not a severity and appears in no legend row. The sea-state category and the safety assessment are keyed on the wave height and period **as displayed** (metres and seconds, one decimal), so the label can never disagree with the number beside it. An exact boundary height (a printed `4.0 m`) is placed in the higher rung — the cautious side — whereas WMO's own coding rule assigns it to the lower code figure. **Both render paths — Open-Meteo and the NOAA Great Lakes and coastal-bay path — produce the marker, the `Sea state:` line, the `Safety:` line and the legend from that same table, through one shared helper**, so the two cannot describe the same sea differently; the cross-path parity contract in `tests/unit/marine-render-parity.test.ts` compares the block from both reports field by field. On the NOAA path a published wave height of `0` bands as `Calm` rather than being reported as an absent reading, and a gridpoint that publishes a period but no height reads `⚪ Current Conditions: Unknown` with no wave-height line.
+- Safety assessment for maritime activities — rendered as a `**Safety:**` line inside the sea-state
+  block on **both** paths
+- A note when the marine model has no cell at the requested point. The model covers ocean and
+  large-lake water cells only, and answers with a null reading rather than an error elsewhere, so
+  the report says so explicitly instead of returning a blank sea state. When the point came from a
+  geocoded place name the note also names the resolved place and its coordinates and explains the
+  land-centroid resolution — a coastal city name often resolves to an inland administrative
+  centroid — and suggests passing `latitude`/`longitude` for a point just offshore. It makes no
+  claim about distance to a coastline, which this server cannot compute.
 - Wave period for planning and safety
 - Optional daily forecast up to 16 days (`forecast_days`, default 5; days past the marine model's ~10-day horizon are trimmed with a note)
 
