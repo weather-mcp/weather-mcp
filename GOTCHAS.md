@@ -456,6 +456,20 @@ remainder-note-detail diff review; closed by `74b69ab`, which added a
 clear-majority case and an exact-tie case. Both new cases also fail when the
 loop is mutated to take the last severity seen rather than the most common.
 
+**The same degeneracy hides on a *seam* rather than on a value, 2026-09-18**
+(`7a5b9b1`, nws-alert-jurisdiction T1). A property asserting two bounding-box
+predicates are disjoint — `isInUS(p) && isInNwsTerritory(p)` false for every
+fixture — is vacuous at any coordinate no fixture occupies, and the coordinate
+that matters is the **shared endpoint**. Boxes here are written with inclusive
+comparisons on both sides, so two boxes that "touch" at `-65.2` (`<= -65.2` and
+`>= -65.2`) are both true on that exact line: they overlap. The plan's own
+mutation row predicted such a mutation would "stay green, by design — edges
+touch, boxes do not overlap", and it did stay green, for the wrong reason. Where
+a property is about the relationship between two ranges, put a fixture **on** the
+seam and one just inside the gap, not only at the region centres. Shipped code was
+unaffected (a real `0.05` gap), but the check that was supposed to defend it was
+not defending it.
+
 **Status:** active. **Verify line re-run 2026-08-26** (cap-disclosure-accuracy
 curation): mutating `count > topCount` to `>=` still turns exactly one test red
 (`alerts-remainder-detail.test.ts` — *"resolves a tie deterministically, by
@@ -1989,6 +2003,16 @@ the note.
   practice and the grep is good practice, and together they contradict. The
   builder's temptation is to delete the comment.
 
+**The vacuous-pass case recurred verbatim, 2026-09-18** (nws-alert-jurisdiction
+T1/T2) — on a plan that **cites this entry in both tasks** and rewrote two other
+acceptance checks because of it. Both tasks' F12 locks were written as
+`git diff main...HEAD -U0 -- <testfile> | grep -c '^-[^-]'` → `0`, run *before*
+the commit, where it compares two commits and reports `0` for a file the working
+tree has not yet contributed. The real pre-commit form is the working-tree
+`git diff -U0 -- <testfile>`; both forms were run, and the committed form re-run
+after each commit. An entry being cited is not the same as an entry being applied,
+which is the argument for testing the check rather than trusting the citation.
+
 **A third direction, found 2026-08-28** (`01595d9`/`a729a2d`,
 lightning-degradation-honesty T2/T4): **a criterion no correct work can satisfy.**
 Distinct from a spurious fail on one wrong expression — these are impossible by
@@ -3022,10 +3046,23 @@ and [G48] repeated the claim; both were corrected.
 tests go red per term. A term with no red is unpinned regardless of how many tests
 sit in the block.
 
+**Verify line run clean, 2026-09-18** (`9cffd30`, nws-alert-jurisdiction T2) — the
+first time this entry's trigger fired and the answer was "both terms pin
+something". `isInUS(...) || isInNwsTerritory(...)` is exactly the short-circuit
+shape. Mutating `isInUS` to `false` turns **9** cases red, every one of them a
+bare-US-coordinate case; mutating `isInNwsTerritory` to `false` turns **13** red,
+all territory cases. The two red sets are **disjoint**, which is the strongest
+form of the answer this entry asks for: neither term was swallowed by the other,
+and the pre-existing block's name still describes what it covers. Recording a
+clean run matters as much as recording a dirty one — the entry is about
+*measuring*, not about expecting a loss.
+
 **Status:** active. Related: [G32] (mutate to every rejected implementation and
 report the divergence set), [G45] (a mutation only goes red where the contract
 reaches it), [G13] (a fixture degenerate along one axis), [G53] (the sibling from
-the same review — what the short-circuited predicate was deciding).
+the same review — what the short-circuited predicate was deciding), [G99] (the
+case where the *added* term is a conjunction inside a fast path, and dropping it
+reddens nothing unless the cross-product cell was written).
 
 ## G56 — A missing-data sentinel can have more than one encoding, so swapping a truthy guard for a real-value guard un-suppresses the second one
 
@@ -5292,6 +5329,74 @@ alone — here the status is a zero exit over a 401 body), [G28] (a probe that
 fails reports as a clean negative), [G39] (the npm half of the same publish, and
 the reason a green workflow is not evidence about the registry), [G91]
 (a guard's refusal turned into silence, the same shape one layer down).
+
+---
+
+## G99 — A country-code fast path can admit a coordinate the geographic predicate exists to reject
+
+**Trigger:** a jurisdiction pre-filter that consults a **country-code set when a
+code is present** and a **geographic predicate only when it is absent** —
+`code ? SET.has(code) : inBoxes(lat, lon)`. The shape is attractive because a
+resolved location already knows its country, so the common case costs no
+geography at all.
+
+**Rule:** the code branch is a **latency shortcut, not a second jurisdiction
+oracle.** Before letting a code decide alone, ask whether that country contains
+area the predicate deliberately excludes. Where it does, the code must carry the
+box with it (`SET.has(code) && inBoxes(...)`), and the set splits in two —
+`CODE_ALONE` for codes with no such split, `CODE_PLUS_BOX` for the rest. **Two
+sets, never one with a special case**: a single set whose membership means
+different things for different members is how the next reader gets it wrong.
+
+Then check the **asymmetry**, which is where the plausible tidy-up lives. A code
+belongs in `CODE_PLUS_BOX` only if the box actually covers it. Moving a code
+there whose territory lives in the *other* predicate makes the conjunction
+evaluate `false` forever and silently drops the feature for that whole country.
+
+**Why:** every check passes. The suite is green, because the natural test for a
+country set puts every code on **one** coordinate — and if that coordinate is
+outside every box, the set is proved and the conjunction is invisible; if it is
+inside, the box is proved and the set is invisible. Either way, deleting the
+conjunction reddens nothing. Meanwhile the excluded coordinate has its own
+zero-call test **without a code**, which returns early and looks like proof that
+the point is excluded. It is not: it says nothing about the same point after
+geocoding. The docs written from the plan then publish a suppression claim that
+the code arm has already made false.
+
+**Verify:** cross every deliberately excluded coordinate with every country code
+a **live** provider can emit there, and write that cell ([G59]). Then mutate the
+conjunction away and confirm the suite reddens. Prove each code with a **pair** —
+in-box one call, out-of-box zero calls — rather than one case: a single green
+case cannot tell you whether the set or the box admitted the point, and moving
+the whole matrix onto in-box fixtures destroys the isolation that made the set
+testable at all.
+
+**Evidence:** 2026-09-18 (`9cffd30`, nws-alert-jurisdiction T2). Filed as
+`codex-R1` by `/plan-review` against the plan, before any code existed, and
+absorbed as impl rev 1. The critical-alert banner's new pre-filter put `gu`, `mp`,
+`vi` and `as` in one set with `us` and `pr` and let any of them decide alone.
+`MP` names the **whole** Northern Marianas while NWS accepts only the southern
+arc, and the Open-Meteo geocoder — the last provider in both `GeocodingService`
+orders, and the only one that emits ISO territory codes at all — returns `MP` for
+Pagan as readily as for Saipan. So a `city_name` falling through to it would have
+paid an uncached HTTP 400 and two `securityEvent` warns at precisely the points
+the new box was drawn to exclude, while the planned suite stayed green and
+`docs/TOOLS.md` said no lookup was made there. The fix is the two-set split above;
+the mutation row that pins it (M7 — revert the conjunction) turns **9** cases red,
+and **none** of them existed in the plan's first draft. The asymmetry half is
+real too: `pr` cannot move into the box set, because Puerto Rico lives in `isInUS`
+and not in `isInNwsTerritory`, so the relocation has the same red set as deleting
+`pr` outright.
+
+**Status:** active. Partly lintable — a `Set` of country codes read in the same
+expression as a coordinate predicate is greppable, though whether a given code
+spans served and unserved area is not. Related: [G59] (the cross-product rule
+this is a directional instance of — the empty cell here is *code admits, box
+refuses*), [G48] (which provider can emit the value at all — the reason `MP` is
+reachable and `pr` is reachable only on one path), [G54] (mutate each term of the
+compound separately; that is what exposes an unpinned conjunction), [G53] (the
+predicate this one guards, and why it is not simply widened), [G46] (the docs
+sentence that published the claim the code had already falsified).
 
 ---
 
