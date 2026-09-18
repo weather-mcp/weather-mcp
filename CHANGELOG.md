@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.1] - 2026-09-18
+
 ### Fixed
 
 - **The life-threatening alert banner never reached Guam, the Northern Mariana Islands, the US Virgin Islands or American Samoa on a raw-coordinate request.** The banner's pre-filter used `isInUS` as its geography arm, and that predicate covers CONUS, Alaska, Hawaii and Puerto Rico and nothing else — so a request carrying bare coordinates in any of those four territories returned before any request was made, and a typhoon warning for Saipan or a tsunami warning for Pago Pago could never surface. NWS serves all four from WFOs GUM, SJU and PPG, and `api.weather.gov/alerts/active` answers HTTP 200 at every one of them. A new routing-only predicate, `isInNwsTerritory`, now sits beside `isInUS` with five boxes drawn to the inhabited islands — two for Guam and the southern Marianas, because the union's corner at `15.2 N, 144.8 E` is a measured rejection and the accepted region is not convex there; one for the USVI; and two for American Samoa, because Swains Island is a separate pocket about 350 km north of the Tutuila-Manu'a-Rose band. The same gap ran through a second door: a `city_name` that fell through to the Open-Meteo geocoder carries the ISO territory code rather than `US` (Nominatim and Census both say `US` for these places), so `GU` and `MP` failed the old equality compare too. The country test is now two sets — one whose members settle jurisdiction alone (`us`, `pr`), and one whose members must **also** satisfy the coordinate box (`gu`, `mp`, `vi`, `as`). The split is not tidiness: `MP` names the whole Northern Marianas while NWS accepts only the southern arc, so letting that code decide by itself would have re-opened, through the geocoder, exactly the northern-CNMI request the box was drawn to exclude. Puerto Rico stays in the code-alone set because it lives in `isInUS` rather than the new predicate, and pairing it with the territory box would have dropped the banner for every Open-Meteo-geocoded Puerto Rico request — a coverage fix turned into a coverage regression. `isInUS` itself is **byte-identical**: it backs a rendered NWPS coverage disclosure in `get_river_conditions`, where Puerto Rico is gauged and Guam is not, so widening it would tell a caller in Guam that NWPS covers Guam. Nothing else routes on the new predicate and nothing rendered anywhere derives from it. The Marianas north of Saipan, Wake, Midway and Johnston are outside the bounds NWS accepts an alerts point for, so no banner appears there; the sovereign COFA states are deliberately out of scope. **Absence of the banner is still never an all-clear** — these tools do not report on alerts, and `get_alerts` remains the authoritative answer. (`src/utils/geography.ts`, `src/handlers/criticalAlertBanner.ts`, `tests/unit/geography.test.ts`, `tests/unit/critical-alert-banner.test.ts`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`, `README.md`, `CLAUDE.md`)
@@ -1793,7 +1795,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.1...HEAD
+[1.31.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.0...v1.31.1
 [1.31.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.1...v1.31.0
 [1.30.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.0...v1.30.1
 [1.30.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.3...v1.30.0
