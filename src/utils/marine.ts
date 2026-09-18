@@ -328,8 +328,50 @@ export function getSafetyAssessment(
 
   return {
     level: waveCategory.level,
-    description: adjustedDescription + context,
+    description: adjustedDescription + '.' + context,
     recommendation: waveCategory.recommendation
   };
+}
+
+/**
+ * The shared sea-state block: both marine render paths (NOAA gridpoint and Open-Meteo) obtain
+ * their sea-state block from this function; neither formats the header, the sea-state line or
+ * the safety line itself. The header line is byte-compatible with the pre-existing Open-Meteo
+ * render site (`## ${marker} Current Conditions: ${level}`), which
+ * tests/unit/marine-sea-state-taxonomy.test.ts contract 6 parses directly — do not reformat it.
+ */
+export function formatSeaStateBlock(safety: SafetyAssessment): string {
+  return (
+    `## ${seaStateMarker(safety.level)} Current Conditions: ${safety.level}\n\n` +
+    `**Sea state:** ${safety.description}\n` +
+    `**Safety:** ${safety.recommendation}\n\n`
+  );
+}
+
+/**
+ * The no-marine-cell note: shown when a location resolves to a point the marine model has no
+ * cell for (most often a place name resolving to a land centroid). Takes plain values, not a
+ * `ResolvedLocation` — this module must not import from `locationResolver.ts`, which pulls in
+ * `LocationStore`, `GeocodingService`, `Cache` and `NominatimService`. Must never contain
+ * `NO_DATA_MARKER`: tests/unit/marine-sea-state-taxonomy.test.ts counts that marker and expects
+ * exactly two occurrences in a no-data report.
+ */
+export function formatNoMarineCellNote(opts: {
+  latitude: number;
+  longitude: number;
+  placeName?: string;
+}): string {
+  const { latitude, longitude, placeName } = opts;
+  if (placeName !== undefined) {
+    return (
+      `*No marine-model cell here. ${placeName} resolved to ${latitude.toFixed(4)}, ${longitude.toFixed(4)} — ` +
+      `a place name resolves to a land centroid, and the marine model covers ocean and large-lake water cells ` +
+      `only. For coastal conditions, pass \`latitude\`/\`longitude\` for a point just offshore.*\n\n`
+    );
+  }
+  return (
+    `*No marine-model cell here — the marine model covers ocean and large-lake water cells only. ` +
+    `For coastal conditions, try a point just offshore.*\n\n`
+  );
 }
 
