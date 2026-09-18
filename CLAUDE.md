@@ -526,7 +526,28 @@ tools use to skip the reverse-geocode lookup.
 - **Validation**: Coordinates validated on save
 - **Geocoding**: Uses Nominatim service (rate-limited to 1 req/sec)
 - **Error handling**: Helpful messages if location not found or invalid
-- **Thread-safe**: LocationStore uses synchronous file I/O with cache invalidation
+- **No cache**: `load()` reads and parses the file on **every** operation and returns a fresh
+  object. A save in one client is visible to the others with no restart. The store previously
+  cached on first read and never refreshed, so an instance wrote "my stale copy plus my change"
+  and deleted whatever another instance had saved meanwhile
+- **Atomic replace**: writes go to a temp file in the same directory, are `fsync`ed, then
+  `rename`d over the target — a reader sees the old file or the new one, never a partial.
+  Permission bits are carried across the rename; a symlinked `locations.json` stays a symlink and
+  its target is replaced, resolved by walking the link chain (never `realpathSync`, which cannot
+  distinguish an absent path from a dangling link). The buffer is written to completion before any
+  `fsync` or `rename`, so a short write can never be published as a successful save
+- **Refuse-on-unreadable**: `ENOENT`, and only `ENOENT`, means an empty store. Any other read
+  failure, a parse failure, or a top level that is not a plain object throws
+  `LocationStoreUnreadableError` from every read and every write, `clear()` included. **The
+  invariant, in those words: the store never overwrites a file it could not parse.** A failed save
+  leaves the previous file intact and leaves no temp residue
+- **Last-writer-wins across processes**: there is no lockfile. The read-modify-write is one
+  synchronous run, so the collision window is microseconds between two humans driving two clients;
+  the loser loses one update and the file stays valid
+- **Keep the store synchronous** (G20): the no-lockfile argument rests on the read and the write
+  being one synchronous run. Do not make these methods `async`, and do not put an `await` between
+  a caller's read and its `set` — `savedLocationsHandler.ts` re-reads its merge base *after* the
+  geocoder await for exactly this reason
 - **Activities (optional)**: array of strings, lowercased/trimmed, ≤ 50 chars each, empties dropped; helps the AI tailor weather context
 - **Smart Updates**: if the alias exists and no location details are provided, only the specified fields change (`description`/`alternateNames`/`notes` preserved when omitted, cleared when explicitly `""`/`[]`); new locations still need `location_query` or lat/long
 
