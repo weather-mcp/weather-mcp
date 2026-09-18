@@ -3587,6 +3587,17 @@ bbox call was refused; the third rerun at ~04:09Z passed and published
 `1.25.17` at 04:11:40Z. The release's diff touched neither
 `riverConditionsHandler.ts` nor `noaa.ts`.
 
+**Evidence (second occurrence):** 2026-09-18, v1.31.2 (run `35372699372`). The
+first attempt failed at `tests/integration/visualization-lightning.test.ts:215`
+(`Test timed out in 15000ms`, a live Blitzortung MQTT query for Tokyo); one
+`gh run rerun --failed` published `1.31.2` cleanly. Two things make this the
+cleanest confirmation of the entry so far: the **CI run on the identical commit
+passed** while the publish run failed, minutes apart — so the two gates ran the
+same code over different networks and disagreed — and the release's diff
+changed **no** file under `tests/integration/` at all. A different upstream and
+a different file from the 2026-09-02 case, so the trap is the live-network
+files as a class, not NWPS specifically.
+
 **Status:** active. The structural fix — running the live-network files in a
 separate non-blocking job, or excluding them from the publish gate — is a
 `publish.yml` change, not a test change; not planned. Related: [G39] (red
