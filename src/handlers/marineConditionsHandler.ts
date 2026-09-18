@@ -9,6 +9,7 @@ import { OpenMeteoService } from '../services/openmeteo.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import type { ResolvedLocation } from '../utils/locationResolver.js';
 import { validateOptionalBoolean, validatePositiveInteger } from '../utils/validation.js';
 import {
   formatWaveHeight,
@@ -18,8 +19,10 @@ import {
   formatWindSpeed,
   getWaveHeightCategory,
   getSafetyAssessment,
-  seaStateMarker,
+  formatSeaStateBlock,
+  formatNoMarineCellNote,
   formatSeaStateLegend,
+  NO_DATA_LEVEL,
   extractNOAAMarineConditions,
   type NOAAMarineConditions
 } from '../utils/marine.js';
@@ -142,7 +145,7 @@ export async function handleGetMarineConditions(
   );
 
   // Format the marine data for display
-  const output = formatOpenMeteoMarineConditions(marineData, latitude, longitude, forecast);
+  const output = formatOpenMeteoMarineConditions(marineData, latitude, longitude, forecast, resolved);
 
   return prependLocationLine({
     content: [
@@ -171,10 +174,19 @@ function formatNOAAMarineConditions(
   output += `**Region:** ${region}\n`;
   output += `**Last Updated:** ${formatInTimezone(data.timestamp, timezone)}\n\n`;
 
+  // The shared sea-state block, identical to the Open-Meteo path's. Gridpoint data carries no
+  // wind-wave/swell split, so those two arguments are undefined by construction and the context
+  // sentence is empty here; the period modifiers still apply.
+  const safety = getSafetyAssessment(data.waveHeight, undefined, undefined, data.wavePeriod);
+  output += formatSeaStateBlock(safety);
+
   // Wave Conditions
   output += `## 🌊 Wave Conditions\n\n`;
 
-  if (data.waveHeight !== undefined && data.waveHeight > 0) {
+  // A published 0 is a value, not an absence: it bands as the lowest rung in the block above,
+  // exactly as a displayed 0.0m does on the Open-Meteo path. Only an absent height renders no
+  // wave line, and the block above has already said `Unknown` for it.
+  if (data.waveHeight !== undefined) {
     const waveCategory = getWaveHeightCategory(data.waveHeight);
     output += `**Significant Wave Height:** ${formatWaveHeight(data.waveHeight)}`;
     output += ` (${waveCategory.description})\n`;
@@ -187,9 +199,7 @@ function formatNOAAMarineConditions(
       output += `**Wave Period:** ${formatWavePeriod(data.wavePeriod)}\n`;
     }
 
-    output += `\n**Safety:** ${waveCategory.recommendation}\n\n`;
-  } else {
-    output += `**Wave Height:** Calm or minimal wave activity\n\n`;
+    output += `\n`;
   }
 
   // Wind Conditions
@@ -223,6 +233,7 @@ function formatNOAAMarineConditions(
   output += `---\n\n`;
   output += `*Data source: NOAA National Weather Service*\n`;
   output += `*Great Lakes and coastal marine conditions from NOAA gridpoint data*\n`;
+  output += '\n' + formatSeaStateLegend();
 
   return output;
 }
@@ -234,7 +245,8 @@ function formatOpenMeteoMarineConditions(
   data: OpenMeteoMarineResponse,
   latitude: number,
   longitude: number,
-  includeForecast: boolean
+  includeForecast: boolean,
+  resolved: ResolvedLocation
 ): string {
   let output = `# Marine Conditions Report\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
@@ -261,10 +273,25 @@ function formatOpenMeteoMarineConditions(
     current.wave_period ?? undefined
   );
 
-  const safetyEmoji = seaStateMarker(safety.level);
+  output += formatSeaStateBlock(safety);
 
-  output += `## ${safetyEmoji} Current Conditions: ${safety.level}\n\n`;
-  output += `${safety.description}\n\n`;
+  // The upstream answers HTTP 200 with a null scalar where the marine model has no cell, so a
+  // coastal place name that geocodes to an inland centroid returns a blank report with nothing
+  // saying why. The note claims only what is known: the upstream returned no cell, and the point
+  // came from a place name. `'geocoded'` alone is the whole guard — `resolveDefaultLocation`
+  // spreads `source: 'default'` over a saved alias and over a geocoded place alike
+  // (locationResolver.ts:422,428,436), so `'default'` carries no information about how the point
+  // was obtained, and admitting it would invent provenance for a coordinate the user saved by
+  // hand (G53). A genuinely geocoded default therefore gets the short variant too; the short
+  // variant claims nothing false, which is the right way to be wrong.
+  //
+  // The flag carries provenance only. The note names neither the place nor the coordinates:
+  // `prependLocationLine` has already printed both in the `**Location:**` header above, and the
+  // report's own location line prints the coordinates again, so restating them was redundant
+  // (test-drive Observation 1).
+  if (safety.level === NO_DATA_LEVEL) {
+    output += formatNoMarineCellNote({ fromPlaceName: resolved.source === 'geocoded' });
+  }
 
   // Wave Height Summary
   output += `## 🌊 Wave Conditions\n\n`;

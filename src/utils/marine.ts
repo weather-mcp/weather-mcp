@@ -328,8 +328,52 @@ export function getSafetyAssessment(
 
   return {
     level: waveCategory.level,
-    description: adjustedDescription + context,
+    description: adjustedDescription + '.' + context,
     recommendation: waveCategory.recommendation
   };
+}
+
+/**
+ * The shared sea-state block: both marine render paths (NOAA gridpoint and Open-Meteo) obtain
+ * their sea-state block from this function; neither formats the header, the sea-state line or
+ * the safety line itself. The header line is byte-compatible with the pre-existing Open-Meteo
+ * render site (`## ${marker} Current Conditions: ${level}`), which
+ * tests/unit/marine-sea-state-taxonomy.test.ts contract 6 parses directly — do not reformat it.
+ */
+export function formatSeaStateBlock(safety: SafetyAssessment): string {
+  return (
+    `## ${seaStateMarker(safety.level)} Current Conditions: ${safety.level}\n\n` +
+    `**Sea state:** ${safety.description}\n` +
+    `**Safety:** ${safety.recommendation}\n\n`
+  );
+}
+
+/**
+ * The no-marine-cell note: shown when a location resolves to a point the marine model has no
+ * cell for (most often a place name resolving to a land centroid). Takes a plain flag, not a
+ * `ResolvedLocation` — this module must not import from `locationResolver.ts`, which pulls in
+ * `LocationStore`, `GeocodingService`, `Cache` and `NominatimService`. Must never contain
+ * `NO_DATA_MARKER`: tests/unit/marine-sea-state-taxonomy.test.ts counts that marker and expects
+ * exactly two occurrences in a no-data report.
+ *
+ * The note deliberately does **not** restate the resolved place name or its coordinates. Both
+ * already render above it — `formatLocationLine` prepends `**Location:** <name> (lat, lon)` for
+ * every name-based resolution (`locationResolver.ts:47`), and the report's own `**Location:**`
+ * line carries the coordinates on every path. `fromPlaceName` therefore carries provenance
+ * only: the long variant explains the *mechanism* that produced an inland point without
+ * repeating data the reader has already been shown four lines earlier.
+ */
+export function formatNoMarineCellNote(opts: { fromPlaceName: boolean }): string {
+  if (opts.fromPlaceName) {
+    return (
+      `*No marine-model cell here — a place name resolves to a land centroid, and the marine model ` +
+      `covers ocean and large-lake water cells only. For coastal conditions, pass ` +
+      `\`latitude\`/\`longitude\` for a point just offshore.*\n\n`
+    );
+  }
+  return (
+    `*No marine-model cell here — the marine model covers ocean and large-lake water cells only. ` +
+    `For coastal conditions, try a point just offshore.*\n\n`
+  );
 }
 
