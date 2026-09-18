@@ -313,7 +313,7 @@ export function getCountryFromCoordinates(lat: number, lon: number): string {
 }
 
 /**
- * Determine if coordinates are within the United States (including Alaska, Hawaii, and territories)
+ * Determine if coordinates are within the United States (including Alaska, Hawaii and Puerto Rico; the other NWS-served territories are `isInNwsTerritory`)
  * Uses bounding box approach for simplicity
  * @param latitude Latitude coordinate
  * @param longitude Longitude coordinate
@@ -394,4 +394,77 @@ export function isInGreatBritain(latitude: number, longitude: number): boolean {
     latitude >= 55.45 && latitude <= 61.05 && longitude >= -9.0 && longitude <= 2.0;
 
   return inSouthwestApproaches || inEnglandWalesScotland || inNorthernScotlandIsles;
+}
+
+/**
+ * Determine if coordinates fall within one of the NWS-served US territories that
+ * `isInUS` deliberately leaves out — Guam, the Northern Mariana Islands (southern
+ * arc only), the US Virgin Islands and American Samoa.
+ *
+ * It answers exactly one question: **will api.weather.gov accept an alerts point
+ * here?** Not "is this the United States", not "does NWS forecast here" (it reports
+ * no `gridId` for American Samoa at all), and not "does any other service cover
+ * this place".
+ *
+ * This function is **routing only and NEVER renders.** No sentence in any tool
+ * output may be derived from it. Its one consumer is the critical-alert banner's
+ * pre-filter in `src/handlers/criticalAlertBanner.ts`, which uses it to decide
+ * whether one `getAlerts` call is worth making. See GOTCHAS G53: promoting a
+ * routing heuristic to a rendered claim inherits every edge the heuristic was
+ * previously allowed to get wrong. The moment a rendered sentence names a
+ * territory off this predicate, every box below owes a fresh audit against the
+ * jurisdiction that sentence names.
+ *
+ * **Why these boxes are drawn tightly to the islands, which is the opposite of
+ * `isInGreatBritain`'s posture.** There, a false positive costs one cheap
+ * Nominatim call, so the boxes are deliberately generous. Here a false positive
+ * costs an HTTP 400 `Parameter "point" is invalid: out of bounds` from
+ * api.weather.gov, which `NOAAService.makeRequest` turns into an
+ * `InvalidLocationError` after its own `securityEvent: true` warn; the banner's
+ * catch then warns a second time, and `getAlerts` never caches a failure, so every
+ * call repeats both. Two security-event log lines per request is the price of a
+ * loose edge, so every corner below was probed against the live endpoint on
+ * 2026-09-18 and the seams measured. An edge moved "for tidiness" is a 400 or a
+ * dropped island. The probe table is in `.devdocs/plan-nws-alert-jurisdiction.md`.
+ *
+ * **Why Guam and the CNMI are two boxes and not one.** The union's northwest
+ * corner, `15.2 N, 144.8 E`, is a measured 400 — the accepted region is not convex
+ * there, so a single merged box would admit open ocean NWS rejects.
+ *
+ * **Why the CNMI box stops at 15.35 N.** NWS rejects every point from 16.0 N north
+ * along 145.7 E: Anatahan, Pagan, Agrihan and Farallon de Pajaros are all out of
+ * bounds. The northern Marianas are excluded because the service excludes them,
+ * not because they were forgotten.
+ *
+ * **The USVI box admits the British Virgin Islands** (Tortola, Virgin Gorda). NWS
+ * answers 200 at those points and nothing here is rendered, so the admission is
+ * harmless and deliberate — tightening the box to exclude them would buy nothing
+ * and risk clipping St Thomas and St John.
+ *
+ * **Why American Samoa is two boxes.** The territory is not a rectangle: the main
+ * box holds the Tutuila–Manuʻa–Rose band, and Swains Island is a separate pocket
+ * ~350 km north. Apia (`−13.83, −171.76`, sovereign Samoa) and the `−168.05`
+ * corners outside the band are measured 400s.
+ *
+ * **`isInUS` must never be widened to absorb these.** That predicate backs a
+ * *rendered* coverage claim in `get_river_conditions` (G53), and the two questions
+ * have different answers: NWPS gauges Puerto Rico and gauges nothing in Guam, so a
+ * widened `isInUS` would tell a caller in Guam that NWPS covers Guam. The two
+ * predicates are **disjoint by construction** — the Puerto Rico box's east edge is
+ * `−65.2` and the USVI box's west edge is `−65.15`, so they touch without
+ * overlapping.
+ *
+ * @param latitude Latitude coordinate
+ * @param longitude Longitude coordinate
+ * @returns True if NWS accepts an alerts point at these coordinates in one of the
+ *          four territories `isInUS` excludes
+ */
+export function isInNwsTerritory(latitude: number, longitude: number): boolean {
+  const inGuam = latitude >= 13.2 && latitude <= 13.7 && longitude >= 144.6 && longitude <= 145.0;
+  const inMarianasSouthernArc = latitude >= 14.05 && latitude <= 15.35 && longitude >= 145.05 && longitude <= 145.9;
+  const inVirginIslands = latitude >= 17.6 && latitude <= 18.45 && longitude >= -65.15 && longitude <= -64.5;
+  const inAmericanSamoaMain = latitude >= -14.65 && latitude <= -14.05 && longitude >= -171.0 && longitude <= -168.05;
+  const inSwainsIsland = latitude >= -11.2 && latitude <= -10.95 && longitude >= -171.2 && longitude <= -170.95;
+
+  return inGuam || inMarianasSouthernArc || inVirginIslands || inAmericanSamoaMain || inSwainsIsland;
 }
