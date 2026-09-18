@@ -171,10 +171,19 @@ function formatNOAAMarineConditions(
   output += `**Region:** ${region}\n`;
   output += `**Last Updated:** ${formatInTimezone(data.timestamp, timezone)}\n\n`;
 
+  // The shared sea-state block, identical to the Open-Meteo path's. Gridpoint data carries no
+  // wind-wave/swell split, so those two arguments are undefined by construction and the context
+  // sentence is empty here; the period modifiers still apply.
+  const safety = getSafetyAssessment(data.waveHeight, undefined, undefined, data.wavePeriod);
+  output += formatSeaStateBlock(safety);
+
   // Wave Conditions
   output += `## 🌊 Wave Conditions\n\n`;
 
-  if (data.waveHeight !== undefined && data.waveHeight > 0) {
+  // A published 0 is a value, not an absence: it bands as the lowest rung in the block above,
+  // exactly as a displayed 0.0m does on the Open-Meteo path. Only an absent height renders no
+  // wave line, and the block above has already said `Unknown` for it.
+  if (data.waveHeight !== undefined) {
     const waveCategory = getWaveHeightCategory(data.waveHeight);
     output += `**Significant Wave Height:** ${formatWaveHeight(data.waveHeight)}`;
     output += ` (${waveCategory.description})\n`;
@@ -187,9 +196,7 @@ function formatNOAAMarineConditions(
       output += `**Wave Period:** ${formatWavePeriod(data.wavePeriod)}\n`;
     }
 
-    output += `\n**Safety:** ${waveCategory.recommendation}\n\n`;
-  } else {
-    output += `**Wave Height:** Calm or minimal wave activity\n\n`;
+    output += `\n`;
   }
 
   // Wind Conditions
@@ -223,6 +230,7 @@ function formatNOAAMarineConditions(
   output += `---\n\n`;
   output += `*Data source: NOAA National Weather Service*\n`;
   output += `*Great Lakes and coastal marine conditions from NOAA gridpoint data*\n`;
+  output += '\n' + formatSeaStateLegend();
 
   return output;
 }
