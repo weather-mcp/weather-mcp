@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.2] - 2026-09-18
+
 ### Fixed
 
 - **One MCP client's saved location silently deleted another's.** `LocationStore` cached the parsed `~/.weather-mcp/locations.json` on first read and never refreshed it — `invalidateCache()` had zero callers anywhere in the tree — so every write was "my stale copy plus my change" written back whole. An instance that loaded before another instance's save deleted that save on its next write. No timing was involved: minutes or days apart was enough, and any client with the lightning tool enabled loads the file at startup, so the stale window was the whole session. The cache is gone; the file is read and parsed on every operation and each call returns a fresh object. A save made in one client is now visible to the others on their next call, with no restart. Measured cost of the uncached read: 11.2 microseconds per call on a three-entry file, against a network request per tool call. (`src/services/locationStore.ts`)
@@ -1805,7 +1807,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.1...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.2...HEAD
+[1.31.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.1...v1.31.2
 [1.31.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.0...v1.31.1
 [1.31.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.1...v1.31.0
 [1.30.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.0...v1.30.1

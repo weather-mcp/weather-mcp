@@ -194,6 +194,8 @@ Claude Desktop, Claude Code, Cline, Cursor, Zed, VS Code (GitHub Copilot), LM St
 
 Restart your MCP client after upgrading. See [CHANGELOG.md](./CHANGELOG.md) for release notes.
 
+**Running more than one MCP client on this machine? Restart every one of them.** All clients share a single `~/.weather-mcp/locations.json`, and a client still running a version before 1.31.2 writes that file from a stale in-memory copy — it will delete saved locations that an upgraded client has since written. The hazard is the un-upgraded instance, so the protection holds only once every client on the machine has been restarted onto the new version.
+
 ## Configuration
 
 **Most users need zero configuration.** Everything below is optional.
