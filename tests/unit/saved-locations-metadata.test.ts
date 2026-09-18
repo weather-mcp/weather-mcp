@@ -437,4 +437,147 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
       ).rejects.toThrow('notes must be a string');
     });
   });
+  /**
+   * Contract 9 — a geocoded re-save must not overwrite a concurrent metadata edit.
+   *
+   * `save_location` reads the existing entry near the top of the handler, then a
+   * full re-save by `location_query` awaits the geocoder. Restoring omitted
+   * metadata from that pre-await snapshot loses whatever another client wrote
+   * during the network round trip — a window measured in network latency, not in
+   * the store's own microseconds. The merge base is therefore re-read after the
+   * last await, immediately before the write.
+   */
+  describe('Concurrent metadata edit during a geocoded re-save (contract 9)', () => {
+    /**
+     * Replace the injected geocoder with one that blocks until the returned
+     * function is called, so the test controls exactly when the await resumes.
+     * A unit test may not reach the network.
+     */
+    function deferGeocoder(coords: { latitude: number; longitude: number; name: string }): () => void {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      nominatimService.searchLocation = (async () => {
+        await gate;
+        return {
+          results: [
+            {
+              id: 1,
+              name: coords.name,
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              timezone: 'America/Chicago',
+              country_code: 'US',
+              admin1: 'Illinois'
+            }
+          ],
+          generationtime_ms: 1
+        };
+      }) as typeof nominatimService.searchLocation;
+
+      return release;
+    }
+
+    it("keeps a second client's notes and activities written while the geocode was in flight", async () => {
+      // A saved entry with metadata this re-save will omit.
+      locationStore.set('auntlisa', {
+        name: "Aunt Lisa's House",
+        latitude: 41.8781,
+        longitude: -87.6298,
+        notes: 'original notes',
+        activities: ['original']
+      });
+
+      const releaseGeocode = deferGeocoder({
+        latitude: 41.9,
+        longitude: -87.7,
+        name: 'Relocated House'
+      });
+
+      // Client A starts a full re-save by location_query, omitting notes and activities.
+      const savePromise = handleSaveLocation(
+        {
+          alias: 'auntlisa',
+          location_query: 'Chicago, IL'
+        },
+        locationStore,
+        nominatimService
+      );
+
+      // Let the handler reach the geocoder await before the second client writes.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Client B — a separate LocationStore instance on the same file, as a second
+      // process would be — edits exactly the fields A omitted.
+      const otherClient = new LocationStore(join(tempDir, 'locations.json'));
+      const current = otherClient.get('auntlisa');
+      expect(current).toBeDefined();
+      otherClient.set('auntlisa', {
+        ...current!,
+        notes: 'updated by the other client',
+        activities: ['kayaking']
+      });
+
+      releaseGeocode();
+      await savePromise;
+
+      const saved = locationStore.get('auntlisa');
+
+      // A's geocoded coordinates won, because A supplied them...
+      expect(saved?.latitude).toBeCloseTo(41.9, 5);
+      expect(saved?.longitude).toBeCloseTo(-87.7, 5);
+      expect(saved?.name).toBe('Relocated House');
+
+      // ...and B's metadata survived, because A omitted it.
+      expect(saved?.notes).toBe('updated by the other client');
+      expect(saved?.activities).toEqual(['kayaking']);
+    });
+
+    it('does not resurrect metadata when the second client removed the alias mid-flight', async () => {
+      locationStore.set('auntlisa', {
+        name: "Aunt Lisa's House",
+        latitude: 41.8781,
+        longitude: -87.6298,
+        notes: 'original notes',
+        activities: ['original'],
+        description: 'original description'
+      });
+
+      const releaseGeocode = deferGeocoder({
+        latitude: 41.9,
+        longitude: -87.7,
+        name: 'Relocated House'
+      });
+
+      const savePromise = handleSaveLocation(
+        {
+          alias: 'auntlisa',
+          location_query: 'Chicago, IL'
+        },
+        locationStore,
+        nominatimService
+      );
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const otherClient = new LocationStore(join(tempDir, 'locations.json'));
+      expect(otherClient.remove('auntlisa')).toBe(true);
+
+      releaseGeocode();
+      await savePromise;
+
+      // The entry is recreated from what this call supplied. The stale metadata is
+      // gone, not preserved.
+      const saved = locationStore.get('auntlisa');
+      expect(saved).toBeDefined();
+      expect(saved?.name).toBe('Relocated House');
+      expect(saved?.notes).toBeUndefined();
+      expect(saved?.activities).toBeUndefined();
+      expect(saved?.description).toBeUndefined();
+    });
+  });
 });

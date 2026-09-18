@@ -10,10 +10,35 @@ import type { SavedLocation, SavedLocationsStore } from '../types/savedLocations
 import { logger } from '../utils/logger.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 
+/**
+ * Thrown when `~/.weather-mcp/locations.json` exists but cannot be read, parsed,
+ * or does not hold a plain JSON object at the top level.
+ *
+ * The store is **contract**, not garnish: it is user data that only this server
+ * writes, so "empty" and "unreadable" must never render as the same answer. An
+ * unreadable file is refused by every read and every write — it is never renamed,
+ * copied, or overwritten. `ENOENT`, and only `ENOENT`, means an empty store.
+ *
+ * The message is fixed apart from the path. The underlying cause goes to the log,
+ * never into the message.
+ */
+export class LocationStoreUnreadableError extends Error {
+  readonly storePath: string;
+
+  constructor(storePath: string) {
+    super(
+      `Saved locations file could not be read: ${storePath}\n\n` +
+      'The file was not modified. To recover, either repair it so it contains a valid JSON object,\n' +
+      'or move it aside (rename or delete it) to start with an empty list. No restart is needed.'
+    );
+    this.name = 'LocationStoreUnreadableError';
+    this.storePath = storePath;
+  }
+}
+
 export class LocationStore {
   private readonly storePath: string;
   private readonly storeDir: string;
-  private cache: SavedLocationsStore | null = null;
 
   constructor(customPath?: string) {
     if (customPath) {
@@ -44,51 +69,57 @@ export class LocationStore {
   }
 
   /**
-   * Load all saved locations from disk
+   * Load all saved locations from disk.
+   *
+   * Reads the file on **every** call — there is no cache. Two clients on one
+   * machine share this file, so a cached copy written back whole silently deletes
+   * the other client's saves. Every call returns a fresh object.
+   *
+   * @throws {LocationStoreUnreadableError} when the file exists but cannot be
+   *   read, cannot be parsed, or is not a plain JSON object at the top level.
+   *   A zero-byte or whitespace-only file is a parse failure like any other.
    */
   load(): SavedLocationsStore {
-    // Return cached data if available
-    if (this.cache !== null) {
-      return this.cache;
-    }
-
-    // If file doesn't exist, return empty store
-    if (!existsSync(this.storePath)) {
-      logger.info('No saved locations file found, starting fresh', {
-        path: this.storePath
-      });
-      this.cache = {};
-      return this.cache;
-    }
-
+    let data: string;
     try {
-      const data = readFileSync(this.storePath, 'utf-8');
-      const parsed = JSON.parse(data) as SavedLocationsStore;
-
-      // Validate the structure
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-        logger.warn('Invalid locations file format, resetting to empty', {
+      data = readFileSync(this.storePath, 'utf-8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        logger.debug('No saved locations file found, starting fresh', {
           path: this.storePath
         });
-        this.cache = {};
-        return this.cache;
+        return {};
       }
-
-      logger.info('Loaded saved locations', {
-        count: Object.keys(parsed).length,
+      // Any other read failure (EISDIR, EACCES, EIO, ENOTDIR) is unreadable, not empty.
+      logger.error('Failed to read saved locations', error as Error, {
         path: this.storePath
       });
-
-      this.cache = parsed;
-      return this.cache;
-    } catch (error) {
-      logger.error('Failed to load saved locations', error as Error, {
-        path: this.storePath
-      });
-      // Return empty store on error rather than failing
-      this.cache = {};
-      return this.cache;
+      throw new LocationStoreUnreadableError(this.storePath);
     }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch (error) {
+      logger.error('Failed to parse saved locations', error as Error, {
+        path: this.storePath
+      });
+      throw new LocationStoreUnreadableError(this.storePath);
+    }
+
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      logger.error('Saved locations file is not a JSON object', undefined, {
+        path: this.storePath
+      });
+      throw new LocationStoreUnreadableError(this.storePath);
+    }
+
+    logger.debug('Loaded saved locations', {
+      count: Object.keys(parsed).length,
+      path: this.storePath
+    });
+
+    return parsed as SavedLocationsStore;
   }
 
   /**
@@ -101,7 +132,6 @@ export class LocationStore {
     try {
       const data = JSON.stringify(locations, null, 2);
       writeFileSync(this.storePath, data, 'utf-8');
-      this.cache = locations; // Update cache
       logger.info('Saved locations to disk', {
         count: Object.keys(locations).length,
         path: this.storePath
@@ -208,6 +238,8 @@ export class LocationStore {
    * Clear all saved locations
    */
   clear(): void {
+    // Load first so clear() refuses an unreadable file like every other operation.
+    this.load();
     this.save({});
     logger.info('Cleared all saved locations');
   }
@@ -217,12 +249,5 @@ export class LocationStore {
    */
   getStorePath(): string {
     return this.storePath;
-  }
-
-  /**
-   * Invalidate the cache, forcing reload on next access
-   */
-  invalidateCache(): void {
-    this.cache = null;
   }
 }
