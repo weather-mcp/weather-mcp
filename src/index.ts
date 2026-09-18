@@ -41,6 +41,8 @@ const server = createWeatherServer({ locationStore });
  * saved locations at startup lets their coverage accumulate before the user asks.
  * Best-effort and fully non-blocking: it opens a persistent MQTT connection, so it is
  * skipped when the lightning tool is disabled or when WEATHER_LIGHTNING_PREWARM=false.
+ * The saved-locations read is guarded too: an unreadable locations file must not stop
+ * the server from booting.
  */
 function prewarmLightningMonitoring(): void {
   if (process.env.WEATHER_LIGHTNING_PREWARM === 'false') {
@@ -50,7 +52,15 @@ function prewarmLightningMonitoring(): void {
     return;
   }
 
-  const savedLocations = Object.values(locationStore.getAll());
+  let savedLocations;
+  try {
+    savedLocations = Object.values(locationStore.getAll());
+  } catch (error) {
+    logger.warn('Skipping lightning pre-warm: saved locations could not be read', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return;
+  }
   if (savedLocations.length === 0) {
     return;
   }
