@@ -223,28 +223,46 @@ export async function handleSaveLocation(
     );
   }
 
+  // Re-read the merge base AFTER every await on this path, and use it for both
+  // the omitted-metadata restoration below and the update/create verb.
+  //
+  // The pre-await read at the top of this function still decides isPartialUpdate
+  // — and, on that branch only, the coordinates, timezone and admin fields —
+  // because that branch never awaits. It must NOT supply metadata: a full re-save
+  // by location_query awaits the geocoder above, and a second client on the same
+  // machine can edit notes/activities during that network latency. Restoring from
+  // the stale pre-await snapshot would silently overwrite that edit.
+  //
+  // There must be no await between this read and locationStore.set() below, so
+  // the read-modify-write stays one synchronous run (G20) — that is the whole
+  // reason this store needs no lockfile.
+  const mergeBase = locationStore.get(alias);
+
   // Preserve description/alternateNames/notes/activities when omitted on ANY
   // update to an existing alias (partial update OR full re-save with new
   // coordinates). Omitted (undefined) -> keep the stored value. Explicitly
   // cleared ("" / []) was already normalized to undefined above by the
-  // *Provided validation blocks.
-  if (existingLocation) {
+  // *Provided validation blocks. A mergeBase of undefined means the alias was
+  // removed mid-flight: the metadata is gone, not preserved, and the entry is
+  // recreated from what this call supplied.
+  if (mergeBase) {
     if (!descriptionProvided) {
-      description = existingLocation.description;
+      description = mergeBase.description;
     }
     if (!alternateNamesProvided) {
-      alternateNames = existingLocation.alternateNames;
+      alternateNames = mergeBase.alternateNames;
     }
     if (!notesProvided) {
-      notes = existingLocation.notes;
+      notes = mergeBase.notes;
     }
     if (!activitiesProvided) {
-      activities = existingLocation.activities;
+      activities = mergeBase.activities;
     }
   }
 
-  // Check if this is an update or new location
-  const isUpdate = locationStore.has(alias);
+  // Check if this is an update or new location — from the same late read, not a
+  // third trip to the store.
+  const isUpdate = mergeBase !== undefined;
 
   // Save the location
   locationStore.set(alias, {

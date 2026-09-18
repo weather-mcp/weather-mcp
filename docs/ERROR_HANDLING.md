@@ -288,6 +288,56 @@ any other fire's information. `0` is a real reading — a new fire is 0% contain
 On the FIRMS path (everywhere outside the US) containment does not exist at all: satellite heat
 detections carry no containment, so no containment line is rendered in either form.
 
+### Saved Locations File Unreadable
+
+Every saved-locations tool — and every weather tool called with `location_name`, and any
+`WEATHER_DEFAULT_LOCATION` set to a saved alias — reports this when
+`~/.weather-mcp/locations.json` exists but cannot be read:
+
+```
+Saved locations file could not be read: /home/you/.weather-mcp/locations.json
+
+The file was not modified. To recover, either repair it so it contains a valid JSON object,
+or move it aside (rename or delete it) to start with an empty list. No restart is needed.
+```
+
+**The file is never modified, renamed, copied, or replaced.** The server does not quarantine it,
+does not write a `.corrupt` copy beside it, and does not overwrite it with an empty store. Your
+bytes are exactly where you left them, which is what makes repairing them possible.
+
+**A missing file is not this error.** If `locations.json` does not exist, that is an empty store
+and every tool behaves normally — the first `save_location` creates the directory and the file.
+This error means the file *is* there and the server will not guess at its contents. A zero-byte
+file is unreadable like any other: a new instance that caught an older one mid-write would
+otherwise read "empty", save, and replace the whole file with one entry.
+
+**What triggers it:** the file is not valid JSON (truncated, or edited by hand into a syntax
+error); the top level is not a JSON object (an array, `null`, a string, a number); or the path
+cannot be read at all (it is a directory, or permissions deny it). The underlying cause is written
+to the **stderr log** with the path — it is deliberately kept out of the message, which stays
+fixed apart from the path.
+
+**Two remedies, both yours to choose:**
+
+1. **Repair it.** Open the file and make it a valid JSON object — `{}` is a valid empty store.
+   Your saved locations come back as soon as the JSON parses.
+2. **Move it aside.** Rename or delete it and start with an empty list.
+
+**Neither needs a restart.** The server reads the file on every operation rather than caching it,
+so the next tool call picks up your repair immediately. That same property is why a save made in
+one MCP client is visible to the others without restarting them.
+
+**This is contract, not garnish.** Saved locations are user data that only this server writes, so
+"empty" and "unreadable" must never render as the same answer — reporting an unreadable file as
+"No saved locations" is what previously let the next save overwrite it. The error propagates
+rather than degrading to a plausible-looking empty result.
+
+**The one place it is deliberately swallowed** is the startup lightning pre-warm, which subscribes
+saved locations to the lightning feed before you ask. It logs a single
+`Skipping lightning pre-warm: saved locations could not be read` warning to stderr and continues,
+because an unreadable file must not stop the server from booting — and because the pre-warm's
+absence asserts nothing to you. Every tool you actually call still reports the error.
+
 ## Service Status Tool
 
 ### Usage

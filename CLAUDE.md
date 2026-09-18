@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.31.1 (Production Ready)
+- **Version:** 1.31.2 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -526,7 +526,28 @@ tools use to skip the reverse-geocode lookup.
 - **Validation**: Coordinates validated on save
 - **Geocoding**: Uses Nominatim service (rate-limited to 1 req/sec)
 - **Error handling**: Helpful messages if location not found or invalid
-- **Thread-safe**: LocationStore uses synchronous file I/O with cache invalidation
+- **No cache**: `load()` reads and parses the file on **every** operation and returns a fresh
+  object. A save in one client is visible to the others with no restart. The store previously
+  cached on first read and never refreshed, so an instance wrote "my stale copy plus my change"
+  and deleted whatever another instance had saved meanwhile
+- **Atomic replace**: writes go to a temp file in the same directory, are `fsync`ed, then
+  `rename`d over the target — a reader sees the old file or the new one, never a partial.
+  Permission bits are carried across the rename; a symlinked `locations.json` stays a symlink and
+  its target is replaced, resolved by walking the link chain (never `realpathSync`, which cannot
+  distinguish an absent path from a dangling link). The buffer is written to completion before any
+  `fsync` or `rename`, so a short write can never be published as a successful save
+- **Refuse-on-unreadable**: `ENOENT`, and only `ENOENT`, means an empty store. Any other read
+  failure, a parse failure, or a top level that is not a plain object throws
+  `LocationStoreUnreadableError` from every read and every write, `clear()` included. **The
+  invariant, in those words: the store never overwrites a file it could not parse.** A failed save
+  leaves the previous file intact and leaves no temp residue
+- **Last-writer-wins across processes**: there is no lockfile. The read-modify-write is one
+  synchronous run, so the collision window is microseconds between two humans driving two clients;
+  the loser loses one update and the file stays valid
+- **Keep the store synchronous** (G20): the no-lockfile argument rests on the read and the write
+  being one synchronous run. Do not make these methods `async`, and do not put an `await` between
+  a caller's read and its `set` — `savedLocationsHandler.ts` re-reads its merge base *after* the
+  geocoder await for exactly this reason
 - **Activities (optional)**: array of strings, lowercased/trimmed, ≤ 50 chars each, empties dropped; helps the AI tailor weather context
 - **Smart Updates**: if the alias exists and no location details are provided, only the specified fields change (`description`/`alternateNames`/`notes` preserved when omitted, cleared when explicitly `""`/`[]`); new locations still need `location_query` or lat/long
 
@@ -606,15 +627,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.31.1 — Production Ready ✅
-- **Test Coverage:** 3,541 tests, 100% pass rate
+- **Version:** 1.31.2 — Production Ready ✅
+- **Test Coverage:** 3,574 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.31.2:** Saved locations survive a second client, a torn write, and an unreadable file
 - **New in v1.31.1:** The life-threatening alert banner now reaches Guam, the CNMI, the US Virgin Islands and American Samoa
 - **New in v1.31.0:** get_marine_conditions renders the same marker, sea-state and safety block on both paths, and explains a missing marine-model cell
-- **New in v1.30.1:** get_wildfire_info no longer prints a full containment bar on a 95-99% fire, a fabricated 0% where NIFC reported nothing, or a miles figure that spans two danger tiers
 
 ## Useful References
 
@@ -637,7 +658,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-18 (v1.31.1)
+**Last Updated:** 2026-09-18 (v1.31.2)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

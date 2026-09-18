@@ -15,6 +15,13 @@ import {
 } from '../../src/utils/locationResolver.js';
 import type { ResolvedLocation } from '../../src/utils/locationResolver.js';
 import type { LocationStore } from '../../src/services/locationStore.js';
+import {
+  LocationStore as RealLocationStore,
+  LocationStoreUnreadableError,
+} from '../../src/services/locationStore.js';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import type { GeocodingService, GeocodingResult } from '../../src/services/geocoding.js';
 import type { SavedLocation } from '../../src/types/savedLocations.js';
 
@@ -362,6 +369,83 @@ describe('resolveLocationAsync', () => {
       await expect(resolveLocationAsync({}, store, service)).rejects.toThrow(
         /Provide one of/i
       );
+    });
+
+    /**
+     * An unreadable saved-locations file must not be mistaken for "this alias is
+     * not saved". Falling through would geocode the alias as a place name and
+     * return the weather for wherever Nominatim puts "home" — a wrong-place
+     * forecast, which is worse than an error.
+     */
+    describe('an unreadable saved-locations file is an error, not a place name', () => {
+      it('(i) rejects with LocationStoreUnreadableError and never calls the geocoder', async () => {
+        process.env[ENV_KEY] = 'home';
+        const store = {
+          get: () => {
+            throw new LocationStoreUnreadableError('/tmp/unreadable/locations.json');
+          },
+          getAll: () => {
+            throw new LocationStoreUnreadableError('/tmp/unreadable/locations.json');
+          },
+        } as unknown as LocationStore;
+        const { service, geocode } = makeGeocodingService([]);
+
+        await expect(resolveLocationAsync({}, store, service)).rejects.toThrow(
+          LocationStoreUnreadableError
+        );
+        expect(geocode).not.toHaveBeenCalled();
+      });
+
+      it('(ii) does the same through a REAL LocationStore on a corrupt file', async () => {
+        // A stub can supply a throw the real store never produces (G48), so one
+        // case must drive the real thing.
+        const tempDir = mkdtempSync(join(tmpdir(), 'weather-mcp-resolver-'));
+        const storePath = join(tempDir, 'locations.json');
+        writeFileSync(storePath, '{"home": {"name": "Seattle", "lat', 'utf-8');
+
+        try {
+          process.env[ENV_KEY] = 'home';
+          const store = new RealLocationStore(storePath);
+          const { service, geocode } = makeGeocodingService([]);
+
+          await expect(resolveLocationAsync({}, store, service)).rejects.toThrow(
+            LocationStoreUnreadableError
+          );
+          expect(geocode).not.toHaveBeenCalled();
+
+          // The file is still there, byte for byte.
+          expect(readFileSync(storePath, 'utf-8')).toBe('{"home": {"name": "Seattle", "lat');
+        } finally {
+          rmSync(tempDir, { recursive: true, force: true });
+        }
+      });
+
+      it('(iii) still geocodes when the store throws an ordinary not-found error', async () => {
+        // The narrowing must not have widened: every other failure still falls
+        // through to the geocoder.
+        process.env[ENV_KEY] = 'home';
+        const store = {
+          get: () => {
+            throw new Error('Saved location "home" not found');
+          },
+          getAll: () => ({}),
+        } as unknown as LocationStore;
+        const { service, geocode } = makeGeocodingService([
+          {
+            id: 1,
+            name: 'Home, Kansas',
+            latitude: 38.5,
+            longitude: -98.0,
+            country_code: 'US',
+          } as GeocodingResult,
+        ]);
+
+        const resolved = await resolveLocationAsync({}, store, service);
+
+        expect(geocode).toHaveBeenCalled();
+        expect(resolved.latitude).toBe(38.5);
+        expect(resolved.source).toBe('default');
+      });
     });
   });
 });

@@ -2,7 +2,7 @@
  * Utility for resolving location coordinates from various input formats
  */
 
-import { LocationStore } from '../services/locationStore.js';
+import { LocationStore, LocationStoreUnreadableError } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { validateLatitude, validateLongitude } from './validation.js';
 import { Cache } from './cache.js';
@@ -426,8 +426,15 @@ async function resolveDefaultLocation(
   try {
     const saved = resolveLocation({ location_name: raw }, locationStore);
     return { ...saved, source: 'default' };
-  } catch {
-    // Not a saved alias — treat it as a free-text place name below.
+  } catch (error) {
+    // An unreadable saved-locations file is not "this alias is not saved" — the
+    // alias may well be in there. Falling through would geocode the alias as a
+    // place name and return the weather for wherever Nominatim puts "home",
+    // which is worse than an error. Every other failure here really does mean
+    // "not a saved alias" and still falls through to the geocode below.
+    if (error instanceof LocationStoreUnreadableError) {
+      throw error;
+    }
   }
 
   // Free-text place name -> geocode (shares the city_name cache)
