@@ -3444,11 +3444,30 @@ every report and `marine-forecast.test.ts` reddened. Resolved by decision
 (rename to `Calm`) rather than by editing the lock; the lock is byte-identical
 to `main`.
 
-**Status:** active. Related: [G41] (a check that cannot fail / cannot pass —
-this is a lock that stops meaning what it says), [G29] (correcting a published
-table sweeps the doc set; this entry is the test-suite half of the same
-sweep). Partly lintable — the Verify grep enumerates candidates; only a human
-knows which are proxies.
+**The Verify grep now returns this entry's own remedy, which is [G40]'s
+2026-09-09 clause applied to it** (2026-09-17, `7c941d4`,
+marine-render-parity T5). `tests/unit/marine-render-parity.test.ts` adds two
+hits: a comment at `:236` explaining why a rung word is *not* used, and
+`not.toContain('Calm or minimal wave activity')` at `:288`. The second is
+**not** an instance of this trap — it is the exact full phrase of a retired
+render line, which is the "assert the construct, not the vocabulary" form this
+entry prescribes, and it cannot be reddened by the legend printing the word
+`Calm`. Read the hit before classing it: the base result for this grep was one
+marine hit (`marine-forecast.test.ts:157`) and it is now three, differing by
+exactly this plan's own additions.
+
+**Status:** active. **Verify line re-run 2026-09-17** (marine-render-parity T3,
+before the NOAA path gained the legend): the only pre-existing marine hit was
+`marine-forecast.test.ts:157`, on the Open-Meteo **forecast** path, still
+trivially true since v1.25.6 — so rendering every rung name in NOAA output
+reddened nothing, as the plan predicted. Related: [G41] (a check that cannot
+fail / cannot pass — this is a lock that stops meaning what it says), [G29]
+(correcting a published table sweeps the doc set; this entry is the test-suite
+half of the same sweep), [G40] (a grep that stops proving its claim because of
+your own work), [G96] (the construct assertion that is satisfied by the wrong
+part of the string — the other way a precise-looking lock tests nothing).
+Partly lintable — the Verify grep enumerates candidates; only a human knows
+which are proxies.
 
 ---
 
@@ -5119,6 +5138,114 @@ written to lock).
 **Status:** active. Not lintable in general — a defaulted parameter is ordinary
 and correct everywhere the absent case is not under test, so only a human can
 tell which defaults sit in front of a contract about absence.
+
+## G96 — A construct assertion over a whole rendered string can be satisfied by a *different* part of that string
+
+**Trigger:** pinning a *shape* rather than a literal — a regex, a "starts with a
+capital and ends in a period", a "contains exactly one heading" — and applying it
+to a **whole** rendered report or a whole concatenated field, when the property
+is really about one sub-structure inside it.
+
+**Rule:** apply the construct to the **exact sub-structure the mutation would
+touch**, not to the string that contains it. Parse the block out first (a regex
+with the whole block's shape, and let it throw when it does not match), or strip
+the known neighbouring part off the end, *then* assert. If the assertion can
+still pass when a neighbour supplies the property, the neighbour is what it is
+testing.
+
+**Why:** this is the failure mode [G45] does **not** cover, and the distinction
+matters because a builder who has read G45 will check the wrong thing and
+conclude the contract is sound. G45 says a mutation only goes red where the
+contract can **reach** it — the wrong *layer*. Here the contract reaches exactly
+the right layer and still passes, because a rendered report is a concatenation
+and a shape assertion over a concatenation is satisfied by **any** part of it
+that has the shape. Both halves of a marine sea-state description end in a full
+stop, so "ends in a full stop" is true of the joined string whether or not the
+separator between them exists.
+
+**Verify:** for each construct assertion, delete the thing it is about and
+re-run. If it stays green, name what else in the string satisfied it — there is
+always something, and that something is the real subject of the test.
+
+**Evidence:** 2026-09-17 (`7c941d4`, marine-render-parity T5), both instances
+found by the executing subagent running the plan's own mandated mutations, and
+neither predicted by the plan. (a) Contract 7 asserted
+`/^[A-Z][^.]*\.(\s|$)/` on `getSafetyAssessment`'s whole `description` to pin
+that D3's full stop separates the rung name from the context sentence. Dropping
+the `'.'` left `Moderate Conditions dominated by local wind waves.` — which
+still starts with a capital and still ends in a period, because the *context
+sentence* carries its own. Three of the four branches stayed green under the
+exact mutation they existed to catch; only the no-context branch went red. Fixed
+by slicing the known context suffix off and asserting `/^[A-Z][^.]*\.$/` on the
+remaining rung-name portion. (b) Contract 3 checked the `⚪ … Unknown` header as
+a `toContain` substring; deleting the `**Safety:**` line from
+`formatSeaStateBlock` left the header intact, so the contract never saw a
+truncated block. Fixed by parsing the whole block with one regex that throws
+when the block is malformed, which then also reddened contract 1.
+
+**Status:** active. Related: [G45] (the layer half of the same problem — read
+both before concluding a mutation is uncatchable), [G13] and [G32] (a fixture
+that cannot discriminate), [G62] (a lock that stops meaning what it says when
+the vocabulary gains a second render site), [G82] (a comment claiming fields the
+derivation never projects — the same "the assertion is not about what it says it
+is about" family). Not lintable: only a human can say which sub-structure a
+construct assertion is really about.
+
+---
+## G97 — `npm run examples` reports "All captures succeeded" while writing an upstream *error* into a shipped example
+
+**Trigger:** running `npm run examples` — the bindings' conditional gate
+addition whenever a tool's output shape changes — and committing what it
+produces.
+
+**Rule:** regenerate **only** the example whose output shape actually changed,
+and **read the capture before committing it**. The script takes a filter
+argument (`scripts/capture-examples.mjs:419-420`), so
+`npm run examples boating` rewrites one file. Then grep the regenerated files
+for a captured failure before staging:
+
+```bash
+git diff --stat examples/ && git diff examples/ | grep -nE '^\+.*(❌|Error retrieving|Unable to fetch|Rate limit exceeded)'
+```
+
+Any hit is a stop. A capture that lost hundreds of lines is the same signal by
+another route — check `git diff --stat` for a large one-sided deletion.
+
+**Why:** the script's success message is about **transport**, not content. A
+tool that catches its own upstream failure and renders a polite error message
+has returned text, so the capture "succeeded" and the summary line says so. The
+result is that the repository's user-facing documentation ships an error message
+as though it were the tool's normal output — and it ships under a commit whose
+subject is about something else entirely, because a full regeneration also
+rewrites every *other* example with ordinary live-data drift, and the real
+damage hides in the noise. This is [G11] at the tooling layer ("the exit code is
+not the acceptance") and [G47]'s shape at the content layer (a rate-limited
+upstream answers with a well-formed body that reads like a legitimate result).
+
+**Verify:** `npm run examples` on a clean tree, then
+`git diff examples/ | grep -nE '^\+.*(❌|Rate limit exceeded)'`. On any run where
+an upstream is throttling, this finds the captured error the summary line did
+not mention.
+
+**Evidence:** 2026-09-17 (`f91d802`, marine-render-parity T6). A full
+`npm run examples` — run because `get_marine_conditions`'s output shape had
+changed — rewrote **eight** files. `examples/river-and-flood.md` came back with
+`❌ **Error retrieving river gauge data** … Error details: Rate limit exceeded
+for NOAA`, deleting **848 lines** of gauge content including the entire
+"Found 20 river gauges" listing, while the script printed `All captures
+succeeded`. The river path was untouched by that branch. Seven unrelated files
+and a radar PNG were reverted and only the marine capture kept. Nothing in the
+gate would have caught it: `check-doc-versions.sh` does not read `examples/`,
+and no test asserts on captured output.
+
+**Status:** active. Lintable, and the better fix is in the script rather than in
+every caller — `capture-examples.mjs` should treat a captured `❌` as a failed
+capture and refuse to write it, which would retire this entry. Flagged as such
+here. Related: [G11] (read the output, the exit code is not the acceptance),
+[G47] (a throttled upstream's well-formed zero needs a positive control),
+[G58] (the narrative around a regenerated capture, which is the *other* half of
+the examples trap and fired on the same commit), [G86] (the version stamp a
+regeneration moves).
 
 ---
 
