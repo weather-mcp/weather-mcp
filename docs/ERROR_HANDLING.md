@@ -236,7 +236,8 @@ the broker on port 1883, or set `BLITZORTUNG_MQTT_URL` to a reachable one.
 The one failure on this page that renders **nothing at all**, deliberately.
 
 `get_forecast`, `get_current_conditions` and `get_weather_summary` surface a banner when the
-National Weather Service has a life-threatening alert active for a US point (see
+National Weather Service has a life-threatening alert active for a point in the
+United States or an NWS-served territory (see
 [Life-threatening alert banner](TOOLS.md#life-threatening-alert-banner)). When that lookup fails —
 NOAA unreachable, a timeout, a malformed response — the banner is **omitted silently**. No note, no
 placeholder, no "could not check". The weather report itself is unaffected and answers the question

@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.31.0 (Production Ready)
+- **Version:** 1.31.1 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -34,7 +34,7 @@ src/
 │   ├── lightningHandler.ts
 │   ├── riverConditionsHandler.ts    # NOAA NWPS (US) / Environment Agency (GB) / Open-Meteo Flood (elsewhere)
 │   ├── wildfireHandler.ts           # NIFC (US, PR, VI, GU) / NASA FIRMS (elsewhere)
-│   ├── criticalAlertBanner.ts       # Life-threatening NWS alert banner — US pre-filter, one
+│   ├── criticalAlertBanner.ts       # Life-threatening NWS alert banner — NWS-jurisdiction pre-filter, one
 │   │                                #   getAlerts call, silent-omit failure posture in one place
 │   └── savedLocationsHandler.ts     # save/list/get/remove_saved_location
 ├── services/                # External API clients (one per upstream)
@@ -117,8 +117,8 @@ All location-based tools accept coordinates, a saved `location_name`, or a
 free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
 Full per-tool parameter reference: `docs/TOOLS.md`.
 
-1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); surfaces a life-threatening NWS alert banner above the response for US points (positive-assertion-only — absence is never an all-clear); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only
-2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere, or worldwide METAR airport observations via `source="metar"`); surfaces the same life-threatening alert banner for US points, gated on *location* not source (so a US `source="metar"` request gets it); `include_fire_weather` gives NOAA's published indices in the US and a server-computed Fosberg index on the Open-Meteo path (not on METAR); automatically adds a frostbite-risk or heat-stress (WBGT) line in extreme conditions — no parameter, gated so moderate output is unchanged
+1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); surfaces a life-threatening NWS alert banner above the response for NWS-served points (the US and its territories) (positive-assertion-only — absence is never an all-clear); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only
+2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere, or worldwide METAR airport observations via `source="metar"`); surfaces the same life-threatening alert banner for NWS-served points (the US and its territories), gated on *location* not source (so a US `source="metar"` request gets it); `include_fire_weather` gives NOAA's published indices in the US and a server-computed Fosberg index on the Open-Meteo path (not on METAR); automatically adds a frostbite-risk or heat-stress (WBGT) line in extreme conditions — no parameter, gated so moderate output is unchanged
 3. **get_alerts** - Weather alerts/warnings routed by country: NOAA (US), MSC GeoMet/ECCC (Canada), EUMETNET MeteoAlarm (38 European countries), and the national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG) — matched by alert polygon where the feed publishes geometry inline (PH/ID), country-level with an explicit note otherwise (IN, whose geometry endpoint is not server-reachable) — and JMA (Japan), matched to the point by class10 warning area from a committed geometry artifact, with the Japanese name verbatim and an English gloss where known; elsewhere the optional keyed Google Weather fallback (`GOOGLE_WEATHER_API_KEY`) or a clean not-covered message; `detail` output control
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo archive, global; NOAA for recent US dates)
 5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning); renders the life-threatening alert banner **once**, above its own header, never once per section
@@ -606,15 +606,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.31.0 — Production Ready ✅
-- **Test Coverage:** 3,481 tests, 100% pass rate
+- **Version:** 1.31.1 — Production Ready ✅
+- **Test Coverage:** 3,541 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.31.1:** The life-threatening alert banner now reaches Guam, the CNMI, the US Virgin Islands and American Samoa
 - **New in v1.31.0:** get_marine_conditions renders the same marker, sea-state and safety block on both paths, and explains a missing marine-model cell
 - **New in v1.30.1:** get_wildfire_info no longer prints a full containment bar on a 95-99% fire, a fabricated 0% where NIFC reported nothing, or a miles figure that spans two danger tiers
-- **New in v1.30.0:** get_forecast falls back to MET Norway when Open-Meteo fails transiently outside the US, so an outage no longer strips the forecast
 
 ## Useful References
 
@@ -637,7 +637,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-17 (v1.31.0)
+**Last Updated:** 2026-09-18 (v1.31.1)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

@@ -11,8 +11,63 @@ import {
   getGreatLakesRegions,
   getMajorCoastalBayRegions,
   isInUS,
+  isInNwsTerritory,
   isInGreatBritain
 } from '../../src/utils/geography.js';
+
+/**
+ * Shared coordinate fixtures for the isInUS / isInNwsTerritory disjointness property.
+ *
+ * Split by which predicate is true, because the property "no coordinate is true for
+ * both" is vacuous over a list where both are always false (GOTCHAS G13). The three
+ * lists together let one case assert the property AND the positives that give it
+ * meaning.
+ *
+ * NON_US_FIXTURES deliberately omits St Croix and Tortola, which the isInUS block
+ * asserts false: both are inside the USVI box and so belong in NWS_TERRITORY_FIXTURES.
+ */
+type Fixture = readonly [name: string, latitude: number, longitude: number];
+
+/** isInUS true. Every point the isInUS block above asserts true. */
+const US_FIXTURES: readonly Fixture[] = [
+  ['Denver, CO', 39.7392, -104.9903],
+  ['Anchorage, AK', 61.2181, -149.9003],
+  ['Honolulu, HI', 21.3069, -157.8583],
+  ['San Juan, PR', 18.4655, -66.1057],
+  ['Punta Agujereada, PR', 18.5208, -67.15],
+  ['Mona Island, PR', 18.09, -67.89],
+  ['Isla Caja de Muertos, PR', 17.88, -66.52]
+];
+
+/** Both predicates false. The isInUS block's negatives, less the two USVI-box points. */
+const NON_US_FIXTURES: readonly Fixture[] = [
+  ['Punta Cana, DO', 18.582, -68.4055],
+  ['London, UK', 51.5074, -0.1278],
+  ['Tokyo, JP', 35.6762, 139.6503],
+  ['Sydney, AU', -33.8688, 151.2093],
+  ['Edmonton, AB', 53.5461, -113.4938],
+  ['Mexico City, MX', 19.4326, -99.1332]
+];
+
+/** isInNwsTerritory true — the four territories, plus the BVI the USVI box admits. */
+const NWS_TERRITORY_FIXTURES: readonly Fixture[] = [
+  ['Hagatna, GU', 13.4443, 144.7937],
+  ['Ritidian Point, GU', 13.65, 144.86],
+  ['Cocos Island, GU', 13.24, 144.65],
+  ['Rota, MP', 14.15, 145.2],
+  ['Aguijan, MP', 14.85, 145.56],
+  ['Tinian, MP', 15.0, 145.63],
+  ['Saipan, MP', 15.185, 145.7467],
+  ['St Croix, VI', 17.7333, -64.7833],
+  ['Point Udall, VI', 17.755, -64.565],
+  ['Charlotte Amalie, VI', 18.3419, -64.9307],
+  ['St John, VI', 18.33, -64.73],
+  ['Tortola, VG (admitted by the USVI box, deliberately)', 18.4207, -64.64],
+  ['Pago Pago, AS', -14.2756, -170.702],
+  ['Ta`u, AS', -14.23, -169.45],
+  ['Rose Atoll, AS', -14.55, -168.15],
+  ['Swains Island, AS', -11.06, -171.08]
+];
 
 describe('Geography Utilities', () => {
   describe('Great Lakes Detection', () => {
@@ -301,6 +356,204 @@ describe('Geography Utilities', () => {
 
     it('should return false for a mid-Atlantic point', () => {
       expect(isInGreatBritain(40.0, -40.0)).toBe(false);
+    });
+  });
+
+  describe('isInNwsTerritory', () => {
+    // Routing-only, exactly as isInGreatBritain is (see that predicate's doc block and
+    // GOTCHAS G53): this decides whether ONE api.weather.gov alerts request is worth
+    // making for the critical-alert banner, and nothing rendered anywhere is derived
+    // from it. These cases are the measured edges of what NWS accepts, probed live on
+    // 2026-09-18 — the table is in .devdocs/plan-nws-alert-jurisdiction.md. One `it`
+    // per named place on purpose: a red tells you which edge moved.
+    //
+    // A false positive here is NOT free. It costs an HTTP 400 `out of bounds`, which
+    // NOAAService.makeRequest logs as a securityEvent and throws on, the banner's catch
+    // logs a second time, and getAlerts never caches a failure. That is why the boxes
+    // are tight and why the "deliberately false" cases below are as load-bearing as the
+    // true ones.
+
+    // --- Guam (box 13.20-13.70 N, 144.60-145.00 E) ---
+
+    it('should detect Hagatna, Guam', () => {
+      // The same coordinates tests/unit/river-conditions-global.test.ts uses as
+      // GUAM_POINT, so the suite carries one Guam fixture rather than two.
+      expect(isInNwsTerritory(13.4443, 144.7937)).toBe(true);
+    });
+
+    it('should detect Ritidian Point, the northern tip of Guam', () => {
+      expect(isInNwsTerritory(13.65, 144.86)).toBe(true);
+    });
+
+    it('should detect Cocos Island, off the southern tip of Guam', () => {
+      expect(isInNwsTerritory(13.24, 144.65)).toBe(true);
+    });
+
+    // --- CNMI, southern arc only (box 14.05-15.35 N, 145.05-145.90 E) ---
+
+    it('should detect Rota, CNMI', () => {
+      expect(isInNwsTerritory(14.15, 145.2)).toBe(true);
+    });
+
+    it('should detect Aguijan, CNMI', () => {
+      expect(isInNwsTerritory(14.85, 145.56)).toBe(true);
+    });
+
+    it('should detect Tinian, CNMI', () => {
+      expect(isInNwsTerritory(15.0, 145.63)).toBe(true);
+    });
+
+    it('should detect Saipan, CNMI', () => {
+      expect(isInNwsTerritory(15.185, 145.7467)).toBe(true);
+    });
+
+    // --- US Virgin Islands (box 17.60-18.45 N, -65.15 to -64.50) ---
+
+    it('should detect St Croix, USVI', () => {
+      // The same coordinates river-conditions-global.test.ts uses as
+      // VIRGIN_ISLANDS_POINT. That tool reads isInUS, which is untouched here.
+      expect(isInNwsTerritory(17.7333, -64.7833)).toBe(true);
+    });
+
+    it('should detect Point Udall, the easternmost point of the USVI', () => {
+      expect(isInNwsTerritory(17.755, -64.565)).toBe(true);
+    });
+
+    it('should detect Charlotte Amalie, St Thomas', () => {
+      expect(isInNwsTerritory(18.3419, -64.9307)).toBe(true);
+    });
+
+    it('should detect St John, USVI', () => {
+      expect(isInNwsTerritory(18.33, -64.73)).toBe(true);
+    });
+
+    // --- American Samoa (main band -14.65 to -14.05 N, -171.00 to -168.05) ---
+
+    it('should detect Pago Pago, Tutuila', () => {
+      expect(isInNwsTerritory(-14.2756, -170.702)).toBe(true);
+    });
+
+    it('should detect Ta`u, the easternmost of the Manu`a group', () => {
+      expect(isInNwsTerritory(-14.23, -169.45)).toBe(true);
+    });
+
+    it('should detect Rose Atoll, the eastern extreme of American Samoa', () => {
+      expect(isInNwsTerritory(-14.55, -168.15)).toBe(true);
+    });
+
+    // --- American Samoa, Swains Island (separate pocket, -11.20 to -10.95 N) ---
+
+    it('should detect Swains Island, ~350 km north of the main band', () => {
+      // A second box, not a widened first one: the region between them is a
+      // measured 400.
+      expect(isInNwsTerritory(-11.06, -171.08)).toBe(true);
+    });
+
+    // --- Deliberately ALLOWED true, and the box is not to be tightened ---
+
+    it('should read true for Tortola, BVI — allowed: inside the USVI box, NWS answers 200, nothing renders', () => {
+      // Not US territory, but this predicate answers "will NWS accept an alerts
+      // point here", and it does (measured 200). Because nothing is rendered off
+      // this predicate, admitting the BVI costs nothing; tightening the box to
+      // exclude it would risk clipping St Thomas and St John. Deliberate.
+      expect(isInNwsTerritory(18.4207, -64.64)).toBe(true);
+    });
+
+    // --- False at the measured seams ---
+
+    it('should return false at 15.2 N, 144.8 E — the merged Guam+CNMI corner NWS answers 400 for', () => {
+      // The reason Guam and the CNMI are two boxes: the union of them is not the
+      // accepted region, because the accepted region is not convex here.
+      expect(isInNwsTerritory(15.2, 144.8)).toBe(false);
+    });
+
+    it('should return false for Anatahan, northern CNMI (NWS 400, out of bounds)', () => {
+      expect(isInNwsTerritory(16.35, 145.67)).toBe(false);
+    });
+
+    it('should return false for Pagan, northern CNMI (NWS 400, out of bounds)', () => {
+      // NWS rejects every point from 16.0 N north along 145.7 E. Excluded because
+      // the service excludes it, not because it was forgotten.
+      expect(isInNwsTerritory(18.1, 145.77)).toBe(false);
+    });
+
+    it('should return false for Apia, sovereign Samoa (NWS 400)', () => {
+      expect(isInNwsTerritory(-13.83, -171.76)).toBe(false);
+    });
+
+    it('should return false for Anegada, BVI — north of the USVI box', () => {
+      expect(isInNwsTerritory(18.73, -64.32)).toBe(false);
+    });
+
+    // --- False at the deliberate absences (recorded so nobody re-probes them) ---
+
+    it('should return false for Wake Island — US-sovereign but outside NWS point bounds', () => {
+      expect(isInNwsTerritory(19.3, 166.63)).toBe(false);
+    });
+
+    it('should return false for Midway Atoll — outside NWS point bounds', () => {
+      // Note: Midway IS inside isInUS's Hawaii box, so the banner reaches getAlerts
+      // there today and draws the 400. That is an isInUS false positive of the
+      // Toronto class, deferred by the design plan — this predicate simply adds
+      // nothing to it.
+      expect(isInNwsTerritory(28.21, -177.38)).toBe(false);
+    });
+
+    it('should return false for Johnston Atoll — outside NWS point bounds', () => {
+      expect(isInNwsTerritory(16.73, -169.53)).toBe(false);
+    });
+
+    it('should return false for Pohnpei, FSM — sovereign COFA state, out of scope', () => {
+      // The alerts endpoint answers 200 for the COFA states and /points answers 500.
+      // They are sovereign countries resolving to fm/pw/mh, deliberately absent from
+      // this predicate and from the banner's country sets until someone asks.
+      expect(isInNwsTerritory(6.92, 158.16)).toBe(false);
+    });
+
+    it('should return false for Koror, Palau — sovereign COFA state, out of scope', () => {
+      expect(isInNwsTerritory(7.34, 134.48)).toBe(false);
+    });
+
+    it('should return false for Majuro, RMI — sovereign COFA state, out of scope', () => {
+      expect(isInNwsTerritory(7.09, 171.38)).toBe(false);
+    });
+
+    // --- False at every point the isInUS block above uses ---
+
+    it('should return false at every coordinate the isInUS block exercises', () => {
+      for (const [name, lat, lon] of US_FIXTURES) {
+        expect(isInNwsTerritory(lat, lon), name).toBe(false);
+      }
+      for (const [name, lat, lon] of NON_US_FIXTURES) {
+        expect(isInNwsTerritory(lat, lon), name).toBe(false);
+      }
+    });
+
+    // --- Disjointness with isInUS ---
+
+    it('is disjoint from isInUS, and non-vacuously so — each side has positives', () => {
+      // G13: the disjointness property alone is vacuous over a list where both
+      // predicates are always false, so the same case asserts the positives that
+      // make it mean something. The property holds BECAUSE each side has members.
+      for (const [name, lat, lon] of [...US_FIXTURES, ...NON_US_FIXTURES, ...NWS_TERRITORY_FIXTURES]) {
+        expect(isInUS(lat, lon) && isInNwsTerritory(lat, lon), name).toBe(false);
+      }
+
+      // The US list is true for isInUS...
+      for (const [name, lat, lon] of US_FIXTURES) {
+        expect(isInUS(lat, lon), name).toBe(true);
+      }
+      // ...and the territory list is true for isInNwsTerritory.
+      for (const [name, lat, lon] of NWS_TERRITORY_FIXTURES) {
+        expect(isInNwsTerritory(lat, lon), name).toBe(true);
+      }
+    });
+
+    it('has adjacent but non-overlapping edges with the Puerto Rico box', () => {
+      // isInUS's Puerto Rico box ends at -65.2 and this predicate's USVI box begins
+      // at -65.15. They touch; they do not overlap. Both must be false in the gap.
+      expect(isInUS(18.0, -65.175)).toBe(false);
+      expect(isInNwsTerritory(18.0, -65.175)).toBe(false);
     });
   });
 
