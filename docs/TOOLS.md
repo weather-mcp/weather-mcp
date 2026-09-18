@@ -213,7 +213,7 @@ reason it strips `compare_models`.
 - Model agreement/divergence instead of a single forecast (when `compare_models=true`)
 - Per-day ensemble confidence, interquartile bands, and wet-member fractions instead of a single forecast (when `ensemble_spread=true`)
 - Snow and ice accumulation forecasts (when available)
-- A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (US only — see [Life-threatening alert banner](#life-threatening-alert-banner))
+- A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (the United States and its NWS-served territories — see [Life-threatening alert banner](#life-threatening-alert-banner))
 - All timestamps in local timezone
 
 A value the model did not publish is omitted rather than rendered as zero. On
@@ -299,7 +299,7 @@ What's the weather right now in Tokyo?
   path vapour-pressure deficit and topsoil moisture — is keyed on the value **as
   displayed**, so the number and its label can never disagree)
 - Thermal-stress context in extreme conditions (automatic, see below)
-- A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (US only — see [Life-threatening alert banner](#life-threatening-alert-banner))
+- A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (the United States and its NWS-served territories — see [Life-threatening alert banner](#life-threatening-alert-banner))
 - All timestamps in local timezone
 
 **Returns (international, via Open-Meteo):**
@@ -313,7 +313,7 @@ What's the weather right now in Tokyo?
   sustained wind, with its category, plus a dryness-context block (vapour-pressure
   deficit, topsoil moisture) when the model reports those values
 - Thermal-stress context in extreme conditions (automatic, see below)
-- **No** life-threatening alert banner. It is gated on the location being in the United States, not on the source, so it never appears here
+- **No** life-threatening alert banner at an international point. It is gated on the location being one NWS serves, not on the source or the data path — so a point in an NWS-served territory, whose weather still renders through Open-Meteo, is eligible for it
 - All timestamps in the location's local timezone
 
 Visibility, snow depth, and cloud layer detail are not available on the
@@ -389,7 +389,7 @@ source.
 - Flight category (VFR / MVFR / IFR / LIFR)
 - The raw METAR text, as the observation of record
 - Climate normals and US records (when `include_normals=true`)
-- A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (US only — see [Life-threatening alert banner](#life-threatening-alert-banner))
+- A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (the United States and its NWS-served territories — see [Life-threatening alert banner](#life-threatening-alert-banner))
 
 Any field the station did not report is omitted. Fire weather indices are not
 available on this source. The alert banner, by contrast, **is** available here:
@@ -543,7 +543,7 @@ Best for broad questions like "What's the weather like in Seattle?" or "Is it sa
 **Returns:**
 - A `# Weather Summary` header with the resolved location and the included sections
 - Each requested section's full output (current conditions, forecast, alerts, air quality, lightning), separated by rules
-- A life-threatening alert banner above the `# Weather Summary` header, rendered once for the whole response rather than once per section, when the National Weather Service has one active for the point (US only — see [Life-threatening alert banner](#life-threatening-alert-banner))
+- A life-threatening alert banner above the `# Weather Summary` header, rendered once for the whole response rather than once per section, when the National Weather Service has one active for the point (the United States and its NWS-served territories — see [Life-threatening alert banner](#life-threatening-alert-banner))
 
 ### 6. search_location
 Find coordinates for any location worldwide by name.
@@ -1065,14 +1065,18 @@ which is the worst thing a weather tool can do.
 
 **What it covers, and what it does not:**
 
-- **United States only**, via NOAA. NOAA is the only upstream publishing the full
-  CAP quadruple (severity, urgency, certainty, **response**) matched to a true
-  point server-side. Other authorities match to a polygon, a bounding box, or a
+- **The United States, Puerto Rico, and the NWS-served territories — Guam, the
+  Northern Mariana Islands, the US Virgin Islands and American Samoa — only**, via
+  NOAA. NOAA is the only upstream publishing the full CAP quadruple (severity,
+  urgency, certainty, **response**) matched to a true point server-side. Other authorities match to a polygon, a bounding box, or a
   whole country, and a country-level warning must never interrupt a forecast
-  request. Japan and the national CAP feeds are the natural next step.
-- **Gated on the location, not on the source.** A US point queried with
-  `source="metar"` gets the banner; an international point never does, whatever
-  the source.
+  request. Japan and the national CAP feeds are the natural next step. The
+  Marianas north of Saipan (Anatahan to Farallon de Pajaros), Wake, Midway and
+  Johnston are outside the bounds NWS accepts an alerts point for, so no banner
+  appears there.
+- **Gated on the location, not on the source.** A point in the United States or
+  an NWS-served territory queried with `source="metar"` is eligible for the
+  banner; a point outside NWS jurisdiction is not, whatever the source.
 - **Deliberately narrow.** The gate is `severity Extreme` **and**
   `urgency Immediate` **and** `certainty` Observed or Likely, or an official
   `response` of `Evacuate`. Measured against the live national feed on
