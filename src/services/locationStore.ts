@@ -3,9 +3,24 @@
  * Stores locations in ~/.weather-mcp/locations.json
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import {
+  readFileSync,
+  mkdirSync,
+  existsSync,
+  lstatSync,
+  readlinkSync,
+  statSync,
+  openSync,
+  writeSync,
+  fsyncSync,
+  fchmodSync,
+  closeSync,
+  renameSync,
+  unlinkSync
+} from 'fs';
+import { randomBytes } from 'crypto';
 import { homedir } from 'os';
-import { join } from 'path';
+import { join, dirname, basename, resolve, isAbsolute } from 'path';
 import type { SavedLocation, SavedLocationsStore } from '../types/savedLocations.js';
 import { logger } from '../utils/logger.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
@@ -35,6 +50,9 @@ export class LocationStoreUnreadableError extends Error {
     this.storePath = storePath;
   }
 }
+
+/** Most symlink hops followed when resolving the write target. A cycle must not spin. */
+const MAX_SYMLINK_HOPS = 32;
 
 export class LocationStore {
   private readonly storePath: string;
@@ -131,7 +149,7 @@ export class LocationStore {
 
     try {
       const data = JSON.stringify(locations, null, 2);
-      writeFileSync(this.storePath, data, 'utf-8');
+      this.writeAtomically(data);
       logger.info('Saved locations to disk', {
         count: Object.keys(locations).length,
         path: this.storePath
@@ -141,6 +159,119 @@ export class LocationStore {
         path: this.storePath
       });
       throw new Error(`Failed to save locations to ${this.storePath}`);
+    }
+  }
+
+  /**
+   * Resolve the pathname this store should actually write, by walking the symlink
+   * chain from `storePath`.
+   *
+   * `realpathSync` cannot be used here: it reports `ENOENT` both for a path that is
+   * absent and for a symlink whose target is absent, so falling back to the literal
+   * path on `ENOENT` renames **over the symlink**, destroying it and writing the
+   * JSON at the link's own pathname. Dotfile managers and synced folders make a
+   * not-yet-created link target an ordinary first-run state.
+   *
+   * @private
+   */
+  private resolveWriteTarget(): string {
+    let current = this.storePath;
+
+    for (let hop = 0; hop < MAX_SYMLINK_HOPS; hop++) {
+      let stats;
+      try {
+        stats = lstatSync(current);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          // Absent: a fresh install, or the intended target of a dangling link.
+          return current;
+        }
+        throw error;
+      }
+
+      if (!stats.isSymbolicLink()) {
+        return current;
+      }
+
+      const link = readlinkSync(current);
+      current = isAbsolute(link) ? link : resolve(dirname(current), link);
+    }
+
+    throw new Error(`Symlink chain too deep at ${this.storePath}`);
+  }
+
+  /**
+   * Replace the store file atomically: write a uniquely named temp file in the same
+   * directory, fsync it, then rename it over the target. A reader sees the old file
+   * or the new one, never a partial — today's in-place write truncates first, and a
+   * reader landing in that window destroys the file through the parse-failure path.
+   *
+   * On any failure the temp file is removed and the target is left untouched. There
+   * is deliberately **no** fallback to an in-place write: that would reintroduce the
+   * truncation window exactly where the environment is already unusual.
+   *
+   * @private
+   */
+  private writeAtomically(data: string): void {
+    const target = this.resolveWriteTarget();
+
+    // A rename replaces the directory entry, where an in-place write goes through
+    // it — so the mode has to be carried over explicitly or a user's 0600 is lost.
+    // A file that does not exist yet keeps the process default, as before.
+    let mode: number | undefined;
+    try {
+      mode = statSync(target).mode & 0o777;
+    } catch {
+      mode = undefined;
+    }
+
+    const tmp = join(
+      dirname(target),
+      `.${basename(target)}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
+    );
+
+    let fd: number | undefined;
+    try {
+      fd = openSync(tmp, 'wx');
+      if (mode !== undefined) {
+        // The open mode is masked by umask, so set it explicitly.
+        fchmodSync(fd, mode);
+      }
+
+      // writeSync returns the number of bytes written and is NOT documented to
+      // write the buffer whole. A short write under ENOSPC or a signal, followed
+      // by fsync and rename, would durably and atomically publish truncated JSON
+      // as a successful save — the exact unreadable state this replace exists to
+      // prevent. Loop to completion and treat no progress as a failure.
+      const buf = Buffer.from(data, 'utf8');
+      for (let off = 0; off < buf.length; ) {
+        const written = writeSync(fd, buf, off, buf.length - off);
+        if (!(written > 0)) {
+          throw new Error(`Write made no progress at offset ${off} of ${buf.length}`);
+        }
+        off += written;
+      }
+
+      // Only after the whole buffer is written.
+      fsyncSync(fd);
+      closeSync(fd);
+      fd = undefined;
+
+      renameSync(tmp, target);
+    } catch (error) {
+      if (fd !== undefined) {
+        try {
+          closeSync(fd);
+        } catch {
+          // Ignore: the original error is what matters.
+        }
+      }
+      try {
+        unlinkSync(tmp);
+      } catch {
+        // Ignore: the temp file may never have been created.
+      }
+      throw error;
     }
   }
 
