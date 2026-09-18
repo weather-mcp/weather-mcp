@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-09-17
+
 ### Added
 
 - **`get_marine_conditions`'s NOAA path now renders the severity marker, the safety line and the legend it never had.** The tool has two render paths — NOAA gridpoint data for the five Great Lakes and the major US coastal bays, Open-Meteo everywhere else — and they disagreed about what a sea-state report contains. The Open-Meteo path printed a marker header and the sea-state description but **discarded the per-rung safety advice entirely**; the NOAA path printed the advice but had no marker, no legend and no period modifiers. So **neither path showed marker, rung name and advice together**: the caller with a marker had to read the tier blurb out of the legend and never saw the per-rung advice, and the caller with the advice had no marker at all. Both paths now obtain the block from one shared pure helper, `formatSeaStateBlock`, whose doc comment states the invariant — neither formatter builds the header, the sea-state line or the safety line itself — so the two cannot drift apart again the way three hand-maintained lists did one release before the taxonomy work fixed them. The NOAA report's **`Safety:` line has moved**: it used to sit at the bottom of the `Wave Conditions` section and now sits in the sea-state block above it, beside the marker and the rung name it belongs with. The NOAA path also gains the `and choppy (short period)` / `with long-period swell (powerful)` modifiers the Open-Meteo path already had, from the same input, and the generated legend in its footer — the legend only, not the Open-Meteo glossary, whose wind-wave, swell and period entries describe fields the NOAA path does not render. A published wave height of `0` now bands as the lowest rung (`Calm`, green, *Ideal for all water activities*) exactly as a displayed `0.0m` does on the other path, and the `Wave Height: Calm or minimal wave activity` fallback is retired: it had folded a real zero and an absent reading into one line that claimed calm seas for a gauge that had published no height at all. An absent height now reads `Current Conditions: Unknown`. Locked by a cross-path parity contract that parses the block out of both reports and compares them field by field, rather than asserting two hand-copied strings. (`src/utils/marine.ts`, `src/handlers/marineConditionsHandler.ts`, `tests/unit/marine-render-parity.test.ts`, `docs/TOOLS.md`, `examples/boating-and-marine.md`)
@@ -1787,7 +1789,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.1...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.0...HEAD
+[1.31.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.1...v1.31.0
 [1.30.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.0...v1.30.1
 [1.30.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.3...v1.30.0
 [1.29.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.29.2...v1.29.3
