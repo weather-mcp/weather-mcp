@@ -189,19 +189,20 @@ function countOccurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
 }
 
-/** The exact literal formatNoMarineCellNote renders with no `placeName`. */
+/** The exact literal formatNoMarineCellNote renders with `fromPlaceName: false`. */
 const SHORT_NO_CELL_NOTE =
   '*No marine-model cell here — the marine model covers ocean and large-lake water cells only. ' +
   'For coastal conditions, try a point just offshore.*';
 
-/** The exact literal formatNoMarineCellNote renders with a `placeName`. */
-function expectedLongNoCellNote(placeName: string, latitude: number, longitude: number): string {
-  return (
-    `*No marine-model cell here. ${placeName} resolved to ${latitude.toFixed(4)}, ${longitude.toFixed(4)} — ` +
-    'a place name resolves to a land centroid, and the marine model covers ocean and large-lake water cells ' +
-    'only. For coastal conditions, pass `latitude`/`longitude` for a point just offshore.*'
-  );
-}
+/**
+ * The exact literal formatNoMarineCellNote renders with `fromPlaceName: true`. It names neither
+ * the place nor the coordinates — both already render in the `**Location:**` header above the
+ * report (test-drive Observation 1), and contract 4 pins that they are still there.
+ */
+const LONG_NO_CELL_NOTE =
+  '*No marine-model cell here — a place name resolves to a land centroid, and the marine model ' +
+  'covers ocean and large-lake water cells only. For coastal conditions, pass ' +
+  '`latitude`/`longitude` for a point just offshore.*';
 
 /** Extracts the rendered no-marine-cell note (either variant) from a report. */
 function extractNoCellNote(text: string): string | undefined {
@@ -294,7 +295,7 @@ describe('NOAA zero/no-data banding (contract 3, design decision D2)', () => {
 // ---------------------------------------------------------------------------
 
 describe('The no-marine-cell hint (contract 4, design decision D4)', () => {
-  it('wave_height: null with a geocoded resolution names the resolved place and carries coordinates at toFixed(4)', async () => {
+  it('wave_height: null with a geocoded resolution renders the long variant, which restates neither the place nor the coordinates', async () => {
     clearCityGeocodeCache();
     const geocoding = makeGeocodingService([
       makeGeocodingResult({
@@ -308,7 +309,19 @@ describe('The no-marine-cell hint (contract 4, design decision D4)', () => {
     const result = await callHandler({ city_name: 'Parity Test Geocoded City Alpha' }, emptyLocationStore, geocoding);
     const text = result.content[0].text;
 
-    expect(text).toContain(expectedLongNoCellNote('Parity Test Geocoded Spot, Testland', 35.1234, -100.6543));
+    expect(text).toContain(LONG_NO_CELL_NOTE);
+
+    // The note explains the mechanism; the data it used to restate lives in the
+    // `**Location:**` header `prependLocationLine` puts above the report. Pin both halves
+    // together — the note is only allowed to stay silent about the place because the header
+    // is guaranteed to name it (test-drive Observation 1).
+    expect(text).toContain('**Location:** Parity Test Geocoded Spot, Testland (35.1234, -100.6543)');
+
+    const note = extractNoCellNote(text);
+    expect(note).toBeDefined();
+    expect(note).not.toContain('Parity Test Geocoded Spot, Testland');
+    expect(note).not.toContain('35.1234');
+    expect(note).not.toContain('-100.6543');
   });
 
   it('wave_height: null with a coordinates resolution renders the short variant, mentioning no resolution', async () => {
@@ -318,7 +331,6 @@ describe('The no-marine-cell hint (contract 4, design decision D4)', () => {
     const text = result.content[0].text;
 
     expect(text).toContain(SHORT_NO_CELL_NOTE);
-    expect(text).not.toContain('resolved to');
     expect(text).not.toContain('land centroid');
   });
 
@@ -379,7 +391,9 @@ describe("source: 'default' renders the short variant in every shape it comes in
     expect(text).toContain(SHORT_NO_CELL_NOTE);
     expect(text).not.toContain('resolves to a land centroid');
     expect(text).not.toContain('Parity Alias Display Name');
-    expect(text).not.toContain('parity-alias resolved to');
+    // Tightest form of the blocker contract: the note is the short literal and nothing else,
+    // so no provenance of any shape can leak into it.
+    expect(extractNoCellNote(text)).toBe(SHORT_NO_CELL_NOTE);
   });
 
   // 5b — a bare "lat,lon" default: resolved.location_name is genuinely
@@ -417,7 +431,7 @@ describe("source: 'default' renders the short variant in every shape it comes in
 
     expect(text).toContain(SHORT_NO_CELL_NOTE);
     expect(text).not.toContain('resolves to a land centroid');
-    expect(text).not.toContain('Parity Default Geocoded Place Beta, Testland resolved to');
+    expect(extractNoCellNote(text)).toBe(SHORT_NO_CELL_NOTE);
   });
 });
 

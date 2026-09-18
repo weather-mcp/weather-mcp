@@ -669,9 +669,10 @@ Provides comprehensive marine weather data with intelligent dual-source support:
 - A note when the marine model has no cell at the requested point. The model covers ocean and
   large-lake water cells only, and answers with a null reading rather than an error elsewhere, so
   the report says so explicitly instead of returning a blank sea state. When the point came from a
-  geocoded place name the note also names the resolved place and its coordinates and explains the
-  land-centroid resolution — a coastal city name often resolves to an inland administrative
-  centroid — and suggests passing `latitude`/`longitude` for a point just offshore. It makes no
+  geocoded place name the note also explains the land-centroid resolution — a coastal city name
+  often resolves to an inland administrative centroid — and suggests passing
+  `latitude`/`longitude` for a point just offshore. It does not restate the resolved place or its
+  coordinates: the `**Location:**` header above the report already carries both. It makes no
   claim about distance to a coastline, which this server cannot compute.
 - Wave period for planning and safety
 - Optional daily forecast up to 16 days (`forecast_days`, default 5; days past the marine model's ~10-day horizon are trimmed with a note)

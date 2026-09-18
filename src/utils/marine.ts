@@ -350,23 +350,25 @@ export function formatSeaStateBlock(safety: SafetyAssessment): string {
 
 /**
  * The no-marine-cell note: shown when a location resolves to a point the marine model has no
- * cell for (most often a place name resolving to a land centroid). Takes plain values, not a
+ * cell for (most often a place name resolving to a land centroid). Takes a plain flag, not a
  * `ResolvedLocation` — this module must not import from `locationResolver.ts`, which pulls in
  * `LocationStore`, `GeocodingService`, `Cache` and `NominatimService`. Must never contain
  * `NO_DATA_MARKER`: tests/unit/marine-sea-state-taxonomy.test.ts counts that marker and expects
  * exactly two occurrences in a no-data report.
+ *
+ * The note deliberately does **not** restate the resolved place name or its coordinates. Both
+ * already render above it — `formatLocationLine` prepends `**Location:** <name> (lat, lon)` for
+ * every name-based resolution (`locationResolver.ts:47`), and the report's own `**Location:**`
+ * line carries the coordinates on every path. `fromPlaceName` therefore carries provenance
+ * only: the long variant explains the *mechanism* that produced an inland point without
+ * repeating data the reader has already been shown four lines earlier.
  */
-export function formatNoMarineCellNote(opts: {
-  latitude: number;
-  longitude: number;
-  placeName?: string;
-}): string {
-  const { latitude, longitude, placeName } = opts;
-  if (placeName !== undefined) {
+export function formatNoMarineCellNote(opts: { fromPlaceName: boolean }): string {
+  if (opts.fromPlaceName) {
     return (
-      `*No marine-model cell here. ${placeName} resolved to ${latitude.toFixed(4)}, ${longitude.toFixed(4)} — ` +
-      `a place name resolves to a land centroid, and the marine model covers ocean and large-lake water cells ` +
-      `only. For coastal conditions, pass \`latitude\`/\`longitude\` for a point just offshore.*\n\n`
+      `*No marine-model cell here — a place name resolves to a land centroid, and the marine model ` +
+      `covers ocean and large-lake water cells only. For coastal conditions, pass ` +
+      `\`latitude\`/\`longitude\` for a point just offshore.*\n\n`
     );
   }
   return (

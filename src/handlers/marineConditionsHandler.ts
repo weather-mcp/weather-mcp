@@ -284,12 +284,13 @@ function formatOpenMeteoMarineConditions(
   // was obtained, and admitting it would invent provenance for a coordinate the user saved by
   // hand (G53). A genuinely geocoded default therefore gets the short variant too; the short
   // variant claims nothing false, which is the right way to be wrong.
+  //
+  // The flag carries provenance only. The note names neither the place nor the coordinates:
+  // `prependLocationLine` has already printed both in the `**Location:**` header above, and the
+  // report's own location line prints the coordinates again, so restating them was redundant
+  // (test-drive Observation 1).
   if (safety.level === NO_DATA_LEVEL) {
-    output += formatNoMarineCellNote({
-      latitude,
-      longitude,
-      placeName: resolved.source === 'geocoded' ? resolved.location_name : undefined
-    });
+    output += formatNoMarineCellNote({ fromPlaceName: resolved.source === 'geocoded' });
   }
 
   // Wave Height Summary
