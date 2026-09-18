@@ -9,6 +9,7 @@ import { OpenMeteoService } from '../services/openmeteo.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
+import type { ResolvedLocation } from '../utils/locationResolver.js';
 import { validateOptionalBoolean, validatePositiveInteger } from '../utils/validation.js';
 import {
   formatWaveHeight,
@@ -19,7 +20,9 @@ import {
   getWaveHeightCategory,
   getSafetyAssessment,
   formatSeaStateBlock,
+  formatNoMarineCellNote,
   formatSeaStateLegend,
+  NO_DATA_LEVEL,
   extractNOAAMarineConditions,
   type NOAAMarineConditions
 } from '../utils/marine.js';
@@ -142,7 +145,7 @@ export async function handleGetMarineConditions(
   );
 
   // Format the marine data for display
-  const output = formatOpenMeteoMarineConditions(marineData, latitude, longitude, forecast);
+  const output = formatOpenMeteoMarineConditions(marineData, latitude, longitude, forecast, resolved);
 
   return prependLocationLine({
     content: [
@@ -242,7 +245,8 @@ function formatOpenMeteoMarineConditions(
   data: OpenMeteoMarineResponse,
   latitude: number,
   longitude: number,
-  includeForecast: boolean
+  includeForecast: boolean,
+  resolved: ResolvedLocation
 ): string {
   let output = `# Marine Conditions Report\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
@@ -270,6 +274,23 @@ function formatOpenMeteoMarineConditions(
   );
 
   output += formatSeaStateBlock(safety);
+
+  // The upstream answers HTTP 200 with a null scalar where the marine model has no cell, so a
+  // coastal place name that geocodes to an inland centroid returns a blank report with nothing
+  // saying why. The note claims only what is known: the upstream returned no cell, and the point
+  // came from a place name. `'geocoded'` alone is the whole guard — `resolveDefaultLocation`
+  // spreads `source: 'default'` over a saved alias and over a geocoded place alike
+  // (locationResolver.ts:422,428,436), so `'default'` carries no information about how the point
+  // was obtained, and admitting it would invent provenance for a coordinate the user saved by
+  // hand (G53). A genuinely geocoded default therefore gets the short variant too; the short
+  // variant claims nothing false, which is the right way to be wrong.
+  if (safety.level === NO_DATA_LEVEL) {
+    output += formatNoMarineCellNote({
+      latitude,
+      longitude,
+      placeName: resolved.source === 'geocoded' ? resolved.location_name : undefined
+    });
+  }
 
   // Wave Height Summary
   output += `## 🌊 Wave Conditions\n\n`;
