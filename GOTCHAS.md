@@ -827,9 +827,11 @@ inside `ensureConnected`), shipped green, caught by reading live output during
 T4, fixed in `30ad5cf` by resolving in `subscribeToLocation` and passing the
 module in.
 
-**Status:** active. Related: [G17] (the same file's other concurrency trap) and
+**Status:** active. Related: [G17] (the same file's other concurrency trap),
 [G11] — this is the sharpest instance yet of the exit code not being the
-acceptance.
+acceptance — and [G100], the same mechanism one layer up: there the `await` sits
+between a read and the write that depends on it, and the module it reads through
+being fully synchronous does not help.
 
 ---
 
@@ -5397,6 +5399,159 @@ reachable and `pr` is reachable only on one path), [G54] (mutate each term of th
 compound separately; that is what exposes an unpinned conjunction), [G53] (the
 predicate this one guards, and why it is not simply widened), [G46] (the docs
 sentence that published the claim the code had already falsified).
+
+---
+
+## G100 — A synchronous store method does not make its *caller's* read-modify-write synchronous
+
+**Trigger:** any handler that reads an entity from a synchronous store, `await`s
+anything at all, and then writes that entity back — the classic shape being
+"read the existing record, geocode/fetch something, merge, save".
+
+**Rule:** the merge base must be re-read **after the last `await` on the path**
+and immediately before the write, with no `await` between the two. A value read
+before an `await` is a snapshot, and how stale it can be is bounded by the
+awaited work, not by the store. Where an earlier read is still needed to pick a
+*branch* (a partial-update mode, a validation path), keep it — but it must not
+supply any field that is written back.
+
+**Why:** `src/services/locationStore.ts` is synchronous on purpose. That is the
+whole argument for having no lockfile: the read and the write are one
+synchronous run, so the collision window was measured at 0.14 ms without
+`fsync` and 10.4 ms with it. The design plan then stated that bound as though it
+were the *system's* window. It was not.
+`src/handlers/savedLocationsHandler.ts` read the existing entry at `:162`,
+awaited Nominatim at `:185`, and restored omitted `notes`, `activities`,
+`description` and `alternateNames` from that pre-await snapshot at `:231-244` —
+so on a full re-save by `location_query` the real window was **external
+geocoder latency**, three to four orders of magnitude wider than the number the
+design defended. A second client's metadata edit during the round trip was
+silently overwritten, and the store being synchronous did nothing about it
+because the race was never inside the store.
+
+The generalisation is the part worth keeping: **making a module synchronous
+buys you atomicity only across that module's own call.** A caller can reopen
+the window as wide as it likes, and nothing in the module's type, tests or
+design can see it. The store's own contracts all stayed green throughout.
+
+**Verify:** move the omitted-metadata restoration back onto the pre-await
+`existingLocation` and run
+`tests/unit/saved-locations-metadata.test.ts` — the two "Concurrent metadata
+edit during a geocoded re-save (contract 9)" cases go red and **every
+store-level contract in `tests/unit/location-store.test.ts` stays green**, which
+is the shape of the trap ([G45]).
+
+**Evidence:** 2026-09-18 (`883a978`, saved-locations-durability T2). Found by
+the `/plan-review` codex leg (R1) against the *plan*, not the code — the design
+had written its own revisit trigger for precisely this ("any `await` appearing
+between the store's read and its write") and then did not apply it to the one
+handler that already had one.
+
+**Status:** active. The caller-level sibling of [G20], which is the same
+mechanism one layer down — there an `await` between a boolean guard and the
+check that reads it, here an `await` between a read and the write that depends
+on it. Related: [G45] (why the store's own contracts cannot catch this), [G19]
+(the second public path a handler-level rule has to be checked against).
+
+---
+
+## G101 — `realpathSync` reports `ENOENT` for a dangling symlink and for an absent path alike, so "fall back to the literal path" destroys the link
+
+**Trigger:** resolving a user-configurable file path before writing it —
+especially before a `rename`-based atomic replace — where the path may not exist
+yet.
+
+**Rule:** do not use `realpathSync` to find a write target. Walk the chain
+yourself, bounded, and distinguish the two states `realpathSync` conflates:
+
+- `lstatSync(p)` throws `ENOENT` ⇒ **`p` is the target** (nothing there yet).
+- `lstatSync(p)` says not a symlink ⇒ **`p` is the target**.
+- `lstatSync(p)` says symlink ⇒ `readlinkSync(p)`; `p` becomes the link text
+  when absolute, otherwise `resolve(dirname(p), link)`. Continue.
+- A hop cap (32 here) ⇒ fail. A link cycle must not spin.
+
+**Why:** `realpathSync` resolves the *whole* chain and throws `ENOENT` both when
+the path itself is absent and when a symlink in the chain points at something
+absent. A fallback reading "on `ENOENT`, use the literal path" therefore cannot
+tell those apart, and in the dangling case it renames the new file **over the
+symlink**, deleting the link and writing the content at the link's own pathname.
+The user's dotfile manager or synced folder silently stops being wired up, and
+the first save is when it happens — the state where the target does not exist
+yet is exactly the *normal first run* for that setup.
+
+`rename` is what makes this destructive rather than merely wrong: an in-place
+`writeFileSync` follows a symlink, dangling or not, so this whole class of bug
+**appears only once you make the write atomic**, which is the opposite of the
+direction people expect a robustness fix to break things in.
+
+**Verify:** create a symlink whose target does not exist but whose parent
+directory does, save through it, and assert `lstatSync(link).isSymbolicLink()`
+is still `true` and the formerly absent target now holds the content — case (g)
+in `tests/unit/location-store.test.ts`. Restoring the `realpathSync` fallback
+turns **that case and only that case** red; the live-target symlink case stays
+green, which is why both cases exist ([G45]).
+
+**Evidence:** 2026-09-18 (`76f73e6`, saved-locations-durability T3). Raised as a
+blocker by the `/plan-review` codex leg (R2) against the plan text, with a
+direct `/tmp` reproduction of the proposed code:
+`{"targetWasLiteralLink":true,"linkIsSymlinkAfterRename":false,"intendedTargetExists":false}`.
+The plan had explicitly claimed the fallback "covers a dangling link".
+
+**Status:** active. Lint candidate — `realpathSync` appearing anywhere near a
+`renameSync` is greppable. Related: [G102] (the other way the same atomic write
+can publish something wrong), [G23] (two error codes that look like one
+condition).
+
+---
+
+## G102 — An atomic `rename` does not make an unchecked `writeSync` complete; it publishes the truncation indivisibly
+
+**Trigger:** any `writeSync`/`write` whose return value is discarded, and
+especially one inside a temp-file-plus-`rename` sequence.
+
+**Rule:** loop until the whole buffer is written, and treat no progress as a
+failure. `fsync` and `rename` run **only after the loop completes**.
+
+```ts
+const buf = Buffer.from(data, 'utf8');
+for (let off = 0; off < buf.length; ) {
+  const n = writeSync(fd, buf, off, buf.length - off);
+  if (!(n > 0)) throw <the save error>;   // zero or negative = no progress
+  off += n;
+}
+```
+
+**Why:** `writeSync` returns *the number of bytes written* and is not documented
+to write the buffer whole (`node_modules/@types/node/fs.d.ts:2882-2909`). A
+short write — a partial `write(2)` under `ENOSPC`, or one interrupted by a
+signal — does not throw. It returns a smaller number that nobody reads. The
+sequence then `fsync`s and `rename`s that **prefix** over the good file and
+reports a successful save.
+
+The trap is that the atomic replace makes this *worse*, not better. The whole
+reason for the rename is "a reader sees the old file or the new one, never a
+partial" — and an unchecked short write is how you hand the reader a partial
+that is, by construction, indivisible and durable. The corruption the mechanism
+exists to prevent arrives wearing the mechanism's own guarantee, and every
+observable says the save succeeded.
+
+**Verify:** spy on `writeSync` so the first call delegates with a truncated
+length and returns that prefix count and later calls delegate in full; assert it
+was called more than once and the final file is byte-identical to the full
+payload — case (h) in `tests/unit/location-store.test.ts`. A second case returns
+`0` and asserts the save fails with the target's bytes unchanged and no temp
+residue. Restoring a single unchecked `writeSync` turns **exactly those two**
+red.
+
+**Evidence:** 2026-09-18 (`76f73e6`, saved-locations-durability T3). Raised as a
+blocker by the `/plan-review` codex leg (R3) against the plan text, from the
+installed `@types/node` declaration — no reproduction needed, because the
+declaration says it outright and the plan had simply not read it.
+
+**Status:** active. Lint candidate — a `writeSync(` whose result is not bound is
+greppable. Related: [G101] (the other trap in the same atomic write), [G8] (a
+bounded operation whose partial result must never be used as if it were
+complete).
 
 ---
 
