@@ -18,7 +18,7 @@ import {
   formatWindSpeed,
   getWaveHeightCategory,
   getSafetyAssessment,
-  seaStateMarker,
+  formatSeaStateBlock,
   formatSeaStateLegend,
   extractNOAAMarineConditions,
   type NOAAMarineConditions
@@ -261,10 +261,7 @@ function formatOpenMeteoMarineConditions(
     current.wave_period ?? undefined
   );
 
-  const safetyEmoji = seaStateMarker(safety.level);
-
-  output += `## ${safetyEmoji} Current Conditions: ${safety.level}\n\n`;
-  output += `${safety.description}\n\n`;
+  output += formatSeaStateBlock(safety);
 
   // Wave Height Summary
   output += `## 🌊 Wave Conditions\n\n`;
