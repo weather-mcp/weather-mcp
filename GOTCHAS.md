@@ -67,7 +67,12 @@ in the file as it was then.
 
 **Status:** active; **file moved 2026-09-09** (issue-95) — `TOOL_DEFINITIONS` was
 carried byte-for-byte from `src/index.ts` into `src/server/weatherServer.ts`, so
-the rule is unchanged and only the path moved. Related: [G1].
+the rule is unchanged and only the path moved. **Verify line re-run 2026-09-18**
+(`35fcba8`, search-location-limit-bound T1, which edits the `search_location`
+`limit` description): all 74 `description:` strings in the file parse with a
+balanced closing quote and none carries an unescaped inner `'`. The replacement
+text was chosen apostrophe-free rather than escaped, per the rule. Related: [G1],
+and [G103] — the same file's *test* side is typechecked by nothing at all.
 
 ---
 
@@ -2218,12 +2223,27 @@ you a test failed and **discards its name**, so you cannot tell a flake from a
 regression without reproducing it. Capture to a file (`npm test 2>&1 | tee
 <scratch>/t.log`) and grep the file, not the stream.
 
+**The second-order trap recurred twice in one run, 2026-09-18**
+(search-location-limit-bound, at T1's and T2's gates). Both times the gate was
+run as `npm test 2>&1 | tail -8`, both times a single test failed out of 3,574
+and then 3,582, and both times the name was gone with the stream — so the only
+available move was a re-run, which came back 149/149 and then 150/150 green with
+no edit in between. Two clean runs after a lost name is a **weaker** result than
+one clean run after a known name: it establishes that the failure is not
+reproducible, and says nothing about which subsystem flaked or whether the two
+occurrences were even the same test. The branch's diff was two schema literals, a
+comment, a new test file and eight doc counts, which cannot produce an
+intermittent failure anywhere — that is what made the re-run conclusive here, and
+it is an argument about the diff rather than evidence from the run. **Redirect
+the first invocation**; there is no second chance at a name that was never
+printed to a file, and each retry costs another ~70 s suite.
+
 **Verify:** `sed -n '32,34p;157,187p' scripts/update-docs-for-release.sh` — the
 precondition guard and the red-suite abort, with steps 1–3 between them.
 
-**Status:** active. Script candidate: move the test run ahead of the first write,
-or trap a non-zero exit and revert the four files the script itself touched.
-Related: [G30] (a first live lightning probe reports zero strikes — the other
+**Status:** active, **second-order trap re-evidenced 2026-09-18**. Script
+candidate: move the test run ahead of the first write, or trap a non-zero exit
+and revert the four files the script itself touched. Related: [G30] (a first live lightning probe reports zero strikes — the other
 "green means nothing yet" trap), [G10] (a check that cannot fail is not
 evidence).
 
@@ -5563,6 +5583,76 @@ declaration says it outright and the plan had simply not read it.
 greppable. Related: [G101] (the other trap in the same atomic write), [G8] (a
 bounded operation whose partial result must never be used as if it were
 complete).
+
+---
+
+## G103 — `tsconfig.json` includes only `src/`, so nothing in the gate typechecks a test file
+
+**Trigger:** writing or reviewing anything under `tests/` — most sharply a cast
+that stands in for a real type (`{ geocode: vi.fn() } as unknown as
+GeocodingService`), a fixture object built to match an upstream shape, or any
+use of `unknown` the repo's "no `any`" convention is meant to police.
+
+**Rule:** treat every type in a test file as **unchecked prose**. The compiler
+will not tell you a cast lies, a fixture is missing a required field, or an
+assertion compares two things that can never be equal. Where a test's
+correctness rests on a type, prove it by **mutation** — break the subject and
+watch the test go red — not by the fact that it compiled, because it never was
+compiled. If you want a real check on one file, run `npx tsc --noEmit` against
+it explicitly; the gate will not do it for you.
+
+**Why:** the two halves of the gate each decline the job, and neither says so.
+`tsconfig.json:27` is `"include": ["src/**/*"]`, so `npm run build` never reads
+`tests/` at all — `tsc` emits zero errors because it was never handed the file.
+Vitest then transpiles each module with esbuild, which strips types without
+checking them ([G1]'s mechanism). So a test file is the one place in this
+repository where `strict`, `noUnusedLocals`, `noImplicitReturns` and the
+standing "no `any`" convention are **stated and not enforced**, and the CLAUDE.md
+line declaring TypeScript strict across the project reads as though they are.
+
+This is [G1] with the polarity reversed, and the pair is the whole picture: a
+green `npm test` does not mean the build compiles, **and** a green
+`npm run build` does not mean the tests typecheck. Neither alone is the
+interesting fact; the two together mean a type error in `tests/` is invisible to
+the entire gate.
+
+The practical cost is a cast that silently stops describing its subject. The
+house pattern for a handler fake is `as unknown as <Service>` — which suppresses
+every structural check by construction, so a service that later grows a method
+the handler calls leaves every such fake stale with no compiler signal. The fake
+still satisfies the cast; the handler calls the missing method and the failure
+arrives at runtime, in whichever test happens to exercise that path.
+
+**Verify:**
+
+```bash
+cp tests/unit/<any>.test.ts /tmp/backup.test.ts
+printf '\nconst deliberate: number = %s;\nvoid deliberate;\n' "'not a number'" >> tests/unit/<any>.test.ts
+npm run build; echo "build exit=$?"          # 0 — the file was never read
+npx vitest run tests/unit/<any>.test.ts      # green — esbuild strips, never checks
+cp /tmp/backup.test.ts tests/unit/<any>.test.ts
+```
+
+Two greens is the trap intact; a non-zero build exit means `include` was widened
+and this entry can be re-scoped or retired.
+
+**Evidence:** 2026-09-18 (`9f53c5f`, search-location-limit-bound T2). Raised as a
+"Surprise" by the executing subagent, which had followed
+`tools-list-budget.test.ts`'s `unknown`-cast pattern for convention's sake and
+then noticed nothing required it. Verified by the orchestrator before curation: a
+`TS2322` (`const deliberateTypeError: number = 'not a number'`) planted in
+`tests/unit/search-location-limit.test.ts` left `npm run build` at **exit 0** and
+`npx vitest run` at **8/8 passing**; restored by `cp` with a green control run
+([G27]).
+
+**Status:** active. **Lint candidate, and the better fix is in the config rather
+than in every reviewer** — a second `tsconfig.test.json` extending the base with
+`"include": ["src/**/*", "tests/**/*"]` and `"noEmit": true`, run as a gate step,
+would close this mechanically and cost one `tsc` pass. Until then the rule above
+is the workaround. Related: [G1] (the mirror — a green suite over a broken
+build), [G70] (a cast that hands the wrong seam a plausible fake), [G45] and
+[G32] (mutation is the check that does work here), [G79] (the other way a test
+can be green locally and not be what it claims).
 
 ---
 
