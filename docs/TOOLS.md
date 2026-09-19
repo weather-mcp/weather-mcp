@@ -550,7 +550,7 @@ Find coordinates for any location worldwide by name.
 
 **Parameters:**
 - `query` (required): Location name to search for (e.g., "Paris", "New York, NY", "Tokyo")
-- `limit` (optional): Maximum number of results to return (1-100, default: 5)
+- `limit` (optional): Maximum number of results to return (1-50, default: 5). Larger values are clamped to 50, not rejected
 
 **Description:**
 Converts location names to coordinates. Returns multiple matches with detailed metadata including coordinates, timezone, elevation, population, and administrative regions. Enables natural language weather queries by finding coordinates automatically.
