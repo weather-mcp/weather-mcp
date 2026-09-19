@@ -3618,9 +3618,26 @@ changed **no** file under `tests/integration/` at all. A different upstream and
 a different file from the 2026-09-02 case, so the trap is the live-network
 files as a class, not NWPS specifically.
 
-**Status:** active. The structural fix — running the live-network files in a
+**Evidence (third occurrence):** 2026-09-19, v1.31.3 (run `35440419782`). The
+first attempt failed at `tests/integration/safety-hazards.test.ts:146` again —
+the *same* file, test and 60 s budget as 2026-09-02 — and one
+`gh run rerun --failed` published `1.31.3` cleanly. The full-suite gate had
+passed **twice locally** on the same tree minutes earlier (150 files, 3,582
+tests, once on the branch and once on the merge commit `780c6cd`), and the `CI`
+run on that identical commit was green, so for the second release running the
+two gates disagreed over nothing but the network. The release's diff touched a
+schema literal, a comment, a new unit test and docs: no path whatsoever to
+river conditions. **The recurrence rate is now the finding.** Three occurrences
+across 17 releases, two of them in the last two days, and the step order is the
+same every time — `Test` red, `Skip if version already published` /
+`Publish to npm` / `Verify publication` all **skipped**, `npm view` still on the
+previous version. That the recovery is reliable is not an argument for leaving
+it: every occurrence spends a release's tag and release page before the package
+exists.
+
+**Status:** active, **extended 2026-09-19 (third occurrence)**. The structural fix — running the live-network files in a
 separate non-blocking job, or excluding them from the publish gate — is a
-`publish.yml` change, not a test change; not planned. Related: [G39] (red
+`publish.yml` change, not a test change; still not planned, and now carrying three occurrences (one of them twice-repeated) against it. Related: [G39] (red
 *after* a successful publish — the opposite half), [G9] (live smoke tests
 classify transport failures and skip; the river integration file does not,
 which is why a refusal becomes a timeout instead of a skip).
