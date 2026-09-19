@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.3] - 2026-09-19
+
 ### Fixed
 
 - **`search_location` declared a `limit` bound its implementation could not honour.** The JSON Schema every MCP client reads on `tools/list` said the parameter accepted up to 100, while the handler has always clamped to 50 and returned at most 50 results — with no error and no note. A client that read the schema, asked for 100 and received 50 had nothing in the response to tell it so, because the delivered count is what the response reports. The schema now declares `maximum: 50`, its description reads `1-50`, and `docs/TOOLS.md` states the same bound and says plainly that larger values are clamped rather than rejected. **No tool output changes for any input**: a caller passing more than 50 still receives 50, exactly as before. What changes is what a client believes it may ask for — one that validates against the schema will now stop at 50 instead of sending a value it can never have honoured. A new test reads the three numbers live from the schema and locks them to the handler clamp, so the two cannot drift apart again. (`src/server/weatherServer.ts`, `src/handlers/locationHandler.ts`, `tests/unit/search-location-limit.test.ts`, `docs/TOOLS.md`)
@@ -1811,7 +1813,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.2...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.3...HEAD
+[1.31.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.2...v1.31.3
 [1.31.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.1...v1.31.2
 [1.31.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.0...v1.31.1
 [1.31.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.30.1...v1.31.0
