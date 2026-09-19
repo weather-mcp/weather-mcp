@@ -48,6 +48,12 @@ export async function handleSearchLocation(
   }
 
   const query = locationArgs.query.trim();
+  // This ceiling is the bound search_location declares in TOOL_DEFINITIONS
+  // (src/server/weatherServer.ts), and tests/unit/search-location-limit.test.ts
+  // holds the two equal. NominatimProvider.geocode (src/services/geocoding.ts)
+  // clamps to the same number independently, so raising one means raising all
+  // three. Out-of-range values are clamped, never rejected — the same tolerant
+  // clamping contract wildfireHandler.ts and riverConditionsHandler.ts follow.
   const limit = typeof locationArgs.limit === 'number' ?
     Math.min(Math.max(1, locationArgs.limit), 50) : 5; // Nominatim max is 50
 

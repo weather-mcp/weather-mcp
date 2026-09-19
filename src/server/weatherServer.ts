@@ -526,9 +526,9 @@ export const TOOL_DEFINITIONS = {
         },
         limit: {
           type: 'number' as const,
-          description: 'Maximum number of results to return (1-100, default: 5)',
+          description: 'Maximum number of results to return (1-50, default: 5)',
           minimum: 1,
-          maximum: 100,
+          maximum: 50,
           default: 5
         }
       },
