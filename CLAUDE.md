@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.31.3 (Production Ready)
+- **Version:** 1.31.4 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -628,15 +628,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.31.3 — Production Ready ✅
+- **Version:** 1.31.4 — Production Ready ✅
 - **Test Coverage:** 3,601 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.31.4:** check_service_status says what it checked, and names every upstream it did not
 - **New in v1.31.3:** search_location's declared limit bound now matches the 50 results it has always returned
 - **New in v1.31.2:** Saved locations survive a second client, a torn write, and an unreadable file
-- **New in v1.31.1:** The life-threatening alert banner now reaches Guam, the CNMI, the US Virgin Islands and American Samoa
 
 ## Useful References
 
@@ -659,7 +659,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-19 (v1.31.3)
+**Last Updated:** 2026-09-23 (v1.31.4)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.4] - 2026-09-23
+
 ### Changed
 
 - **`check_service_status` output text changed in three places — anything that matched on it needs updating.** The both-up headline `✅ All Services Operational` is now `✅ NOAA and Open-Meteo Reachable`; the partial verdict's `… API is operational: … available` line now reads `… API answered, so it is reachable. This does not confirm that … will succeed.`; and every verdict gains a final `**Not checked by this tool:**` line. The per-service sections, the both-down wording, the version and the cache statistics are unchanged. The reasons are under Fixed below.
@@ -1821,7 +1823,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.3...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.4...HEAD
+[1.31.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.3...v1.31.4
 [1.31.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.2...v1.31.3
 [1.31.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.1...v1.31.2
 [1.31.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.0...v1.31.1
