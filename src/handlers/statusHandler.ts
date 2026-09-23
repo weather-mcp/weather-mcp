@@ -5,15 +5,18 @@
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
 import { CacheConfig } from '../config/cache.js';
+import { formatNotCheckedLine } from '../utils/serviceStatusCoverage.js';
 
 export async function handleCheckServiceStatus(
   noaaService: NOAAService,
   openMeteoService: OpenMeteoService,
   serverVersion?: string
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  // Check status of both services
-  const noaaStatus = await noaaService.checkServiceStatus();
-  const openMeteoStatus = await openMeteoService.checkServiceStatus();
+  // Probes run concurrently; neither rejects (each catches and returns a status object).
+  const [noaaStatus, openMeteoStatus] = await Promise.all([
+    noaaService.checkServiceStatus(),
+    openMeteoService.checkServiceStatus(),
+  ]);
 
   // Format the status report
   let output = `# Weather API Service Status\n\n`;
@@ -107,8 +110,8 @@ export async function handleCheckServiceStatus(
   const neitherOperational = !noaaStatus.operational && !openMeteoStatus.operational;
 
   if (bothOperational) {
-    output += `## Overall Status: ✅ All Services Operational\n\n`;
-    output += `Both NOAA and Open-Meteo APIs are functioning normally. Weather data requests should succeed.\n`;
+    output += `## Overall Status: ✅ NOAA and Open-Meteo Reachable\n\n`;
+    output += `Both checked services answered. This confirms they are reachable; it does not confirm that every request will succeed.\n`;
   } else if (neitherOperational) {
     output += `## Overall Status: ❌ Multiple Service Issues\n\n`;
     output += `Both weather APIs are experiencing issues. Please check the status pages above for updates.\n`;
@@ -122,6 +125,8 @@ export async function handleCheckServiceStatus(
       output += `NOAA API has issues: Forecasts and current conditions for US locations may be unavailable.\n`;
     }
   }
+
+  output += `\n${formatNotCheckedLine()}`;
 
   return {
     content: [

@@ -38,9 +38,9 @@ All 17 tools appear across these examples:
 | `get_wildfire_info` | [wildfire](./wildfire-awareness.md) (both the NIFC and FIRMS paths) |
 | `save_location`, `list_saved_locations`, `get_saved_location`, `remove_saved_location` | [saved locations](./saved-locations-workflow.md) |
 
-## Bonus: is everything up?
+## Bonus: are the core weather APIs up?
 
-`check_service_status` reports the health of every upstream API — handy when a tool errors:
+`check_service_status` checks whether NOAA and Open-Meteo are reachable, and lists the specialist upstreams it does not check — handy when a tool errors:
 
 <!-- capture:service-status -->
 <details>
@@ -57,11 +57,11 @@ check_service_status({})
 ````markdown
 # Weather API Service Status
 
-**Check Time:** 9/2/2026, 5:05:37 PM
+**Check Time:** 9/23/2026, 11:52:07 AM
 
 ## Server Version
 
-**Installed Version:** 1.25.18
+**Installed Version:** 1.31.3
 **Latest Release:** https://github.com/weather-mcp/weather-mcp/releases/latest
 **Changelog:** https://github.com/weather-mcp/weather-mcp/blob/main/CHANGELOG.md
 **Upgrade Instructions:** See README.md "Upgrading to Latest Version" section
@@ -106,9 +106,11 @@ check_service_status({})
 
 *Cache reduces API calls and improves performance for repeated queries.*
 
-## Overall Status: ✅ All Services Operational
+## Overall Status: ✅ NOAA and Open-Meteo Reachable
 
-Both NOAA and Open-Meteo APIs are functioning normally. Weather data requests should succeed.
+Both checked services answered. This confirms they are reachable; it does not confirm that every request will succeed.
+
+**Not checked by this tool:** NOAA river gauges (NWPS); USGS; NOAA NCEI; Aviation Weather Center METAR; Open-Meteo (forecast, air quality, marine, flood, ensemble and geocoding hosts); Census.gov geocoder; Nominatim (OpenStreetMap); MET Norway; MeteoAlarm; MSC GeoMet; JMA; NDMA SACHET, PAGASA and BMKG; Google Weather; Google Pollen; Environment Agency; NIFC; NASA FIRMS; NASA GIBS; RainViewer; Blitzortung; RCC ACIS. A failure in one of these is not diagnosable here.
 ````
 
 </details>
@@ -125,5 +127,5 @@ npm run build && npm run examples
 **About imagery links:** the radar URLs inside captured output expire — RainViewer retains only ~2 hours of frames — and a tile over dry skies renders blank, since radar tiles are transparent precipitation overlays. So the imagery examples also commit a PNG snapshot (`images/`): the capture script downloads the radar tile and composites it onto an OpenStreetMap base layer (four z+1 tiles stitched, pure-JS via the `pngjs` devDependency) so the echoes have geography under them, and warns if the overlay looks echo-free so a rain-free snapshot never ships unnoticed. Verify the image visually after regenerating. Committed snapshots carry attribution: radar © RainViewer, base map © OpenStreetMap contributors. The server output itself now includes an **interactive map** link (RainViewer live map / NASA Worldview) for the layered, animated browser view.
 
 <!-- capture-stamp -->
-*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-23 with weather-mcp v1.31.3 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->
