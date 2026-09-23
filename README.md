@@ -82,7 +82,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
 | `get_river_conditions` | US: NWPS gauge levels, flood stages, streamflow, rise/fall trends, forecast series. Great Britain: Environment Agency observed river levels against each gauge's published typical range. Elsewhere: GloFAS modeled discharge snapped to the nearest river channel, with ensemble forecast | 🌍 Global |
 | `get_wildfire_info` | US: named incidents with containment, size, and safety guidance from the nearest *uncontained* fire. Elsewhere: NASA FIRMS satellite heat detections (VIIRS, near real-time), clustered with distance, bearing, and intensity | 🌍 Global |
-| `check_service_status` | Health checks for all upstream APIs plus cache statistics | — |
+| `check_service_status` | Checks that NOAA and Open-Meteo are reachable, lists the upstreams it does not check, plus cache statistics | — |
 | `save_location` | Save places as aliases ("home", "cabin") with optional activity tags | — |
 | `list_saved_locations` | List all saved locations | — |
 | `get_saved_location` | Details for one saved location | — |
