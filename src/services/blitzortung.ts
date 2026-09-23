@@ -33,6 +33,29 @@ import { MqttLoadFailedError, MqttUnavailableError } from '../errors/ApiError.js
  */
 type MqttModule = (typeof import('mqtt'))['default'];
 
+/** A subscription not accessed for longer than this is unsubscribed by the prune. */
+export const SUBSCRIPTION_IDLE_THRESHOLD_MS = 60 * 60 * 1000;
+
+/** How often the prune runs. */
+export const SUBSCRIPTION_PRUNE_INTERVAL_MS = 15 * 60 * 1000;
+
+/**
+ * How often saved locations are re-warmed. Each re-warm re-stamps a saved location's
+ * geohashes, so their access stamp is never older than this interval and can never pass
+ * the idle threshold. Derived, never a second literal; the half margin absorbs event-loop
+ * delay.
+ */
+export const PREWARM_REFRESH_INTERVAL_MS = SUBSCRIPTION_IDLE_THRESHOLD_MS / 2;
+
+/**
+ * What one pre-warm call did. An out-parameter, like `subscribeToLocation`'s `phase`: the
+ * service is a singleton shared by overlapping callers, so a result field would be read by
+ * the wrong one. `status` stays unset when the call failed.
+ */
+export interface PrewarmOutcome {
+  status?: 'subscribed' | 'refreshed' | 'skipped-capacity' | 'skipped-reconnecting';
+}
+
 /**
  * Three-state resolution memo. `undefined` = not yet attempted, a module =
  * loaded, `null` = attempted and confirmed absent. Without it, an absent module
@@ -43,9 +66,9 @@ let mqttModule: MqttModule | null | undefined;
 /**
  * Single-flight guard for an import already in progress.
  *
- * The value memo alone does not close the startup race: `prewarmLightningMonitoring`
- * fires `void prewarmLocation(...)` per saved location without awaiting the
- * previous one, so with two saved locations both callers can observe
+ * The value memo alone does not close the startup race: the pre-warm refresh
+ * (`src/server/lightningPrewarm.ts`) fires `prewarmLocation(...)` for every saved
+ * location without awaiting the previous one, so with two saved locations both callers can observe
  * `mqttModule === undefined` before either import settles, both start an import,
  * and both emit the supposedly once-per-process warning.
  */
@@ -418,13 +441,25 @@ export class BlitzortungService {
     // Deliberately an out-parameter rather than an instance field: pre-warm and overlapping
     // queries all share this method, and a shared phase field would let one of them describe
     // another's failure. Trailing and optional, so omitting it is exactly the old behaviour.
-    phase?: { current: 'connect' | 'subscribe' }
+    phase?: { current: 'connect' | 'subscribe' },
+    // Set only by `prewarmLocation`. Pre-warm is speculative, so on this path the method never
+    // evicts to make room, never opens a second client while mqtt.js is reconnecting one, and
+    // logs nothing at INFO when every geohash is already subscribed. `undefined` is the query path.
+    prewarm?: { outcome: PrewarmOutcome }
   ): Promise<void> {
     // Resolved here, outside `ensureConnected`, so that method contains no
     // await before it sets `isConnecting` (see the comment there). An absent
     // package therefore throws before any connection state is touched, and
     // concurrent callers all reject from the one shared import promise.
     const mqtt = await loadMqtt();
+    // A client that exists but is neither connected nor connecting is one mqtt.js is already
+    // reconnecting. `ensureConnected` would open a second client and orphan it; a refresh tick
+    // would do that once per tick for the whole outage. A pure read, in the same synchronous
+    // run as the `ensureConnected` call below.
+    if (prewarm && this.client && !this.isConnected && !this.isConnecting) {
+      prewarm.outcome.status = 'skipped-reconnecting';
+      return;
+    }
     if (phase) {
       phase.current = 'connect';
     }
@@ -439,20 +474,34 @@ export class BlitzortungService {
 
     // Redact coordinates for logging to protect user privacy
     const redacted = redactCoordinatesForLogging(latitude, longitude);
-    logger.info('Subscribing to geohash topics', {
-      latitude: redacted.lat,
-      longitude: redacted.lon,
-      radiusKm,
-      geohashCount: geohashes.size,
-      geohashes: Array.from(geohashes)
-    });
+    const logSubscribing = (): void => {
+      logger.info('Subscribing to geohash topics', {
+        latitude: redacted.lat,
+        longitude: redacted.lon,
+        radiusKm,
+        geohashCount: geohashes.size,
+        geohashes: Array.from(geohashes)
+      });
+    };
+    if (!prewarm) {
+      logSubscribing();
+    }
 
     const now = Date.now();
 
     // Check if we need to evict old subscriptions before adding new ones
     const potentialNewSubs = Array.from(geohashes).filter(g => !this.subscribedGeohashes.has(g));
     if (this.subscribedGeohashes.size + potentialNewSubs.length > this.maxSubscriptions) {
+      if (prewarm) {
+        // Skip the whole location and stamp nothing. No `await` may sit between this check and
+        // the stage loop below, or two concurrent pre-warms both pass it and jointly overflow.
+        prewarm.outcome.status = 'skipped-capacity';
+        return;
+      }
       await this.evictOldestSubscriptions(potentialNewSubs.length);
+    }
+    if (prewarm && potentialNewSubs.length > 0) {
+      logSubscribing();
     }
 
     // Subscribe to each geohash and track access time
@@ -507,6 +556,9 @@ export class BlitzortungService {
               count: subscriptions.length,
               totalSubscriptions: this.subscribedGeohashes.size
             });
+            if (prewarm) {
+              prewarm.outcome.status = 'subscribed';
+            }
             resolve();
           }
         });
@@ -515,6 +567,9 @@ export class BlitzortungService {
       logger.debug('All required geohashes already subscribed', {
         totalSubscriptions: this.subscribedGeohashes.size
       });
+      if (prewarm) {
+        prewarm.outcome.status = 'refreshed';
+      }
     }
   }
 
@@ -573,14 +628,13 @@ export class BlitzortungService {
    * Periodically prune stale subscriptions (not accessed in last hour)
    */
   private startSubscriptionPruning(): void {
-    // Prune every 15 minutes
     setInterval(async () => {
       if (!this.client || this.subscribedGeohashes.size === 0) {
         return;
       }
 
       const now = Date.now();
-      const staleThreshold = 60 * 60 * 1000; // 1 hour
+      const staleThreshold = SUBSCRIPTION_IDLE_THRESHOLD_MS;
       const staleGeohashes: string[] = [];
 
       for (const [geohash, lastAccess] of this.subscribedGeohashes.entries()) {
@@ -622,7 +676,7 @@ export class BlitzortungService {
           remainingSubscriptions: this.subscribedGeohashes.size
         });
       }
-    }, 15 * 60 * 1000); // Every 15 minutes
+    }, SUBSCRIPTION_PRUNE_INTERVAL_MS);
   }
 
   /**
@@ -745,23 +799,36 @@ export class BlitzortungService {
    * Begin buffering strikes for a location without waiting for or returning results.
    *
    * Subscribes the area's geohashes so the rolling buffer starts filling immediately.
-   * Intended for startup pre-warming of known locations (e.g. saved locations) so that
-   * later queries have real monitoring coverage instead of starting from zero. Best-effort:
-   * failures are swallowed and must never block or crash startup.
+   * Intended for pre-warming known locations (saved locations, at startup and on every
+   * refresh) so that later queries have real monitoring coverage instead of starting from
+   * zero. Never evicts another subscription to make room. Best-effort: failures are
+   * swallowed and must never block or crash startup. What the call did is written to
+   * `outcome`; the return stays `Promise<void>`.
    */
   async prewarmLocation(
     latitude: number,
     longitude: number,
-    radiusKm: number = 100
+    radiusKm: number = 100,
+    outcome?: PrewarmOutcome
   ): Promise<void> {
+    const result: PrewarmOutcome = outcome ?? {};
     try {
-      await this.subscribeToLocation(latitude, longitude, radiusKm);
+      await this.subscribeToLocation(latitude, longitude, radiusKm, undefined, { outcome: result });
       const redacted = redactCoordinatesForLogging(latitude, longitude);
-      logger.info('Pre-warmed lightning monitoring for location', {
-        latitude: redacted.lat,
-        longitude: redacted.lon,
-        radiusKm
-      });
+      if (result.status === 'subscribed') {
+        logger.info('Pre-warmed lightning monitoring for location', {
+          latitude: redacted.lat,
+          longitude: redacted.lon,
+          radiusKm
+        });
+      } else {
+        logger.debug('Lightning pre-warm subscribed nothing new', {
+          latitude: redacted.lat,
+          longitude: redacted.lon,
+          radiusKm,
+          status: result.status
+        });
+      }
     } catch (error) {
       // The loader's own line is the whole of "say it once". This catch runs
       // once per saved location, so repeating it here would produce exactly the
