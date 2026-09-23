@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.4] - 2026-09-23
+
+### Changed
+
+- **`check_service_status` output text changed in three places — anything that matched on it needs updating.** The both-up headline `✅ All Services Operational` is now `✅ NOAA and Open-Meteo Reachable`; the partial verdict's `… API is operational: … available` line now reads `… API answered, so it is reachable. This does not confirm that … will succeed.`; and every verdict gains a final `**Not checked by this tool:**` line. The per-service sections, the both-down wording, the version and the cache statistics are unchanged. The reasons are under Fixed below.
+
+### Fixed
+
+- **`check_service_status` printed "All Services Operational" after probing two upstreams.** The tool checks NOAA and the Open-Meteo archive host and nothing else, but when both answered it announced that all services were operational and that weather data requests should succeed — a coverage claim it had not earned and a prediction it cannot make. Since the tool description points a model here after *any* weather tool error, a JMA or MeteoAlarm failure came back with a green headline about two unrelated services. The both-up verdict now reads `✅ NOAA and Open-Meteo Reachable` and says plainly that reachability does not confirm every request will succeed. Every verdict — both up, partial and both down — now ends with one plain-text line naming, by provider, each upstream the tool does not check, rendered from a single constant; a new unit test pins that constant against `src/services/`, so a new service file fails the test suite until it is placed. The partial verdict made the same overclaim for the one service that answered — `NOAA API is operational: … are available` — although the probes count a NOAA 404 and an Open-Meteo 400 as up; it now says that service answered and is reachable, and that this does not confirm its requests will succeed. The both-down wording, the per-service sections and the cache statistics are unchanged. The two probes now run concurrently, which halves the worst-case wait from 20 to 10 seconds. (`src/handlers/statusHandler.ts`, `src/utils/serviceStatusCoverage.ts`, `tests/unit/status-handler.test.ts`, `examples/README.md`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`, `README.md`)
+
 ## [1.31.3] - 2026-09-19
 
 ### Fixed
@@ -1813,7 +1823,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.3...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.4...HEAD
+[1.31.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.3...v1.31.4
 [1.31.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.2...v1.31.3
 [1.31.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.1...v1.31.2
 [1.31.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.0...v1.31.1

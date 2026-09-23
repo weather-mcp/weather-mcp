@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-3%2C582%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-3%2C601%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Three optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 3,582 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 3,601 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -82,7 +82,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | `get_lightning_activity` | Real-time strike detection with 4-level proximity safety assessment | 🌍 Global |
 | `get_river_conditions` | US: NWPS gauge levels, flood stages, streamflow, rise/fall trends, forecast series. Great Britain: Environment Agency observed river levels against each gauge's published typical range. Elsewhere: GloFAS modeled discharge snapped to the nearest river channel, with ensemble forecast | 🌍 Global |
 | `get_wildfire_info` | US: named incidents with containment, size, and safety guidance from the nearest *uncontained* fire. Elsewhere: NASA FIRMS satellite heat detections (VIIRS, near real-time), clustered with distance, bearing, and intensity | 🌍 Global |
-| `check_service_status` | Health checks for all upstream APIs plus cache statistics | — |
+| `check_service_status` | Checks that NOAA and Open-Meteo are reachable, lists the upstreams it does not check, plus cache statistics | — |
 | `save_location` | Save places as aliases ("home", "cabin") with optional activity tags | — |
 | `list_saved_locations` | List all saved locations | — |
 | `get_saved_location` | Details for one saved location | — |
@@ -390,7 +390,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 3,582 tests
+npm test               # Run all 3,601 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

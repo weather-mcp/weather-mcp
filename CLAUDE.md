@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.31.3 (Production Ready)
+- **Version:** 1.31.4 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -71,6 +71,7 @@ src/
 │   ├── criticalAlert.ts     # Life-threatening-alert gate, selection, banner copy (pure)
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
+│   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
 │   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing
 │   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates; shared country-code resolution
 │   ├── geography.ts         # isInUS and region helpers
@@ -122,7 +123,7 @@ Full per-tool parameter reference: `docs/TOOLS.md`.
 3. **get_alerts** - Weather alerts/warnings routed by country: NOAA (US), MSC GeoMet/ECCC (Canada), EUMETNET MeteoAlarm (38 European countries), and the national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG) — matched by alert polygon where the feed publishes geometry inline (PH/ID), country-level with an explicit note otherwise (IN, whose geometry endpoint is not server-reachable) — and JMA (Japan), matched to the point by class10 warning area from a committed geometry artifact, with the Japanese name verbatim and an English gloss where known; elsewhere the optional keyed Google Weather fallback (`GOOGLE_WEATHER_API_KEY`) or a clean not-covered message; `detail` output control
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo archive, global; NOAA for recent US dates)
 5. **get_weather_summary** - One-call overview: current + forecast + alerts (+ optional air quality, lightning); renders the life-threatening alert banner **once**, above its own header, never once per section
-6. **check_service_status** - API health check (all services)
+6. **check_service_status** - Reachability check for NOAA and Open-Meteo; names the upstreams it does not probe; cache performance metrics
 7. **search_location** - Location search/geocoding (Nominatim/OSM)
 8. **get_air_quality** - AQI + pollutants (Open-Meteo, global); pollen keyless in Europe (CAMS grains/m³), worldwide as a Universal Pollen Index with the optional `GOOGLE_POLLEN_API_KEY`
 9. **get_marine_conditions** - Wave height, swell, currents (Open-Meteo, global)
@@ -627,15 +628,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.31.3 — Production Ready ✅
-- **Test Coverage:** 3,582 tests, 100% pass rate
+- **Version:** 1.31.4 — Production Ready ✅
+- **Test Coverage:** 3,601 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.31.4:** check_service_status says what it checked, and names every upstream it did not
 - **New in v1.31.3:** search_location's declared limit bound now matches the 50 results it has always returned
 - **New in v1.31.2:** Saved locations survive a second client, a torn write, and an unreadable file
-- **New in v1.31.1:** The life-threatening alert banner now reaches Guam, the CNMI, the US Virgin Islands and American Samoa
 
 ## Useful References
 
@@ -658,7 +659,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-19 (v1.31.3)
+**Last Updated:** 2026-09-23 (v1.31.4)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

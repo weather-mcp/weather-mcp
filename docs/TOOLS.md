@@ -576,7 +576,7 @@ Check the operational status of weather APIs and cache performance.
 **Parameters:** None
 
 **Description:**
-Checks whether the upstream weather APIs (NOAA and Open-Meteo) are reachable. **This is the tool to call after any weather tool returns an error** — the recovery pointer lives here, on the status tool itself, rather than repeated in every weather tool's description. It is also useful before a batch of requests. Note the scope: it checks NOAA and Open-Meteo, the two general-purpose providers; a failure in a specialist upstream (RainViewer, JMA, NIFC, FIRMS, NWPS, Blitzortung) is not diagnosable here, and the reply says which two services it checked. Returns current status, helpful messages, links to official status pages, and cache statistics.
+Checks whether the upstream weather APIs (NOAA and Open-Meteo) are reachable. **This is the tool to call after any weather tool returns an error** — the recovery pointer lives here, on the status tool itself, rather than repeated in every weather tool's description. It is also useful before a batch of requests. Note the scope: it checks NOAA and Open-Meteo, the two general-purpose providers; a failure in a specialist upstream (RainViewer, JMA, NIFC, FIRMS, NWPS, Blitzortung) is not diagnosable here, and the reply says which two services it checked and lists, by provider, the upstreams it does not check. Returns current status, helpful messages, links to official status pages, and cache statistics.
 
 **Example:**
 ```
@@ -585,10 +585,10 @@ Check if the weather services are operational
 
 **Returns:**
 - Operational status for NOAA API (forecasts & current conditions)
-- Operational status for Open-Meteo API (historical data & forecasts)
+- Operational status for Open-Meteo API (the historical-archive host)
 - Cache statistics (hit rate, size, API call reduction)
 - Status page links and recommended actions if issues are detected
-- Overall service availability summary
+- Overall verdict for the two checked services, and the list of upstreams not checked
 
 ### 8. get_air_quality
 Get comprehensive air quality data for any location worldwide.

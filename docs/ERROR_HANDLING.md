@@ -376,31 +376,33 @@ Call the `check_service_status` tool with no parameters:
 
 [Recommended Actions if issues detected]
 
-## Overall Status: ✅ All Services Operational | ❌ Multiple Service Issues | ⚠️ Partial Service Availability
+## Overall Status: ✅ NOAA and Open-Meteo Reachable | ❌ Multiple Service Issues | ⚠️ Partial Service Availability
 
 [Summary and recommendations]
+
+**Not checked by this tool:** [every upstream it does not probe, by provider]
 ```
 
 ### When to Use
 
 - **Before batch requests** - Verify services are operational before making multiple weather data requests
-- **After errors** - Diagnose whether errors are due to service outages or other issues
+- **After errors** - Diagnose whether errors are due to service outages or other issues. The tool probes only NOAA and Open-Meteo; every other upstream (JMA, MeteoAlarm, FIRMS, NWPS and the rest) is listed as not checked, so for those the failing tool's own error message is the diagnostic
 - **Monitoring** - Periodic health checks for uptime monitoring
 - **Debugging** - Verify API connectivity during development and testing
 
 ### Health Check Implementation
 
-The status checker performs lightweight API requests:
+The status checker performs two lightweight API requests, concurrently. They measure **reachability** — whether the service answered — not whether a given weather request will succeed:
 
 **NOAA API:**
 - Tests: `/points/39.8283,-98.5795` (geographic center of US mainland)
 - Timeout: 10 seconds
-- Interprets: 200 OK = operational, 429 = operational but rate limited, 5xx = outage
+- Interprets: 200 OK = operational, 404 = reachable (endpoint may have changed), 429 = operational but rate limited, 5xx = outage
 
 **Open-Meteo API:**
 - Tests: Historical data request for London, 30 days ago
 - Timeout: 10 seconds
-- Interprets: 200 OK = operational, 429 = operational but rate limited, 5xx = outage
+- Interprets: 200 OK = operational, 400 = reachable (test request may need adjustment), 429 = operational but rate limited, 5xx = outage
 
 ## Implementation Details
 
