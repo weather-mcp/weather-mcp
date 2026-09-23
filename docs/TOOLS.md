@@ -783,9 +783,11 @@ Provides real-time lightning strike detection from the Blitzortung.org global li
 subscribed, so a report can carry one of two coverage disclosures in place of a plain verdict:
 
 - **`🟢 SAFE (LIMITED DATA)`** — a first query for this area. The feed begins buffering strikes only
-  once an area is queried (saved locations are pre-warmed at startup), so coverage starts near zero
+  once an area is queried, so coverage starts near zero
   and builds over the following minutes. The report says to re-check in a few minutes. Historical
-  strikes cannot be backfilled.
+  strikes cannot be backfilled. The exception is saved locations while pre-warm is active
+  (`WEATHER_LIGHTNING_PREWARM`, with this tool enabled): they have coverage from startup and keep it
+  for as long as they stay saved. Every other area starts cold on its first query.
 - **`⚪ UNKNOWN (LIVE FEED UNAVAILABLE)`** — the server could not reach the Blitzortung feed for this
   query, either because the connection never succeeded or because it dropped partway through
   collection. **This is not an all-clear**: no live strike data could be collected, so nothing is

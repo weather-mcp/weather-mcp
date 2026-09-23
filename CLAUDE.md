@@ -18,8 +18,9 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 
 ```
 src/
-├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning prewarm, main(), shutdown
+├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown
 ├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
+├── server/lightningPrewarm.ts  # Saved-location lightning pre-warm: gate, guarded store read, refresh timer (never evicts)
 ├── handlers/                # One handler per MCP tool (saved locations share one file)
 │   ├── forecastHandler.ts           # get_forecast (+ compare_models, ensemble_spread, normals, astronomy)
 │   ├── currentConditionsHandler.ts  # get_current_conditions (NOAA / Open-Meteo / METAR; fire weather, thermal stress)
@@ -364,10 +365,12 @@ ENABLED_TOOLS=basic            # Preset (basic | standard | full | all) and/or n
 WEATHER_DEFAULT_LOCATION=home  # saved alias | "lat,lon" | free-text place name
 
 # Lightning
-WEATHER_LIGHTNING_PREWARM=true # Subscribe saved locations at startup so lightning
-                               # coverage accumulates before the first query (default: true).
-                               # Set false to skip the startup MQTT connection. No effect
-                               # when get_lightning_activity is disabled.
+WEATHER_LIGHTNING_PREWARM=true # Subscribe saved locations so lightning coverage accumulates
+                               # before the first query, and keep them subscribed while they
+                               # stay saved (re-read every 30 min; a removed one ages out within
+                               # about an hour). Default: true. Set false to skip it and the
+                               # MQTT connection it opens. No effect when get_lightning_activity
+                               # is disabled (default basic preset: ENABLED_TOOLS=basic,+lightning).
 
 # Units / Localization
 WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
