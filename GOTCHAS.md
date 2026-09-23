@@ -5673,6 +5673,44 @@ can be green locally and not be what it claims).
 
 ---
 
+## G104 — In a Claude Code shell `grep` is a ugrep wrapper, so a plan's `grep -v '^./…'` exclusions silently match nothing
+
+**Trigger:** running a plan's mechanical acceptance check — or writing one — that
+pipes `grep -rn … .` into `grep -v -e '^./<path>'`, inside a Claude Code session
+(any `/run-plan`, `/quick-fix` or subagent Bash call).
+
+**Rule:** run acceptance greps written for GNU grep as `command grep`, for both
+halves of the pipe. When writing one, prefer exclusions that do not depend on the
+`./` prefix (`-e 'CHANGELOG.md:'`, `--exclude=`, `--exclude-dir=`).
+
+**Why:** Claude Code defines `grep` as a shell function that execs its bundled
+ugrep with `--ignore-files --hidden -I` and several `--exclude-dir`s. Two
+behaviours differ from GNU grep. It prints `CHANGELOG.md:12`, not
+`./CHANGELOG.md:12`, so every `^./` exclusion matches nothing and the filtered
+hits come back through. And it honours `.gitignore`, so `node_modules/`, `dist/`
+and `.devdocs` are skipped before any exclusion runs. The first behaviour
+produces spurious hits ([G41]); the second can hide a real one in a gitignored
+path the plan meant to search. A plan author who tested the command in a plain
+terminal sees neither.
+
+**Verify:** `type grep` prints `grep is a function` inside a session, and
+`grep -rn 'x' --include='*.md' . | head -1` prints a path with no `./`.
+
+**Evidence:** 2026-09-23 (`dfa4814`, service-status-honest-verdict T3). The
+T3 acceptance grep excluded `'^./CHANGELOG.md'` and still printed the CHANGELOG
+bullet that quotes the retired headline on purpose. Re-run with `command grep`,
+that exclusion held, and the only remaining hit was
+`tests/unit/status-handler.test.ts:165-166`. That is T2's own `not.toContain`
+lock on the retired phrases, which the plan's exclusions did not anticipate. That
+one is a plain [G41] spurious hit.
+
+**Status:** active. Related: [G41] (test the acceptance check before obeying it
+— this is one more way it goes spurious), [G91] (piping a script through `grep`
+changes what you see). Lintable only in the plan: `/impl-plan` could write
+`command grep` in every acceptance command.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
