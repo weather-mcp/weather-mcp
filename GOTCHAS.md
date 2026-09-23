@@ -5711,6 +5711,39 @@ changes what you see). Lintable only in the plan: `/impl-plan` could write
 
 ---
 
+## G105 — A filename-union inventory guard cannot see a missing provider when one file owns several upstreams
+
+**Trigger:** a drift guard classifies source files as probed / not checked / no
+network, while one file owns more than one outbound client or host — and
+especially when that file sits in more than one class.
+
+**Rule:** guard the atomic thing the user-facing claim names (the provider, client
+or host), not only the source filename. Keep the expected inventory independent
+of the production list it checks. A rendered list compared with the constant that
+rendered it proves formatting, not completeness.
+
+**Why:** `check_service_status`'s guard passes when every `src/services/*.ts` file
+appears in `STATUS_PROBED_SOURCES`, `STATUS_NOT_CHECKED` or the test's
+no-upstream list. `noaa.ts` is in the probed list, so deleting both of its
+unprobed entries (NOAA river gauges and USGS) from `STATUS_NOT_CHECKED` still
+leaves the filename covered. The not-checked line becomes false and every test
+passes. `openmeteo.ts` and `geocoding.ts` have the same shape.
+
+**Verify:** delete one unprobed provider whose `sources` file is also listed
+elsewhere, run `tests/unit/status-handler.test.ts`, and require a red that names
+the missing provider or host.
+
+**Evidence:** 2026-09-23, service-status-honest-verdict diff review DR-M1
+(codex). Deleting `NOAA river gauges (NWPS)` and `USGS` gave `Tests 17 passed
+(17)`. Triage deferred the fix as a scope expansion: the shipped list is complete,
+and a deletion is a deliberate edit that a diff review sees.
+
+**Status:** active, unfixed. Related: [G45] (the check cannot reach the missing
+atomic fact), [G96] (an assertion satisfied by the wrong neighbour), [G32]
+(mutate the plausible failure shape).
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
