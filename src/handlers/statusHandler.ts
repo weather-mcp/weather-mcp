@@ -118,10 +118,10 @@ export async function handleCheckServiceStatus(
   } else {
     output += `## Overall Status: ⚠️ Partial Service Availability\n\n`;
     if (noaaStatus.operational) {
-      output += `NOAA API is operational: Forecasts and current conditions for US locations are available.\n`;
+      output += `NOAA API answered, so it is reachable. This does not confirm that US forecasts and current conditions will succeed.\n`;
       output += `Open-Meteo API has issues: Historical weather data may be unavailable.\n`;
     } else {
-      output += `Open-Meteo API is operational: Historical weather data is available globally.\n`;
+      output += `Open-Meteo API answered, so it is reachable. This does not confirm that historical weather requests will succeed.\n`;
       output += `NOAA API has issues: Forecasts and current conditions for US locations may be unavailable.\n`;
     }
   }

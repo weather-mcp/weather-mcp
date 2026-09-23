@@ -2,8 +2,9 @@
  * Unit tests for the check_service_status handler.
  *
  * Locks: the honest both-up verdict (no "all services" / "requests should
- * succeed" coverage claim), the byte-for-byte-unchanged partial/both-down
- * copy, the not-checked line appended once after every branch, the two
+ * succeed" coverage claim), the reachability-only partial verdict (the
+ * probes report NOAA 404 and Open-Meteo 400 as up, so "up" proves only
+ * that the host answered), the byte-for-byte-unchanged both-down copy, the not-checked line appended once after every branch, the two
  * probes running concurrently, and the version/cache sections rendering
  * unchanged from `main`.
  *
@@ -65,6 +66,23 @@ const OPENMETEO_UP: ServiceStatus = {
 const OPENMETEO_DOWN: ServiceStatus = {
   operational: false,
   message: 'Open-Meteo API is experiencing server errors (possible outage)',
+  statusPage: OPENMETEO_STATUS_PAGE,
+  timestamp: '2026-01-01T00:00:00.000Z',
+};
+
+// The real messages the services return for the answers they map to
+// `operational: true` without a healthy response (noaa.ts 404 arm,
+// openmeteo.ts 400 arm). A reachability probe cannot tell these from a
+// healthy answer, so the partial verdict must not claim data is available.
+const NOAA_404: ServiceStatus = {
+  operational: true,
+  message: 'NOAA API is responding (health check endpoint may have changed)',
+  statusPage: NOAA_STATUS_PAGE,
+  timestamp: '2026-01-01T00:00:00.000Z',
+};
+const OPENMETEO_400: ServiceStatus = {
+  operational: true,
+  message: 'Open-Meteo API is responding (health check may need adjustment)',
   statusPage: OPENMETEO_STATUS_PAGE,
   timestamp: '2026-01-01T00:00:00.000Z',
 };
@@ -149,12 +167,12 @@ const BOTH_DOWN_VERDICT =
 
 const PARTIAL_NOAA_UP_VERDICT =
   '## Overall Status: ⚠️ Partial Service Availability\n\n' +
-  'NOAA API is operational: Forecasts and current conditions for US locations are available.\n' +
+  'NOAA API answered, so it is reachable. This does not confirm that US forecasts and current conditions will succeed.\n' +
   'Open-Meteo API has issues: Historical weather data may be unavailable.\n';
 
 const PARTIAL_OPENMETEO_UP_VERDICT =
   '## Overall Status: ⚠️ Partial Service Availability\n\n' +
-  'Open-Meteo API is operational: Historical weather data is available globally.\n' +
+  'Open-Meteo API answered, so it is reachable. This does not confirm that historical weather requests will succeed.\n' +
   'NOAA API has issues: Forecasts and current conditions for US locations may be unavailable.\n';
 
 describe('handleCheckServiceStatus', () => {
@@ -215,11 +233,14 @@ describe('handleCheckServiceStatus', () => {
     }
   });
 
-  describe('partial and both-down copy is unchanged from main', () => {
+  describe('both-down copy is unchanged from main', () => {
     it('both down', async () => {
       const text = await renderStatus(NOAA_DOWN, OPENMETEO_DOWN);
       expect(extractVerdictHeadlineAndSentence(text)).toBe(BOTH_DOWN_VERDICT);
     });
+  });
+
+  describe('partial verdict claims reachability only', () => {
 
     it('partial — NOAA up, Open-Meteo down', async () => {
       const text = await renderStatus(NOAA_UP, OPENMETEO_DOWN);
@@ -229,6 +250,22 @@ describe('handleCheckServiceStatus', () => {
     it('partial — Open-Meteo up, NOAA down', async () => {
       const text = await renderStatus(NOAA_DOWN, OPENMETEO_UP);
       expect(extractVerdictHeadlineAndSentence(text)).toBe(PARTIAL_OPENMETEO_UP_VERDICT);
+    });
+
+    it('NOAA 404 counts as reachable, never as data available', async () => {
+      const text = await renderStatus(NOAA_404, OPENMETEO_DOWN);
+      const verdict = extractVerdictHeadlineAndSentence(text);
+      expect(verdict).toBe(PARTIAL_NOAA_UP_VERDICT);
+      expect(verdict).not.toContain('is operational');
+      expect(verdict).not.toContain('are available');
+    });
+
+    it('Open-Meteo 400 counts as reachable, never as data available', async () => {
+      const text = await renderStatus(NOAA_DOWN, OPENMETEO_400);
+      const verdict = extractVerdictHeadlineAndSentence(text);
+      expect(verdict).toBe(PARTIAL_OPENMETEO_UP_VERDICT);
+      expect(verdict).not.toContain('is operational');
+      expect(verdict).not.toContain('is available');
     });
   });
 
