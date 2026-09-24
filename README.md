@@ -231,8 +231,8 @@ Control which tools are exposed to reduce context overhead:
 
 **Context cost.** Every MCP client puts the `tools/list` result into model context on
 every turn, so the preset you choose is a standing cost on every request. Measured on
-the built server: `basic` **12,987 bytes** (~3.2k tokens), `standard` **20,961** (~5.2k),
-`full`/`all` **30,836** (~7.7k). It scales with the number of **tools**, not the number of
+the built server: `basic` **13,212 bytes** (~3.3k tokens), `standard` **21,186** (~5.3k),
+`full`/`all` **31,055** (~7.8k). It scales with the number of **tools**, not the number of
 data sources — adding Japan and India as alert authorities added zero tools and zero bytes.
 
 ```bash

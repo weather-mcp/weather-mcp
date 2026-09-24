@@ -277,8 +277,9 @@ Limits on this source: `include_normals` works as usual, but
 `include_fire_weather` renders a one-line note instead of indices — Haines
 and transport wind need NOAA gridpoint data a METAR does not carry — and the
 thermal-stress lines do not render on this source. TAF
-(aerodrome forecasts) and a dedicated aviation tool are out of scope;
-`get_weather_summary` does not pass this source through.
+(aerodrome forecasts) and a dedicated aviation tool are out of scope.
+METAR is available only from `get_current_conditions`: `get_weather_summary`
+refuses `source: "metar"` with a validation error.
 
 **Example:**
 ```
@@ -526,10 +527,13 @@ Get a combined weather overview for a location in a single call.
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
 - `include` (optional): Array of sections to include — any of `current`, `forecast`, `alerts`, `air_quality`, `lightning` (default: `["current", "forecast", "alerts"]`)
 - `days` (optional): Forecast days when the forecast section is included (1-16, default: 7). The forecast section renders through `get_forecast`, so it inherits the same NOAA horizon disclosure: at a US point, a `days` above 7 shows NOAA's 7 days plus a line saying so, and `source: "openmeteo"` reaches the full range
+- `source` (optional): `auto` (default: NOAA in the US, Open-Meteo elsewhere), `noaa` or `openmeteo`. It applies to the current and forecast sections only. `metar` and any other value are refused before any request is made; use `get_current_conditions` for METAR. A forced `noaa` outside NOAA's coverage renders those two sections as unavailable, and the rest of the summary still renders
 - `detail` (optional): `summary` (default here), `standard`, or `full`
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
 
 *Coordinates not required when `location_name` or `city_name` is provided. Precedence: coordinates > `location_name` > `city_name`.
+
+The summary forwards only the parameters listed here. Sub-tool parameters such as `granularity`, `include_normals`, `include_fire_weather`, `active_only` or `radius` are not forwarded, so the forecast section is always daily. For those options, call `get_forecast`, `get_current_conditions`, `get_air_quality`, `get_alerts` or `get_lightning_activity` directly.
 
 **Description:**
 Best for broad questions like "What's the weather like in Seattle?" or "Is it safe to hike today?". Aggregates several specialized tools for one location in a single response, resolving the location once so there is no repeated geocoding. Sections that are unavailable for a location (e.g. alerts in a country not yet covered) are noted rather than failing the whole summary. For a single specific data product, call that specialized tool directly.
@@ -550,7 +554,7 @@ Find coordinates for any location worldwide by name.
 
 **Parameters:**
 - `query` (required): Location name to search for (e.g., "Paris", "New York, NY", "Tokyo")
-- `limit` (optional): Maximum number of results to return (1-50, default: 5). Larger values are clamped to 50, not rejected
+- `limit` (optional): Maximum number of results to return (1-50, default: 5). Larger values are clamped to 50, not rejected. A fractional value is truncated (`2.5` → `2`), not rejected
 
 **Description:**
 Converts location names to coordinates. Returns multiple matches with detailed metadata including coordinates, timezone, elevation, population, and administrative regions. Enables natural language weather queries by finding coordinates automatically.
