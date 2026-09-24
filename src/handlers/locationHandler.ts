@@ -54,8 +54,12 @@ export async function handleSearchLocation(
   // clamps to the same number independently, so raising one means raising all
   // three. Out-of-range values are clamped, never rejected — the same tolerant
   // clamping contract wildfireHandler.ts and riverConditionsHandler.ts follow.
+  // A fractional value (the schema declares `limit` as `integer`, but nothing
+  // stops a caller from sending a float) is truncated with Math.floor before
+  // the clamp, never rejected, which keeps the tolerant contract — so the
+  // geocoders only ever receive integers.
   const limit = typeof locationArgs.limit === 'number' ?
-    Math.min(Math.max(1, locationArgs.limit), 50) : 5; // Nominatim max is 50
+    Math.min(Math.max(1, Math.floor(locationArgs.limit)), 50) : 5; // Nominatim max is 50
 
   // Search for locations using multi-service geocoding
   const results = await geocodingService.geocode(query, limit);
