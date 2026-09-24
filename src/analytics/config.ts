@@ -30,7 +30,7 @@ const DEFAULT_ENDPOINT = 'https://analytics.weather-mcp.com/v1/events';
  * Validate analytics endpoint for security
  * Prevents SSRF attacks and enforces HTTPS
  */
-function validateAnalyticsEndpoint(endpoint: string): void {
+export function validateAnalyticsEndpoint(endpoint: string): void {
   let url: URL;
   try {
     url = new URL(endpoint);
@@ -129,7 +129,7 @@ function getOrGenerateAnalyticsSalt(): string {
 /**
  * Load and validate analytics configuration from environment variables
  */
-function loadAnalyticsConfig(): AnalyticsConfig {
+export function loadAnalyticsConfig(): AnalyticsConfig {
   // Analytics disabled by default (users must opt-in)
   const enabled = process.env.ANALYTICS_ENABLED === 'true';
 
