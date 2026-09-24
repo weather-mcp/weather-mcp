@@ -4,9 +4,11 @@
  * TOOL_DEFINITIONS.search_location), but nothing stops a caller from sending
  * a float (2.5, 0.5, …). Before this file, a fractional value reached the
  * clamp in handleSearchLocation (src/handlers/locationHandler.ts) unfloored
- * and was forwarded to the geocoders as-is; Nominatim and Open-Meteo reject a
- * non-integer `limit` with an HTTP 400, and the caller saw "No locations
- * found" instead of results. The fix: a fractional value is truncated with
+ * and was forwarded to GeocodingService.geocode as-is. That service asks each
+ * provider for max(limit, PROVIDER_RESULT_FLOOR = 5), so a fraction below 5
+ * reached the upstream as 5 and worked. Above 5 the float itself was sent,
+ * Nominatim and Open-Meteo rejected it with an HTTP 400, and the caller saw
+ * "No locations found" (verified live 2026-09-24 with limit 7.5). The fix: a fractional value is truncated with
  * Math.floor and then clamped, never rejected — see
  * tests/unit/search-location-limit.test.ts for the sibling lock on the
  * integer-clamp bound this file assumes (that file is not edited here).
