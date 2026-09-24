@@ -20,6 +20,7 @@ import { GoogleWeatherService } from '../services/googleWeather.js';
 import { NationalCapService } from '../services/nationalCap.js';
 import { resolveLocationAsync, formatLocationLine } from '../utils/locationResolver.js';
 import { validateDetail, validateForecastDays, DetailLevel } from '../utils/validation.js';
+import { UnitArgs } from '../utils/unitPreferences.js';
 import { logger } from '../utils/logger.js';
 import { handleGetCurrentConditions } from './currentConditionsHandler.js';
 import { handleGetForecast } from './forecastHandler.js';
@@ -39,7 +40,33 @@ export type SummarySection = 'current' | 'forecast' | 'alerts' | 'air_quality' |
 const VALID_SECTIONS: SummarySection[] = ['current', 'forecast', 'alerts', 'air_quality', 'lightning'];
 const DEFAULT_SECTIONS: SummarySection[] = ['current', 'forecast', 'alerts'];
 
-interface WeatherSummaryArgs {
+/**
+ * Sources the summary accepts for its current and forecast sections. `metar`
+ * is deliberately absent: the forecast handler has no METAR arm, so a METAR
+ * current section would silently pair with an Open-Meteo forecast.
+ */
+type SummarySource = 'auto' | 'noaa' | 'openmeteo';
+
+const VALID_SOURCES: SummarySource[] = ['auto', 'noaa', 'openmeteo'];
+
+/**
+ * The unit keys the summary declares and forwards. They mirror
+ * `UNIT_SCHEMA_PROPERTIES` in `src/server/weatherServer.ts`, which this module
+ * cannot import (that file imports this handler, so the import would be a
+ * cycle). `tests/unit/weather-summary-allowlist.test.ts` derives its expected
+ * key set from the declared schema, so the two cannot drift apart unnoticed.
+ */
+const SUMMARY_UNIT_KEYS = [
+  'units',
+  'temperature_unit',
+  'wind_speed_unit',
+  'precipitation_unit',
+  'pressure_unit',
+  'distance_unit',
+  'time_format'
+] as const;
+
+interface WeatherSummaryArgs extends UnitArgs {
   latitude?: number;
   longitude?: number;
   location_name?: string;
@@ -47,6 +74,7 @@ interface WeatherSummaryArgs {
   include?: unknown;
   detail?: DetailLevel;
   days?: number;
+  source?: unknown;
 }
 
 /**
@@ -76,6 +104,26 @@ function validateInclude(value: unknown): SummarySection[] {
 
   // Empty array falls back to the default set rather than producing an empty report
   return sections.length > 0 ? sections : DEFAULT_SECTIONS;
+}
+
+/**
+ * Validate the optional `source`. Absent stays absent (not `'auto'`): both
+ * sub-handlers apply their own `|| 'auto'`, so forwarding nothing keeps the
+ * default path identical by construction. `metar` and any other value are
+ * refused before any upstream call.
+ */
+function validateSummarySource(value: unknown): SummarySource | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value === 'string' && VALID_SOURCES.includes(value as SummarySource)) {
+    return value as SummarySource;
+  }
+
+  throw new Error(
+    `Invalid source "${String(value)}". Valid sources for get_weather_summary: ${VALID_SOURCES.join(', ')}.`
+  );
 }
 
 /**
@@ -118,10 +166,10 @@ export async function handleGetWeatherSummary(
   // safety element people stop reading.
   //
   // The summary therefore resolves the banner **once, here**, and prepends it to
-  // its own assembled body. Two facts already keep the sub-handlers quiet: both
-  // calls below pass 6 arguments, so a trailing 8th/9th arrives `undefined`; and
-  // `subArgs` is spread from the caller's `args`, while this is a function
-  // parameter and not a member of `args`. Neither survives a future edit
+  // its own assembled body. Two facts already keep the sub-handlers quiet: the
+  // two calls below never pass the banner flag positionally; and `subArgs` is
+  // built from a fixed allowlist of declared keys, while this is a function
+  // parameter and not on that list. Neither survives a future edit
   // unnoticed, which is why `tests/unit/critical-alert-summary.test.ts` counts
   // the banner's occurrences rather than merely asserting it is present.
   criticalAlertBanner?: boolean,
@@ -135,6 +183,10 @@ export async function handleGetWeatherSummary(
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   const typedArgs = (args ?? {}) as WeatherSummaryArgs;
 
+  // First, before resolveLocationAsync: a `city_name` is geocoded there, which
+  // is itself an upstream call, and a refused source must cost none.
+  const source = validateSummarySource(typedArgs.source);
+
   // Resolve location once; sub-handlers receive the resolved coordinates so they
   // never re-geocode (coordinates take precedence in resolveLocationAsync).
   const resolved = await resolveLocationAsync(typedArgs, locationStore, geocodingService);
@@ -142,23 +194,34 @@ export async function handleGetWeatherSummary(
   const detail = validateDetail(typedArgs.detail, 'summary');
   const days = validateForecastDays(typedArgs);
 
-  // Shared args for every sub-handler: resolved coordinates plus pass-through of
-  // unit preferences and detail. Coordinates override any name so no geocoding.
-  const subArgs = {
-    ...(typeof args === 'object' && args !== null ? args : {}),
+  // The invariant: the summary forwards only what it declares. A sub-tool
+  // parameter reaches a section only if it is declared on get_weather_summary
+  // (G85). This is an allowlist, not a spread, so a parameter added to a
+  // sub-handler later does not leak through by default.
+  //
+  // - Resolved coordinates, so no sub-handler re-geocodes. `location_name` and
+  //   `city_name` are consumed here and never copied.
+  // - `detail`, as validated for the summary.
+  // - The declared unit keys and `source`, each copied only when the caller
+  //   sent it, so no key arrives with an `undefined` value.
+  //
+  // Deliberately not forwarded: `granularity` (an hourly table is the wrong
+  // shape inside a one-call overview; use get_forecast), and `compare_models` /
+  // `ensemble_spread` (D9: a comparison or spread view is the wrong shape inside
+  // a summary). `days` goes to the forecast section only, below.
+  const subArgs: Record<string, unknown> = {
     latitude: resolved.latitude,
     longitude: resolved.longitude,
-    location_name: undefined,
-    city_name: undefined,
-    // A comparison block is the wrong shape inside a summary; users wanting
-    // a comparison call get_forecast directly.
-    compare_models: undefined,
-    // Same reasoning as compare_models (D9): the summary's forecast section is
-    // a plain forecast, and a spread view would replace that section with a
-    // different product rather than compose with the summary's other sections.
-    ensemble_spread: undefined,
     detail
   };
+  for (const key of SUMMARY_UNIT_KEYS) {
+    if (typedArgs[key] !== undefined) {
+      subArgs[key] = typedArgs[key];
+    }
+  }
+  if (source !== undefined) {
+    subArgs.source = source;
+  }
 
   // Resolved once for the whole summary and prepended outermost, so the reader
   // meets the warning before the heading. The summary builds a string rather

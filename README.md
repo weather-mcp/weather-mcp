@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-3%2C622%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-3%2C644%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Three optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 3,622 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 3,644 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -231,8 +231,8 @@ Control which tools are exposed to reduce context overhead:
 
 **Context cost.** Every MCP client puts the `tools/list` result into model context on
 every turn, so the preset you choose is a standing cost on every request. Measured on
-the built server: `basic` **12,987 bytes** (~3.2k tokens), `standard` **20,961** (~5.2k),
-`full`/`all` **30,836** (~7.7k). It scales with the number of **tools**, not the number of
+the built server: `basic` **13,212 bytes** (~3.3k tokens), `standard` **21,186** (~5.3k),
+`full`/`all` **31,055** (~7.8k). It scales with the number of **tools**, not the number of
 data sources — adding Japan and India as alert authorities added zero tools and zero bytes.
 
 ```bash
@@ -390,7 +390,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 3,622 tests
+npm test               # Run all 3,644 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

@@ -738,6 +738,13 @@ which is the point: this is a claim a plan can state confidently and get
 backwards, because it is invisible in the summary's own `switch`. Lint candidate
 — a test asserting `subArgs.detail` for each section would pin it mechanically.
 
+**Superseded 2026-09-24** (`6a68911`, tool-schema-truth T1): the paragraph below
+describes the old spread. `subArgs` is now an allowlist of the resolved
+coordinates, `detail`, the seven unit keys and `source` (each only when sent),
+plus `days` for the forecast. Nothing else reaches a section, so
+`include_fire_weather` no longer passes through. The lesson still stands: read
+what the summary builds, and do not infer it. See [G85].
+
 **Sharpened 2026-08-27** (`ffe8e6b`, issue-82 display-band-coherence T6) — **the
 "substitutes its own" half is true of exactly seven keys, and guessing which is
 how a plan gets the blast radius wrong in the other direction.**
@@ -4693,17 +4700,13 @@ gap is invisible from either end — the sub-handler sees a normal argument, and
 the composite's schema looks complete — which means the behaviour is discovered
 by a user, not by a test or a reviewer reading one file.
 
-**Verify:**
-
-```bash
-grep -n 'subArgs' src/handlers/weatherSummaryHandler.ts
-```
-
-The spread plus an explicit null-out list is the shape: whatever is **not** in
-that list is forwarded. Compare it against `get_weather_summary`'s
-`inputSchema.properties` in `src/server/weatherServer.ts` — every key in the second that is
-not nulled in the first is declared, and every key in neither is an
-undeclared pass-through.
+**Verify:** `npx vitest run tests/unit/weather-summary-allowlist.test.ts`. It
+derives the expected forwarded keys from `get_weather_summary`'s declared
+`inputSchema.properties`, sends every declared key **and** every known
+sub-handler key in one call, and asserts each section receives exactly the
+allowlisted set. `grep -n '\.\.\.(typeof args' src/handlers/weatherSummaryHandler.ts`
+must return nothing: the spread is gone. For any *new* composite, the same
+question applies from scratch: read how it builds its sub-call arguments.
 
 **Evidence:** 2026-09-08, `codex-MAJOR-1` on the forecast-auto-source-contract
 diff review, downgraded to minor and deferred at triage. `weatherSummaryHandler.ts`
@@ -4715,10 +4718,15 @@ two months; v1.29.0's new hourly source note simply made the path visible, where
 it is correct about the product it labels. Removing the capability is a scope
 decision, not a bug fix, which is why the entry is here rather than a patch.
 
-**Status:** active. Related: [G19] (the sub-handler contract a composite
-inherits without restating). Partially lintable — a test could assert that the
-null-out list plus the declared properties covers every key any sub-handler
-reads, but nothing does today.
+**Status:** **resolved for `get_weather_summary`, 2026-09-24** (`6a68911`,
+tool-schema-truth T1; lock `7eed9c8`, T4). The summary now builds `subArgs` from
+an allowlist, and the invariant is stated above it: *a composite forwards only
+what it declares*. It declares and validates `source` and stops forwarding
+`granularity` and every other sub-tool key. The lock derives its expectation
+from the schema rather than restating it, so declaring a key without forwarding
+it, or forwarding one without declaring it, both go red (mutations M3 and M6).
+The entry stays in place for the next composite tool. Related: [G19] (the
+sub-handler contract a composite inherits without restating).
 
 ---
 
@@ -5806,6 +5814,44 @@ subagent a debugging cycle; settled with a `settleStartup()` helper that advance
 
 **Status:** active. Related: [G20] (the `isConnecting` guard that forces the
 poll), [G21] (the fresh-import pattern these tests use).
+
+---
+
+## G108 — A defect traced by reading one layer can be masked by a later one, so run the repro on the base before a plan builds on it
+
+**Trigger:** a design or plan that states a user-visible failure ("the user sees
+`No locations found`") derived by reading the code path, with a named example
+input, and a live positive control on `main` that expects that failure.
+
+**Rule:** run the example input against the built `main` **before** the plan
+fixes its positive control. Trace the value through **every** layer to the
+upstream, not only to the first function that forwards it. When the base does
+not fail, find the layer that rewrites the value and choose an input past it.
+
+**Why:** the reading can be right at each step it covers and still wrong at the
+boundary. The fix may be correct and the tests green while the published claim
+("a fractional limit returned no results") is false for the stated example. A
+CHANGELOG line written from the design then ships a claim that a user can
+disprove in one call.
+
+**Verify:** the plan's live pass records the base output for the defect input,
+and that output shows the failure. If it does not, the repro is wrong, not the
+probe.
+
+**Evidence:** 2026-09-24, tool-schema-truth T6. The design said
+`search_location` with `limit: 2.5` reached Nominatim and Open-Meteo as a float
+and returned `No locations found`. On `main` it returned 2 results.
+`GeocodingService.geocode` (`src/services/geocoding.ts`) asks each provider for
+`max(limit, PROVIDER_RESULT_FLOOR = 5)`, so any fraction below 5 went upstream as
+the integer 5, and only `slice(0, 2.5)` used the float. The defect is real above
+5: `limit: 7.5` for "Paris" rendered `No locations found` on `main`, and the
+branch rendered byte-identical to `limit: 7`. The upstream 400s were confirmed
+with direct requests. The CHANGELOG and a test header were narrowed in
+`aec455f`; the handler fix did not change.
+
+**Status:** active. Related: [G10] (the base column as the defect's own proof),
+[G46] (every published behavioural sentence names its proof), [G19] (read what a
+layer passes on; do not infer it).
 
 ---
 

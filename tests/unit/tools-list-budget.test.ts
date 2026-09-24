@@ -19,8 +19,9 @@
  *                  in the `full` payload (tool AND parameter descriptions).
  *   3. Shape     — the params/required/enums/defaults shape of all 17 tools'
  *                  input schemas matches a fingerprint generated from `main`
- *                  (80d901a), so T1-T4 are proven to have changed no
- *                  parameter, enum, default, or `required` entry.
+ *                  (b699bce), with the entries tool-schema-truth moved on
+ *                  purpose applied (listed above the literal). Any other
+ *                  parameter, enum, default, or `required` change fails it.
  *
  * --- G61 no longer applies to this import ---
  *
@@ -232,20 +233,31 @@ type FingerprintEntry = {
 };
 
 /**
- * Generated from `main` (80d901a), NOT from this branch. G10 applies: a
- * fingerprint generated from the branch under test would only assert that
- * the branch equals itself — precisely the accidental-parameter-removal
- * class of bug this test exists to catch. A `git worktree` at main was
- * compiled and its TOOL_DEFINITIONS dumped, and that dump was byte-identical
- * (md5 469c2ba0a73c9501d230d4d4aa89a5d5) to the same dump taken from this
- * branch — the proof that T1-T4 changed no parameter, enum, default, or
- * `required` entry.
+ * Generated from `main` (b699bce), NOT from the branch under test alone. G10
+ * applies: a fingerprint generated from the branch under test would only
+ * assert that the branch equals itself — precisely the accidental-parameter-
+ * removal class of bug this test exists to catch. A `git worktree` at main
+ * and the tool-schema-truth branch were each dumped through this file's
+ * projection and diffed. Exactly these entries moved, deliberately, under
+ * that plan, and every other entry of all 17 tools diffed identical:
+ *
+ *   - get_weather_imagery.required: ['type'] -> [] (the handler has always
+ *     defaulted `type`, so the required entry was dead);
+ *   - get_weather_summary.params gains `source`;
+ *   - get_weather_summary.enums gains source: ['auto', 'noaa', 'openmeteo'];
+ *   - get_weather_summary.defaults gains source: 'auto'.
+ *
+ * (Dump md5s: main c6e6138a5a347a21c3a0f31e3500530b, branch
+ * d7f13f4559bc36018315f752350a63f8.) The previous base was 80d901a, whose
+ * dump was byte-identical to its branch.
  *
  * The four projected fields are exactly what `deriveFingerprint` below
  * derives. Nothing else is locked: descriptions are Contract 2's job, and
  * `type`/`minimum`/`maximum` are deliberately outside the fingerprint — say
  * so here rather than letting the next editor infer coverage from the word
- * "shape".
+ * "shape". That is also why search_location.limit's `number` -> `integer`
+ * change in the same plan does not appear in the list above;
+ * tests/unit/search-location-fractional-limit.test.ts locks it instead.
  *
  * The literal is inlined here on purpose. An earlier draft read it from
  * .claude/scratch/, which is gitignored: the suite passed locally off an
@@ -381,7 +393,7 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
   },
   get_weather_imagery: {
     params: ['animated', 'city_name', 'composite', 'detail', 'latitude', 'location_name', 'longitude', 'type'],
-    required: ['type'],
+    required: [],
     enums: {
       detail: ['full', 'standard', 'summary'],
       type: ['precipitation', 'radar', 'satellite'],
@@ -393,7 +405,7 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
     },
   },
   get_weather_summary: {
-    params: ['city_name', 'days', 'detail', 'distance_unit', 'include', 'latitude', 'location_name', 'longitude', 'precipitation_unit', 'pressure_unit', 'temperature_unit', 'time_format', 'units', 'wind_speed_unit'],
+    params: ['city_name', 'days', 'detail', 'distance_unit', 'include', 'latitude', 'location_name', 'longitude', 'precipitation_unit', 'pressure_unit', 'source', 'temperature_unit', 'time_format', 'units', 'wind_speed_unit'],
     required: [],
     enums: {
       detail: ['full', 'standard', 'summary'],
@@ -401,6 +413,7 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
       'include.items': ['air_quality', 'alerts', 'current', 'forecast', 'lightning'],
       precipitation_unit: ['inch', 'mm'],
       pressure_unit: ['hPa', 'inHg'],
+      source: ['auto', 'noaa', 'openmeteo'],
       temperature_unit: ['C', 'F'],
       time_format: ['12h', '24h'],
       units: ['imperial', 'metric'],
@@ -408,6 +421,7 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
     },
     defaults: {
       days: 7,
+      source: 'auto',
     },
   },
   get_wildfire_info: {
@@ -483,7 +497,7 @@ function deriveFingerprint(def: ToolDefinitionShape): FingerprintEntry {
   return { params, required, enums, defaults };
 }
 
-describe('tools/list shape fingerprint (vs main 80d901a)', () => {
+describe('tools/list shape fingerprint (vs main b699bce)', () => {
   const expectedNames = Object.keys(EXPECTED_FINGERPRINT_FROM_MAIN).sort();
 
   it('the fingerprint file covers exactly the 17 registered tool names', () => {

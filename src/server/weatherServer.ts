@@ -497,6 +497,12 @@ export const TOOL_DEFINITIONS = {
           maximum: 16,
           default: 7
         },
+        source: {
+          type: 'string' as const,
+          description: 'Source for the current and forecast sections: "auto" (default: NOAA in the US, Open-Meteo elsewhere), "noaa" or "openmeteo".',
+          enum: ['auto', 'noaa', 'openmeteo'],
+          default: 'auto'
+        },
         ...DETAIL_SCHEMA_PROPERTY,
         ...UNIT_SCHEMA_PROPERTIES
       },
@@ -525,7 +531,7 @@ export const TOOL_DEFINITIONS = {
           description: 'Location name to search for (e.g., "Paris", "New York, NY", "Tokyo")'
         },
         limit: {
-          type: 'number' as const,
+          type: 'integer' as const,
           description: 'Maximum number of results to return (1-50, default: 5)',
           minimum: 1,
           maximum: 50,
@@ -609,7 +615,7 @@ export const TOOL_DEFINITIONS = {
         },
         ...DETAIL_SCHEMA_PROPERTY
       },
-      required: ['type']
+      required: []
     }
   },
 

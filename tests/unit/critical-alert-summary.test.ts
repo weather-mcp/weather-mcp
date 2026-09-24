@@ -6,9 +6,10 @@
  * `forecast` sections through the same two handlers that now carry the
  * `criticalAlertBanner` flag, so threading the flag down to either of them would
  * put the banner in the response three times. Two facts already prevent that —
- * both sub-handler calls pass 6 arguments, and `subArgs` is spread from the
- * caller's `args` while the flag is a function parameter — but neither survives
- * a future edit unnoticed. Hence the occurrence **count** below rather than a
+ * the forecast call never passes the banner flag positionally, and `subArgs` is
+ * built from a fixed allowlist of declared keys while the flag is a function
+ * parameter, not a member of that allowlist — but neither survives a future
+ * edit unnoticed. Hence the occurrence **count** below rather than a
  * `toContain`, which cannot see a triple.
  *
  * Sub-handlers are mocked at the module seam, following
@@ -186,10 +187,11 @@ describe('the critical-alert banner in get_weather_summary', () => {
     });
 
     it('does not leak the flag through the subArgs spread', async () => {
-      // The second of the two facts that protect this: `subArgs` is spread from
-      // the caller's `args`, and the flag is a function parameter rather than a
-      // member of `args`. A future refactor moving it into `args` would break
-      // this without breaking the two argument-count tests above.
+      // The second of the two facts that protect this: `subArgs` is built from
+      // a fixed allowlist of declared keys, and the flag is a function
+      // parameter rather than a member of that allowlist. A future refactor
+      // moving it into the allowlist would break this without breaking the two
+      // argument-count tests above.
       await callSummary(
         { ...US_ARGS, include: ['current'] },
         noaaWithAlerts(TORNADO_WARNING),

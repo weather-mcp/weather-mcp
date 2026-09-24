@@ -681,15 +681,16 @@ describe('handleGetCurrentConditions — untouched fire-weather sites stay as th
 // the handler-mock pattern this deliberately does NOT copy) proves what
 // actually reaches the sub-handler, rather than assuming.
 //
-// Reading weatherSummaryHandler.ts: `subArgs = { ...args, latitude,
-// longitude, location_name: undefined, city_name: undefined,
-// compare_models: undefined, ensemble_spread: undefined, detail }`. Only
-// location fields and the two forecast-only flags are stripped/overridden;
-// `units`/`units_*`/`include_fire_weather`/`source` all pass through
-// unchanged from the caller's own args because the spread runs first. `detail`
-// is always overridden to the computed value (default 'summary', not
-// 'standard'), but currentConditionsHandler.ts never reads `detail` at all,
-// so the current-conditions section is identical at either level.
+// Reading weatherSummaryHandler.ts: `subArgs` is built from a fixed allowlist
+// of declared keys — `latitude`, `longitude`, `detail`, each of the seven
+// declared unit keys (copied only when the caller sent it), and `source`
+// (likewise). `units`/`units_*`/`source` still pass through unchanged from
+// the caller's own args, because they are on that allowlist; `include_fire_weather`
+// is not declared on get_weather_summary, so it no longer reaches the current
+// section through the summary at all. `detail` is always overridden to the
+// computed value (default 'summary', not 'standard'), but
+// currentConditionsHandler.ts never reads `detail` at all, so the
+// current-conditions section is identical at either level.
 // ---------------------------------------------------------------------------
 
 describe('handleGetWeatherSummary — forwards units to the current-conditions section via its own subArgs (G19)', () => {

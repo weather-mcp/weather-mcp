@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-09-24
+
+Three tool schemas described a server that does not exist: the tool list is the only contract a model reads, and in three places it said something the handlers did not do. `get_weather_summary` now accepts exactly the parameters it declares. `get_weather_imagery` no longer requires a parameter that has a default. `search_location` no longer lets a fractional `limit` turn into an empty answer.
+
+### Added
+
+- **`get_weather_summary` declares a `source` parameter.** `auto` (the default: NOAA in the US, Open-Meteo elsewhere), `noaa` or `openmeteo` selects the source for the summary's current and forecast sections. The summary already honoured this key without declaring it, and its own forecast section tells users to pass `source: "openmeteo"` for a longer horizon, so the remedy it gives is now part of its schema. `metar` and any other value are refused with a validation error before any request, geocoding included; METAR stays on `get_current_conditions`. A forced `noaa` outside NOAA's coverage renders those two sections as unavailable, and the rest of the summary still renders. (`src/handlers/weatherSummaryHandler.ts`, `src/server/weatherServer.ts`, `tests/unit/weather-summary-allowlist.test.ts`, `tests/unit/weather-summary-source.test.ts`, `docs/TOOLS.md`)
+
+### Changed
+
+- **`get_weather_summary` no longer forwards parameters it does not declare.** It passed the caller's whole argument object to every section, so any sub-tool parameter reached its section, although the summary's schema did not list it. The most visible case is `granularity: "hourly"`, which put an hourly table inside the summary: the forecast section is now always daily. `include_normals`, `include_astronomy`, `include_fire_weather`, `include_precipitation_probability`, `include_severe_weather`, `active_only`, `forecast`, `forecast_days`, `radius` and `timeWindow` also stop reaching their sections. Call `get_forecast`, `get_current_conditions`, `get_air_quality`, `get_alerts` or `get_lightning_activity` directly for those options. The summary now forwards the resolved coordinates, `detail`, the unit parameters and `source`, and a test derives that list from the declared schema, so the two cannot drift apart. Output for a call that uses only declared parameters is unchanged. The `tools/list` byte budget is raised for the new parameter: `basic` 13,212 bytes, `standard` 21,186, `full` 31,055. (`src/handlers/weatherSummaryHandler.ts`, `src/config/tools.ts`, `tests/unit/weather-summary-allowlist.test.ts`, `tests/unit/tools-list-budget.test.ts`, `README.md`)
+
+### Fixed
+
+- **`get_weather_imagery` declared `type` as required, although it has a default.** The handler has always used `precipitation` when `type` is absent, and `docs/TOOLS.md` already documented it as optional, but a client that honours `required` made the model choose a type. The schema now declares no required parameter. (`src/server/weatherServer.ts`, `tests/unit/tools-list-budget.test.ts`)
+- **A fractional `search_location` `limit` above 5 returned no results.** The value passed the clamp as a float. Providers are always asked for at least 5 results, so a fractional limit below 5 reached them as the integer 5 and worked. Above 5, the float itself was sent, and Nominatim and Open-Meteo reject a non-integer limit with an HTTP 400, so the user saw `No locations found` (live: `limit: 7.5` for "Paris"). The value is now truncated before the clamp and never rejected (`2.5` → `2`, `0.5` → `1`, `50.7` → `50`), and the schema declares `limit` as an integer. Integer limits behave exactly as before. (`src/handlers/locationHandler.ts`, `src/server/weatherServer.ts`, `tests/unit/search-location-fractional-limit.test.ts`, `docs/TOOLS.md`)
+
 ## [1.31.5] - 2026-09-23
 
 ### Fixed
@@ -1831,7 +1848,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.5...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.0...HEAD
+[1.32.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.5...v1.32.0
 [1.31.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.4...v1.31.5
 [1.31.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.3...v1.31.4
 [1.31.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.2...v1.31.3
