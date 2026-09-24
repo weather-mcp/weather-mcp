@@ -30,7 +30,7 @@ const DEFAULT_ENDPOINT = 'https://analytics.weather-mcp.com/v1/events';
  * Validate analytics endpoint for security
  * Prevents SSRF attacks and enforces HTTPS
  */
-function validateAnalyticsEndpoint(endpoint: string): void {
+export function validateAnalyticsEndpoint(endpoint: string): void {
   let url: URL;
   try {
     url = new URL(endpoint);
@@ -44,11 +44,12 @@ function validateAnalyticsEndpoint(endpoint: string): void {
   }
 
   // SECURITY: Prevent SSRF to internal networks
-  const hostname = url.hostname.toLowerCase();
+  // URL.hostname keeps a trailing dot ("localhost."), which still resolves to
+  // the same host, so drop every trailing dot before the name checks.
+  const hostname = url.hostname.toLowerCase().replace(/\.+$/, '');
   if (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
-    hostname === '::1' ||
     hostname.startsWith('10.') ||
     hostname.startsWith('172.16.') ||
     hostname.startsWith('172.17.') ||
@@ -73,8 +74,10 @@ function validateAnalyticsEndpoint(endpoint: string): void {
     throw new Error('Invalid ANALYTICS_ENDPOINT: cannot point to internal network');
   }
 
-  // SECURITY: Require domain name (not IP address)
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+  // SECURITY: Require domain name (not IP address), in both families.
+  // URL.hostname keeps IPv6 literals bracketed ("[::1]"), so a leading "["
+  // is exactly the set of IPv6 literals, in every spelling.
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname) || hostname.startsWith('[')) {
     throw new Error('Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name');
   }
 
@@ -129,7 +132,7 @@ function getOrGenerateAnalyticsSalt(): string {
 /**
  * Load and validate analytics configuration from environment variables
  */
-function loadAnalyticsConfig(): AnalyticsConfig {
+export function loadAnalyticsConfig(): AnalyticsConfig {
   // Analytics disabled by default (users must opt-in)
   const enabled = process.env.ANALYTICS_ENABLED === 'true';
 

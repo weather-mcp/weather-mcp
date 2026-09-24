@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.32.1] - 2026-09-24
+
+The check that keeps an opt-in analytics endpoint off your own network had two gaps. Any IPv6 address, including loopback (`https://[::1]/`), passed it, and so did `localhost` or a `.local` name written with a trailing dot. Both gaps are now closed. Analytics is off by default, so these changes affect only users who set `ANALYTICS_ENABLED=true` and their own `ANALYTICS_ENDPOINT`. No tool output changes.
+
+### Security
+
+- **An IPv6 address in `ANALYTICS_ENDPOINT` is now rejected, as an IPv4 address already was.** Loopback, private, link-local, IPv4-mapped and public IPv6 literals (`https://[::1]/`, `https://[fd00::1]/`, `https://[::ffff:127.0.0.1]/`) all passed before. The old `::1` check could never match, because the URL parser keeps IPv6 addresses in brackets (`[::1]`). The endpoint must now be a domain name, in either address family. A rejected endpoint disables analytics and logs one `Invalid ANALYTICS_ENDPOINT configuration` error at startup. The server keeps running, and no tool is affected. (`src/analytics/config.ts`, `tests/unit/analytics-endpoint-validation.test.ts`)
+- **`localhost` and `.local` names with a trailing dot are now rejected like the same names without it.** `https://localhost./` and `https://printer.local./` passed, because the URL parser keeps the trailing dot and the name checks did not match it. Every trailing dot is now removed before the checks, so `localhost..` is rejected too. A public domain written with a trailing dot (`https://analytics.example.com./`) is still accepted. (`src/analytics/config.ts`, `tests/unit/analytics-endpoint-validation.test.ts`)
+- **What the check does not do:** it reads only the configured string. A domain name that resolves to a private address is not detected. Detecting that would need a DNS lookup at startup, which would turn a DNS outage into a failed boot.
+
+### Fixed
+
+- **The local analytics guide no longer documents an endpoint the server always rejected.** It showed `http://localhost:3100/v1/events`, which fails both the HTTPS check and the `localhost` check, so the documented local setup could never enable analytics. It also said analytics was on by default, which is false. The guide now lists the endpoint requirements the server enforces. (`docs/analytics/LOCAL_ANALYTICS_GUIDE.md`)
+
 ## [1.32.0] - 2026-09-24
 
 Three tool schemas described a server that does not exist: the tool list is the only contract a model reads, and in three places it said something the handlers did not do. `get_weather_summary` now accepts exactly the parameters it declares. `get_weather_imagery` no longer requires a parameter that has a default. `search_location` no longer lets a fractional `limit` turn into an empty answer.
@@ -1848,7 +1862,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.1...HEAD
+[1.32.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.0...v1.32.1
 [1.32.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.5...v1.32.0
 [1.31.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.4...v1.31.5
 [1.31.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.3...v1.31.4

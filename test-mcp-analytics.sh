@@ -3,7 +3,9 @@
 #
 # Prerequisites:
 # 1. Analytics server running on localhost:3100
-# 2. .env file configured with ANALYTICS_ENDPOINT=http://localhost:3100/v1/events
+# 2. .env file configured with ANALYTICS_ENABLED=true and an HTTPS ANALYTICS_ENDPOINT
+#    that reaches it through a proxy or tunnel with a real domain name
+#    (http://localhost is rejected; see docs/analytics/LOCAL_ANALYTICS_GUIDE.md)
 #
 # This script will:
 # 1. Start the MCP server

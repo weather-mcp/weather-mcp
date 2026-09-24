@@ -1160,6 +1160,14 @@ because `git checkout --` is muscle memory. The control run is what makes the
 trap cheap: **always end a mutation sweep by re-running the suite on the restored
 tree and asserting it is green**, not merely by restoring.
 
+**A mutation that turns the controls red too is broken, not discriminating**
+(2026-09-24, analytics-endpoint-hardening T2). A scripted splice that moved a `throw`
+block above the chain it was meant to precede also moved it above the
+`const hostname` declaration it reads, so every row, the accepted endpoints
+included, went red on a TDZ `ReferenceError`. Read *which* rows went red, not how
+many: a mutation's red set should sit inside the contract it targets, and a red
+row among the controls means the mutant does not run.
+
 **Status:** active. Lint candidate — a mutation helper that snapshots and restores
 by copy would close it mechanically.
 
@@ -3715,6 +3723,16 @@ fixtures were degenerate along that axis. **The generalisation:** a comparison
 operator's mutation set needs a fixture *on* the boundary, not merely either
 side of it, and having one on one guard says nothing about its twin.
 
+**Third instance, 2026-09-24** (`3c6e768`, analytics-endpoint-hardening T1): **Vitest's
+`toThrow('<string>')` is itself a substring match**, so a row written with the *full*
+message still pins nothing after it — `toThrow('Invalid X: bad')` passes against
+`'Invalid X: bad, and more'`. The plan asked for every message "whole, with
+`toThrow('<the full string>')`", and the returned file did exactly that and was a
+prefix lock on all thirteen rows. Pin with an anchored, escaped regex
+(`toThrow(/^…$/)`, via a small `exactly()` helper in the test file) and pin a
+logged line with `toBe` on the whole argument, not `toContain`. Same trap one layer
+down: the assertion *reads* as whole and the matcher is not.
+
 **Status:** active. Related: [G32] (the rejected-alternative set — this entry is
 the gap *beside* it, for behaviour the design deliberately did not settle),
 [G45] (a mutation that cannot reach its layer; here it reaches the layer and no
@@ -5852,6 +5870,52 @@ with direct requests. The CHANGELOG and a test header were narrowed in
 **Status:** active. Related: [G10] (the base column as the defect's own proof),
 [G46] (every published behavioural sentence names its proof), [G19] (read what a
 layer passes on; do not infer it).
+
+---
+
+## G109 — `URL.hostname` keeps IPv6 literals in brackets, so a bare IPv6 comparison never matches
+
+**Trigger:** any check on `new URL(x).hostname` (or `url.host`) that compares against,
+or prefix-matches, an IPv6 address: `hostname === '::1'`, `hostname.startsWith('fd')`,
+an IP-range allowlist or denylist, an SSRF guard.
+
+**Rule:** `URL.hostname` returns IPv6 **bracketed** and **normalised**: `[::1]`, not
+`::1`; `[0:0:0:0:0:0:0:1]` becomes `[::1]`; `[::ffff:127.0.0.1]` becomes
+`[::ffff:7f00:1]`. A clause written against the bare or un-normalised spelling is dead
+code. To refuse IP literals, key on *being* one: a leading `[` is exactly the set of IPv6
+literals, in every spelling. Do not enumerate IPv6 ranges by string prefix, because
+the normalised spellings slip past a prefix list.
+
+**Why:** the analytics endpoint guard (`src/analytics/config.ts`) carried
+`hostname === '::1'` from its first version. The clause could never match, so every IPv6
+literal (loopback, ULA, link-local, IPv4-mapped, unspecified) passed the SSRF check. No
+test exercised the guard, so a green suite was consistent with the clause never having
+worked. A review then proposed prefix enumeration (`fc00::/7`, `fe80::/10`, `::ffff:`).
+That would still have left `[::1]`, `[::]` and the normalised mapped form reachable. The
+mutation pass measured it: under prefix enumeration, 7 of the 9 IPv6 rows went red,
+because those addresses got past the guard.
+
+**Verify:** `node -e "console.log(new URL('https://[0:0:0:0:0:0:0:1]/').hostname)"`
+prints `[::1]`. Then grep `src/` for `hostname ===` and `hostname.startsWith(` and
+check every IPv6-shaped operand is bracketed or is the `[` test.
+
+**Evidence:** 2026-09-24, analytics-endpoint-hardening. The lock went in as `it.fails` in
+`3c6e768`, and the fix, which rejects any bracketed hostname with the IPv4-literal message,
+went in as `ee519e7`. On the built v1.32.0 artifact, `ANALYTICS_ENDPOINT=https://[::1]/v1/events` logged
+`Analytics configuration loaded` `endpoint: custom`; on the branch it logs the IP-literal
+error and disables analytics.
+
+**Same trap, second spelling (2026-09-24, `3bcf9ec`, diff-review gemini N1):
+`URL.hostname` also keeps a trailing dot**, and repeated ones: `https://localhost./`
+gives `localhost.`, and `localhost..` gives `localhost..`. So `=== 'localhost'` and
+`.endsWith('.local')` both miss a name that resolves to the same host. Strip **every**
+trailing dot (`replace(/\.+$/, '')`) before comparing names. Stripping only one leaves
+`localhost.` reachable, and the mutation pass showed it. IPv4 is not affected, because the
+parser normalises `127.0.0.1.` to `127.0.0.1`.
+
+**Status:** active. Partly lintable: a grep for an unbracketed IPv6 literal on the right of
+`hostname ===` is mechanical. Related: [G65] (the lock on the rejection messages), [G108]
+(the base-artifact repro).
 
 ---
 

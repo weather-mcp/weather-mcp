@@ -17,17 +17,36 @@ This guide explains how to test the Weather MCP server with local analytics in d
 
 ## Configuration
 
-The `.env` file is already configured for local development:
+Analytics is off by default. To send events to your own analytics server, set these in `.env`:
 
 ```bash
 # Analytics Configuration
 ANALYTICS_ENABLED=true
 ANALYTICS_LEVEL=detailed
-ANALYTICS_ENDPOINT=http://localhost:3100/v1/events
+ANALYTICS_ENDPOINT=https://analytics.example.test/v1/events  # your HTTPS hostname
 
 # Debug Logging
 LOG_LEVEL=0  # 0=DEBUG for verbose output
 ```
+
+The MCP server does not accept `http://localhost:3100/v1/events`: the endpoint must be HTTPS, and
+`localhost` is rejected. To reach a local analytics server, put an HTTPS reverse proxy or tunnel with
+a real domain name in front of port 3100, and set `ANALYTICS_ENDPOINT` to that hostname.
+
+### Endpoint requirements
+
+The server checks `ANALYTICS_ENDPOINT` once, at startup. The endpoint must:
+
+- be a valid URL that uses `https://`;
+- use a domain name, not an IP address — neither IPv4 (`https://10.0.0.1/`) nor IPv6
+  (`https://[::1]/`, `https://[fd00::1]/`), public or private;
+- not be `localhost` or a name ending in `.local`;
+- use port 443, or a port from 1024 to 65535.
+
+An endpoint that fails any check **disables analytics**. The server logs one
+`Invalid ANALYTICS_ENDPOINT configuration: …` error at startup and keeps running; no tool is
+affected. These checks look only at the configured string. They cannot see what a domain name
+resolves to.
 
 ## Testing Analytics Integration
 
@@ -59,7 +78,7 @@ This will:
    ```
 
 3. **Make requests through your MCP client** (Claude Desktop, etc.)
-   - Every tool call will automatically send analytics to `localhost:3100`
+   - Every tool call will automatically send analytics to the configured `ANALYTICS_ENDPOINT`
    - Analytics are tracked in the background and never interfere with tool execution
 
 ## Verifying Analytics Data
@@ -169,8 +188,10 @@ Check the analytics server logs for validation errors. Common issues:
 ### Analytics not being sent
 
 1. Verify `ANALYTICS_ENABLED=true` in `.env`
-2. Check `ANALYTICS_ENDPOINT` points to correct URL
-3. Ensure analytics server is running on port 3100
+2. Check `ANALYTICS_ENDPOINT` points to correct URL, and that it meets the
+   [endpoint requirements](#endpoint-requirements) — look for an
+   `Invalid ANALYTICS_ENDPOINT configuration` error at startup
+3. Ensure analytics server is running on port 3100, behind your HTTPS proxy or tunnel
 4. Look for analytics-related DEBUG logs
 
 ## Production vs Development
@@ -179,14 +200,15 @@ Check the analytics server logs for validation errors. Common issues:
 ```bash
 ANALYTICS_ENABLED=true
 ANALYTICS_LEVEL=detailed
-ANALYTICS_ENDPOINT=http://localhost:3100/v1/events
+ANALYTICS_ENDPOINT=https://analytics.example.test/v1/events  # your HTTPS hostname
 LOG_LEVEL=0
 ```
 
 ### Production (default without .env)
 ```bash
-# These are the defaults if no .env file exists
-ANALYTICS_ENABLED=true
+# These are the defaults if no .env file exists.
+# Analytics is opt-in: nothing is sent unless ANALYTICS_ENABLED=true.
+ANALYTICS_ENABLED=false
 ANALYTICS_LEVEL=minimal
 ANALYTICS_ENDPOINT=https://analytics.weather-mcp.com/v1/events
 LOG_LEVEL=1
