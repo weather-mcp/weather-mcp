@@ -85,12 +85,14 @@ export class OpenMeteoService {
   /**
    * In-flight climate-normals table pulls, keyed by the table cache key (D3).
    *
-   * `get_weather_summary` spreads the caller's args into every sub-handler, so
-   * `include_normals: true` fans out to the forecast and current-conditions
-   * handlers **concurrently** for the same coordinates — without this map both
-   * would miss the (not-yet-populated) cache and each issue a full-year
-   * archive pull. Entries are removed once settled, so a rejected pull is
-   * never cached and never left behind for the next caller to join.
+   * `include_normals: true` is accepted by both `get_forecast` and
+   * `get_current_conditions`, and a client may call the two **concurrently**
+   * for the same coordinates — without this map both would miss the
+   * (not-yet-populated) cache and each issue a full-year archive pull.
+   * (`get_weather_summary` no longer reaches this path: it forwards only its
+   * declared keys, and `include_normals` is not one.) Entries are removed once
+   * settled, so a rejected pull is never cached and never left behind for the
+   * next caller to join.
    */
   private normalsTableInFlight = new Map<string, Promise<NormalsTable>>();
 
