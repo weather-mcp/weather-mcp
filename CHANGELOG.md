@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-09-24
+
 Three tool schemas described a server that does not exist: the tool list is the only contract a model reads, and in three places it said something the handlers did not do. `get_weather_summary` now accepts exactly the parameters it declares. `get_weather_imagery` no longer requires a parameter that has a default. `search_location` no longer lets a fractional `limit` turn into an empty answer.
 
 ### Added
@@ -1846,7 +1848,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.5...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.0...HEAD
+[1.32.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.5...v1.32.0
 [1.31.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.4...v1.31.5
 [1.31.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.3...v1.31.4
 [1.31.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.2...v1.31.3
