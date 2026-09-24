@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - An `ANALYTICS_ENDPOINT` that is an IPv6 literal (for example `https://[::1]/` or `https://[fd00::1]/`) is now rejected, as an IPv4 literal already was, and analytics stays disabled. The old `::1` check could never match, because `URL.hostname` keeps IPv6 addresses in brackets (`[::1]`). Every IPv6 literal, including loopback, private and IPv4-mapped forms, passed the endpoint check. Analytics is off by default, so this affects only users who opted in.
+- An `ANALYTICS_ENDPOINT` host with a trailing dot (`https://localhost./`, `https://printer.local./`) is now rejected like the same name without the dot. `URL.hostname` keeps the trailing dot, so the `localhost` and `.local` checks did not match it.
 
 ### Fixed
 

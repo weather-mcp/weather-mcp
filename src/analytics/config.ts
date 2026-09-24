@@ -44,7 +44,9 @@ export function validateAnalyticsEndpoint(endpoint: string): void {
   }
 
   // SECURITY: Prevent SSRF to internal networks
-  const hostname = url.hostname.toLowerCase();
+  // URL.hostname keeps a trailing dot ("localhost."), which still resolves to
+  // the same host, so drop every trailing dot before the name checks.
+  const hostname = url.hostname.toLowerCase().replace(/\.+$/, '');
   if (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||

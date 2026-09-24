@@ -58,6 +58,8 @@ describe('validateAnalyticsEndpoint', () => {
       'https://analytics.example.com:443/v1/events',
       'https://analytics.example.com:8443/v1/events',
       'https://analytics.weather-mcp.com/v1/events',
+      // A fully-qualified name with a trailing dot is still a domain name.
+      'https://analytics.example.com./v1/events',
     ];
 
     it.each(accepted)('%s does not throw', (endpoint) => {
@@ -75,6 +77,11 @@ describe('validateAnalyticsEndpoint', () => {
       'https://192.168.1.1/',
       'https://169.254.1.1/',
       'https://printer.local/',
+      // URL.hostname keeps trailing dots, and these still resolve to the
+      // same host as the undotted name.
+      'https://localhost./',
+      'https://localhost../',
+      'https://printer.local./',
     ];
 
     it.each(blocked)('%s throws the internal-network message', (endpoint) => {
