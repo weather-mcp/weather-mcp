@@ -184,9 +184,13 @@ describe('OpenMeteoService.getClimateNormals() — full-year normals table (D1)'
 /**
  * In-flight dedupe + bounded 429 retry (D3).
  *
- * The dedupe scenario is real: `weatherSummaryHandler` spreads the caller's
- * args into every sub-handler, so `include_normals: true` fans out to the
- * forecast and current-conditions handlers concurrently for one location.
+ * The dedupe scenario is real: `include_normals: true` is accepted by both
+ * `get_forecast` and `get_current_conditions`, and a client may call the two
+ * concurrently for the same coordinates — without the in-flight map, both
+ * would miss the not-yet-populated cache and each issue a full-year archive
+ * pull (see `normalsTableInFlight`'s docblock in src/services/openmeteo.ts).
+ * `get_weather_summary` no longer reaches this path itself: it forwards only
+ * its declared keys, and `include_normals` is not one.
  *
  * The retry uses fake timers throughout — the suite stays deterministic and
  * fast, with no real 2s sleeps.
