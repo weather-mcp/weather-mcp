@@ -1040,7 +1040,7 @@ npx @dangahagan/weather-mcp@latest
 **Check published documentation:**
 1. Visit https://github.com/weather-mcp/weather-mcp/blob/main/README.md
 2. Verify version badges show correct version (if present)
-3. Verify test counts are accurate (3,601 tests)
+3. Verify test counts are accurate (3,622 tests)
 4. Verify all documentation links work
 5. Check CHANGELOG.md shows new release at top
 

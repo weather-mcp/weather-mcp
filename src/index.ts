@@ -20,6 +20,7 @@ import {
   SERVER_VERSION,
   clearServiceCaches
 } from './server/weatherServer.js';
+import { startLightningPrewarm, type LightningPrewarmHandle } from './server/lightningPrewarm.js';
 
 /**
  * Initialize the LocationStore for managing saved/favorite locations
@@ -30,52 +31,11 @@ const locationStore = new LocationStore();
 
 const server = createWeatherServer({ locationStore });
 
+let lightningPrewarm: LightningPrewarmHandle | undefined;
+
 /**
  * Start the server
  */
-/**
- * Pre-warm live lightning monitoring for saved locations at startup.
- *
- * The Blitzortung feed only buffers strikes for an area once it is subscribed, so the
- * first query to a location otherwise reports zero monitoring coverage. Subscribing
- * saved locations at startup lets their coverage accumulate before the user asks.
- * Best-effort and fully non-blocking: it opens a persistent MQTT connection, so it is
- * skipped when the lightning tool is disabled or when WEATHER_LIGHTNING_PREWARM=false.
- * The saved-locations read is guarded too: an unreadable locations file must not stop
- * the server from booting.
- */
-function prewarmLightningMonitoring(): void {
-  if (process.env.WEATHER_LIGHTNING_PREWARM === 'false') {
-    return;
-  }
-  if (!toolConfig.isEnabled('get_lightning_activity')) {
-    return;
-  }
-
-  let savedLocations;
-  try {
-    savedLocations = Object.values(locationStore.getAll());
-  } catch (error) {
-    logger.warn('Skipping lightning pre-warm: saved locations could not be read', {
-      error: error instanceof Error ? error.message : String(error)
-    });
-    return;
-  }
-  if (savedLocations.length === 0) {
-    return;
-  }
-
-  logger.info('Pre-warming lightning monitoring for saved locations', {
-    count: savedLocations.length
-  });
-
-  // Fire-and-forget: prewarmLocation swallows its own errors and must never block
-  // startup or the stdio transport.
-  for (const location of savedLocations) {
-    void blitzortungService.prewarmLocation(location.latitude, location.longitude);
-  }
-}
-
 async function main() {
   const transport = new StdioServerTransport();
 
@@ -88,11 +48,14 @@ async function main() {
       await analytics.shutdown();
       logger.info('Analytics flushed');
 
-      // 2. Clean up resources
+      // 2. Stop the lightning pre-warm refresh
+      lightningPrewarm?.stop();
+
+      // 3. Clean up resources
       clearServiceCaches();
       logger.info('Cache cleared');
 
-      // 3. Close server connection
+      // 4. Close server connection
       await server.close();
       logger.info('Server closed');
 
@@ -116,9 +79,15 @@ async function main() {
       toolList: toolConfig.getEnabledTools().join(', ')
     });
 
-    // Begin buffering lightning strikes for saved locations so their coverage
-    // accumulates before the first query (non-blocking, best-effort).
-    prewarmLightningMonitoring();
+    // Begin buffering lightning strikes for saved locations so their coverage accumulates
+    // before the first query, and keep it subscribed while it stays saved (non-blocking,
+    // best-effort).
+    lightningPrewarm = startLightningPrewarm({
+      toolEnabled: toolConfig.isEnabled('get_lightning_activity'),
+      optOutValue: process.env.WEATHER_LIGHTNING_PREWARM,
+      readSavedLocations: () => Object.values(locationStore.getAll()),
+      prewarmLocation: (lat, lon, r, o) => blitzortungService.prewarmLocation(lat, lon, r, o)
+    });
 
     // Inform users about version and upgrade options
     logger.info('Version check', {

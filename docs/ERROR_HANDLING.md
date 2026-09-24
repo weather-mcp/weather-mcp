@@ -332,11 +332,19 @@ one MCP client is visible to the others without restarting them.
 "No saved locations" is what previously let the next save overwrite it. The error propagates
 rather than degrading to a plausible-looking empty result.
 
-**The one place it is deliberately swallowed** is the startup lightning pre-warm, which subscribes
-saved locations to the lightning feed before you ask. It logs a single
-`Skipping lightning pre-warm: saved locations could not be read` warning to stderr and continues,
-because an unreadable file must not stop the server from booting — and because the pre-warm's
-absence asserts nothing to you. Every tool you actually call still reports the error.
+**The one place it is deliberately swallowed** is the lightning pre-warm, which subscribes saved
+locations to the lightning feed before you ask — at startup, and again every 30 minutes so they stay
+subscribed. It logs a single `Skipping lightning pre-warm: saved locations could not be read` warning
+to stderr when the file becomes unreadable, not on every refresh, and continues, because an
+unreadable file must not stop the server from booting — and because the pre-warm's absence asserts
+nothing to you. While the file stays unreadable nothing is re-warmed, so existing saved-location
+subscriptions age out through the ordinary idle prune rather than being extended from data that
+could not be read. Every tool you actually call still reports the error.
+
+Pre-warm also never displaces an area you queried: a saved location that does not fit the
+50-subscription limit is skipped, with one
+`Lightning pre-warm skipped saved locations: subscription limit reached` warning when the skipped
+count changes.
 
 ## Service Status Tool
 

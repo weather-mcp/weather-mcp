@@ -5744,6 +5744,71 @@ atomic fact), [G96] (an assertion satisfied by the wrong neighbour), [G32]
 
 ---
 
+## G106 — A refresh that must beat a timer-enforced expiry survives until *threshold plus the enforcer's period*, not until the threshold
+
+**Trigger:** writing a mutation or a bound for a periodic refresh that keeps
+something alive against an expiry that a **different** timer enforces — an idle
+prune, a TTL sweep, a heartbeat reaper.
+
+**Rule:** the refresh period only goes wrong once it passes the threshold **plus
+one period of the enforcing timer**. A mutation that nudges the refresh just past
+the threshold (`threshold + 1`) stays green. So can a larger nudge that lands on
+the enforcer's grid, because a refresh and a sweep at the same fake-clock
+millisecond run in registration order. Pick a mutation that clears the whole
+window (`threshold × 2`). Keep the production contract strict (`refresh <
+threshold`): the slack belongs to the enforcer's granularity, not to the design.
+
+**Why:** the enforcer only *observes* staleness on its own ticks. With a
+15-minute prune and a 60-minute threshold, a refresh every 60 min + 1 ms re-stamps
+before any prune tick sees an age over 60 minutes. The plan's mutation assumed
+the threshold alone was the boundary, so it would have recorded a green mutation
+as a hole in the tests.
+
+**Verify:** in `tests/unit/lightning-prewarm.test.ts`, set `startLightningPrewarm`'s
+default `intervalMs` to `SUBSCRIPTION_IDLE_THRESHOLD_MS + 1` — Block B stays
+green; set it to `SUBSCRIPTION_IDLE_THRESHOLD_MS * 2` — all three Block B tests
+go red.
+
+**Evidence:** 2026-09-23 (`38ed67d`, issue-81-lightning-prewarm T4). Mutation (b)
+as planned was `threshold + 1`; it and `threshold + SUBSCRIPTION_PRUNE_INTERVAL_MS`
+both stayed green. The second failed on a same-millisecond tie that the refresh
+won, confirmed by instrumenting the prune callback.
+
+**Status:** active. Related: [G32] (mutate the plausible failure shape), [G41]
+(prove the survival check is not vacuous), [G45] (a mutation goes red only where
+the contract can reach it).
+
+---
+
+## G107 — Concurrent callers into the real `BlitzortungService` park in a 100 ms poll, so fake-timer tests must advance time
+
+**Trigger:** a fake-timer unit test that starts two or more `prewarmLocation` or
+`getLightningStrikes` calls against the real service before the first connect
+settles — any multi-location pre-warm test.
+
+**Rule:** after starting the calls, advance the fake clock
+(`vi.advanceTimersByTimeAsync(…)`, at least a few hundred ms) before asserting.
+Flushing microtasks settles only the first caller.
+
+**Why:** the first caller sets `isConnecting` and awaits the fake client's
+`connect` event. Every later caller takes `ensureConnected`'s `isConnecting` branch,
+which polls with a `setInterval(…, 100)` rather than awaiting the event. Under
+fake timers that poll never fires unless time moves, so the later callers stay
+pending and the test asserts against a half-settled start.
+
+**Verify:** in a Block B test in `tests/unit/lightning-prewarm.test.ts`, replace
+the `settleStartup()` time advance with microtask flushes only — the second saved
+location has no coverage start.
+
+**Evidence:** 2026-09-23 (`38ed67d`, issue-81-lightning-prewarm T4). Cost the
+subagent a debugging cycle; settled with a `settleStartup()` helper that advances
+1,000 ms.
+
+**Status:** active. Related: [G20] (the `isConnecting` guard that forces the
+poll), [G21] (the fresh-import pattern these tests use).
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
