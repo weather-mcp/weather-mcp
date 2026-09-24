@@ -5905,6 +5905,14 @@ went in as `ee519e7`. On the built v1.32.0 artifact, `ANALYTICS_ENDPOINT=https:/
 `Analytics configuration loaded` `endpoint: custom`; on the branch it logs the IP-literal
 error and disables analytics.
 
+**Same trap, second spelling (2026-09-24, `3bcf9ec`, diff-review gemini N1):
+`URL.hostname` also keeps a trailing dot**, and repeated ones: `https://localhost./`
+gives `localhost.`, and `localhost..` gives `localhost..`. So `=== 'localhost'` and
+`.endsWith('.local')` both miss a name that resolves to the same host. Strip **every**
+trailing dot (`replace(/\.+$/, '')`) before comparing names. Stripping only one leaves
+`localhost.` reachable, and the mutation pass showed it. IPv4 is not affected, because the
+parser normalises `127.0.0.1.` to `127.0.0.1`.
+
 **Status:** active. Partly lintable: a grep for an unbracketed IPv6 literal on the right of
 `hostname ===` is mechanical. Related: [G65] (the lock on the rejection messages), [G108]
 (the base-artifact repro).
