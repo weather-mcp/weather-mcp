@@ -48,7 +48,6 @@ export function validateAnalyticsEndpoint(endpoint: string): void {
   if (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
-    hostname === '::1' ||
     hostname.startsWith('10.') ||
     hostname.startsWith('172.16.') ||
     hostname.startsWith('172.17.') ||
@@ -73,8 +72,10 @@ export function validateAnalyticsEndpoint(endpoint: string): void {
     throw new Error('Invalid ANALYTICS_ENDPOINT: cannot point to internal network');
   }
 
-  // SECURITY: Require domain name (not IP address)
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+  // SECURITY: Require domain name (not IP address), in both families.
+  // URL.hostname keeps IPv6 literals bracketed ("[::1]"), so a leading "["
+  // is exactly the set of IPv6 literals, in every spelling.
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname) || hostname.startsWith('[')) {
     throw new Error('Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name');
   }
 

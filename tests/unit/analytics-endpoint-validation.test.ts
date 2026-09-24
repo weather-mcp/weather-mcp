@@ -2,14 +2,11 @@
  * Locks `validateAnalyticsEndpoint` and `loadAnalyticsConfig`'s SSRF guard
  * against `ANALYTICS_ENDPOINT` (src/analytics/config.ts).
  *
- * This is T1 of .devdocs/plan-analytics-endpoint-hardening-impl.md: a lock
- * test written against the UNFIXED guard. `url.hostname` brackets IPv6
- * (`[::1]`), so the one clause written with IPv6 in mind —
- * `hostname === '::1'` at config.ts:51 — can never match, and every IPv6
- * literal currently reaches the "IP addresses not allowed" ban's else
- * branch undetected, i.e. passes the guard entirely. The IPv6 rows below
- * are written with `it.fails` because they pass (no throw) on today's code;
- * T2 fixes the guard and flips them to plain `it`.
+ * `url.hostname` brackets IPv6 (`[::1]`), so a bare `hostname === '::1'`
+ * comparison can never match. Before the fix every IPv6 literal passed the
+ * guard; these rows were first committed as `it.fails` and seen to fail on
+ * that code (plan-analytics-endpoint-hardening T1), then flipped when the
+ * guard began rejecting every bracketed hostname.
  *
  * GOTCHAS applied:
  *   G21/G61 — never import src/index.ts (runs main()); import only
@@ -93,47 +90,45 @@ describe('validateAnalyticsEndpoint', () => {
     });
   });
 
-  describe('IPv6 literals — should be blocked, but reach the network today (locked to fail)', () => {
-    // url.hostname brackets IPv6 ("[::1]"), so config.ts:51's
-    // `hostname === '::1'` never matches and these all pass the guard
-    // as written. Each row is written with it.fails: it must fail today
-    // (no throw is raised, so the toThrow assertion itself fails) and T2
-    // flips these to plain `it` once the guard rejects bracketed hosts.
-    it.fails('https://[::1]/ throws the IP-literal message', () => {
+  describe('blocked: IP addresses not allowed (IPv6, every spelling)', () => {
+    // url.hostname keeps IPv6 bracketed ("[::1]", "[::ffff:7f00:1]"), so the
+    // guard rejects any hostname starting with "[". The public address is here
+    // on purpose: the policy is "no IP literals", not "no private ones".
+    it('https://[::1]/ throws the IP-literal message', () => {
       expect(() => validateAnalyticsEndpoint('https://[::1]/')).toThrow(exactly('Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name'));
     });
 
-    it.fails('https://[fd00::1]/ throws the IP-literal message', () => {
+    it('https://[fd00::1]/ throws the IP-literal message', () => {
       expect(() => validateAnalyticsEndpoint('https://[fd00::1]/')).toThrow(exactly('Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name'));
     });
 
-    it.fails('https://[fe80::1]/ throws the IP-literal message', () => {
+    it('https://[fe80::1]/ throws the IP-literal message', () => {
       expect(() => validateAnalyticsEndpoint('https://[fe80::1]/')).toThrow(exactly('Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name'));
     });
 
-    it.fails('https://[::ffff:127.0.0.1]/ throws the IP-literal message', () => {
+    it('https://[::ffff:127.0.0.1]/ throws the IP-literal message', () => {
       expect(() =>
         validateAnalyticsEndpoint('https://[::ffff:127.0.0.1]/')
       ).toThrow(exactly('Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name'));
     });
 
-    it.fails('https://[::]/ throws the IP-literal message', () => {
+    it('https://[::]/ throws the IP-literal message', () => {
       expect(() => validateAnalyticsEndpoint('https://[::]/')).toThrow(exactly('Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name'));
     });
 
-    it.fails('https://[0:0:0:0:0:0:0:1]/ throws the IP-literal message', () => {
+    it('https://[0:0:0:0:0:0:0:1]/ throws the IP-literal message', () => {
       expect(() =>
         validateAnalyticsEndpoint('https://[0:0:0:0:0:0:0:1]/')
       ).toThrow(exactly('Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name'));
     });
 
-    it.fails('https://[2606:4700:4700::1111]/ (public IPv6) throws the IP-literal message', () => {
+    it('https://[2606:4700:4700::1111]/ (public IPv6) throws the IP-literal message', () => {
       expect(() =>
         validateAnalyticsEndpoint('https://[2606:4700:4700::1111]/')
       ).toThrow(exactly('Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name'));
     });
 
-    it.fails('https://[::1]:8443/v1/events throws the IP-literal message', () => {
+    it('https://[::1]:8443/v1/events throws the IP-literal message', () => {
       expect(() =>
         validateAnalyticsEndpoint('https://[::1]:8443/v1/events')
       ).toThrow(exactly('Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name'));
@@ -197,7 +192,7 @@ describe('loadAnalyticsConfig — fail-safe fallback', () => {
     );
   });
 
-  it.fails(
+  it(
     'falls back to disabled and the default endpoint when ANALYTICS_ENDPOINT is a rejected IPv6 literal',
     () => {
       vi.stubEnv('ANALYTICS_ENABLED', 'true');
