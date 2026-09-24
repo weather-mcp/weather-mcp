@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.5] - 2026-09-23
+
 ### Fixed
 
 - **Saved-location lightning coverage lapsed after the first hour.** Pre-warm subscribed saved locations once, at startup, and the idle prune dropped any subscription not queried for an hour — deleting its coverage start, so the next query started cold as if pre-warm had never run. Pre-warm now re-reads the saved list and re-warms every saved location every 30 minutes, an interval derived from the idle threshold, so a saved location keeps its original coverage start for as long as it stays saved. A location saved from another client is picked up on the next refresh, and a removed one stops being watched within about an hour, with no restart. Re-warming an area that is already subscribed sends nothing to the broker and logs nothing at INFO. An unreadable locations file warns once when it becomes unreadable, not on every refresh, and re-warms nothing while it stays so. (`src/server/lightningPrewarm.ts`, `src/services/blitzortung.ts`, `src/index.ts`, `tests/unit/lightning-prewarm.test.ts`)
@@ -1829,7 +1831,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.4...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.5...HEAD
+[1.31.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.4...v1.31.5
 [1.31.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.3...v1.31.4
 [1.31.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.2...v1.31.3
 [1.31.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.1...v1.31.2
