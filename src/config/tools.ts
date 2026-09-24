@@ -323,11 +323,12 @@ export const ALIASES = TOOL_ALIASES;
  * Every MCP client puts this payload into model context on every turn, so it is
  * a standing context cost. Each value is the measured payload rounded up to the
  * next 1,000 bytes, so growth past it is a deliberate edit of this file rather
- * than a description that quietly grew. Measured 2026-09-08 in UTF-8 bytes
+ * than a description that quietly grew. Measured 2026-09-23 in UTF-8 bytes
  * (Buffer.byteLength, not String.length — the descriptions carry em-dashes, and
- * a code-unit count under-reports): basic 12,987, full 30,836.
+ * a code-unit count under-reports): basic 13,212, full 31,055. Raised from
+ * 13,000 / 31,000 on purpose, for get_weather_summary's declared `source`.
  */
 export const TOOLS_LIST_BYTE_BUDGET: Record<'basic' | 'full', number> = {
-  basic: 13000,
-  full: 31000,
+  basic: 14000,
+  full: 32000,
 };
