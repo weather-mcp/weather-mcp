@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- An `ANALYTICS_ENDPOINT` that is an IPv6 literal (for example `https://[::1]/` or `https://[fd00::1]/`) is now rejected, as an IPv4 literal already was, and analytics stays disabled. The old `::1` check could never match, because `URL.hostname` keeps IPv6 addresses in brackets (`[::1]`). Every IPv6 literal, including loopback, private and IPv4-mapped forms, passed the endpoint check. Analytics is off by default, so this affects only users who opted in.
+
+### Fixed
+
+- The local analytics guide (`docs/analytics/LOCAL_ANALYTICS_GUIDE.md`) no longer documents an `http://localhost` endpoint that the server always rejected, and no longer says analytics is on by default. It now lists the endpoint requirements the server enforces.
+
 ## [1.32.0] - 2026-09-24
 
 Three tool schemas described a server that does not exist: the tool list is the only contract a model reads, and in three places it said something the handlers did not do. `get_weather_summary` now accepts exactly the parameters it declares. `get_weather_imagery` no longer requires a parameter that has a default. `search_location` no longer lets a fractional `limit` turn into an empty answer.
