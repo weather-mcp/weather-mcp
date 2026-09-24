@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.32.1] - 2026-09-24
+
 The check that keeps an opt-in analytics endpoint off your own network had two gaps. Any IPv6 address, including loopback (`https://[::1]/`), passed it, and so did `localhost` or a `.local` name written with a trailing dot. Both gaps are now closed. Analytics is off by default, so these changes affect only users who set `ANALYTICS_ENABLED=true` and their own `ANALYTICS_ENDPOINT`. No tool output changes.
 
 ### Security
@@ -1860,7 +1862,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.1...HEAD
+[1.32.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.0...v1.32.1
 [1.32.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.5...v1.32.0
 [1.31.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.4...v1.31.5
 [1.31.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.3...v1.31.4
