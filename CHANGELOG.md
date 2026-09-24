@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Three tool schemas described a server that does not exist: the tool list is the only contract a model reads, and in three places it said something the handlers did not do. `get_weather_summary` now accepts exactly the parameters it declares. `get_weather_imagery` no longer requires a parameter that has a default. `search_location` no longer lets a fractional `limit` turn into an empty answer.
+
 ### Added
 
 - **`get_weather_summary` declares a `source` parameter.** `auto` (the default: NOAA in the US, Open-Meteo elsewhere), `noaa` or `openmeteo` selects the source for the summary's current and forecast sections. The summary already honoured this key without declaring it, and its own forecast section tells users to pass `source: "openmeteo"` for a longer horizon, so the remedy it gives is now part of its schema. `metar` and any other value are refused with a validation error before any request, geocoding included; METAR stays on `get_current_conditions`. A forced `noaa` outside NOAA's coverage renders those two sections as unavailable, and the rest of the summary still renders. (`src/handlers/weatherSummaryHandler.ts`, `src/server/weatherServer.ts`, `tests/unit/weather-summary-allowlist.test.ts`, `tests/unit/weather-summary-source.test.ts`, `docs/TOOLS.md`)
