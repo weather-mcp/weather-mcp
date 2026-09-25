@@ -1256,7 +1256,14 @@ contain parentheses as well as spaces, and its markers are astral-plane
 code points. Match names against the table's own name list, and `startsWith`
 the marker rather than classing it.
 
-**Status:** active, **broadened 2026-08-26, twice on 2026-08-27, and 2026-09-01**. Same family as
+**Recurred 2026-09-24** (metar-fosberg impl plan, T2 step 6): the plan itself
+specified `/^\*\*[🟢🟡🟠🔴] Fosberg …$/m` with no `u` flag, so the test it
+prescribed could never match correct output. The cross-vendor plan review caught
+it before the run (gemini R1, reproduced in node); the shipped locks use `/mu`
+(`dc2b760`, `de5c6ff`). The trap survives into plan text, not only into drivers
+— a plan that writes a regex over the emoji markers must write the flag.
+
+**Status:** active, **broadened 2026-08-26, twice on 2026-08-27, 2026-09-01, and recurred 2026-09-24**. Same family as
 [G10]'s vacuous-hash half — a failed or mis-scoped measurement that renders as a
 clean result — its mirror, a correct result that renders as a failure, and now a
 parse too coarse to represent the failure at all.
@@ -2476,7 +2483,26 @@ to this entry's 2026-08-29 extension (a mutation must *diverge*, not merely
 differ): there the two branches computed the same value from the fixtures; here a
 second, redundant suppressor sat between the mutation and the observable.
 
-**Status:** active, **extended 2026-08-29, twice on 2026-09-01, and 2026-09-03**. Related: [G13] (a fixture that cannot discriminate),
+**Extended 2026-09-24** (`de5c6ff`, metar-fosberg T3) — **two rows of a plan's
+mutation table were equivalent mutants by arithmetic, and one was visible only
+by reading the guard it mutated.** (a) The design's row "route wind through the
+prefs chain with normalize-back" converts knots → m/s → kn → mph:
+`0.514444 × 1.943844 = 0.999998882736`, and nothing on that chain rounds, so no
+`Math.round`ed index can tell it from the direct `knotsToMph`. The implementation
+plan caught this at authoring and replaced the row with the *non-normalised*
+mistakes (a display-unit value fed as °F or mph), which redden under metric and
+`kn`. **A mutation through a round-trip of inverse, unrounded conversions is an
+equivalent mutant; name the mistake that skips the normalisation instead.**
+(b) Row M8, "`!== undefined` in place of `!= null`", was a no-op against the real
+guard `x != null && Number.isFinite(x)`: `Number.isFinite` already rejects both
+`null` and `undefined`, so swapping one conjunct changes nothing. The mutation
+that reddens the JSON-`null` row drops the finiteness conjunct too (bare
+`!== undefined`). **Before recording a guard mutation, check whether another
+conjunct of the same guard already rejects what the mutation lets through.**
+Both are this entry's 2026-08-29 rule — a mutation must diverge at the fixtures
+in play — applied one stage earlier, to the mutation table as written.
+
+**Status:** active, **extended 2026-08-29, twice on 2026-09-01, 2026-09-03, and 2026-09-24**. Related: [G13] (a fixture that cannot discriminate),
 [G32] (mutating to every *rejected implementation* — this entry is about the
 *entry point*, that one about the *alternative*), [G11] (read the real output),
 [G41] (a plan's mechanical prediction is not the contract), [G57] (the run that
