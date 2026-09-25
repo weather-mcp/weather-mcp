@@ -876,6 +876,28 @@ function prefsWindToMph(value: number, prefs: UnitPreferences): number {
 }
 
 /**
+ * The Fosberg index line and its explanation, ending in a blank line. Shared
+ * by the Open-Meteo and METAR fire-weather sections so the round-then-band
+ * rule and the emoji ladder exist once; the dryness block and the derivation
+ * disclosure stay per-path. The caller guarantees `ffwi` is finite.
+ */
+function formatFosbergIndexLines(ffwi: number): string {
+  // Categorize the displayed (rounded) value so the number and the label
+  // never disagree at a band edge.
+  const index = Math.round(ffwi);
+  const category = getFosbergCategory(index);
+  const emoji =
+    category.level === 'Low' ? '🟢' :
+    category.level === 'Moderate' ? '🟡' :
+    category.level === 'High' ? '🟠' : '🔴';
+
+  return (
+    `**${emoji} Fosberg Fire Weather Index:** ${index} (${category.level})\n` +
+    `Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.\n\n`
+  );
+}
+
+/**
  * Render the Fire Weather section for the Open-Meteo (model) path: a Fosberg
  * Fire Weather Index computed by this server from current values, plus dryness
  * context (D5), carrying the derivation disclosure (D6).
@@ -911,17 +933,7 @@ function formatOpenMeteoFireWeather(
     return output;
   }
 
-  // Categorize the displayed (rounded) value so the number and the label
-  // never disagree at a band edge.
-  const index = Math.round(ffwi);
-  const category = getFosbergCategory(index);
-  const emoji =
-    category.level === 'Low' ? '🟢' :
-    category.level === 'Moderate' ? '🟡' :
-    category.level === 'High' ? '🟠' : '🔴';
-
-  output += `**${emoji} Fosberg Fire Weather Index:** ${index} (${category.level})\n`;
-  output += `Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.\n\n`;
+  output += formatFosbergIndexLines(ffwi);
 
   // Open ocean returns HTTP 200 with null dryness fields (Flood-API
   // precedent): omit the line, or the whole block when both are missing.
