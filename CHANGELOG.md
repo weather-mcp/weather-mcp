@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Fire weather on the METAR source.** `get_current_conditions` with `source: "metar"` and `include_fire_weather: true` now shows a Fosberg Fire Weather Index. It is computed from the station's own temperature, dew point and sustained wind, and it uses the humidity the report prints, so you can check it against the lines above. The index is the same in every unit system. It is not an official fire-danger rating, and there is no dryness context: vapour-pressure deficit and topsoil moisture are model values a METAR does not carry. If the report omits one of the three inputs, you get one line naming what is missing instead of an index. At a US point, the section also points to `source: "noaa"` for NOAA's published Haines, grassland and red-flag indices. This replaces the old "not available on the METAR source" note. (`src/handlers/currentConditionsHandler.ts`, `src/server/weatherServer.ts`, `tests/unit/metar-fire-weather.test.ts`, `docs/TOOLS.md`)
+
 ## [1.32.1] - 2026-09-24
 
 The check that keeps an opt-in analytics endpoint off your own network had two gaps. Any IPv6 address, including loopback (`https://[::1]/`), passed it, and so did `localhost` or a `.local` name written with a trailing dot. Both gaps are now closed. Analytics is off by default, so these changes affect only users who set `ANALYTICS_ENABLED=true` and their own `ANALYTICS_ENDPOINT`. No tool output changes.
