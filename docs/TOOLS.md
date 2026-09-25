@@ -231,7 +231,7 @@ Get current weather conditions for a location (global).
 - `longitude` (required*): Longitude coordinate (-180 to 180)
 - `location_name` (optional): Name of a saved location — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode — use instead of coordinates
-- `include_fire_weather` (optional): Include fire weather (default: false). US locations get NOAA's published indices; elsewhere a Fosberg Fire Weather Index computed by this server, with dryness context
+- `include_fire_weather` (optional): Include fire weather (default: false). US locations get NOAA's published indices; elsewhere a Fosberg Fire Weather Index computed by this server, with dryness context. With `source="metar"`, the Fosberg index is computed from the station's own temperature, dew point and sustained wind, with no dryness context
 - `include_normals` (optional): Include climate normals for comparison (default: false). Normals are **global**: official NCEI station normals when an `NCEI_API_TOKEN` is configured and the point is in the US, and 1991-2020 normals computed from the Open-Meteo archive everywhere else — which, since the server ships keyless, is the default path. One full-year archive pull is made per location and reused for every date there. For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
 - `source` (optional): `"auto"` (default), `"noaa"`, `"openmeteo"`, or `"metar"` — see Description
 - `units` (optional): "imperial" (default) or "metric", plus per-unit overrides — see [Units & Localization](#units--localization)
@@ -273,10 +273,9 @@ present-weather in ~8%, so absent fields are omitted rather than rendered
 blank. A visibility of `"10+"` keeps its qualifier (`+10 mi`) because "at
 least 10" is a floor, not a measurement of exactly 10.
 
-Limits on this source: `include_normals` works as usual, but
-`include_fire_weather` renders a one-line note instead of indices — Haines
-and transport wind need NOAA gridpoint data a METAR does not carry — and the
-thermal-stress lines do not render on this source. TAF
+Limits on this source: `include_normals` and `include_fire_weather` work (see
+the Returns list below), but the thermal-stress lines do not render on this
+source. TAF
 (aerodrome forecasts) and a dedicated aviation tool are out of scope.
 METAR is available only from `get_current_conditions`: `get_weather_summary`
 refuses `source: "metar"` with a validation error.
@@ -390,10 +389,19 @@ source.
 - Flight category (VFR / MVFR / IFR / LIFR)
 - The raw METAR text, as the observation of record
 - Climate normals and US records (when `include_normals=true`)
+- Fire weather (when `include_fire_weather=true`) — a **Fosberg Fire Weather
+  Index computed by this server** from the station's reported temperature, dew
+  point and sustained wind, with its category. It uses the humidity the report
+  prints, but the station's unrounded temperature and wind, so the index is the
+  same in every unit system. A recomputation from the rounded temperature and
+  wind lines can therefore differ by 1. It is not an official
+  fire-danger rating, and there is no dryness context (a METAR does not carry
+  it). A report that omits one of the three inputs gets one line naming what is
+  missing instead of an index. At a US point, the section also points to
+  `source="noaa"` for NOAA's published Haines, grassland and red-flag indices
 - A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (the United States and its NWS-served territories — see [Life-threatening alert banner](#life-threatening-alert-banner))
 
-Any field the station did not report is omitted. Fire weather indices are not
-available on this source. The alert banner, by contrast, **is** available here:
+Any field the station did not report is omitted. The alert banner, by contrast, **is** available here:
 it is gated on the location rather than on the source, so a US airport queried
 with `source="metar"` gets it like any other US request.
 

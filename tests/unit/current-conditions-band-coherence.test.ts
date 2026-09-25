@@ -10,8 +10,9 @@
  *     path: VPD, topsoil moisture) — all banded on the rounded/displayed
  *     figure the line prints.
  *
- * Plus two "must stay untouched" pins (METAR fire-weather note, Fosberg
- * rendering) and one composite-path check (get_weather_summary forwards the
+ * Plus METAR Fosberg band coherence (the index line's number and label agree),
+ * one "must stay untouched" pin (Open-Meteo Fosberg rendering), and one
+ * composite-path check (get_weather_summary forwards the
  * caller's args through its own `subArgs`, per weatherSummaryHandler.ts).
  *
  * Fake/fixture pattern follows tests/unit/thermal-stress-handler.test.ts and
@@ -43,6 +44,7 @@ import type { OpenMeteoForecastResponse } from '../../src/types/openmeteo.js';
 import type { BoundingBox, MetarObservation } from '../../src/types/aviationWeather.js';
 import { metersToMiles } from '../../src/utils/units.js';
 import { DisplayThresholds } from '../../src/config/displayThresholds.js';
+import { getFosbergCategory } from '../../src/utils/fireWeather.js';
 
 // ---------------------------------------------------------------------------
 // Shared fixtures — NOAA path
@@ -625,8 +627,8 @@ describe('handleGetCurrentConditions — fire-weather Open-Meteo dryness context
 // 4. Untouched paths, pinned
 // ---------------------------------------------------------------------------
 
-describe('handleGetCurrentConditions — untouched fire-weather sites stay as they are', () => {
-  it('METAR source renders the not-available note verbatim and no Red Flag / Vapour-pressure line', async () => {
+describe('handleGetCurrentConditions — METAR Fosberg band coherence', () => {
+  it('METAR source renders a Fosberg index whose number and label agree, and no Red Flag / Vapour-pressure line', async () => {
     const noaa = {
       getCurrentConditions: vi.fn().mockRejectedValue(new Error('NOAA not expected on the METAR path')),
       getStations: vi.fn().mockRejectedValue(new Error('NOAA not expected on the METAR path')),
@@ -655,14 +657,17 @@ describe('handleGetCurrentConditions — untouched fire-weather sites stay as th
     const text = textOf(result);
 
     expect(text).toContain('## Fire Weather');
-    expect(text).toContain(
-      'Fire weather indices are not available on the METAR source — they require NOAA gridpoint data. ' +
-        'Use `source: "noaa"` for a US location, or omit `source` to get a server-computed Fosberg index from model data elsewhere.'
+    const match = text.match(
+      /^\*\*[🟢🟡🟠🔴] Fosberg Fire Weather Index:\*\* (\d+) \((Low|Moderate|High|Extreme)\)$/mu
     );
+    expect(match).not.toBeNull();
+    expect(getFosbergCategory(Number(match![1])).level).toBe(match![2]);
     expect(text).not.toContain('Red Flag');
     expect(text).not.toContain('Vapour-pressure');
   });
+});
 
+describe('handleGetCurrentConditions — untouched fire-weather sites stay as they are', () => {
   it('Fosberg index still renders Math.round(index) with its category, unchanged by this plan', async () => {
     // 60°F, 55% RH, 10 mph (default fixture) -> FFWI ~= 15.906 -> rounds 16, Low.
     const response = buildOpenMeteoCurrentResponse({

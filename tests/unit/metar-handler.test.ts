@@ -15,7 +15,7 @@
  *   - `wdir: "VRB"` and `visib: "10+"` parsing edge cases.
  *   - The no-station message, with no fallback to Open-Meteo.
  *   - `include_normals` (renders on METAR path; no ACIS call for non-US) and
- *     `include_fire_weather` (not-available note).
+ *     `include_fire_weather` (a Fosberg index computed from the observation).
  *   - Unit preferences (imperial vs metric labels).
  *   - Missing `aviationWeatherService` throws `ServiceUnavailableError`.
  *
@@ -611,7 +611,7 @@ describe('handleGetCurrentConditions — include_normals on the METAR path', () 
 // ---------------------------------------------------------------------------
 
 describe('handleGetCurrentConditions — include_fire_weather on the METAR path', () => {
-  it('renders the "not available on the METAR source" note', async () => {
+  it('renders a computed Fosberg index, a disclosure naming the station, and the NOAA pointer for a US point', async () => {
     const fakes = buildFakes();
     const aviation = buildAviationFake([buildMetarObservation()]);
 
@@ -623,10 +623,11 @@ describe('handleGetCurrentConditions — include_fire_weather on the METAR path'
     );
     const text = textOf(result);
 
-    expect(text).toContain('Fire weather indices are not available on the METAR source');
-    expect(text).toContain('source: "noaa"');
-    expect(text).toContain('omit `source`');
-    expect(text).toContain('server-computed Fosberg index');
+    expect(text).toMatch(
+      /^\*\*[🟢🟡🟠🔴] Fosberg Fire Weather Index:\*\* \d+ \((Low|Moderate|High|Extreme)\)$/mu
+    );
+    expect(text).toContain('*Derived by this server from the KSEA observation above');
+    expect(text).toContain('use `source: "noaa"`');
   });
 });
 

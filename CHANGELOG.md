@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-09-25
+
+Airport observations had no fire-weather reading. `source: "metar"` is the only way to get a measured observation outside the US, and asking it for `include_fire_weather` returned only a note that the index was not available on that source. The METAR source now computes the same Fosberg Fire Weather Index as the Open-Meteo path, from the station's own measurements. No other output changes.
+
+### Added
+
+- **Fire weather on the METAR source.** `get_current_conditions` with `source: "metar"` and `include_fire_weather: true` now shows a Fosberg Fire Weather Index. It is computed from the station's own temperature, dew point and sustained wind, and it uses the humidity the report prints. Temperature and wind are the station's unrounded values, so the index is the same in every unit system; a recomputation from the rounded lines above can differ by 1. It is not an official fire-danger rating, and there is no dryness context: vapour-pressure deficit and topsoil moisture are model values a METAR does not carry. If the report omits one of the three inputs, you get one line naming what is missing instead of an index. At a US point, the section also points to `source: "noaa"` for NOAA's published Haines, grassland and red-flag indices. This replaces the old "not available on the METAR source" note. (`src/handlers/currentConditionsHandler.ts`, `src/server/weatherServer.ts`, `tests/unit/metar-fire-weather.test.ts`, `docs/TOOLS.md`)
+
+### Changed
+
+- **`source: "metar"` with `include_fire_weather: true` no longer prints the "not available on the METAR source" note.** Anything that matched on that text now gets a `Fire Weather` section with an index, or one line naming the missing input. A METAR call without `include_fire_weather` is unchanged, byte for byte. The `include_fire_weather` schema description now names the METAR source and says dryness context comes only from the model path. (`src/handlers/currentConditionsHandler.ts`, `src/server/weatherServer.ts`)
+
 ## [1.32.1] - 2026-09-24
 
 The check that keeps an opt-in analytics endpoint off your own network had two gaps. Any IPv6 address, including loopback (`https://[::1]/`), passed it, and so did `localhost` or a `.local` name written with a trailing dot. Both gaps are now closed. Analytics is off by default, so these changes affect only users who set `ANALYTICS_ENABLED=true` and their own `ANALYTICS_ENDPOINT`. No tool output changes.
@@ -1862,7 +1874,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.1...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.0...HEAD
+[1.33.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.1...v1.33.0
 [1.32.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.0...v1.32.1
 [1.32.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.5...v1.32.0
 [1.31.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.4...v1.31.5

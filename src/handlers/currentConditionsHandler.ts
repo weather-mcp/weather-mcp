@@ -876,6 +876,28 @@ function prefsWindToMph(value: number, prefs: UnitPreferences): number {
 }
 
 /**
+ * The Fosberg index line and its explanation, ending in a blank line. Shared
+ * by the Open-Meteo and METAR fire-weather sections so the round-then-band
+ * rule and the emoji ladder exist once; the dryness block and the derivation
+ * disclosure stay per-path. The caller guarantees `ffwi` is finite.
+ */
+function formatFosbergIndexLines(ffwi: number): string {
+  // Categorize the displayed (rounded) value so the number and the label
+  // never disagree at a band edge.
+  const index = Math.round(ffwi);
+  const category = getFosbergCategory(index);
+  const emoji =
+    category.level === 'Low' ? '🟢' :
+    category.level === 'Moderate' ? '🟡' :
+    category.level === 'High' ? '🟠' : '🔴';
+
+  return (
+    `**${emoji} Fosberg Fire Weather Index:** ${index} (${category.level})\n` +
+    `Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.\n\n`
+  );
+}
+
+/**
  * Render the Fire Weather section for the Open-Meteo (model) path: a Fosberg
  * Fire Weather Index computed by this server from current values, plus dryness
  * context (D5), carrying the derivation disclosure (D6).
@@ -911,17 +933,7 @@ function formatOpenMeteoFireWeather(
     return output;
   }
 
-  // Categorize the displayed (rounded) value so the number and the label
-  // never disagree at a band edge.
-  const index = Math.round(ffwi);
-  const category = getFosbergCategory(index);
-  const emoji =
-    category.level === 'Low' ? '🟢' :
-    category.level === 'Moderate' ? '🟡' :
-    category.level === 'High' ? '🟠' : '🔴';
-
-  output += `**${emoji} Fosberg Fire Weather Index:** ${index} (${category.level})\n`;
-  output += `Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.\n\n`;
+  output += formatFosbergIndexLines(ffwi);
 
   // Open ocean returns HTTP 200 with null dryness fields (Flood-API
   // precedent): omit the line, or the whole block when both are missing.
@@ -1256,6 +1268,12 @@ function noStationMessage(prefs: UnitPreferences): string {
   return output;
 }
 
+/** `a`, `a and b`, or `a, b and c` — for naming the fields a report omits. */
+function joinFieldNames(names: string[]): string {
+  if (names.length <= 1) return names.join('');
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
 /**
  * Format current conditions from a METAR station observation (worldwide).
  *
@@ -1419,14 +1437,51 @@ async function formatMetarCurrentConditions(
   // a pilot-facing tool.
   output += `\n\`${obs.rawOb}\`\n`;
 
-  // Fire weather (optional) — needs NOAA gridpoint inputs (transport wind,
-  // Haines) that a METAR simply does not carry, so it is named rather than
-  // silently dropped (D7).
+  // Fire weather (optional) — a Fosberg index computed from this station's own
+  // temperature, dew point and sustained wind. A METAR arrives in fixed native
+  // units (°C, knots), unlike Open-Meteo's caller-unit values (global-fire-
+  // weather D4), so the inputs are converted directly and never through the
+  // caller's preferences: the index cannot move with them. RH is the rounded
+  // value the humidity line prints; temperature and wind are the station's
+  // unrounded values, because rounding them to the display would make the index
+  // depend on the unit system. A recomputation from the rounded temperature and
+  // wind lines can therefore differ by 1 at a rounding seam. Gusts never enter;
+  // missing inputs are named, not faked.
   if (includeFireWeather) {
     output += `\n## Fire Weather\n\n`;
-    output += `Fire weather indices are not available on the METAR source — they `;
-    output += `require NOAA gridpoint data. Use \`source: "noaa"\` for a US location, `;
-    output += `or omit \`source\` to get a server-computed Fosberg index from model data elsewhere.\n`;
+
+    const temp = obs.temp;
+    const dewp = obs.dewp;
+    const wspd = obs.wspd;
+    const hasTemp = temp != null && Number.isFinite(temp);
+    const hasDewp = dewp != null && Number.isFinite(dewp);
+    const hasWind = wspd != null && Number.isFinite(wspd);
+
+    if (!hasTemp || !hasDewp || !hasWind) {
+      const missing: string[] = [];
+      if (!hasTemp) missing.push('temperature');
+      if (!hasDewp) missing.push('dew point');
+      if (!hasWind) missing.push('wind speed');
+      output += `⚠️ Fire weather index unavailable — the ${obs.icaoId} report omits ${joinFieldNames(missing)}.\n`;
+    } else {
+      const ffwi = calculateFosbergIndex(
+        celsiusToFahrenheit(temp),
+        relativeHumidityFromDewpoint(temp, dewp),
+        knotsToMph(wspd)
+      );
+      if (Number.isFinite(ffwi)) {
+        output += formatFosbergIndexLines(ffwi);
+        output += `*Derived by this server from the ${obs.icaoId} observation above — not an official fire-danger rating. Heed warnings from your national fire authority.*\n`;
+      } else {
+        output += `⚠️ Fire weather index unavailable for this observation.\n`;
+      }
+    }
+
+    // isInUS is a coarse routing box that also covers Canadian border points
+    // such as Toronto (G53), so the advice is worded to stay true there.
+    if (isInUS(latitude, longitude)) {
+      output += `\nFor a US location, NOAA publishes Haines, grassland and red-flag indices — use \`source: "noaa"\`.\n`;
+    }
   }
 
   // Climate normals (optional) — supported here exactly as on the other two

@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-3%2C677%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-3%2C689%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Three optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 3,677 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 3,689 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -71,7 +71,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 | Tool | What it does | Coverage |
 |------|-------------|----------|
 | `get_forecast` | Daily/hourly forecasts up to 16 days by coordinates, saved location, or city name (NOAA publishes 7 days daily and ~6.5 days hourly in the US, and says so when you ask for more; `source="openmeteo"` reaches the full range); sunrise/sunset, UV, precipitation probability, optional climate-normals comparison, optional moon phase & twilight almanac, optional five-model agreement comparison When the National Weather Service has a life-threatening alert active for a point in the United States or an NWS-served territory, its warning is surfaced at the top of the response before the report — absence of the banner is not an all-clear, so call `get_alerts` for the authoritative answer | 🌍 Global |
-| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional NOAA fire-weather indices), Open-Meteo model data elsewhere (with an optional computed Fosberg fire-weather index), or real airport station observations worldwide with `source="metar"`. Always states the observation's age, and automatically falls back to a fresher nearby station when the nearest one has gone dark. In extreme conditions automatically adds frostbite time-to-onset (computed wind chill) or heat-stress context (estimated WBGT) When the National Weather Service has a life-threatening alert active for a point in the United States or an NWS-served territory, its warning is surfaced at the top of the response before the report — absence of the banner is not an all-clear, so call `get_alerts` for the authoritative answer | 🌍 Global |
+| `get_current_conditions` | Current weather: temperature, wind, humidity, pressure; NOAA station observations in the US (plus heat index/wind chill, snow depth, optional NOAA fire-weather indices), Open-Meteo model data elsewhere (with an optional computed Fosberg fire-weather index), or real airport station observations worldwide with `source="metar"` (the optional Fosberg index is then computed from the station's own observation). Always states the observation's age, and automatically falls back to a fresher nearby station when the nearest one has gone dark. In extreme conditions automatically adds frostbite time-to-onset (computed wind chill) or heat-stress context (estimated WBGT) When the National Weather Service has a life-threatening alert active for a point in the United States or an NWS-served territory, its warning is surfaced at the top of the response before the report — absence of the banner is not an all-clear, so call `get_alerts` for the authoritative answer | 🌍 Global |
 | `get_alerts` | Active watches, warnings, and advisories sorted by severity; official national warnings for the US (NOAA), Canada (ECCC), 38 European countries (MeteoAlarm), India (NDMA SACHET), the Philippines (PAGASA), Indonesia (BMKG), and Japan (JMA) | 🇺🇸 🇨🇦 🇪🇺 🇮🇳 🇵🇭 🇮🇩 🇯🇵 |
 | `get_historical_weather` | Hourly/daily observations from 1940 to present | 🌍 Global |
 | `get_weather_summary` | One-call overview combining current conditions, forecast, and alerts (optionally air quality and lightning); a life-threatening NWS alert is surfaced once above the whole summary, not once per section | 🌍 Global |
@@ -231,8 +231,8 @@ Control which tools are exposed to reduce context overhead:
 
 **Context cost.** Every MCP client puts the `tools/list` result into model context on
 every turn, so the preset you choose is a standing cost on every request. Measured on
-the built server: `basic` **13,212 bytes** (~3.3k tokens), `standard` **21,186** (~5.3k),
-`full`/`all` **31,055** (~7.8k). It scales with the number of **tools**, not the number of
+the built server: `basic` **13,249 bytes** (~3.3k tokens), `standard` **21,223** (~5.3k),
+`full`/`all` **31,092** (~7.8k). It scales with the number of **tools**, not the number of
 data sources — adding Japan and India as alert authorities added zero tools and zero bytes.
 
 ```bash
@@ -378,7 +378,7 @@ Being honest about what free public data can and can't do:
 - Historical data older than 7 days comes from reanalysis models (9–25km grid), not direct station observations, and trails real time by ~5 days.
 - Non-US wildfire results are **satellite heat detections, not managed incidents** — no fire names, sizes, or containment percentages exist in the data, detections can include industrial heat sources or agricultural burns, and a clear result is not an all-clear (cloud cover hides fires; small or new fires evade detection). The output frames all of this explicitly. Keyless data covers the last 24 hours; an optional free [`FIRMS_MAP_KEY`](https://firms.modaps.eosdis.nasa.gov/api/map_key/) unlocks targeted queries and up to 5 days of detection history (`day_range`).
 - Frostbite-risk and heat-stress (WBGT) lines are **computed by this server** from temperature, humidity, and wind — not agency-published ratings. The wind chill is the standard 2001 North American model; the frostbite time bands are adapted from Environment Canada's published categories and the WBGT is the Australian Bureau of Meteorology's *simplified* estimate, which assumes full sun and light wind and so can overestimate in shade or overcast. Exertion thresholds also genuinely shift with acclimatization. Treat both as context, not as an occupational-safety determination.
-- Non-US fire weather is a **Fosberg Fire Weather Index computed by this server** from current model values, not an agency-published rating — US locations get NOAA's own Haines/grassland/red-flag indices instead. The output says which it is and defers to national fire authorities; its category bands are a project heuristic.
+- Non-US fire weather is a **Fosberg Fire Weather Index computed by this server** from current model values — or, with `source="metar"`, from the station's reported values — not an agency-published rating — US locations get NOAA's own Haines/grassland/red-flag indices instead. The output says which it is and defers to national fire authorities; its category bands are a project heuristic.
 - Non-US river discharge is **modeled**, not observed, and has no official flood-stage thresholds — levels are shown relative to recent history and the forecast ensemble. The ~5km model grid means the reported channel may be a few km from the requested point; the output says so when it is.
 - Pollen is **Europe-only without a key**: it rides the CAMS European model on the air-quality endpoint, which returns real grains/m³ in Europe and nothing anywhere else. An optional [`GOOGLE_POLLEN_API_KEY`](#optional-api-keys) fills the gap for 65+ countries including the US, as a grass/tree/weed Universal Pollen Index (0–5) rather than per-species counts. Europe keeps the richer keyless data and never contacts Google.
 - Marine data has limited coastal accuracy and is **not suitable for navigation**.
@@ -390,7 +390,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 3,677 tests
+npm test               # Run all 3,689 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```
