@@ -184,6 +184,34 @@ function extractVerdictHeadlineAndSentence(text: string): string {
   return tail.slice(0, idx + 1); // keep exactly one trailing \n (the sentence's own)
 }
 
+/**
+ * One service's block, from its `## <service> …` header up to (not including)
+ * the next `## ` heading (G96) — the verdict and the other service's section
+ * also carry status marks and the words NOAA / Open-Meteo, so a per-service
+ * pin must never be asserted against the whole report.
+ */
+function extractServiceSection(text: string, header: string): string {
+  const start = text.indexOf(header);
+  if (start === -1) {
+    throw new Error(`No "${header}" heading found in rendered output`);
+  }
+  const nextHeadingIdx = text.indexOf('\n## ', start + header.length);
+  const end = nextHeadingIdx === -1 ? text.length : nextHeadingIdx + 1;
+  return text.slice(start, end);
+}
+
+/** The `**Status:**` line alone, matched end-to-end so a malformed section throws rather than passing. */
+function extractStatusLine(section: string): string {
+  const match = section.match(/^\*\*Status:\*\* .+$/m);
+  if (!match) {
+    throw new Error('No "**Status:**" line found in section');
+  }
+  return match[0];
+}
+
+const NOAA_HEADER = '## NOAA Weather API (Forecasts & Current Conditions)';
+const OPENMETEO_HEADER = '## Open-Meteo API (Historical Weather Data)';
+
 const STATUS_MARKS = ['✅', '❌', '⚠️', '⚪', '❓', '🟢', '🔴'];
 
 // -----------------------------------------------------------------------
@@ -211,6 +239,35 @@ const PARTIAL_OPENMETEO_UP_VERDICT =
   '## Overall Status: ⚠️ One Service Answered Normally\n\n' +
   'Open-Meteo API answered, so it is reachable. This does not confirm that historical weather requests will succeed.\n' +
   'NOAA API answered with HTTP 503: Forecasts and current conditions for US locations may be unavailable.\n';
+
+const PARTIAL_NOAA_UP_OPENMETEO_429_VERDICT =
+  '## Overall Status: ⚠️ One Service Answered Normally\n\n' +
+  'NOAA API answered, so it is reachable. This does not confirm that US forecasts and current conditions will succeed.\n' +
+  'Open-Meteo API answered HTTP 429 and is rate limiting this caller: Historical weather data may be unavailable.\n';
+
+const PARTIAL_NOAA_UP_OPENMETEO_400_VERDICT =
+  '## Overall Status: ⚠️ One Service Answered Normally\n\n' +
+  'NOAA API answered, so it is reachable. This does not confirm that US forecasts and current conditions will succeed.\n' +
+  'Open-Meteo API answered with HTTP 400: Historical weather data may be unavailable.\n';
+
+const PARTIAL_NOAA_UP_OPENMETEO_NO_RESPONSE_VERDICT =
+  '## Overall Status: ⚠️ One Service Answered Normally\n\n' +
+  'NOAA API answered, so it is reachable. This does not confirm that US forecasts and current conditions will succeed.\n' +
+  'Open-Meteo API gave no HTTP response: Historical weather data may be unavailable.\n';
+
+const PARTIAL_OPENMETEO_UP_NOAA_429_VERDICT =
+  '## Overall Status: ⚠️ One Service Answered Normally\n\n' +
+  'Open-Meteo API answered, so it is reachable. This does not confirm that historical weather requests will succeed.\n' +
+  'NOAA API answered HTTP 429 and is rate limiting this caller: Forecasts and current conditions for US locations may be unavailable.\n';
+
+const PARTIAL_OPENMETEO_UP_NOAA_NO_RESPONSE_VERDICT =
+  '## Overall Status: ⚠️ One Service Answered Normally\n\n' +
+  'Open-Meteo API answered, so it is reachable. This does not confirm that historical weather requests will succeed.\n' +
+  'NOAA API gave no HTTP response: Forecasts and current conditions for US locations may be unavailable.\n';
+
+const BOTH_NOT_OK_MIXED_NORESPONSE_429_VERDICT =
+  '## Overall Status: ❌ Neither Service Answered Normally\n\n' +
+  "NOAA API gave no HTTP response. Open-Meteo API answered HTTP 429 and is rate limiting this caller. See each service's section above for what to check.\n";
 
 describe('handleCheckServiceStatus', () => {
   describe('no coverage claim', () => {
@@ -293,6 +350,230 @@ describe('handleCheckServiceStatus', () => {
       const text = await renderStatus(NOAA_503, OPENMETEO_OK);
       expect(extractVerdictHeadlineAndSentence(text)).toBe(PARTIAL_OPENMETEO_UP_VERDICT);
     });
+  });
+
+  // -----------------------------------------------------------------------
+  // T4 — per-service label, actions gating and split-verdict pins.
+  // -----------------------------------------------------------------------
+
+  describe('per-service status label, pinned whole (G65)', () => {
+    const noaaCases: Array<[string, ServiceProbeResult, string]> = [
+      ['NOAA ok', NOAA_OK, '**Status:** ✅ Answered normally'],
+      ['NOAA rate_limited', NOAA_429, '**Status:** ⚠️ Rate limited (HTTP 429)'],
+      ['NOAA http_error 404', NOAA_404, '**Status:** ❌ Error status (HTTP 404)'],
+      ['NOAA http_error 503', NOAA_503, '**Status:** ❌ Error status (HTTP 503)'],
+      ['NOAA no_response', NOAA_NO_RESPONSE, '**Status:** ❌ No response'],
+    ];
+    for (const [label, noaaStatus, expectedLine] of noaaCases) {
+      it(label, async () => {
+        const text = await renderStatus(noaaStatus, OPENMETEO_OK);
+        const section = extractServiceSection(text, NOAA_HEADER);
+        expect(extractStatusLine(section)).toBe(expectedLine);
+      });
+    }
+
+    const openMeteoCases: Array<[string, ServiceProbeResult, string]> = [
+      ['Open-Meteo ok', OPENMETEO_OK, '**Status:** ✅ Answered normally'],
+      ['Open-Meteo rate_limited', OPENMETEO_429, '**Status:** ⚠️ Rate limited (HTTP 429)'],
+      ['Open-Meteo http_error 400', OPENMETEO_400, '**Status:** ❌ Error status (HTTP 400)'],
+      ['Open-Meteo http_error 503', OPENMETEO_503, '**Status:** ❌ Error status (HTTP 503)'],
+      ['Open-Meteo no_response', OPENMETEO_NO_RESPONSE, '**Status:** ❌ No response'],
+    ];
+    for (const [label, openMeteoStatus, expectedLine] of openMeteoCases) {
+      it(label, async () => {
+        const text = await renderStatus(NOAA_OK, openMeteoStatus);
+        const section = extractServiceSection(text, OPENMETEO_HEADER);
+        expect(extractStatusLine(section)).toBe(expectedLine);
+      });
+    }
+  });
+
+  describe('rate limited is never rendered green (G11)', () => {
+    it('NOAA rate_limited section carries no ✅', async () => {
+      const text = await renderStatus(NOAA_429, OPENMETEO_OK);
+      const section = extractServiceSection(text, NOAA_HEADER);
+      expect(section).not.toContain('✅');
+    });
+
+    it('Open-Meteo rate_limited section carries no ✅', async () => {
+      const text = await renderStatus(NOAA_OK, OPENMETEO_429);
+      const section = extractServiceSection(text, OPENMETEO_HEADER);
+      expect(section).not.toContain('✅');
+    });
+  });
+
+  describe('no retired full phrase renders anywhere', () => {
+    const RETIRED_PHRASES = [
+      '✅ Operational',
+      '❌ Issues Detected',
+      'Partial Service Availability',
+      'Both weather APIs are experiencing issues',
+    ];
+
+    const renders: Array<[string, ServiceProbeResult, ServiceProbeResult]> = [
+      ['both up', NOAA_OK, OPENMETEO_OK],
+      ['partial, NOAA up', NOAA_OK, OPENMETEO_503],
+      ['partial, Open-Meteo up', NOAA_429, OPENMETEO_OK],
+      ['both no response', NOAA_NO_RESPONSE, OPENMETEO_NO_RESPONSE],
+      ['mixed not-ok', NOAA_503, OPENMETEO_NO_RESPONSE],
+      ['both http_error', NOAA_404, OPENMETEO_400],
+    ];
+
+    for (const [label, noaaStatus, openMeteoStatus] of renders) {
+      it(label, async () => {
+        const text = await renderStatus(noaaStatus, openMeteoStatus);
+        for (const phrase of RETIRED_PHRASES) {
+          expect(text).not.toContain(phrase);
+        }
+      });
+    }
+  });
+
+  describe('recommended actions gating, pinned whole', () => {
+    it('ok renders no Recommended Actions — NOAA', async () => {
+      const text = await renderStatus(NOAA_OK, OPENMETEO_OK);
+      const section = extractServiceSection(text, NOAA_HEADER);
+      expect(section).not.toContain('**Recommended Actions:**');
+    });
+
+    it('ok renders no Recommended Actions — Open-Meteo', async () => {
+      const text = await renderStatus(NOAA_OK, OPENMETEO_OK);
+      const section = extractServiceSection(text, OPENMETEO_HEADER);
+      expect(section).not.toContain('**Recommended Actions:**');
+    });
+
+    it('rate_limited section equals header, fixed lines and the two-bullet wait block — NOAA', async () => {
+      const text = await renderStatus(NOAA_429, OPENMETEO_OK);
+      const section = extractServiceSection(text, NOAA_HEADER);
+      expect(section).toBe(
+        '## NOAA Weather API (Forecasts & Current Conditions)\n\n' +
+          '**Status:** ⚠️ Rate limited (HTTP 429)\n' +
+          '**Message:** NOAA Weather API answered HTTP 429: it is rate limiting this caller\n' +
+          '**Status Page:** https://weather-gov.github.io/api/planned-outages\n' +
+          '**Coverage:** United States locations only\n\n' +
+          '**Recommended Actions:**\n' +
+          '- Wait before retrying: the API answered, but it is rate limiting requests from this caller\n' +
+          '- Check planned outages: https://weather-gov.github.io/api/planned-outages\n\n'
+      );
+    });
+
+    it('rate_limited section equals header, fixed lines and the two-bullet wait block — Open-Meteo', async () => {
+      const text = await renderStatus(NOAA_OK, OPENMETEO_429);
+      const section = extractServiceSection(text, OPENMETEO_HEADER);
+      expect(section).toBe(
+        '## Open-Meteo API (Historical Weather Data)\n\n' +
+          '**Status:** ⚠️ Rate limited (HTTP 429)\n' +
+          '**Message:** Open-Meteo API answered HTTP 429: it is rate limiting this caller\n' +
+          '**Status Page:** https://open-meteo.com/en/docs/model-updates\n' +
+          '**Coverage:** Global (worldwide locations)\n\n' +
+          '**Recommended Actions:**\n' +
+          '- Wait before retrying: the API answered, but it is rate limiting requests from this caller\n' +
+          '- Check production status: https://open-meteo.com/en/docs/model-updates\n\n'
+      );
+    });
+
+    it('http_error section contains the existing three-bullet contact block whole — NOAA', async () => {
+      const text = await renderStatus(NOAA_404, OPENMETEO_OK);
+      const section = extractServiceSection(text, NOAA_HEADER);
+      expect(section).toContain(
+        '**Recommended Actions:**\n' +
+          '- Check planned outages: https://weather-gov.github.io/api/planned-outages\n' +
+          '- View service notices: https://www.weather.gov/notification\n' +
+          '- Report issues: nco.ops@noaa.gov or (301) 683-1518\n\n'
+      );
+    });
+
+    it('http_error section contains the existing three-bullet contact block whole — Open-Meteo', async () => {
+      const text = await renderStatus(NOAA_OK, OPENMETEO_400);
+      const section = extractServiceSection(text, OPENMETEO_HEADER);
+      expect(section).toContain(
+        '**Recommended Actions:**\n' +
+          '- Check production status: https://open-meteo.com/en/docs/model-updates\n' +
+          '- View GitHub issues: https://github.com/open-meteo/open-meteo/issues\n' +
+          '- Review documentation: https://open-meteo.com/en/docs\n\n'
+      );
+    });
+
+    it('no_response section equals header, fixed lines and the network-first block, and names no upstream contact — NOAA', async () => {
+      const text = await renderStatus(NOAA_NO_RESPONSE, OPENMETEO_OK);
+      const section = extractServiceSection(text, NOAA_HEADER);
+      expect(section).toBe(
+        '## NOAA Weather API (Forecasts & Current Conditions)\n\n' +
+          '**Status:** ❌ No response\n' +
+          '**Message:** No HTTP response from the NOAA Weather API\n' +
+          '**Status Page:** https://weather-gov.github.io/api/planned-outages\n' +
+          '**Coverage:** United States locations only\n\n' +
+          '**Recommended Actions:**\n' +
+          '- No HTTP response reached this machine. Check its network first: connection, DNS, proxy and VPN settings\n' +
+          '- Retry once the network is confirmed; the status page above is worth checking only after that\n\n'
+      );
+      expect(section).not.toContain('nco.ops@noaa.gov');
+      expect(section).not.toContain('github.com/open-meteo');
+      expect(section).not.toContain('weather.gov/notification');
+    });
+
+    it('no_response section equals header, fixed lines and the network-first block, and names no upstream contact — Open-Meteo', async () => {
+      const text = await renderStatus(NOAA_OK, OPENMETEO_NO_RESPONSE);
+      const section = extractServiceSection(text, OPENMETEO_HEADER);
+      expect(section).toBe(
+        '## Open-Meteo API (Historical Weather Data)\n\n' +
+          '**Status:** ❌ No response\n' +
+          '**Message:** No HTTP response from the Open-Meteo API\n' +
+          '**Status Page:** https://open-meteo.com/en/docs/model-updates\n' +
+          '**Coverage:** Global (worldwide locations)\n\n' +
+          '**Recommended Actions:**\n' +
+          '- No HTTP response reached this machine. Check its network first: connection, DNS, proxy and VPN settings\n' +
+          '- Retry once the network is confirmed; the status page above is worth checking only after that\n\n'
+      );
+      expect(section).not.toContain('nco.ops@noaa.gov');
+      expect(section).not.toContain('github.com/open-meteo');
+      expect(section).not.toContain('weather.gov/notification');
+    });
+  });
+
+  describe("partial verdict names the other side's outcome — all seven pins (G65)", () => {
+    const cases: Array<[string, ServiceProbeResult, ServiceProbeResult, string]> = [
+      ['NOAA ok, Open-Meteo rate_limited', NOAA_OK, OPENMETEO_429, PARTIAL_NOAA_UP_OPENMETEO_429_VERDICT],
+      ['NOAA ok, Open-Meteo http_error 503', NOAA_OK, OPENMETEO_503, PARTIAL_NOAA_UP_VERDICT],
+      ['NOAA ok, Open-Meteo http_error 400', NOAA_OK, OPENMETEO_400, PARTIAL_NOAA_UP_OPENMETEO_400_VERDICT],
+      ['NOAA ok, Open-Meteo no_response', NOAA_OK, OPENMETEO_NO_RESPONSE, PARTIAL_NOAA_UP_OPENMETEO_NO_RESPONSE_VERDICT],
+      ['Open-Meteo ok, NOAA rate_limited', NOAA_429, OPENMETEO_OK, PARTIAL_OPENMETEO_UP_NOAA_429_VERDICT],
+      ['Open-Meteo ok, NOAA http_error 503', NOAA_503, OPENMETEO_OK, PARTIAL_OPENMETEO_UP_VERDICT],
+      ['Open-Meteo ok, NOAA no_response', NOAA_NO_RESPONSE, OPENMETEO_OK, PARTIAL_OPENMETEO_UP_NOAA_NO_RESPONSE_VERDICT],
+    ];
+
+    for (const [label, noaaStatus, openMeteoStatus, expected] of cases) {
+      it(label, async () => {
+        const text = await renderStatus(noaaStatus, openMeteoStatus);
+        const verdict = extractVerdictHeadlineAndSentence(text);
+        expect(verdict).toBe(expected);
+        expect(verdict).not.toContain('has issues');
+      });
+    }
+  });
+
+  it('both no response: whole output carries neither the retired both-down phrase nor the NOAA operations contact', async () => {
+    const text = await renderStatus(NOAA_NO_RESPONSE, OPENMETEO_NO_RESPONSE);
+    expect(text).not.toContain('Both weather APIs are experiencing issues');
+    expect(text).not.toContain('nco.ops@noaa.gov');
+  });
+
+  describe('mixed both-not-ok attributes no cause to either side', () => {
+    const cases: Array<[string, ServiceProbeResult, ServiceProbeResult, string]> = [
+      ['NOAA 503, Open-Meteo no_response', NOAA_503, OPENMETEO_NO_RESPONSE, BOTH_NOT_OK_MIXED_VERDICT],
+      ['NOAA no_response, Open-Meteo 429', NOAA_NO_RESPONSE, OPENMETEO_429, BOTH_NOT_OK_MIXED_NORESPONSE_429_VERDICT],
+    ];
+
+    for (const [label, noaaStatus, openMeteoStatus, expected] of cases) {
+      it(label, async () => {
+        const text = await renderStatus(noaaStatus, openMeteoStatus);
+        const verdict = extractVerdictHeadlineAndSentence(text);
+        expect(verdict).toBe(expected);
+        expect(verdict).not.toContain('network');
+        expect(verdict).not.toContain('proxy');
+        expect(verdict).not.toContain('VPN');
+      });
+    }
   });
 
   it('runs both probes concurrently — both start before either resolves', async () => {
