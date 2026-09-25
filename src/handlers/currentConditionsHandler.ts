@@ -1477,8 +1477,10 @@ async function formatMetarCurrentConditions(
       }
     }
 
+    // isInUS is a coarse routing box that also covers Canadian border points
+    // such as Toronto (G53), so the advice is worded to stay true there.
     if (isInUS(latitude, longitude)) {
-      output += `\nFor NOAA's published Haines, grassland and red-flag indices, use \`source: "noaa"\`.\n`;
+      output += `\nFor a US location, NOAA publishes Haines, grassland and red-flag indices — use \`source: "noaa"\`.\n`;
     }
   }
 

@@ -413,7 +413,7 @@ describe('METAR Fosberg section — missing inputs (Test 4, G59)', () => {
 
 describe('METAR Fosberg section — US pointer gating (Test 5)', () => {
   const NOAA_POINTER =
-    'For NOAA\'s published Haines, grassland and red-flag indices, use `source: "noaa"`.';
+    'For a US location, NOAA publishes Haines, grassland and red-flag indices — use `source: "noaa"`.';
 
   it('renders the NOAA pointer for a US point (SEATTLE/KSEA)', async () => {
     const fakes = buildFakes();
