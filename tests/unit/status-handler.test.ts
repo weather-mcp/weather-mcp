@@ -2,11 +2,11 @@
  * Unit tests for the check_service_status handler.
  *
  * Locks: the honest both-up verdict (no "all services" / "requests should
- * succeed" coverage claim), the reachability-only partial verdict (the
- * probes report NOAA 404 and Open-Meteo 400 as up, so "up" proves only
- * that the host answered), the byte-for-byte-unchanged both-down copy, the not-checked line appended once after every branch, the two
- * probes running concurrently, and the version/cache sections rendering
- * unchanged from `main`.
+ * succeed" coverage claim), the partial and both-not-ok verdicts rendered from
+ * each probe's outcome, the not-checked line appended once after every branch,
+ * the two probes running concurrently, and the version/cache sections rendering
+ * unchanged. Every fixture is a result the real probe emits (pinned in
+ * tests/unit/service-status-probes.test.ts).
  *
  * The drift guard below reads `src/services/` with `readdirSync` and checks
  * every file is placed in `STATUS_PROBED_SOURCES`, `STATUS_NOT_CHECKED`, or
@@ -22,17 +22,11 @@ import { handleCheckServiceStatus } from '../../src/handlers/statusHandler.js';
 import { STATUS_PROBED_SOURCES, STATUS_NOT_CHECKED } from '../../src/utils/serviceStatusCoverage.js';
 import type { NOAAService } from '../../src/services/noaa.js';
 import type { OpenMeteoService } from '../../src/services/openmeteo.js';
+import type { ServiceProbeResult } from '../../src/utils/serviceStatusProbe.js';
 
 // -----------------------------------------------------------------------
 // Fixtures
 // -----------------------------------------------------------------------
-
-interface ServiceStatus {
-  operational: boolean;
-  message: string;
-  statusPage: string;
-  timestamp: string;
-}
 
 interface CacheStats {
   hits: number;
@@ -45,52 +39,91 @@ interface CacheStats {
 const NOAA_STATUS_PAGE = 'https://weather-gov.github.io/api/planned-outages';
 const OPENMETEO_STATUS_PAGE = 'https://open-meteo.com/en/docs/model-updates';
 
-const NOAA_UP: ServiceStatus = {
-  operational: true,
-  message: 'NOAA Weather API is operational',
-  statusPage: NOAA_STATUS_PAGE,
-  timestamp: '2026-01-01T00:00:00.000Z',
-};
-const NOAA_DOWN: ServiceStatus = {
-  operational: false,
-  message: 'NOAA API is experiencing server errors (possible outage)',
-  statusPage: NOAA_STATUS_PAGE,
-  timestamp: '2026-01-01T00:00:00.000Z',
-};
-const OPENMETEO_UP: ServiceStatus = {
-  operational: true,
-  message: 'Open-Meteo API is operational',
-  statusPage: OPENMETEO_STATUS_PAGE,
-  timestamp: '2026-01-01T00:00:00.000Z',
-};
-const OPENMETEO_DOWN: ServiceStatus = {
-  operational: false,
-  message: 'Open-Meteo API is experiencing server errors (possible outage)',
-  statusPage: OPENMETEO_STATUS_PAGE,
-  timestamp: '2026-01-01T00:00:00.000Z',
-};
+const TS = '2026-01-01T00:00:00.000Z';
 
-// The real messages the services return for the answers they map to
-// `operational: true` without a healthy response (noaa.ts 404 arm,
-// openmeteo.ts 400 arm). A reachability probe cannot tell these from a
-// healthy answer, so the partial verdict must not claim data is available.
-const NOAA_404: ServiceStatus = {
+const NOAA_OK: ServiceProbeResult = {
   operational: true,
-  message: 'NOAA API is responding (health check endpoint may have changed)',
+  outcome: 'ok',
+  httpStatus: 200,
+  message: 'NOAA Weather API answered normally (HTTP 200)',
   statusPage: NOAA_STATUS_PAGE,
-  timestamp: '2026-01-01T00:00:00.000Z',
+  timestamp: TS,
 };
-const OPENMETEO_400: ServiceStatus = {
+const NOAA_429: ServiceProbeResult = {
+  operational: false,
+  outcome: 'rate_limited',
+  httpStatus: 429,
+  message: 'NOAA Weather API answered HTTP 429: it is rate limiting this caller',
+  statusPage: NOAA_STATUS_PAGE,
+  timestamp: TS,
+};
+const NOAA_404: ServiceProbeResult = {
+  operational: false,
+  outcome: 'http_error',
+  httpStatus: 404,
+  message: 'NOAA Weather API answered with HTTP 404',
+  statusPage: NOAA_STATUS_PAGE,
+  timestamp: TS,
+};
+const NOAA_503: ServiceProbeResult = {
+  operational: false,
+  outcome: 'http_error',
+  httpStatus: 503,
+  message: 'NOAA Weather API answered with HTTP 503',
+  statusPage: NOAA_STATUS_PAGE,
+  timestamp: TS,
+};
+const NOAA_NO_RESPONSE: ServiceProbeResult = {
+  operational: false,
+  outcome: 'no_response',
+  message: 'No HTTP response from the NOAA Weather API',
+  statusPage: NOAA_STATUS_PAGE,
+  timestamp: TS,
+};
+const OPENMETEO_OK: ServiceProbeResult = {
   operational: true,
-  message: 'Open-Meteo API is responding (health check may need adjustment)',
+  outcome: 'ok',
+  httpStatus: 200,
+  message: 'Open-Meteo API answered normally (HTTP 200)',
   statusPage: OPENMETEO_STATUS_PAGE,
-  timestamp: '2026-01-01T00:00:00.000Z',
+  timestamp: TS,
+};
+const OPENMETEO_429: ServiceProbeResult = {
+  operational: false,
+  outcome: 'rate_limited',
+  httpStatus: 429,
+  message: 'Open-Meteo API answered HTTP 429: it is rate limiting this caller',
+  statusPage: OPENMETEO_STATUS_PAGE,
+  timestamp: TS,
+};
+const OPENMETEO_400: ServiceProbeResult = {
+  operational: false,
+  outcome: 'http_error',
+  httpStatus: 400,
+  message: 'Open-Meteo API answered with HTTP 400',
+  statusPage: OPENMETEO_STATUS_PAGE,
+  timestamp: TS,
+};
+const OPENMETEO_503: ServiceProbeResult = {
+  operational: false,
+  outcome: 'http_error',
+  httpStatus: 503,
+  message: 'Open-Meteo API answered with HTTP 503',
+  statusPage: OPENMETEO_STATUS_PAGE,
+  timestamp: TS,
+};
+const OPENMETEO_NO_RESPONSE: ServiceProbeResult = {
+  operational: false,
+  outcome: 'no_response',
+  message: 'No HTTP response from the Open-Meteo API',
+  statusPage: OPENMETEO_STATUS_PAGE,
+  timestamp: TS,
 };
 
 const DEFAULT_NOAA_CACHE_STATS: CacheStats = { hits: 8, misses: 2, evictions: 1, size: 10, maxSize: 1000 };
 const DEFAULT_OPENMETEO_CACHE_STATS: CacheStats = { hits: 17, misses: 3, evictions: 0, size: 20, maxSize: 1000 };
 
-function makeNoaaFake(status: ServiceStatus, cacheStats: CacheStats = DEFAULT_NOAA_CACHE_STATS): NOAAService {
+function makeNoaaFake(status: ServiceProbeResult, cacheStats: CacheStats = DEFAULT_NOAA_CACHE_STATS): NOAAService {
   return {
     checkServiceStatus: vi.fn().mockResolvedValue(status),
     getCacheStats: vi.fn().mockReturnValue(cacheStats),
@@ -98,7 +131,7 @@ function makeNoaaFake(status: ServiceStatus, cacheStats: CacheStats = DEFAULT_NO
 }
 
 function makeOpenMeteoFake(
-  status: ServiceStatus,
+  status: ServiceProbeResult,
   cacheStats: CacheStats = DEFAULT_OPENMETEO_CACHE_STATS
 ): OpenMeteoService {
   return {
@@ -107,7 +140,7 @@ function makeOpenMeteoFake(
   } as unknown as OpenMeteoService;
 }
 
-async function renderStatus(noaaStatus: ServiceStatus, openMeteoStatus: ServiceStatus): Promise<string> {
+async function renderStatus(noaaStatus: ServiceProbeResult, openMeteoStatus: ServiceProbeResult): Promise<string> {
   const result = await handleCheckServiceStatus(makeNoaaFake(noaaStatus), makeOpenMeteoFake(openMeteoStatus), '1.31.3-test');
   return result.content[0].text;
 }
@@ -161,38 +194,42 @@ const BOTH_UP_VERDICT =
   '## Overall Status: ✅ NOAA and Open-Meteo Reachable\n\n' +
   'Both checked services answered. This confirms they are reachable; it does not confirm that every request will succeed.\n';
 
-const BOTH_DOWN_VERDICT =
-  '## Overall Status: ❌ Multiple Service Issues\n\n' +
-  'Both weather APIs are experiencing issues. Please check the status pages above for updates.\n';
+const BOTH_NO_RESPONSE_VERDICT =
+  '## Overall Status: ❌ Neither Service Answered\n\n' +
+  'Neither NOAA nor Open-Meteo returned an HTTP response. Two independent hosts failing at once points at this machine or its network path, not at the APIs: check the connection, DNS, proxy and VPN settings first, then retry.\n';
+
+const BOTH_NOT_OK_MIXED_VERDICT =
+  '## Overall Status: ❌ Neither Service Answered Normally\n\n' +
+  "NOAA API answered with HTTP 503. Open-Meteo API gave no HTTP response. See each service's section above for what to check.\n";
 
 const PARTIAL_NOAA_UP_VERDICT =
-  '## Overall Status: ⚠️ Partial Service Availability\n\n' +
+  '## Overall Status: ⚠️ One Service Answered Normally\n\n' +
   'NOAA API answered, so it is reachable. This does not confirm that US forecasts and current conditions will succeed.\n' +
-  'Open-Meteo API has issues: Historical weather data may be unavailable.\n';
+  'Open-Meteo API answered with HTTP 503: Historical weather data may be unavailable.\n';
 
 const PARTIAL_OPENMETEO_UP_VERDICT =
-  '## Overall Status: ⚠️ Partial Service Availability\n\n' +
+  '## Overall Status: ⚠️ One Service Answered Normally\n\n' +
   'Open-Meteo API answered, so it is reachable. This does not confirm that historical weather requests will succeed.\n' +
-  'NOAA API has issues: Forecasts and current conditions for US locations may be unavailable.\n';
+  'NOAA API answered with HTTP 503: Forecasts and current conditions for US locations may be unavailable.\n';
 
 describe('handleCheckServiceStatus', () => {
   describe('no coverage claim', () => {
     it('carries neither retired phrase when both probes succeed', async () => {
-      const text = await renderStatus(NOAA_UP, OPENMETEO_UP);
+      const text = await renderStatus(NOAA_OK, OPENMETEO_OK);
       const verdict = extractVerdictHeadlineAndSentence(text);
       expect(verdict).not.toContain('All Services Operational');
       expect(verdict).not.toContain('requests should succeed');
     });
 
     it('pins the both-up headline and sentence whole', async () => {
-      const text = await renderStatus(NOAA_UP, OPENMETEO_UP);
+      const text = await renderStatus(NOAA_OK, OPENMETEO_OK);
       expect(extractVerdictHeadlineAndSentence(text)).toBe(BOTH_UP_VERDICT);
     });
   });
 
   describe('not-checked line', () => {
     it('names every provider in the constant, from the constant, in order', async () => {
-      const text = await renderStatus(NOAA_UP, OPENMETEO_UP);
+      const text = await renderStatus(NOAA_OK, OPENMETEO_OK);
       const line = extractNotCheckedLine(text);
       const listMatch = line.match(/^\*\*Not checked by this tool:\*\* (.+)\. A failure in one of these is not diagnosable here\.$/);
       if (!listMatch) {
@@ -203,7 +240,7 @@ describe('handleCheckServiceStatus', () => {
     });
 
     it('carries no status mark for an unprobed service', async () => {
-      const text = await renderStatus(NOAA_UP, OPENMETEO_UP);
+      const text = await renderStatus(NOAA_OK, OPENMETEO_OK);
       const line = extractNotCheckedLine(text);
       for (const mark of STATUS_MARKS) {
         expect(line).not.toContain(mark);
@@ -212,11 +249,12 @@ describe('handleCheckServiceStatus', () => {
   });
 
   describe('every branch carries the not-checked line exactly once, as the last non-empty line', () => {
-    const cases: Array<[string, ServiceStatus, ServiceStatus]> = [
-      ['both up', NOAA_UP, OPENMETEO_UP],
-      ['NOAA down only', NOAA_DOWN, OPENMETEO_UP],
-      ['Open-Meteo down only', NOAA_UP, OPENMETEO_DOWN],
-      ['both down', NOAA_DOWN, OPENMETEO_DOWN],
+    const cases: Array<[string, ServiceProbeResult, ServiceProbeResult]> = [
+      ['both up', NOAA_OK, OPENMETEO_OK],
+      ['NOAA down only', NOAA_503, OPENMETEO_OK],
+      ['Open-Meteo down only', NOAA_OK, OPENMETEO_503],
+      ['both no response', NOAA_NO_RESPONSE, OPENMETEO_NO_RESPONSE],
+      ['mixed not-ok', NOAA_503, OPENMETEO_NO_RESPONSE],
     ];
 
     for (const [label, noaaStatus, openMeteoStatus] of cases) {
@@ -233,49 +271,37 @@ describe('handleCheckServiceStatus', () => {
     }
   });
 
-  describe('both-down copy is unchanged from main', () => {
-    it('both down', async () => {
-      const text = await renderStatus(NOAA_DOWN, OPENMETEO_DOWN);
-      expect(extractVerdictHeadlineAndSentence(text)).toBe(BOTH_DOWN_VERDICT);
+  describe('both not-ok splits on whether either service answered', () => {
+    it('both no response', async () => {
+      const text = await renderStatus(NOAA_NO_RESPONSE, OPENMETEO_NO_RESPONSE);
+      expect(extractVerdictHeadlineAndSentence(text)).toBe(BOTH_NO_RESPONSE_VERDICT);
+    });
+
+    it('mixed: NOAA 503, Open-Meteo no response', async () => {
+      const text = await renderStatus(NOAA_503, OPENMETEO_NO_RESPONSE);
+      expect(extractVerdictHeadlineAndSentence(text)).toBe(BOTH_NOT_OK_MIXED_VERDICT);
     });
   });
 
   describe('partial verdict claims reachability only', () => {
-
-    it('partial — NOAA up, Open-Meteo down', async () => {
-      const text = await renderStatus(NOAA_UP, OPENMETEO_DOWN);
+    it('partial — NOAA up, Open-Meteo 503', async () => {
+      const text = await renderStatus(NOAA_OK, OPENMETEO_503);
       expect(extractVerdictHeadlineAndSentence(text)).toBe(PARTIAL_NOAA_UP_VERDICT);
     });
 
-    it('partial — Open-Meteo up, NOAA down', async () => {
-      const text = await renderStatus(NOAA_DOWN, OPENMETEO_UP);
+    it('partial — Open-Meteo up, NOAA 503', async () => {
+      const text = await renderStatus(NOAA_503, OPENMETEO_OK);
       expect(extractVerdictHeadlineAndSentence(text)).toBe(PARTIAL_OPENMETEO_UP_VERDICT);
-    });
-
-    it('NOAA 404 counts as reachable, never as data available', async () => {
-      const text = await renderStatus(NOAA_404, OPENMETEO_DOWN);
-      const verdict = extractVerdictHeadlineAndSentence(text);
-      expect(verdict).toBe(PARTIAL_NOAA_UP_VERDICT);
-      expect(verdict).not.toContain('is operational');
-      expect(verdict).not.toContain('are available');
-    });
-
-    it('Open-Meteo 400 counts as reachable, never as data available', async () => {
-      const text = await renderStatus(NOAA_DOWN, OPENMETEO_400);
-      const verdict = extractVerdictHeadlineAndSentence(text);
-      expect(verdict).toBe(PARTIAL_OPENMETEO_UP_VERDICT);
-      expect(verdict).not.toContain('is operational');
-      expect(verdict).not.toContain('is available');
     });
   });
 
   it('runs both probes concurrently — both start before either resolves', async () => {
-    let resolveNoaa!: (status: ServiceStatus) => void;
-    let resolveOpenMeteo!: (status: ServiceStatus) => void;
-    const noaaPromise = new Promise<ServiceStatus>((resolve) => {
+    let resolveNoaa!: (status: ServiceProbeResult) => void;
+    let resolveOpenMeteo!: (status: ServiceProbeResult) => void;
+    const noaaPromise = new Promise<ServiceProbeResult>((resolve) => {
       resolveNoaa = resolve;
     });
-    const openMeteoPromise = new Promise<ServiceStatus>((resolve) => {
+    const openMeteoPromise = new Promise<ServiceProbeResult>((resolve) => {
       resolveOpenMeteo = resolve;
     });
 
@@ -299,21 +325,20 @@ describe('handleCheckServiceStatus', () => {
     expect(noaaCheck).toHaveBeenCalledTimes(1);
     expect(openMeteoCheck).toHaveBeenCalledTimes(1);
 
-    resolveNoaa(NOAA_UP);
-    resolveOpenMeteo(OPENMETEO_UP);
+    resolveNoaa(NOAA_OK);
+    resolveOpenMeteo(OPENMETEO_OK);
 
     await resultPromise;
   });
 
-  it('leaves the server-version, per-service and cache sections unchanged from main', async () => {
-    const text = await renderStatus(NOAA_UP, OPENMETEO_UP);
+  it('leaves the server-version section unchanged from main', async () => {
+    const text = await renderStatus(NOAA_OK, OPENMETEO_OK);
     // Check Time is wall-clock; strip it (and its trailing blank line) before comparing.
     const withoutCheckTime = text.replace(/\*\*Check Time:\*\* .*\n\n/, '');
-    const overallStatusIdx = withoutCheckTime.indexOf('## Overall Status:');
-    if (overallStatusIdx === -1) {
-      throw new Error('No "## Overall Status:" heading found');
+    const noaaIdx = withoutCheckTime.indexOf('## NOAA Weather API');
+    if (noaaIdx === -1) {
+      throw new Error('No "## NOAA Weather API" heading found');
     }
-    const upToVerdict = withoutCheckTime.slice(0, overallStatusIdx);
 
     const expected =
       `# Weather API Service Status\n\n` +
@@ -322,17 +347,20 @@ describe('handleCheckServiceStatus', () => {
       `**Latest Release:** https://github.com/weather-mcp/weather-mcp/releases/latest\n` +
       `**Changelog:** https://github.com/weather-mcp/weather-mcp/blob/main/CHANGELOG.md\n` +
       `**Upgrade Instructions:** See README.md "Upgrading to Latest Version" section\n\n` +
-      `*Tip: Use \`npx -y @dangahagan/weather-mcp@latest\` in your MCP config to always run the newest version.*\n\n` +
-      `## NOAA Weather API (Forecasts & Current Conditions)\n\n` +
-      `**Status:** ✅ Operational\n` +
-      `**Message:** ${NOAA_UP.message}\n` +
-      `**Status Page:** ${NOAA_UP.statusPage}\n` +
-      `**Coverage:** United States locations only\n\n` +
-      `## Open-Meteo API (Historical Weather Data)\n\n` +
-      `**Status:** ✅ Operational\n` +
-      `**Message:** ${OPENMETEO_UP.message}\n` +
-      `**Status Page:** ${OPENMETEO_UP.statusPage}\n` +
-      `**Coverage:** Global (worldwide locations)\n\n` +
+      `*Tip: Use \`npx -y @dangahagan/weather-mcp@latest\` in your MCP config to always run the newest version.*\n\n`;
+
+    expect(withoutCheckTime.slice(0, noaaIdx)).toBe(expected);
+  });
+
+  it('leaves the cache section unchanged from main', async () => {
+    const text = await renderStatus(NOAA_OK, OPENMETEO_OK);
+    const cacheIdx = text.indexOf('## Cache Statistics');
+    const overallStatusIdx = text.indexOf('## Overall Status:');
+    if (cacheIdx === -1 || overallStatusIdx === -1) {
+      throw new Error('No "## Cache Statistics" or "## Overall Status:" heading found');
+    }
+
+    const expected =
       `## Cache Statistics\n\n` +
       `**Cache Status:** ✅ Enabled\n` +
       `**Overall Hit Rate:** 83.3%\n` +
@@ -353,7 +381,7 @@ describe('handleCheckServiceStatus', () => {
       `- Evictions: 0\n\n` +
       `*Cache reduces API calls and improves performance for repeated queries.*\n\n`;
 
-    expect(upToVerdict).toBe(expected);
+    expect(text.slice(cacheIdx, overallStatusIdx)).toBe(expected);
   });
 
   // -----------------------------------------------------------------------
