@@ -392,7 +392,9 @@ source.
 - Fire weather (when `include_fire_weather=true`) — a **Fosberg Fire Weather
   Index computed by this server** from the station's reported temperature, dew
   point and sustained wind, with its category. It uses the humidity the report
-  prints, so you can recompute it from the lines above. It is not an official
+  prints, but the station's unrounded temperature and wind, so the index is the
+  same in every unit system. A recomputation from the rounded temperature and
+  wind lines can therefore differ by 1. It is not an official
   fire-danger rating, and there is no dryness context (a METAR does not carry
   it). A report that omits one of the three inputs gets one line naming what is
   missing instead of an index. At a US point, the section also points to

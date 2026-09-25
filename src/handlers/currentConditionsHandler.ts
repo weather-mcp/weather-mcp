@@ -1442,8 +1442,11 @@ async function formatMetarCurrentConditions(
   // units (°C, knots), unlike Open-Meteo's caller-unit values (global-fire-
   // weather D4), so the inputs are converted directly and never through the
   // caller's preferences: the index cannot move with them. RH is the rounded
-  // value the humidity line prints, so a reader can recompute the index from
-  // the lines above it. Gusts never enter; missing inputs are named, not faked.
+  // value the humidity line prints; temperature and wind are the station's
+  // unrounded values, because rounding them to the display would make the index
+  // depend on the unit system. A recomputation from the rounded temperature and
+  // wind lines can therefore differ by 1 at a rounding seam. Gusts never enter;
+  // missing inputs are named, not faked.
   if (includeFireWeather) {
     output += `\n## Fire Weather\n\n`;
 
