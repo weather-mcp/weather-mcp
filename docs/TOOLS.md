@@ -583,7 +583,7 @@ Converts location names to coordinates. Returns multiple matches with detailed m
 - Feature type (capital, city, airport, etc.)
 
 ### 7. check_service_status
-Check the operational status of weather APIs and cache performance.
+Check whether NOAA and Open-Meteo answer, and how, plus cache performance.
 
 **Parameters:** None
 
@@ -596,11 +596,11 @@ Check if the weather services are operational
 ```
 
 **Returns:**
-- Operational status for NOAA API (forecasts & current conditions)
-- Operational status for Open-Meteo API (the historical-archive host)
+- Whether the NOAA API (forecasts & current conditions) answered, and with what HTTP status
+- Whether the Open-Meteo API (the historical-archive host) answered, and with what HTTP status
 - Cache statistics (hit rate, size, API call reduction)
-- Status page links and recommended actions if issues are detected
-- Overall verdict for the two checked services, and the list of upstreams not checked
+- Status page links, and recommended actions: this machine's network when no response arrived, the upstream's status page and contacts when it answered with an error
+- Overall verdict for the two checked services, and the list of upstreams not checked; when neither service returned an HTTP response, the verdict points at the local network before the APIs
 
 ### 8. get_air_quality
 Get comprehensive air quality data for any location worldwide.
@@ -1226,13 +1226,15 @@ More info: https://open-meteo.com/en/pricing
 
 ### Service Status Checking
 
-Use the `check_service_status` tool to proactively verify API availability:
+Use the `check_service_status` tool to see whether NOAA and Open-Meteo answer, and how:
 
 **When to use:**
 - Before making multiple weather requests
 - When experiencing errors or timeouts
-- To verify service availability after an outage
+- To confirm the APIs answer again after an outage
 - For monitoring and alerting purposes
+
+When neither service returns an HTTP response, the tool points at this machine's connection, DNS, proxy and VPN before the APIs.
 
 **Status Page Links:**
 - **NOAA API:**
