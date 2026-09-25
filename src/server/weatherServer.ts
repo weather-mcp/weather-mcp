@@ -409,7 +409,7 @@ export const TOOL_DEFINITIONS = {
         ...LOCATION_SCHEMA_PROPERTIES,
         include_fire_weather: {
           type: 'boolean' as const,
-          description: 'US locations get NOAA fire-weather indices (Haines, grassland, red-flag); elsewhere a computed Fosberg Fire Weather Index with dryness context. (default: false)',
+          description: 'US locations get NOAA fire-weather indices (Haines, grassland, red-flag); elsewhere, and on source metar, a computed Fosberg Fire Weather Index. Dryness context is model-path only. (default: false)',
           default: false
         },
         include_normals: {
