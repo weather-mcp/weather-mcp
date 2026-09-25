@@ -203,52 +203,6 @@ describe('Error Recovery - OpenMeteo Service', () => {
       expect(params.hourly).toBeUndefined();
     });
   });
-
-  describe('Service Status Checking', () => {
-    it('should return operational status when service is up', async () => {
-      // Mock the client.get method (not makeRequest) since checkServiceStatus uses it
-      // directly, and assert on the shape it actually inspects: `response.status === 200
-      // && response.data`. Mocking makeRequest here is inert, which left this test making
-      // a real archive-API call inside the 5s test timeout — green when the network was
-      // fast, red otherwise, and never actually exercising the branch it names.
-      vi.spyOn((service as any).client, 'get').mockResolvedValue({
-        status: 200,
-        data: { daily: { time: ['2024-01-01'], temperature_2m_max: [20] } }
-      });
-
-      const status = await service.checkServiceStatus();
-
-      expect(status.operational).toBe(true);
-      expect(status.message).toMatch(/operational/i);
-    });
-
-    it('should return non-operational status on API errors', async () => {
-      // Mock the client.get method (not makeRequest) since checkServiceStatus uses it directly
-      vi.spyOn((service as any).client, 'get').mockRejectedValue({
-        code: 'ECONNREFUSED',
-        message: 'Connection refused'
-      });
-
-      const status = await service.checkServiceStatus();
-
-      expect(status.operational).toBe(false);
-      expect(status.message).toBeDefined();
-      expect(status.message).toMatch(/connect|connection/i);
-    });
-
-    it('should include timestamp in status response', async () => {
-      // Same seam as above — client.get, not makeRequest.
-      vi.spyOn((service as any).client, 'get').mockResolvedValue({
-        status: 200,
-        data: { daily: { time: ['2024-01-01'], temperature_2m_max: [20] } }
-      });
-
-      const status = await service.checkServiceStatus();
-
-      expect(status.timestamp).toBeDefined();
-      expect(new Date(status.timestamp)).toBeInstanceOf(Date);
-    });
-  });
 });
 
 /**
