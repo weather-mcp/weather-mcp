@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.1] - 2026-09-26
+
 `check_service_status` could not tell a problem on your own machine from an outage at the weather services. A rate limit, a server error, a timeout and a dead local proxy all rendered as the same "may be experiencing issues". When the failure was local, it said "Both weather APIs are experiencing issues" and listed NOAA's operations phone number. The tool now reports what each check actually saw: a normal answer, a rate limit, an error status (named), or no answer at all. When neither service answered, it tells you to check your own network first.
 
 ### Changed
@@ -1884,7 +1886,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.1...HEAD
+[1.33.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.0...v1.33.1
 [1.33.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.1...v1.33.0
 [1.32.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.0...v1.32.1
 [1.32.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.5...v1.32.0
