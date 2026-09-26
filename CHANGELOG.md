@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+`check_service_status` could not tell a problem on your own machine from an outage at the weather services. A rate limit, a server error, a timeout and a dead local proxy all rendered as the same "may be experiencing issues". When the failure was local, it said "Both weather APIs are experiencing issues" and listed NOAA's operations phone number. The tool now reports what each check actually saw: a normal answer, a rate limit, an error status (named), or no answer at all. When neither service answered, it tells you to check your own network first.
+
 ### Changed
 
 - **`check_service_status` output text changed.** The per-service `**Status:**` label is now one of four states: `✅ Answered normally`, `⚠️ Rate limited (HTTP 429)`, `❌ Error status (HTTP nnn)` and `❌ No response`. The partial headline is `⚠️ One Service Answered Normally`, and its second line names what the other service did. When neither service answered normally, the verdict is `❌ Neither Service Answered` (no HTTP response from either) or `❌ Neither Service Answered Normally` (any other mix). The Recommended Actions block now depends on the outcome. Anything that matched on `✅ Operational`, `❌ Issues Detected`, `Partial Service Availability` or `Both weather APIs are experiencing issues` needs updating. The both-up verdict, the not-checked line, and the version and cache sections are unchanged. (`src/handlers/statusHandler.ts`, `examples/README.md`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`)
