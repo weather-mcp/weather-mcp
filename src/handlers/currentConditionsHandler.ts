@@ -1358,21 +1358,21 @@ async function formatMetarCurrentConditions(
 
   // --- Measurements (D6 units). Absent fields are omitted, never blanked:
   // wgst appears in 14% of reports and wxString in 8%, so sparse is normal.
-  if (obs.temp !== undefined) {
+  if (obs.temp != null && Number.isFinite(obs.temp)) {
     const extras: string[] = [];
-    if (obs.dewp !== undefined) {
+    if (obs.dewp != null && Number.isFinite(obs.dewp)) {
       extras.push(`dew point ${formatTemperatureFromC(obs.dewp, prefs)}`);
       extras.push(`humidity ${relativeHumidityFromDewpoint(obs.temp, obs.dewp)}%`);
     }
     output += `**Temperature:** ${formatTemperatureFromC(obs.temp, prefs)}`;
     output += extras.length > 0 ? ` (${extras.join(', ')})\n` : `\n`;
-  } else if (obs.dewp !== undefined) {
+  } else if (obs.dewp != null && Number.isFinite(obs.dewp)) {
     output += `**Dew Point:** ${formatTemperatureFromC(obs.dewp, prefs)}\n`;
   }
 
   // Wind: knots natively, so kt -> m/s -> the caller's unit.
   const windDirection = parseWindDirection(obs.wdir);
-  if (obs.wspd !== undefined) {
+  if (obs.wspd != null && Number.isFinite(obs.wspd)) {
     const speed = withLabel(
       convertWindFromMps(obs.wspd * KNOTS_TO_MPS, prefs),
       windSpeedLabel(prefs),
@@ -1389,7 +1389,7 @@ async function formatMetarCurrentConditions(
       wind = speed;
     }
 
-    if (obs.wgst !== undefined) {
+    if (obs.wgst != null && Number.isFinite(obs.wgst)) {
       wind += `, gusting to ${withLabel(
         convertWindFromMps(obs.wgst * KNOTS_TO_MPS, prefs),
         windSpeedLabel(prefs),

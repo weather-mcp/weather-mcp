@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`get_current_conditions` with `source: "metar"` no longer turns a null measurement into zero.** If a station report carries temperature, dew point, wind speed or gust as JSON `null` rather than leaving the field out, that line is now omitted, as it already was for a missing field. Before, a null temperature rendered as 32°F, and a null wind speed rendered as "0 mph", even when `include_fire_weather` said on the same page that the report omits wind speed. No live report sent a null in a 400-station sample, so this guards a case that can happen, not one seen in the wild. Output for reports that carry these values is byte-identical. (`src/handlers/currentConditionsHandler.ts`, `src/types/aviationWeather.ts`)
+
 ## [1.33.2] - 2026-09-26
 
 `check_service_status` ends with a list of the services it does not check, so you know which failures it cannot diagnose. Nothing kept that list complete: a provider could drop off it, or a new one could be added without joining it, and every test still passed. This release adds that check to the test suite. The tool's output is unchanged.

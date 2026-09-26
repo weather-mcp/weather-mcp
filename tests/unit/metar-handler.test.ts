@@ -691,3 +691,59 @@ describe('handleGetCurrentConditions — source: "metar" with no aviationWeather
     ).rejects.toThrow(ServiceUnavailableError);
   });
 });
+
+// ---------------------------------------------------------------------------
+// JSON null measurements — omitted like absent ones, never coerced to 0
+// ---------------------------------------------------------------------------
+
+describe('handleGetCurrentConditions — METAR JSON-null measurements', () => {
+  async function render(overrides: Partial<MetarObservation>, extraArgs: Record<string, unknown> = {}) {
+    const aviation = buildAviationFake([buildMetarObservation(overrides)]);
+    const result = await callCurrentConditions(
+      { ...SEATTLE, source: 'metar', units: 'imperial', ...extraArgs },
+      buildFakes(),
+      undefined,
+      aviation
+    );
+    return textOf(result);
+  }
+
+  it('temp null, dewp present: falls back to the Dew Point line, no fabricated 32°F', async () => {
+    const text = await render({ temp: null });
+    expect(text).not.toContain('**Temperature:**');
+    expect(text).toContain('**Dew Point:** 50°F');
+    expect(text).not.toContain('32°F');
+  });
+
+  it('temp present, dewp null: Temperature renders with no dew point or humidity', async () => {
+    const text = await render({ dewp: null });
+    expect(text).toMatch(/\*\*Temperature:\*\* 68°F\n/);
+    expect(text).not.toContain('dew point');
+    expect(text).not.toContain('humidity');
+  });
+
+  it('temp and dewp both null: neither line renders', async () => {
+    const text = await render({ temp: null, dewp: null });
+    expect(text).not.toContain('**Temperature:**');
+    expect(text).not.toContain('**Dew Point:**');
+  });
+
+  it('wspd null with a gust present: no Wind line at all, not "0 mph"', async () => {
+    const text = await render({ wspd: null, wgst: 18 });
+    expect(text).not.toContain('**Wind:**');
+    expect(text).not.toContain('0 mph');
+    expect(text).not.toContain('gusting to');
+  });
+
+  it('wspd present, wgst null: Wind renders with no gust clause', async () => {
+    const text = await render({ wgst: null });
+    expect(text).toContain('**Wind:**');
+    expect(text).not.toContain('gusting to');
+  });
+
+  it('wspd null with include_fire_weather: the report no longer contradicts the "omits wind speed" line', async () => {
+    const text = await render({ wspd: null }, { include_fire_weather: true });
+    expect(text).toContain('omits wind speed');
+    expect(text).not.toContain('**Wind:**');
+  });
+});

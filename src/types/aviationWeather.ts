@@ -59,16 +59,16 @@ export interface MetarObservation {
   qcField: number;
 
   /** Temperature, **°C**. ~99% presence. */
-  temp?: number;
+  temp?: number | null;
   /** Dew point, **°C**. ~99% presence. */
-  dewp?: number;
+  dewp?: number | null;
 
   /** Wind direction, degrees, or `"VRB"` for variable. ~98% presence. */
   wdir?: number | string;
   /** Wind speed, **knots**. ~98% presence. */
-  wspd?: number;
+  wspd?: number | null;
   /** Wind gust, **knots**. ~14% presence. */
-  wgst?: number;
+  wgst?: number | null;
 
   /** Altimeter setting, **hPa**. ~97% presence. */
   altim?: number;
