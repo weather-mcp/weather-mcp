@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.33.1 (Production Ready)
+- **Version:** 1.33.2 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -632,15 +632,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.33.1 — Production Ready ✅
+- **Version:** 1.33.2 — Production Ready ✅
 - **Test Coverage:** 3,762 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.33.2:** The service-status coverage line is guarded by host, not only by file
 - **New in v1.33.1:** check_service_status tells a local network failure from an upstream outage
 - **New in v1.33.0:** The METAR source computes the Fosberg fire-weather index
-- **New in v1.32.1:** The analytics endpoint check rejects IPv6 addresses and trailing-dot local names
 
 ## Useful References
 
@@ -663,7 +663,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-26 (v1.33.1)
+**Last Updated:** 2026-09-26 (v1.33.2)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
