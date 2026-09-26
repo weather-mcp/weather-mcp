@@ -879,9 +879,10 @@ describe('handleCheckServiceStatus', () => {
         for (const [file, host] of controls) {
           const text = readFileSync(new URL(`../../src/services/${file}`, import.meta.url), 'utf-8');
           const lines = text.split(/\r?\n/);
-          const wiringLine = lines.find((line) => line.includes(`://${host}`));
-          expect(wiringLine, `no line in ${file} carries ${host}`).toBeDefined();
-          expect(isWiringLine(wiringLine ?? ''), `${file}'s ${host} line was not classified as wiring`).toBe(true);
+          // Any line carrying the host may be the wiring one; a doc comment above it must not decide.
+          const hostLines = lines.filter((line) => line.includes(`://${host}`));
+          expect(hostLines.length, `no line in ${file} carries ${host}`).toBeGreaterThan(0);
+          expect(hostLines.some(isWiringLine), `no ${host} line in ${file} was classified as wiring`).toBe(true);
         }
       });
 
