@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.3] - 2026-09-26
+
+Airport (METAR) reports could turn a missing measurement into a false zero. If a station sent its temperature or wind speed as an explicit `null`, the report showed 32°F or "0 mph", which looks like a real reading. This release leaves those lines out instead. Reports that carry their measurements look exactly as before.
+
 ### Fixed
 
 - **`get_current_conditions` with `source: "metar"` no longer turns a null measurement into zero.** If a station report carries temperature, dew point, wind speed or gust as JSON `null` rather than leaving the field out, that line is now omitted, as it already was for a missing field. Before, a null temperature rendered as 32°F, and a null wind speed rendered as "0 mph", even when `include_fire_weather` said on the same page that the report omits wind speed. No live report sent a null in a 400-station sample, so this guards a case that can happen, not one seen in the wild. Output for reports that carry these values is byte-identical. (`src/handlers/currentConditionsHandler.ts`, `src/types/aviationWeather.ts`)
@@ -1898,7 +1902,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.2...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.3...HEAD
+[1.33.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.2...v1.33.3
 [1.33.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.1...v1.33.2
 [1.33.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.0...v1.33.1
 [1.33.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.1...v1.33.0
