@@ -5998,6 +5998,37 @@ untouched. The anchored `--unified=0` form read 0, and 2 with the guard renamed.
 
 ---
 
+## G111 — Axios delivers an empty response body as `''`, not `null`, so a stubbed `data: null` tests a shape the real client never produces
+
+**Trigger:** code that tests whether an axios response "has a body" (`response.data == null`,
+`!== undefined`), or a unit test that fakes an empty answer by stubbing the adapter with
+`data: null` or `data: undefined`.
+
+**Rule:** treat `''` as empty too: `response.data == null || response.data === ''`. Stub the
+empty case as `data: ''`, beside any `null`/`undefined` rows you keep. Better still, prove the
+shape once against a real local HTTP server rather than a stub.
+
+**Why:** with the default `responseType: 'json'`, axios 1.x returns a bodiless 200 as the
+empty string. Its JSON transform skips an empty string rather than turning it into `null`. A
+guard written against `null` passes every stubbed test and misses every real empty body. The
+failure is quiet: the empty answer is reported as a normal one.
+
+**Verify:** start `http.createServer` answering `200` with `content-type: application/json`
+and no body, then `axios.get(url, { validateStatus: () => true })`. `data` is `''`,
+`data == null` is `false`, and `!!data` is `false`.
+
+**Evidence:** 2026-09-26, service-status-probe-outcomes, triage-T1 (`5934bad`). The Open-Meteo
+probe's empty-body guard was changed from `response.data` truthiness to `response.data == null`.
+Both unit rows stubbed `null`/`undefined`, and the gemini diff review filed nothing. The live
+check above returned `{"data":"","isNull":false,"truthy":false}` on axios 1.20.0, so a real empty
+200 would have rendered "answered normally". Found at diff triage, not by any test.
+
+**Status:** active. Related: [G13]/[G45]/[G70] (prove a stub reaches the real code path before
+trusting it). This is the same idea for the *payload*: a stub can reach the real interceptor and
+still hand it a value the network never sends.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
