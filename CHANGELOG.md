@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The "Not checked by this tool" line in `check_service_status` can no longer silently lose a provider.** The test suite used to check only that every file in `src/services/` was accounted for. One file often talks to several upstreams, so removing a provider from the line, or adding a new upstream to an existing file, passed unnoticed. The suite now also checks every upstream host named in `src/services/`: each one must be either probed by the tool or named on that line, and a host listed as a documentation link must not be one the code sends requests to. Nothing rendered changes. Proof: the host-inventory tests in `tests/unit/status-handler.test.ts`, which go red on the deletion that previously passed (GOTCHAS G105). (`src/utils/serviceStatusCoverage.ts`)
+
 ## [1.33.1] - 2026-09-26
 
 `check_service_status` could not tell a problem on your own machine from an outage at the weather services. A rate limit, a server error, a timeout and a dead local proxy all rendered as the same "may be experiencing issues". When the failure was local, it said "Both weather APIs are experiencing issues" and listed NOAA's operations phone number. The tool now reports what each check actually saw: a normal answer, a rate limit, an error status (named), or no answer at all. When neither service answered, it tells you to check your own network first.
