@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.1] - 2026-09-26
+
+`check_service_status` could not tell a problem on your own machine from an outage at the weather services. A rate limit, a server error, a timeout and a dead local proxy all rendered as the same "may be experiencing issues". When the failure was local, it said "Both weather APIs are experiencing issues" and listed NOAA's operations phone number. The tool now reports what each check actually saw: a normal answer, a rate limit, an error status (named), or no answer at all. When neither service answered, it tells you to check your own network first.
+
+### Changed
+
+- **`check_service_status` output text changed.** The per-service `**Status:**` label is now one of four states: `✅ Answered normally`, `⚠️ Rate limited (HTTP 429)`, `❌ Error status (HTTP nnn)` and `❌ No response`. The partial headline is `⚠️ One Service Answered Normally`, and its second line names what the other service did. When neither service answered normally, the verdict is `❌ Neither Service Answered` (no HTTP response from either) or `❌ Neither Service Answered Normally` (any other mix). The Recommended Actions block now depends on the outcome. Anything that matched on `✅ Operational`, `❌ Issues Detected`, `Partial Service Availability` or `Both weather APIs are experiencing issues` needs updating. The both-up verdict, the not-checked line, and the version and cache sections are unchanged. (`src/handlers/statusHandler.ts`, `examples/README.md`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`)
+
+### Fixed
+
+- **`check_service_status` no longer blames the weather APIs for a failure on this machine.** Each probe classified failures in a `catch` that ran after the client's response interceptor had already rewritten every axios error. So a rate limit, a 404, a server error and a refused connection all rendered as "may be experiencing issues". A dead local proxy that failed in milliseconds was reported as "Both weather APIs are experiencing issues", with NOAA's operations contact below it. Each probe now accepts every HTTP status and reads it itself, and the four outcomes render differently. The upstream's contact lines appear only when it answered with an error. When neither service returned an HTTP response, the verdict points at this machine's network first. Proof: the adapter-seam unit tests drive both probes through their real interceptor (`tests/unit/service-status-probes.test.ts`); the handler tests pin every label, action block and verdict (`tests/unit/status-handler.test.ts`); the live dead-proxy and forced 429/503 runs are recorded against the previous release in the QA record. (`src/services/noaa.ts`, `src/services/openmeteo.ts`, `src/utils/serviceStatusProbe.ts`, `tests/integration/error-recovery.test.ts`)
+
 ## [1.33.0] - 2026-09-25
 
 Airport observations had no fire-weather reading. `source: "metar"` is the only way to get a measured observation outside the US, and asking it for `include_fire_weather` returned only a note that the index was not available on that source. The METAR source now computes the same Fosberg Fire Weather Index as the Open-Meteo path, from the station's own measurements. No other output changes.
@@ -1874,7 +1886,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.1...HEAD
+[1.33.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.0...v1.33.1
 [1.33.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.1...v1.33.0
 [1.32.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.0...v1.32.1
 [1.32.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.31.5...v1.32.0

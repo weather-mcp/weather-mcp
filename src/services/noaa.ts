@@ -20,6 +20,7 @@ import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
+import { classifyProbeStatus, type ServiceProbeResult } from '../utils/serviceStatusProbe.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -214,63 +215,50 @@ export class NOAAService {
   }
 
   /**
-   * Check if the NOAA API is operational
-   * Performs a lightweight health check by requesting a well-known endpoint
-   * @returns Object with status information
+   * Check whether the NOAA API answers, and how
+   * Performs a lightweight health check by requesting a well-known endpoint.
+   * Every HTTP status resolves (validateStatus) so the probe reads it itself; the
+   * interceptor rewrites rejections, so the catch only records that no answer came.
+   * @returns What the probe observed; never rejects
    */
-  async checkServiceStatus(): Promise<{
-    operational: boolean;
-    message: string;
-    statusPage: string;
-    timestamp: string;
-  }> {
+  async checkServiceStatus(): Promise<ServiceProbeResult> {
+    const statusPage = 'https://weather-gov.github.io/api/planned-outages';
     try {
       // Use a simple, well-known location (US mainland center) for health check
       const response = await this.client.get('/points/39.8283,-98.5795', {
-        timeout: 10000 // Shorter timeout for health check
+        timeout: 10000, // Shorter timeout for health check
+        validateStatus: () => true
       });
 
-      if (response.status === 200) {
-        return {
-          operational: true,
-          message: 'NOAA Weather API is operational',
-          statusPage: 'https://weather-gov.github.io/api/planned-outages',
-          timestamp: new Date().toISOString()
-        };
+      const httpStatus = response.status;
+      const outcome = classifyProbeStatus(httpStatus);
+      let message: string;
+      if (outcome === 'ok') {
+        message = 'NOAA Weather API answered normally (HTTP 200)';
+      } else if (outcome === 'rate_limited') {
+        logger.warn('Rate limit exceeded', {
+          service: 'NOAA',
+          securityEvent: true
+        });
+        message = 'NOAA Weather API answered HTTP 429: it is rate limiting this caller';
+      } else {
+        message = `NOAA Weather API answered with HTTP ${httpStatus}`;
       }
 
       return {
-        operational: false,
-        message: `NOAA API returned unexpected status: ${response.status}`,
-        statusPage: 'https://weather-gov.github.io/api/planned-outages',
+        operational: outcome === 'ok',
+        outcome,
+        httpStatus,
+        message,
+        statusPage,
         timestamp: new Date().toISOString()
       };
-    } catch (error) {
-      const axiosError = error as AxiosError;
-      let message = 'NOAA Weather API may be experiencing issues';
-      let operational = false;
-
-      if (axiosError.response) {
-        const status = axiosError.response.status;
-        if (status === 429) {
-          operational = true; // API is up, just rate limited
-          message = 'NOAA API is operational but rate limited';
-        } else if (status >= 500) {
-          message = 'NOAA API is experiencing server errors (possible outage)';
-        } else if (status === 404) {
-          operational = true; // 404 on this endpoint might just mean API change
-          message = 'NOAA API is responding (health check endpoint may have changed)';
-        }
-      } else if (axiosError.code === 'ECONNABORTED') {
-        message = 'NOAA API is not responding (timeout)';
-      } else if (axiosError.code === 'ENOTFOUND' || axiosError.code === 'ECONNREFUSED') {
-        message = 'Cannot connect to NOAA API (DNS or connection failure)';
-      }
-
+    } catch {
       return {
-        operational,
-        message,
-        statusPage: 'https://weather-gov.github.io/api/planned-outages',
+        operational: false,
+        outcome: 'no_response',
+        message: 'No HTTP response from the NOAA Weather API',
+        statusPage,
         timestamp: new Date().toISOString()
       };
     }

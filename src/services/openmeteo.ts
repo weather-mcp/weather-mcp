@@ -27,6 +27,7 @@ import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { computeNormalsTable, getNormalsTableCacheKey, type NormalsTable } from '../utils/normals.js';
 import { getUserAgent } from '../utils/version.js';
+import { classifyProbeStatus, type ServiceProbeResult } from '../utils/serviceStatusProbe.js';
 import { UnitPreferences, IMPERIAL_PREFERENCES } from '../config/units.js';
 import { openMeteoUnitParams } from '../utils/unitFormat.js';
 import { COMPARISON_MODELS } from '../utils/modelComparison.js';
@@ -344,16 +345,14 @@ export class OpenMeteoService {
   }
 
   /**
-   * Check if the Open-Meteo API is operational
-   * Performs a lightweight health check by requesting a simple query
-   * @returns Object with status information
+   * Check whether the Open-Meteo archive API answers, and how
+   * Performs a lightweight health check by requesting a simple query.
+   * Every HTTP status resolves (validateStatus) so the probe reads it itself; the
+   * interceptor rewrites rejections, so the catch only records that no answer came.
+   * @returns What the probe observed; never rejects
    */
-  async checkServiceStatus(): Promise<{
-    operational: boolean;
-    message: string;
-    statusPage: string;
-    timestamp: string;
-  }> {
+  async checkServiceStatus(): Promise<ServiceProbeResult> {
+    const statusPage = 'https://open-meteo.com/en/docs/model-updates';
     try {
       // Use a simple request for a recent date at a known location (London, UK)
       // Using a 1-day range from 30 days ago to avoid the 5-day delay issue
@@ -370,50 +369,44 @@ export class OpenMeteoService {
           daily: 'temperature_2m_max',
           timezone: 'UTC'
         },
-        timeout: 10000 // Shorter timeout for health check
+        timeout: 10000, // Shorter timeout for health check
+        validateStatus: () => true
       });
 
-      if (response.status === 200 && response.data) {
-        return {
-          operational: true,
-          message: 'Open-Meteo API is operational',
-          statusPage: 'https://open-meteo.com/en/docs/model-updates',
-          timestamp: new Date().toISOString()
-        };
+      const httpStatus = response.status;
+      const classified = classifyProbeStatus(httpStatus);
+      // A 200 with no body answered, but not usably. Axios delivers an empty body as ''
+      const emptyBody = classified === 'ok' && (response.data == null || response.data === '');
+      const outcome = emptyBody ? 'http_error' : classified;
+      let message: string;
+      if (emptyBody) {
+        message = 'Open-Meteo API answered HTTP 200 with an empty body';
+      } else if (outcome === 'ok') {
+        message = 'Open-Meteo API answered normally (HTTP 200)';
+      } else if (outcome === 'rate_limited') {
+        logger.warn('Rate limit exceeded', {
+          service: 'OpenMeteo',
+          securityEvent: true
+        });
+        message = 'Open-Meteo API answered HTTP 429: it is rate limiting this caller';
+      } else {
+        message = `Open-Meteo API answered with HTTP ${httpStatus}`;
       }
 
       return {
-        operational: false,
-        message: `Open-Meteo API returned unexpected status: ${response.status}`,
-        statusPage: 'https://open-meteo.com/en/docs/model-updates',
+        operational: outcome === 'ok',
+        outcome,
+        httpStatus,
+        message,
+        statusPage,
         timestamp: new Date().toISOString()
       };
-    } catch (error) {
-      const axiosError = error as AxiosError;
-      let message = 'Open-Meteo API may be experiencing issues';
-      let operational = false;
-
-      if (axiosError.response) {
-        const status = axiosError.response.status;
-        if (status === 429) {
-          operational = true; // API is up, just rate limited
-          message = 'Open-Meteo API is operational but rate limited';
-        } else if (status >= 500) {
-          message = 'Open-Meteo API is experiencing server errors (possible outage)';
-        } else if (status === 400) {
-          operational = true; // Bad request might indicate API is up but our test is wrong
-          message = 'Open-Meteo API is responding (health check may need adjustment)';
-        }
-      } else if (axiosError.code === 'ECONNABORTED') {
-        message = 'Open-Meteo API is not responding (timeout)';
-      } else if (axiosError.code === 'ENOTFOUND' || axiosError.code === 'ECONNREFUSED') {
-        message = 'Cannot connect to Open-Meteo API (DNS or connection failure)';
-      }
-
+    } catch {
       return {
-        operational,
-        message,
-        statusPage: 'https://open-meteo.com/en/docs/model-updates',
+        operational: false,
+        outcome: 'no_response',
+        message: 'No HTTP response from the Open-Meteo API',
+        statusPage,
         timestamp: new Date().toISOString()
       };
     }

@@ -54,7 +54,7 @@ try {
   description: 'Get weather data for a location. ' +
                'If this tool returns an error, check the error message ' +
                'for status page links and consider using check_service_status ' +
-               'to verify API availability.',
+               'to check whether the weather APIs answer.',
   inputSchema: { /* ... */ }
 }
 ```
@@ -72,9 +72,9 @@ try {
 ```typescript
 {
   name: 'check_service_status',
-  description: 'Check the operational status of weather APIs. ' +
-               'Use this when experiencing errors or to proactively verify ' +
-               'service availability before making weather data requests.',
+  description: 'Check whether the weather APIs answer, and how. ' +
+               'Use this when experiencing errors, to tell a local network failure ' +
+               'from an upstream error before making weather data requests.',
   inputSchema: { type: 'object', properties: {}, required: [] }
 }
 ```
@@ -96,7 +96,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
       {
         uri: 'status://api-health',
         name: 'API Health Status',
-        description: 'Real-time operational status of weather APIs',
+        description: 'Whether each weather API answered, and how',
         mimeType: 'application/json'
       }
     ]

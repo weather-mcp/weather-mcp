@@ -57,11 +57,11 @@ check_service_status({})
 ````markdown
 # Weather API Service Status
 
-**Check Time:** 9/23/2026, 11:52:07 AM
+**Check Time:** 9/25/2026, 1:43:38 AM
 
 ## Server Version
 
-**Installed Version:** 1.31.3
+**Installed Version:** 1.33.0
 **Latest Release:** https://github.com/weather-mcp/weather-mcp/releases/latest
 **Changelog:** https://github.com/weather-mcp/weather-mcp/blob/main/CHANGELOG.md
 **Upgrade Instructions:** See README.md "Upgrading to Latest Version" section
@@ -70,15 +70,15 @@ check_service_status({})
 
 ## NOAA Weather API (Forecasts & Current Conditions)
 
-**Status:** ✅ Operational
-**Message:** NOAA Weather API is operational
+**Status:** ✅ Answered normally
+**Message:** NOAA Weather API answered normally (HTTP 200)
 **Status Page:** https://weather-gov.github.io/api/planned-outages
 **Coverage:** United States locations only
 
 ## Open-Meteo API (Historical Weather Data)
 
-**Status:** ✅ Operational
-**Message:** Open-Meteo API is operational
+**Status:** ✅ Answered normally
+**Message:** Open-Meteo API answered normally (HTTP 200)
 **Status Page:** https://open-meteo.com/en/docs/model-updates
 **Coverage:** Global (worldwide locations)
 
@@ -127,5 +127,5 @@ npm run build && npm run examples
 **About imagery links:** the radar URLs inside captured output expire — RainViewer retains only ~2 hours of frames — and a tile over dry skies renders blank, since radar tiles are transparent precipitation overlays. So the imagery examples also commit a PNG snapshot (`images/`): the capture script downloads the radar tile and composites it onto an OpenStreetMap base layer (four z+1 tiles stitched, pure-JS via the `pngjs` devDependency) so the echoes have geography under them, and warns if the overlay looks echo-free so a rain-free snapshot never ships unnoticed. Verify the image visually after regenerating. Committed snapshots carry attribution: radar © RainViewer, base map © OpenStreetMap contributors. The server output itself now includes an **interactive map** link (RainViewer live map / NASA Worldview) for the layered, animated browser view.
 
 <!-- capture-stamp -->
-*Captured 2026-09-23 with weather-mcp v1.31.3 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-25 with weather-mcp v1.33.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

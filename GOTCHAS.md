@@ -2179,7 +2179,13 @@ the module and was the thing actually wanted. Vacuous checks pass when they
 should fail; spurious ones fail when they should pass, and the second kind wastes
 a run arguing with correct code.
 
-**Status:** active, **extended twice on 2026-09-01 and again 2026-09-03**. Lint candidate on the vacuous half — a plan-authoring check
+**Spurious, the lock-names-the-ban shape (2026-09-25, service-status-probe-outcomes T5).** A
+"no retired phrase anywhere" grep over the repo also matches the lock that forbids those
+phrases: T4's `not.toContain('✅ Operational')` list in `tests/unit/status-handler.test.ts`. When
+the same plan adds a negative lock and a retired-phrase grep, exclude the lock file from the
+grep's pathspec, or the check fails on correct code.
+
+**Status:** active, **extended twice on 2026-09-01, again 2026-09-03 and 2026-09-25**. Lint candidate on the vacuous half — a plan-authoring check
 could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
 contains a file marked **new**. Related: [G10] (prove the hash is not vacuous —
 same family, a check that cannot fail is not evidence), [G40] (a plan's claim
@@ -3993,9 +3999,10 @@ these methods are called as `this.makeRequest<T>(...)`, so a `this\.m\(`
 pattern reports zero call sites for a method with five, and the sweep looks
 alarming for the wrong reason. Use `this\.m[<(]`. Run 2026-09-02 across
 `tests/`: the four spied methods (`makeRequest`, `makeRequestToEnsemble`,
-`makeRequestToFlood`, `makeRequestToForecast`) all have real call sites, and
-all three `checkServiceStatus` tests now mock `client.get` — **no inert mocks
-remain.** Mechanically checkable, so a strong lint candidate.
+`makeRequestToFlood`, `makeRequestToForecast`) all have real call sites. The
+three `checkServiceStatus` tests that mocked `client.get` were removed on
+2026-09-25 (see the interceptor twin below). Mechanically checkable, so a strong
+lint candidate.
 
 **Evidence:** 2026-09-02 (`f9f6771`). Two tests in
 `tests/integration/error-recovery.test.ts` mocked `makeRequest` while
@@ -4022,7 +4029,22 @@ tests beside it went red. Fixed by making each mock honour the flag the way the 
 mock, the mock must vary its output accordingly, or every assertion downstream of it is a
 tautology.
 
-**Status:** active, **extended 2026-09-03**. Lint candidate (see Verify). Related: [G45] (the mutation
+**The interceptor twin, 2026-09-25** (`4573e01`, `7c75d8a`, service-status-probe-outcomes). A
+`vi.spyOn(client, 'get')` is the wrong seam for any client that carries a response
+interceptor: the spy returns **before** the interceptor runs, so the code under test sees a raw
+value it can never see in production. The `checkServiceStatus` probes read `.response` and
+`.code` in a `catch` that ran after `handleError` had rewritten every axios error as an
+`ApiError`; the spy handed them a raw `{ code: 'ECONNREFUSED' }` and made the dead branches look
+alive for months. **Stub the adapter instead, and make the stub call axios's own `settle`**
+(`import settle from 'axios/unsafe/core/settle.js'`): the built-in adapters use `settle` to apply
+`validateStatus`, so a custom adapter that resolves a response object directly bypasses it and a
+test of a `validateStatus` change passes with or without the change. Prove the seam first with a
+positive control (a direct `client.get` against a stubbed 503 rejects with
+`ServiceUnavailableError`). Give every error answer a body (`data: {}`): `NOAAService.handleError`
+reads `data.detail` on a 404 unconditionally, so a body-less stub throws `TypeError` and the
+control fails for the wrong reason.
+
+**Status:** active, **extended 2026-09-03 and 2026-09-25**. Lint candidate (see Verify). Related: [G45] (the mutation
 check that exposes it), [G21] (the other way a mock is not the thing you think
 it is), [G13] (a fixture that cannot discriminate — this is its mock-shaped
 sibling), and the project's determinism rule — anything mockable is mocked.
@@ -5942,6 +5964,37 @@ parser normalises `127.0.0.1.` to `127.0.0.1`.
 **Status:** active. Partly lintable: a grep for an unbracketed IPv6 literal on the right of
 `hostname ===` is mechanical. Related: [G65] (the lock on the rejection messages), [G108]
 (the base-artifact repro).
+
+---
+
+## G110 — A default-context `git diff` pulls unchanged neighbours into the hunk, so `git diff | grep -c <pattern>` counts lines nobody changed
+
+**Trigger:** an acceptance check that proves a region is *unchanged* by counting a pattern in a
+diff: `git diff main -- <file> | grep -c '<name of the thing that must not change>'` expected
+to be 0.
+
+**Rule:** diff with `--unified=0` and count changed lines only, anchored so the `---`/`+++`
+headers do not match: `git diff --unified=0 main -- <file> | grep -cE '^[+-][^+-].*<pattern>'`.
+Positive-control it by renaming the thing on a scratch copy; the count must become 2 (one removed
+line, one added).
+
+**Why:** git prints three context lines around every hunk. An edit that ends within three lines
+of the protected block puts the block's unchanged first line into the output, and the count
+reads 1 for code nobody touched. The check then fails on correct work, or a builder "fixes" the
+lock to make it pass.
+
+**Verify:** after the task, run the anchored command and its scratch-copy positive control;
+0 and 2.
+
+**Evidence:** 2026-09-25, service-status-probe-outcomes T4 (`ae6715f`), found at plan review
+(codex R2). T3 rewrote the header comment of `tests/unit/status-handler.test.ts` through line 9;
+the unchanged `The drift guard below…` line 11 fell inside the default context, so the plan's
+original `git diff … | grep -c 'drift guard'` read 1 on a scratch copy with the guard
+untouched. The anchored `--unified=0` form read 0, and 2 with the guard renamed.
+
+**Status:** active. Mechanical — a plan-authoring lint could flag `git diff` piped into
+`grep -c` without `--unified=0`. Related: [G41] (a plan's acceptance check can be spurious),
+[G104] (the other way a plan's grep silently measures the wrong thing).
 
 ---
 
