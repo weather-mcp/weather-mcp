@@ -5805,14 +5805,19 @@ passes. `openmeteo.ts` and `geocoding.ts` have the same shape.
 
 **Verify:** delete one unprobed provider whose `sources` file is also listed
 elsewhere, run `tests/unit/status-handler.test.ts`, and require a red that names
-the missing provider or host.
+the missing provider or host. Since `9fbd091` the red is `host inventory > places
+every observed host exactly once`, listing every orphaned host with the file it
+was seen in. Collect the misplacements and assert once on the list: an `expect`
+inside the loop stops at the first orphan, so a two-provider deletion names only
+one of them.
 
 **Evidence:** 2026-09-23, service-status-honest-verdict diff review DR-M1
 (codex). Deleting `NOAA river gauges (NWPS)` and `USGS` gave `Tests 17 passed
 (17)`. Triage deferred the fix as a scope expansion: the shipped list is complete,
-and a deletion is a deliberate edit that a diff review sees.
+and a deletion is a deliberate edit that a diff review sees. 2026-09-26: the same
+deletion now goes red naming `api.water.noaa.gov` and `waterservices.usgs.gov`.
 
-**Status:** active, unfixed. Related: [G45] (the check cannot reach the missing
+**Status:** fixed in `9fbd091` (T2, plan-service-status-host-inventory). Related: [G45] (the check cannot reach the missing
 atomic fact), [G96] (an assertion satisfied by the wrong neighbour), [G32]
 (mutate the plausible failure shape).
 
