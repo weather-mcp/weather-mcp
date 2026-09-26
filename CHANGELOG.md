@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.2] - 2026-09-26
+
+`check_service_status` ends with a list of the services it does not check, so you know which failures it cannot diagnose. Nothing kept that list complete: a provider could drop off it, or a new one could be added without joining it, and every test still passed. This release adds that check to the test suite. The tool's output is unchanged.
+
+### Changed
+
+- **The "Not checked by this tool" line in `check_service_status` can no longer silently lose a provider.** The test suite used to check only that every file in `src/services/` was accounted for. One file often talks to several upstreams, so removing a provider from the line, or adding a new upstream to an existing file, passed unnoticed. The suite now also checks every upstream host named in `src/services/`: each one must be either probed by the tool or named on that line, and a host listed as a documentation link must not be one the code sends requests to. Nothing rendered changes. Proof: the host-inventory tests in `tests/unit/status-handler.test.ts`, which go red on the deletion that previously passed (GOTCHAS G105). (`src/utils/serviceStatusCoverage.ts`)
+
 ## [1.33.1] - 2026-09-26
 
 `check_service_status` could not tell a problem on your own machine from an outage at the weather services. A rate limit, a server error, a timeout and a dead local proxy all rendered as the same "may be experiencing issues". When the failure was local, it said "Both weather APIs are experiencing issues" and listed NOAA's operations phone number. The tool now reports what each check actually saw: a normal answer, a rate limit, an error status (named), or no answer at all. When neither service answered, it tells you to check your own network first.
@@ -1886,7 +1894,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.1...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.2...HEAD
+[1.33.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.1...v1.33.2
 [1.33.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.0...v1.33.1
 [1.33.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.1...v1.33.0
 [1.32.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.32.0...v1.32.1

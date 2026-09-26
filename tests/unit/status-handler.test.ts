@@ -8,18 +8,25 @@
  * unchanged. Every fixture is a result the real probe emits (pinned in
  * tests/unit/service-status-probes.test.ts).
  *
- * The drift guard below reads `src/services/` with `readdirSync` and checks
- * every file is placed in `STATUS_PROBED_SOURCES`, `STATUS_NOT_CHECKED`, or
- * this file's own `NO_UPSTREAM_FILES`. Its scope is `src/services/` only:
- * the handler-level RainViewer tile fetch (`src/handlers/weatherImageryHandler.ts`,
- * a bare `axios.get`) and the opt-in analytics transport (`src/analytics/transport.ts`,
- * core `https`) are both outside `src/services/` and outside this guard.
+ * The drift guard below reads `src/services/` with `readdirSync` and runs two
+ * independent checks: every file is placed in `STATUS_PROBED_SOURCES`,
+ * `STATUS_NOT_CHECKED`, or this file's own `NO_UPSTREAM_FILES`; and every
+ * `<scheme>://<host>` literal those files contain is placed in exactly one of
+ * `STATUS_PROBED_HOSTS`, some entry's `hosts`, or this file's own
+ * `NON_REQUEST_HOSTS` (test-local for the same reason `NO_UPSTREAM_FILES` is:
+ * neither renders anything, and a file placed correctly can still hide a new
+ * host, or lose an old one, without either being noticed by filename alone).
+ * Its scope is `src/services/` only: the handler-level RainViewer tile fetch
+ * (`src/handlers/weatherImageryHandler.ts`, a bare `axios.get`) and the opt-in
+ * analytics transport (`src/analytics/transport.ts`, core `https`) are both
+ * outside `src/services/` and outside this guard.
  */
 
 import { describe, it, expect, vi } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { handleCheckServiceStatus } from '../../src/handlers/statusHandler.js';
 import { STATUS_PROBED_SOURCES, STATUS_NOT_CHECKED } from '../../src/utils/serviceStatusCoverage.js';
+import { STATUS_PROBED_HOSTS } from '../../src/utils/serviceStatusCoverage.js';
 import type { NOAAService } from '../../src/services/noaa.js';
 import type { OpenMeteoService } from '../../src/services/openmeteo.js';
 import type { ServiceProbeResult } from '../../src/utils/serviceStatusProbe.js';
@@ -675,6 +682,24 @@ describe('handleCheckServiceStatus', () => {
     // Kept in the test rather than the constant, since it renders nothing.
     const NO_UPSTREAM_FILES = ['gibs.ts', 'locationStore.ts'];
 
+    // Hosts that appear in src/services/*.ts but are not request targets — docs,
+    // issue trackers, sign-up pages, and rendered attribution. Kept in the test
+    // rather than the constant, for the same reason NO_UPSTREAM_FILES is: it
+    // renders nothing.
+    const NON_REQUEST_HOSTS: Record<string, string> = {
+      'github.com': 'issue trackers and the User-Agent contact URL',
+      'weather-gov.github.io': 'NWS status and reporting pages',
+      'open-meteo.com': 'docs and status page',
+      'nominatim.org': 'Nominatim docs and usage policy',
+      'operations.osmfoundation.org': 'Nominatim docs and usage policy',
+      'wiki.openstreetmap.org': 'Nominatim docs and usage policy',
+      'nasa-gibs.github.io': 'GIBS docs',
+      'www.rainviewer.com': 'API docs',
+      'www.blitzortung.org': 'project page',
+      'www.ncdc.noaa.gov': 'NCEI token sign-up page in an error message',
+      'www.jma.go.jp': 'JMA_SOURCE_URL, rendered attribution (alertsHandler.ts:824)',
+    };
+
     const serviceFiles = readdirSync(new URL('../../src/services/', import.meta.url)).filter((f) =>
       f.endsWith('.ts')
     );
@@ -688,6 +713,37 @@ describe('handleCheckServiceStatus', () => {
         fileText.includes('fetch(') ||
         fileText.includes(`import('mqtt')`)
       );
+    }
+
+    // <scheme>://<host> literal scan, over every scheme seen in src/services/ today
+    // (http/https/mqtt/mqtts/ws/wss) — a future plaintext or websocket host is red
+    // until placed, which is the fail-closed posture the file guard already has for
+    // an unknown file.
+    const HOST_LITERAL_RE = /\b(https?|mqtts?|wss?):\/\/([A-Za-z0-9.-]+)/g;
+
+    /** Every host literal in src/services/*.ts, mapped to the file(s) it was seen in. */
+    function scanHosts(): Map<string, Set<string>> {
+      const hosts = new Map<string, Set<string>>();
+      for (const file of serviceFiles) {
+        const text = readFileSync(new URL(`../../src/services/${file}`, import.meta.url), 'utf-8');
+        for (const match of text.matchAll(HOST_LITERAL_RE)) {
+          const host = match[2];
+          if (!hosts.has(host)) {
+            hosts.set(host, new Set());
+          }
+          hosts.get(host)!.add(file);
+        }
+      }
+      return hosts;
+    }
+
+    // Literal tokens that mark a line as wiring a host into a request client —
+    // single hop, line-local. Its disclosed blind spot: a request host assigned to
+    // a bare const and wired two hops away would not be caught if allowlisted.
+    const WIRING_MARKERS = ['baseURL', 'brokerUrl', 'indexUrl:', 'axios.create(', '.get(', '.post(', 'fetch(', 'connect('];
+
+    function isWiringLine(line: string): boolean {
+      return WIRING_MARKERS.some((marker) => line.includes(marker));
     }
 
     it('places every service file as probed, not-checked, or no-upstream', () => {
@@ -738,6 +794,105 @@ describe('handleCheckServiceStatus', () => {
         const text = readFileSync(new URL(`../../src/services/${file}`, import.meta.url), 'utf-8');
         expect(importsNetwork(text), `${file} imports a network client but is listed as no-upstream`).toBe(false);
       }
+    });
+
+    describe('host inventory', () => {
+      it('places every observed host exactly once', () => {
+        // Collect every misplacement before asserting, so one red names every orphaned host.
+        const misplaced: string[] = [];
+        for (const [host, files] of scanHosts()) {
+          let count = 0;
+          if (STATUS_PROBED_HOSTS.includes(host)) {
+            count++;
+          }
+          for (const entryItem of STATUS_NOT_CHECKED) {
+            if (entryItem.hosts.includes(host)) {
+              count++;
+            }
+          }
+          if (Object.prototype.hasOwnProperty.call(NON_REQUEST_HOSTS, host)) {
+            count++;
+          }
+          if (count !== 1) {
+            misplaced.push(
+              `${host} (seen in ${[...files].join(', ')}) is placed in ${count} of STATUS_PROBED_HOSTS / ` +
+                `STATUS_NOT_CHECKED[].hosts / NON_REQUEST_HOSTS — place it in exactly one (tests/unit/status-handler.test.ts)`
+            );
+          }
+        }
+        expect(misplaced).toEqual([]);
+      });
+
+      it('names no stale host', () => {
+        const scanned = scanHosts();
+        for (const host of STATUS_PROBED_HOSTS) {
+          expect(
+            scanned.has(host),
+            `"${host}" (STATUS_PROBED_HOSTS) is declared but not observed in src/services/`
+          ).toBe(true);
+        }
+        for (const entryItem of STATUS_NOT_CHECKED) {
+          for (const host of entryItem.hosts) {
+            expect(
+              scanned.has(host),
+              `"${host}" ("${entryItem.provider}") is declared but not observed in src/services/`
+            ).toBe(true);
+          }
+        }
+        for (const host of Object.keys(NON_REQUEST_HOSTS)) {
+          expect(
+            scanned.has(host),
+            `"${host}" (NON_REQUEST_HOSTS) is declared but not observed in src/services/`
+          ).toBe(true);
+        }
+      });
+
+      it('every entry declares at least one host', () => {
+        for (const entryItem of STATUS_NOT_CHECKED) {
+          expect(entryItem.hosts.length, `"${entryItem.provider}" names no hosts`).toBeGreaterThan(0);
+        }
+      });
+
+      it('keeps NON_REQUEST_HOSTS honest', () => {
+        for (const host of Object.keys(NON_REQUEST_HOSTS)) {
+          for (const file of serviceFiles) {
+            const text = readFileSync(new URL(`../../src/services/${file}`, import.meta.url), 'utf-8');
+            const lines = text.split(/\r?\n/);
+            lines.forEach((line, idx) => {
+              if (line.includes(`://${host}`)) {
+                expect(
+                  isWiringLine(line),
+                  `${host} appears on a wiring line at ${file}:${idx + 1} but is listed in NON_REQUEST_HOSTS`
+                ).toBe(false);
+              }
+            });
+          }
+        }
+      });
+
+      it('positive control: the wiring predicate can fail', () => {
+        const controls: Array<[string, string]> = [
+          ['noaa.ts', 'api.weather.gov'],
+          ['blitzortung.ts', 'blitzortung.ha.sed.pl'],
+          ['nationalCap.ts', 'sachet.ndma.gov.in'],
+        ];
+        for (const [file, host] of controls) {
+          const text = readFileSync(new URL(`../../src/services/${file}`, import.meta.url), 'utf-8');
+          const lines = text.split(/\r?\n/);
+          // Any line carrying the host may be the wiring one; a doc comment above it must not decide.
+          const hostLines = lines.filter((line) => line.includes(`://${host}`));
+          expect(hostLines.length, `no line in ${file} carries ${host}`).toBeGreaterThan(0);
+          expect(hostLines.some(isWiringLine), `no ${host} line in ${file} was classified as wiring`).toBe(true);
+        }
+      });
+
+      it('positive control: the scan sees a non-HTTPS scheme', () => {
+        const scanned = scanHosts();
+        expect(
+          scanned.has('blitzortung.ha.sed.pl'),
+          'the mqtt:// scheme arm of the host regex found nothing'
+        ).toBe(true);
+      });
     });
   });
 });
