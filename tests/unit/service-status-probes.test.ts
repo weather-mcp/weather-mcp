@@ -316,4 +316,17 @@ describe('Open-Meteo checkServiceStatus() empty-body handling', () => {
     expect(result.httpStatus).toBe(200);
     expect(result.message).toBe('Open-Meteo API answered HTTP 200 with an empty body');
   });
+
+  // The shape a real empty body has: axios 1.x delivers it as '', not null
+  it("200 with data: '' -> http_error, httpStatus 200, empty-body message", async () => {
+    const service = new OpenMeteoService();
+    stubAdapter(getClient(service), { status: 200, data: '' });
+
+    const result = await service.checkServiceStatus();
+
+    expect(result.outcome).toBe('http_error');
+    expect(result.operational).toBe(false);
+    expect(result.httpStatus).toBe(200);
+    expect(result.message).toBe('Open-Meteo API answered HTTP 200 with an empty body');
+  });
 });

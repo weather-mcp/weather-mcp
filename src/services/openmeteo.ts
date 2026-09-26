@@ -375,8 +375,8 @@ export class OpenMeteoService {
 
       const httpStatus = response.status;
       const classified = classifyProbeStatus(httpStatus);
-      // A 200 with no body answered, but not usably
-      const emptyBody = classified === 'ok' && response.data == null;
+      // A 200 with no body answered, but not usably. Axios delivers an empty body as ''
+      const emptyBody = classified === 'ok' && (response.data == null || response.data === '');
       const outcome = emptyBody ? 'http_error' : classified;
       let message: string;
       if (emptyBody) {
