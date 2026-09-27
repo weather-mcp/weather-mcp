@@ -43,7 +43,10 @@ import {
 } from '../../src/analytics/config.js';
 import { logger } from '../../src/utils/logger.js';
 
-const DEFAULT_ENDPOINT = 'https://analytics.weather-mcp.com/v1/events';
+// There is no default endpoint. The absent case warns with this string, pinned
+// whole (G65).
+const NO_ENDPOINT_WARNING =
+  'ANALYTICS_ENABLED=true but ANALYTICS_ENDPOINT is not set; analytics stays off (there is no default endpoint)';
 
 // Vitest's toThrow('<string>') is a substring match. Pin every message whole
 // (G65), so a suffix appended to a message turns the row red.
@@ -57,7 +60,6 @@ describe('validateAnalyticsEndpoint', () => {
       'https://analytics.example.com/v1/events',
       'https://analytics.example.com:443/v1/events',
       'https://analytics.example.com:8443/v1/events',
-      'https://analytics.weather-mcp.com/v1/events',
       // A fully-qualified name with a trailing dot is still a domain name.
       'https://analytics.example.com./v1/events',
     ];
@@ -167,20 +169,48 @@ describe('loadAnalyticsConfig — fail-safe fallback', () => {
     vi.restoreAllMocks();
   });
 
-  it('defaults to disabled with the default endpoint when unset, and does not log an error', () => {
+  it('stays disabled with no endpoint when nothing is set, and logs neither a warning nor an error', () => {
     vi.stubEnv('ANALYTICS_ENABLED', undefined);
     vi.stubEnv('ANALYTICS_ENDPOINT', undefined);
     vi.stubEnv('ANALYTICS_SALT', 'analytics-endpoint-validation-test');
     const errorSpy = vi.spyOn(logger, 'error');
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const infoSpy = vi.spyOn(logger, 'info');
 
     const config = loadAnalyticsConfig();
 
     expect(config.enabled).toBe(false);
-    expect(config.endpoint).toBe(DEFAULT_ENDPOINT);
+    expect(config.endpoint).toBeNull();
     expect(errorSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledWith('Analytics disabled by user preference');
   });
 
-  it('falls back to disabled and the default endpoint when ANALYTICS_ENDPOINT is a rejected IPv4 literal', () => {
+  it.each([
+    ['unset', undefined],
+    ['empty', ''],
+  ])(
+    'stays disabled with no endpoint and warns once when ANALYTICS_ENABLED=true and ANALYTICS_ENDPOINT is %s',
+    (_label, value) => {
+      vi.stubEnv('ANALYTICS_ENABLED', 'true');
+      vi.stubEnv('ANALYTICS_ENDPOINT', value);
+      vi.stubEnv('ANALYTICS_SALT', 'analytics-endpoint-validation-test');
+      const errorSpy = vi.spyOn(logger, 'error');
+      const warnSpy = vi.spyOn(logger, 'warn');
+      const infoSpy = vi.spyOn(logger, 'info');
+
+      const config = loadAnalyticsConfig();
+
+      expect(config.enabled).toBe(false);
+      expect(config.endpoint).toBeNull();
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0][0]).toBe(NO_ENDPOINT_WARNING);
+      expect(infoSpy).not.toHaveBeenCalledWith('Analytics configuration loaded', expect.anything());
+    }
+  );
+
+  it('falls back to disabled with no endpoint when ANALYTICS_ENDPOINT is a rejected IPv4 literal', () => {
     vi.stubEnv('ANALYTICS_ENABLED', 'true');
     vi.stubEnv('ANALYTICS_ENDPOINT', 'https://10.0.0.1/v1/events');
     vi.stubEnv('ANALYTICS_SALT', 'analytics-endpoint-validation-test');
@@ -192,7 +222,7 @@ describe('loadAnalyticsConfig — fail-safe fallback', () => {
     }).not.toThrow();
 
     expect(config!.enabled).toBe(false);
-    expect(config!.endpoint).toBe(DEFAULT_ENDPOINT);
+    expect(config!.endpoint).toBeNull();
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy.mock.calls[0][0]).toBe(
       'Invalid ANALYTICS_ENDPOINT configuration: Invalid ANALYTICS_ENDPOINT: cannot point to internal network'
@@ -200,7 +230,7 @@ describe('loadAnalyticsConfig — fail-safe fallback', () => {
   });
 
   it(
-    'falls back to disabled and the default endpoint when ANALYTICS_ENDPOINT is a rejected IPv6 literal',
+    'falls back to disabled with no endpoint when ANALYTICS_ENDPOINT is a rejected IPv6 literal',
     () => {
       vi.stubEnv('ANALYTICS_ENABLED', 'true');
       vi.stubEnv('ANALYTICS_ENDPOINT', 'https://[::1]/v1/events');
@@ -213,7 +243,7 @@ describe('loadAnalyticsConfig — fail-safe fallback', () => {
       }).not.toThrow();
 
       expect(config!.enabled).toBe(false);
-      expect(config!.endpoint).toBe(DEFAULT_ENDPOINT);
+      expect(config!.endpoint).toBeNull();
       expect(errorSpy).toHaveBeenCalledTimes(1);
       expect(errorSpy.mock.calls[0][0]).toBe(
         'Invalid ANALYTICS_ENDPOINT configuration: Invalid ANALYTICS_ENDPOINT: IP addresses not allowed, use domain name'
@@ -225,10 +255,15 @@ describe('loadAnalyticsConfig — fail-safe fallback', () => {
     vi.stubEnv('ANALYTICS_ENABLED', 'true');
     vi.stubEnv('ANALYTICS_ENDPOINT', 'https://analytics.example.com/v1/events');
     vi.stubEnv('ANALYTICS_SALT', 'analytics-endpoint-validation-test');
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const infoSpy = vi.spyOn(logger, 'info');
 
     const config = loadAnalyticsConfig();
 
     expect(config.enabled).toBe(true);
     expect(config.endpoint).toBe('https://analytics.example.com/v1/events');
+    expect(warnSpy).not.toHaveBeenCalled();
+    // The exact object: no 'default' | 'custom' endpoint discriminator.
+    expect(infoSpy).toHaveBeenCalledWith('Analytics configuration loaded', { level: 'minimal' });
   });
 });

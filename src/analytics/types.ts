@@ -56,7 +56,11 @@ export type AnalyticsEvent =
 export interface AnalyticsConfig {
   enabled: boolean;
   level: AnalyticsLevel;
-  endpoint: string;
+  /**
+   * Invariant: `enabled` is true only when `endpoint` is a validated HTTPS URL.
+   * `null` means no endpoint was configured, and there is no default.
+   */
+  endpoint: string | null;
   version: string;
   salt?: string; // For session ID hashing
 }

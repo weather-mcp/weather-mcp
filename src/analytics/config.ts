@@ -22,11 +22,6 @@ const packageJson = JSON.parse(
 );
 
 /**
- * Default analytics endpoint (production analytics server)
- */
-const DEFAULT_ENDPOINT = 'https://analytics.weather-mcp.com/v1/events';
-
-/**
  * Validate analytics endpoint for security
  * Prevents SSRF attacks and enforces HTTPS
  */
@@ -148,26 +143,44 @@ export function loadAnalyticsConfig(): AnalyticsConfig {
     });
   }
 
-  // Analytics endpoint (custom server or default)
-  const endpoint = process.env.ANALYTICS_ENDPOINT || DEFAULT_ENDPOINT;
+  // Analytics endpoint. There is no default: events go only where the operator
+  // names. An empty value is treated as unset.
+  const rawEndpoint = process.env.ANALYTICS_ENDPOINT;
+  const endpoint = rawEndpoint ? rawEndpoint : null;
 
-  // Validate endpoint for security
-  try {
-    validateAnalyticsEndpoint(endpoint);
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`Invalid ANALYTICS_ENDPOINT configuration: ${errorMsg}`, error instanceof Error ? error : new Error(String(error)));
-    // Disable analytics if endpoint is invalid (fail-safe)
-    return {
-      enabled: false,
-      level: 'minimal',
-      endpoint: DEFAULT_ENDPOINT,
-      version: packageJson.version,
-    };
+  // Validate endpoint for security (whenever one is supplied, enabled or not)
+  if (endpoint !== null) {
+    try {
+      validateAnalyticsEndpoint(endpoint);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`Invalid ANALYTICS_ENDPOINT configuration: ${errorMsg}`, error instanceof Error ? error : new Error(String(error)));
+      // Disable analytics if endpoint is invalid (fail-safe)
+      return {
+        enabled: false,
+        level: 'minimal',
+        endpoint: null,
+        version: packageJson.version,
+      };
+    }
   }
 
   // Salt for session ID hashing (auto-generated if not provided)
   const salt = getOrGenerateAnalyticsSalt();
+
+  if (enabled && endpoint === null) {
+    logger.warn(
+      'ANALYTICS_ENABLED=true but ANALYTICS_ENDPOINT is not set; analytics stays off (there is no default endpoint)',
+      { securityEvent: true }
+    );
+    return {
+      enabled: false,
+      level,
+      endpoint: null,
+      version: packageJson.version,
+      salt,
+    };
+  }
 
   const config: AnalyticsConfig = {
     enabled,
@@ -178,10 +191,7 @@ export function loadAnalyticsConfig(): AnalyticsConfig {
   };
 
   if (enabled) {
-    logger.info('Analytics configuration loaded', {
-      level,
-      endpoint: endpoint === DEFAULT_ENDPOINT ? 'default' : 'custom',
-    });
+    logger.info('Analytics configuration loaded', { level });
   } else {
     logger.info('Analytics disabled by user preference');
   }
