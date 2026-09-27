@@ -3445,7 +3445,11 @@ it into the checking process.
 **Rule.** The four points below apply to an import of the **entry**,
 `src/index.ts`. `src/index.ts` calls `main()` unconditionally at module scope, so the
 import *is* a server start: it constructs a `StdioServerTransport`, calls
-`server.connect()`, and registers `SIGTERM`/`SIGINT` handlers. Four things, all
+`server.connect()`, registers `SIGTERM`/`SIGINT` handlers, and — since
+`ba58043` (2026-09-27) — attaches `end`/`close` listeners to **`process.stdin`
+itself** and sets `server.onclose`, all wired to a coordinator that ends in
+`process.exit`. Stubbing the transport does not stub those listeners: the
+worker's own stdin closing would run the shutdown. Four things, all
 required together:
 
 1. `vi.mock('@modelcontextprotocol/sdk/server/stdio.js', …)` with a stub class
@@ -3511,7 +3515,12 @@ DOTENV_CONFIG_PATH=/nonexistent npx vitest run <file>`) — the suite stays gree
 and `analytics-salt` appears under the temp `HOME`, which is the whole point (the
 pin's absence is invisible to the assertions and visible only on the filesystem).
 Measured 2026-09-09: 64 bytes, mode 0600. For the four points themselves there is
-no live example left — nothing imports the entry.
+no live example left — nothing imports the entry. **To test the entry's
+behaviour, spawn it instead:** `tests/integration/stdio-shutdown.test.ts`
+(`4846e9e`) runs `node --import <tsx resolved via import.meta.resolve('tsx')>
+src/index.ts` from a temp cwd and `HOME` with this entry's offline variables, and
+is the working template. Resolve `tsx` from the test file: `--import tsx`
+resolves against the child's cwd, which is deliberately outside the repo.
 
 **Evidence:** 2026-09-01 (`a4252ca`, tool-name-single-source T3). Until that
 commit **no test imported `src/index.ts` at all**, so the trap had never been
@@ -6088,9 +6097,52 @@ over `git diff main`; the fixture lines match.
 T2/T4). Ten hits over the branch diff: two in docs (reworded before commit),
 eight in the two new test files.
 
+**Second data point, 2026-09-27** (`fa6dbd9`, stdio-eof-shutdown T2): **zero
+hits** is achievable and worth aiming for. The regex needs one of its four words
+followed by `=`/`:`. A userinfo URL (`mqtt://u5er-eof:pw-eof-hyg@host`) does not
+match, and neither does a fixture held in a variable named `marker` rather than
+`token`/`password`. The absence assertion is exactly as strong.
+
 **Status:** active. Lint candidate: the scan could exclude `tests/` lines whose
 token value matches a declared synthetic-fixture marker (e.g. a `-hyg` suffix).
 Related: [G13], [G62].
+
+---
+
+## G113 — `memo = asyncRun()` does not publish the memo before the pre-`await` body runs
+
+**Trigger:** a run-once or single-flight wrapper that stores the promise of an
+`async` function in its own memo — `if (running) return running; running =
+run();` — where `run()` can reach the wrapper again synchronously, directly or
+through a callback it fires (a `close()` that fires an `onclose` handler).
+
+**Rule:** publish the promise before the body starts:
+`running = Promise.resolve().then(() => run(reason));`. Lock it with a test
+whose **first** step re-enters the wrapper synchronously. A re-entry in a later
+step proves nothing, because an earlier `await` has already published the memo.
+
+**Why:** the right-hand side is evaluated before the assignment, and an `async`
+function runs synchronously up to its first suspension, including evaluating
+the first awaited expression. A re-entry in that window sees an empty memo and
+starts a second run. This is [G20]'s window moved inside a single expression:
+there is no visible `await` between check and assignment, so the G20 check
+passes on a line that is still unsound. Production can be safe by accident — the
+shutdown coordinator's real re-entry (`server.close()` → `server.onclose`) is
+its fourth step, after three awaits — while the exported contract is broken.
+
+**Verify:** in `src/server/shutdown.ts`, replace the deferred launch with
+`running = run(reason)` and run `tests/unit/shutdown.test.ts`. Only
+"a FIRST step that re-enters the trigger synchronously does not start a second
+run" goes red.
+
+**Evidence:** 2026-09-27, stdio-eof-shutdown. Found at plan review (codex R1)
+against a plan that prescribed `running = run(reason)` and justified it with
+G20's same-synchronous-run argument. Fixed before any code was written
+(`fa6dbd9`). The mutation above (T2 M7) reddened exactly that one case.
+
+**Status:** active. Related: [G20] (the boolean-flag form of the same window),
+[G17]/[G24] (the memoised `mqtt` import, the repo's other single-flight). Not
+lintable in general: whether `run()` can re-enter is a property of its callers.
 
 ---
 
