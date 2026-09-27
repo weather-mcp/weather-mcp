@@ -1767,11 +1767,20 @@ diagnose by **CPU and process tree**, never by log silence: compare
 `pgrep -a -P <pid>`. If the children are stranded drivers, kill **them**, not
 the chain — the CLI then flushes and exits 0 with its work intact.
 
-**Why:** every service constructor calls `new Cache(...)`, which arms a ref'd
-5-minute `setInterval` at `src/utils/cache.ts:42` and never `.unref()`s it —
-`src/analytics/collector.ts:274` is the only unref'd timer in the tree. One
-constructed service therefore holds Node's event loop open forever: the script
-body runs, prints, and the process stays. Nothing in the output says "hung".
+**Why:** until v1.33.5, every service constructor called `new Cache(...)`, which
+armed a ref'd 5-minute `setInterval` at `src/utils/cache.ts:42`, and
+`src/analytics/collector.ts:274` (now `:286`) was the only unref'd timer in the
+tree. One constructed service therefore held Node's event loop open forever: the
+script body ran, printed, and the process stayed. Nothing in the output said
+"hung".
+
+**Since `stdio-eof-shutdown` (`2c4cc31`, 2026-09-27)** the cache interval and
+both `BlitzortungService` housekeeping intervals are `unref()`'d, so a driver
+that only constructs services now exits on its own. It still does **not** exit
+while it holds a socket — a Blitzortung MQTT connection (auto-reconnecting), an
+in-flight upstream request — and a driver that opens one still hangs exactly as
+described. So the rule stands as hygiene: `process.exit(0)` in every driver,
+one at a time.
 
 The second half is what makes this expensive. A vendor CLI invoked
 non-interactively (`agy -p`, and the other `--print`-style modes) **buffers its
@@ -1788,8 +1797,10 @@ and nothing else prints its line and then hangs —
 node -e 'import("./dist/services/nifc.js").then(m=>{new (Object.values(m).find(v=>typeof v==="function"))();console.log("body finished")})'
 ```
 
-exits 124 under `timeout 10`, not 0. Adding `process.exit(0)` after the log
-makes it exit 0 immediately.
+exited 124 under `timeout 10` before `2c4cc31`. **Re-run 2026-09-27 against
+`feat/stdio-eof-shutdown` @ `4846e9e`'s dist: exit 0** — the body finishes and
+the loop drains. To reproduce the hang now, the driver must open a socket (for
+example `blitzortungService.prewarmLocation(...)` against a reachable broker).
 
 **Evidence:** 2026-08-27, `post-run-pipeline.sh` on `feat/wildfire-band-rounding`
 — the Antigravity/Gemini diff-review leg appeared dead for 16 minutes: `agy`
