@@ -227,6 +227,9 @@ What the report will and will not claim:
 
 The cause (connect timeout, connection error, or a failed subscribe) is written to the **stderr log
 only**, never to the report. Nothing about the broker — its URL included — reaches either surface.
+The connect-time log line names the endpoint — scheme, host and port — so you can see which broker
+the server is using. It never carries the username, password or query string of
+`BLITZORTUNG_MQTT_URL`.
 
 No action is usually needed. If every lightning query reports an outage, check outbound access to
 the broker on port 1883, or set `BLITZORTUNG_MQTT_URL` to a reachable one.

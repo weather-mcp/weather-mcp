@@ -8,7 +8,7 @@
  */
 
 import type { MqttClient } from 'mqtt';
-import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging, redactUrlForLogging } from '../utils/logger.js';
 import { LightningStrike, LightningFeedFailure, LightningFeedFailureReason } from '../types/lightning.js';
 import { calculateGeohashSubscriptions } from '../utils/geohash.js';
 import { MqttLoadFailedError, MqttUnavailableError } from '../errors/ApiError.js';
@@ -205,6 +205,9 @@ export class BlitzortungService {
   //
   // Location privacy: Geohash subscriptions have ~4-40km precision (limited tracking risk)
   private readonly brokerUrl = process.env.BLITZORTUNG_MQTT_URL || 'mqtt://blitzortung.ha.sed.pl:1883';
+  // The broker as it may appear in a log line: scheme, host and port. The URL itself can carry
+  // credentials in userinfo or the query, and mqtt forwards both to the broker.
+  private readonly brokerDisplay = redactUrlForLogging(this.brokerUrl);
   private readonly topicPrefix = 'blitzortung/1.1';
   private readonly reconnectPeriod = 5000; // 5 seconds
   private readonly connectTimeout = 30000; // 30 seconds
@@ -287,14 +290,14 @@ export class BlitzortungService {
 
       if (isPlaintext) {
         logger.warn('SECURITY: Using plaintext MQTT connection (unencrypted)', {
-          broker: this.brokerUrl,
+          broker: this.brokerDisplay,
           securityEvent: true,
           recommendation: 'Use BLITZORTUNG_MQTT_URL environment variable to configure TLS broker (mqtts:// or wss://)'
         });
       }
 
       logger.info('Connecting to Blitzortung MQTT broker', {
-        broker: this.brokerUrl,
+        broker: this.brokerDisplay,
         encrypted: !isPlaintext
       });
 
@@ -321,7 +324,15 @@ export class BlitzortungService {
           clearTimeout(timeoutId);
           this.isConnecting = false;
           this.connectionLossGeneration++;
-          logger.error('MQTT connection error', error);
+          // The `Error` slot is deliberately left empty, as at the three other failure sites below:
+          // the logger serialises message and stack, and the transport decides what goes in them —
+          // mqtt names the broker host and port, and ws puts the raw address in `Invalid URL: …`.
+          // Only the name and code are kept.
+          const failure = error as NodeJS.ErrnoException;
+          logger.error('MQTT connection error', undefined, {
+            name: failure.name,
+            code: failure.code
+          });
           reject(error);
         });
 

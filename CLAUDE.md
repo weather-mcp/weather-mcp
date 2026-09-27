@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.33.4 (Production Ready)
+- **Version:** 1.33.5 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -74,7 +74,7 @@ src/
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
 │   ├── serviceStatusProbe.ts     # check_service_status probe outcome type + 200/429/other classification; both probes import it (pure)
-│   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing
+│   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing; log redaction (coordinates, URLs)
 │   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates; shared country-code resolution
 │   ├── geography.ts         # isInUS and region helpers
 │   ├── timezone.ts          # Local-time formatting, formatObservationAge
@@ -224,6 +224,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 ### Keys, secrets, attribution
 
 - **Key-in-URL services** (FIRMS, Google Pollen, Google Weather): never log or throw URLs or raw axios errors; every thrown error is a fixed pre-written string; logs carry only `{ status, code }`; unit tests assert the key appears in no thrown message and no logger argument.
+- **The MQTT broker URL** (`BLITZORTUNG_MQTT_URL`) is in the same class: it can carry credentials in userinfo or the query, and `mqtt` forwards both. Never log it raw; `redactUrlForLogging` (`src/utils/logger.ts`) is the accessor, and it has no `LOG_PII` opt-in.
 - **Env vars are permanent and per-feature** — a new Google-backed feature gets its own var (key restrictions make a shared var break silently).
 - **Standing key policy:** no tool ever *requires* a key; a keyed feature needs a usable free tier; say plainly when a "free tier" still needs a billing account.
 - **Attribution strings that a licence mandates are exact** (`Source: Includes weather data from Google`, `Source: Includes pollen data from Google`) — do not reword. Licensed alert text renders verbatim with issue times as published.
@@ -632,15 +633,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.33.4 — Production Ready ✅
-- **Test Coverage:** 3,770 tests, 100% pass rate
+- **Version:** 1.33.5 — Production Ready ✅
+- **Test Coverage:** 3,807 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.33.5:** The lightning broker's credentials no longer reach the log
 - **New in v1.33.4:** Analytics no longer has a default endpoint
 - **New in v1.33.3:** METAR reports no longer render a null measurement as zero
-- **New in v1.33.2:** The service-status coverage line is guarded by host, not only by file
 
 ## Useful References
 
@@ -663,7 +664,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-26 (v1.33.4)
+**Last Updated:** 2026-09-27 (v1.33.5)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

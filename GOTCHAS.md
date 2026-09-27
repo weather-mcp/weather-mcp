@@ -5704,6 +5704,11 @@ watch the test go red — not by the fact that it compiled, because it never was
 compiled. If you want a real check on one file, run `npx tsc --noEmit` against
 it explicitly; the gate will not do it for you.
 
+On TypeScript 7 (`typescript@7.0.2`, since 2026-09) a one-file `tsc` with flags
+fails with `TS5112` while `tsconfig.json` exists; pass `--ignoreConfig`:
+`npx tsc --noEmit --ignoreConfig --module Node16 --moduleResolution Node16 --target ES2022 --strict --skipLibCheck --types node,vitest tests/unit/<file>.test.ts`
+(exit 0 and no output on a clean file; 2026-09-27, `408a5ee`/`984df08`).
+
 **Why:** the two halves of the gate each decline the job, and neither says so.
 `tsconfig.json:27` is `"include": ["src/**/*"]`, so `npm run build` never reads
 `tests/` at all — `tsc` emits zero errors because it was never handed the file.
@@ -6043,6 +6048,38 @@ check above returned `{"data":"","isNull":false,"truthy":false}` on axios 1.20.0
 **Status:** active. Related: [G13]/[G45]/[G70] (prove a stub reaches the real code path before
 trusting it). This is the same idea for the *payload*: a stub can reach the real interceptor and
 still hand it a value the network never sends.
+
+---
+
+## G112 — A credential-hygiene test's fixtures trip the release leak scan
+
+**Trigger:** a plan whose tests prove that a secret never reaches a log line or
+an error message — broker URLs, key-in-URL services, anything with synthetic
+`password`/`token` fixtures — and any doc prose that quotes a credentialed URL.
+
+**Rule:** expect the bindings' release leak scan (`## Release`, "Leak scan") to
+hit the test file, and say so in the run's closing report so `/release` reads
+the hits instead of stopping cold. Use obviously synthetic tokens
+(`pw-hunter2-hyg`, `qt0ken-hyg`) so each hit is recognisable at a glance. Keep
+docs off the pattern: write "a token in the query string", not `?token=…`.
+
+**Why:** the scan matches `(api[_-]?key|token|secret|password)[^a-z]*[=:]`, and
+the bindings call any hit "a stop, not a judgment call". A hygiene contract
+cannot be written without a credential-shaped fixture (G13: the fixture must
+carry the secret, or the absence assertion cannot fail). So the scan and the
+test are in direct conflict, and the conflict surfaces only at `/release`,
+after every review has passed.
+
+**Verify:** on a branch that adds such a test, run the scan from the bindings
+over `git diff main`; the fixture lines match.
+
+**Evidence:** 2026-09-27 (`984df08`, `c897f92`, mqtt-broker-url-log-hygiene
+T2/T4). Ten hits over the branch diff: two in docs (reworded before commit),
+eight in the two new test files.
+
+**Status:** active. Lint candidate: the scan could exclude `tests/` lines whose
+token value matches a declared synthetic-fixture marker (e.g. a `-hyg` suffix).
+Related: [G13], [G62].
 
 ---
 
