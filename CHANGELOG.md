@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.5] - 2026-09-27
+
+You can point the lightning tool at your own broker with `BLITZORTUNG_MQTT_URL`, and that address can carry a username and password. The server wrote the whole address, credentials included, to its log each time it connected, so anyone who could read the log could read the password. This release keeps the credentials out of the log. The log still names the broker by scheme, host and port. Nothing changes if you use the default broker, and the lightning report reads exactly as before.
+
 ### Security
 
 - **The lightning broker's credentials no longer reach the log.** A `BLITZORTUNG_MQTT_URL` carrying a username, password or query token (`mqtts://user:pass@host:8883`, or a token in the query string) was written verbatim to stderr on every connect and reconnect, and a connection error copied the transport's own message into the log. The connect lines now show only the scheme, host and port, and a connection error logs its name and code. The broker still receives the credentials. Nothing `get_lightning_activity` renders changes. (`src/utils/logger.ts`, `src/services/blitzortung.ts`, `docs/ERROR_HANDLING.md`, `.env.example`)
@@ -1914,7 +1918,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.4...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.5...HEAD
+[1.33.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.4...v1.33.5
 [1.33.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.3...v1.33.4
 [1.33.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.2...v1.33.3
 [1.33.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.1...v1.33.2
