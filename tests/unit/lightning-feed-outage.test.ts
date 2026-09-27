@@ -99,10 +99,12 @@ function createPresentMqttModule(client: ReturnType<typeof createFakeMqttClient>
  * Re-import blitzortung.js (and the logger singleton) from a clean module
  * registry, exactly as tests/unit/mqtt-optional.test.ts does, so the
  * per-query WeakMap and connectionLossGeneration state, and the module-level
- * mqtt memo, all start fresh. Wrapped in fake timers so the constructor's two
- * un-unref'd setInterval calls land on the fake clock and are abandoned
- * rather than leaking real timers (G21 rule 3) — the test body then switches
- * to its own fake timers for the 10s accumulation wait.
+ * mqtt memo, all start fresh. The constructor's two setInterval calls are now
+ * unref'd, so they no longer hold the event loop open — but a fresh import
+ * under vi.resetModules() still arms two live timers per import, so this
+ * stays wrapped in fake timers to land them on the fake clock and abandon
+ * them there rather than leaking real timers (G21 rule 3) — the test body
+ * then switches to its own fake timers for the 10s accumulation wait.
  */
 async function importFreshBlitzortung() {
   vi.useFakeTimers();

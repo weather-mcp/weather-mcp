@@ -639,6 +639,7 @@ export class BlitzortungService {
    * Periodically prune stale subscriptions (not accessed in last hour)
    */
   private startSubscriptionPruning(): void {
+    // Housekeeping only — must not keep the process alive once nothing else is live.
     setInterval(async () => {
       if (!this.client || this.subscribedGeohashes.size === 0) {
         return;
@@ -687,7 +688,7 @@ export class BlitzortungService {
           remainingSubscriptions: this.subscribedGeohashes.size
         });
       }
-    }, SUBSCRIPTION_PRUNE_INTERVAL_MS);
+    }, SUBSCRIPTION_PRUNE_INTERVAL_MS).unref();
   }
 
   /**
@@ -969,9 +970,10 @@ export class BlitzortungService {
    */
   private startCleanupInterval(): void {
     // Clean up every 5 minutes
+    // Housekeeping only — must not keep the process alive once nothing else is live.
     setInterval(() => {
       this.cleanupBuffer();
-    }, 5 * 60 * 1000);
+    }, 5 * 60 * 1000).unref();
   }
 
   /**

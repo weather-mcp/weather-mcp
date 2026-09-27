@@ -42,6 +42,8 @@ export class Cache<T = any> {
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpired();
     }, cleanupIntervalMs);
+    // Housekeeping only — must not keep the process alive once nothing else is live.
+    this.cleanupInterval.unref();
   }
 
   /**
