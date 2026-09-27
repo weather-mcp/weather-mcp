@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+An MCP client ends a session by closing the server's input and waiting for it to exit. This server did not notice. It kept running until the client gave up and sent `SIGTERM`, which the MCP SDK's own client does after a 2-second wait. With lightning pre-warm on it stayed connected to the lightning broker the whole time. This release makes the server shut down as soon as its client closes the session. The shutdown is bounded and happens once, and it disconnects from the broker on the way out. Weather output does not change.
+
 ### Fixed
 
 - **The server now exits when its client closes stdin.** MCP clients end a stdio session by closing the server's input. The server ignored that and stayed running until the client fell back to `SIGTERM`. It now shuts down on stdin EOF, when the transport closes, or on `SIGTERM`/`SIGINT`. It does this once however many of these arrive, and it takes at most 1.5 seconds. On the way out it also disconnects from the lightning broker. Background housekeeping timers no longer keep the process alive. (`src/server/shutdown.ts`, `src/index.ts`, `src/utils/cache.ts`, `src/services/blitzortung.ts`)
+- **A shutdown that goes wrong now exits with code 1 and says why.** If a shutdown step fails, the remaining steps still run, the failure is logged by step name and error code, and the exit code is 1. This includes a broker disconnect that reports an error, which used to be logged as a clean disconnect. A step that stalls is cut off at the 1.5-second limit, with a warning that names it. The error text itself is not logged, because a broker error can carry the broker's address. (`src/server/shutdown.ts`, `src/services/blitzortung.ts`)
+
+### Changed
+
+- **The shutdown log lines have new wording.** On shutdown, stderr used to show `Received SIGTERM, shutting down gracefully...`, `Analytics flushed`, `Cache cleared` and `Server closed`. It now shows `Shutting down` with the reason (`stdin end`, `stdin close`, `transport closed`, `SIGTERM` or `SIGINT`), then `Shutdown complete`. Update anything that watches the log for the old lines. (`src/index.ts`, `src/server/shutdown.ts`)
 
 ## [1.33.5] - 2026-09-27
 
