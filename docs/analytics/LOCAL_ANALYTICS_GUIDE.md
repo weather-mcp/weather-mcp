@@ -52,7 +52,9 @@ There is **no default endpoint**. With `ANALYTICS_ENABLED=true` and `ANALYTICS_E
 empty, the server logs one warning at startup —
 `ANALYTICS_ENABLED=true but ANALYTICS_ENDPOINT is not set; analytics stays off (there is no default endpoint)` —
 and analytics stays off. The server keeps running and no tool is affected. With `ANALYTICS_ENABLED`
-unset, nothing is sent and the only analytics line logged is `Analytics disabled by user preference`.
+unset, nothing is sent and the server logs `Analytics disabled by user preference`. On the first
+run — no `ANALYTICS_SALT` set and no `~/.weather-mcp/analytics-salt` file yet — it also logs
+`Generated new analytics salt` just before that line.
 
 ## Testing Analytics Integration
 
