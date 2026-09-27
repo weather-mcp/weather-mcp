@@ -241,3 +241,39 @@ export function redactCoordinatesForLogging(latitude: number, longitude: number)
     lon: Math.round(longitude * 100) / 100
   };
 }
+
+/**
+ * Reduce a URL to its scheme, host and port for logging.
+ *
+ * Returns only `<protocol>//<host>` — never the username, password, path, query
+ * or fragment. Userinfo and the query string are both credential channels for a
+ * broker URL (e.g. `mqtt`'s client forwards both to the connection), so either
+ * one reaching a log line is a leak, not just the password.
+ *
+ * Deliberately **not** gated on `LOG_PII`: that flag exists to trade coordinate
+ * precision for debuggability, and credentials are not PII. Gating this on it
+ * would mean flipping `LOG_PII=true` to debug a location bug also puts a broker
+ * password on stderr.
+ *
+ * Never throws — this runs in a field initializer of a module-load singleton,
+ * where a throw over a malformed env var would take the whole server down. An
+ * unparseable input renders as the fixed string `<unparseable>`.
+ *
+ * Built from `protocol` and `host`, never `url.origin`: WHATWG gives `origin`
+ * as the literal string `"null"` for non-special schemes (`mqtt:`, `mqtts:`,
+ * `tcp:`), which is exactly what a broker URL uses. Note also that the WHATWG
+ * URL parser drops a *default* port only on special schemes (e.g.
+ * `wss://host:443` renders as `wss://host`), so the displayed endpoint is the
+ * URL standard's spelling, not necessarily the operator's original bytes.
+ *
+ * @param raw - The URL to redact (e.g. an MQTT broker URL from an env var)
+ * @returns `<protocol>//<host>`, or `<unparseable>` if `raw` is not a valid URL
+ */
+export function redactUrlForLogging(raw: string): string {
+  try {
+    const url = new URL(raw);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return '<unparseable>';
+  }
+}
