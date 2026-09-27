@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.6] - 2026-09-27
+
 An MCP client ends a session by closing the server's input and waiting for it to exit. This server did not notice. It kept running until the client gave up and sent `SIGTERM`, which the MCP SDK's own client does after a 2-second wait. With lightning pre-warm on it stayed connected to the lightning broker the whole time. This release makes the server shut down as soon as its client closes the session. The shutdown is bounded and happens once, and it disconnects from the broker on the way out. Weather output does not change.
 
 ### Fixed
@@ -1929,7 +1931,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.5...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.6...HEAD
+[1.33.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.5...v1.33.6
 [1.33.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.4...v1.33.5
 [1.33.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.3...v1.33.4
 [1.33.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.2...v1.33.3
