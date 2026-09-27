@@ -248,7 +248,10 @@ describe('createShutdown', () => {
     expect(scheduler.setTimeout).toHaveBeenCalledWith(expect.any(Function), 1234);
   });
 
-  it('contract 6 — the real deadline timer does not hold the process open', async () => {
+  // The deadline must hold the loop while teardown runs: a pending promise owns no handle, so an
+  // unref'd deadline lets a handle-free hang drain to exit 0 (diff-review DR-M1). The process-level
+  // proof is in tests/integration/stdio-shutdown.test.ts.
+  it('contract 6 — the real deadline timer holds the process while teardown runs', async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const exit = vi.fn();
     const trigger = createShutdown({
@@ -263,14 +266,14 @@ describe('createShutdown', () => {
     const handles = setTimeoutSpy.mock.results.map((r) => r.value as NodeJS.Timeout);
     try {
       expect(handles).toHaveLength(1);
-      // Positive control: a plain timer in this environment IS ref'd.
-      const control = setTimeout(() => {}, 1e6);
+      // Positive control: an unref'd timer in this environment reports false.
+      const control = setTimeout(() => {}, 1e6).unref();
       try {
-        expect(control.hasRef()).toBe(true);
+        expect(control.hasRef()).toBe(false);
       } finally {
         clearTimeout(control);
       }
-      expect(handles[0].hasRef()).toBe(false);
+      expect(handles[0].hasRef()).toBe(true);
       expect(exit).not.toHaveBeenCalled();
     } finally {
       for (const handle of handles) {

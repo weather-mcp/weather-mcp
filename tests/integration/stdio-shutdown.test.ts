@@ -3,7 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SHUTDOWN_DEADLINE_MS } from '../../src/server/shutdown.js';
 
 /**
@@ -21,6 +21,7 @@ import { SHUTDOWN_DEADLINE_MS } from '../../src/server/shutdown.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ENTRY_PATH = join(__dirname, '../../src/index.ts');
+const SHUTDOWN_MODULE_URL = pathToFileURL(join(__dirname, '../../src/server/shutdown.ts')).href;
 
 // `--import tsx` resolves relative to the child's cwd, and the cwd here is a
 // fresh temp directory outside the repo (G26), so resolve tsx's loader hook
@@ -265,6 +266,48 @@ describe('stdio shutdown on stdin EOF', () => {
 
       const complete = lines.filter((line) => line.message === 'Shutdown complete');
       expect(complete).toHaveLength(1);
+    },
+    CASE_TIMEOUT_MS
+  );
+});
+
+describe('shutdown deadline in a real process', () => {
+  it(
+    'a step that hangs without holding any handle still exits 1 at the deadline',
+    async () => {
+      // A pending promise owns no libuv handle. With an unref'd deadline, nothing would keep the
+      // loop alive and the process would drain to exit 0 with no warning (diff-review DR-M1). A
+      // unit test cannot see this: the Vitest worker holds handles of its own.
+      const cwd = await mkdtemp(join(tmpdir(), 'stdio-eof-deadline-'));
+      tempDirs.push(cwd);
+      const script = [
+        `import { createShutdown } from ${JSON.stringify(SHUTDOWN_MODULE_URL)};`,
+        'const shutdown = createShutdown({',
+        "  steps: [{ name: 'handle-free-hang', run: () => new Promise(() => {}) }],",
+        '  deadlineMs: 200,',
+        '  exit: (code) => process.exit(code)',
+        '});',
+        "void shutdown('deadline regression');"
+      ].join('\n');
+
+      const child = spawn(process.execPath, ['--import', TSX_LOADER, '--input-type=module', '-e', script], {
+        cwd,
+        env: buildEnv(cwd),
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      liveChildren.add(child);
+      child.once('exit', () => liveChildren.delete(child));
+      const stderrChunks: Buffer[] = [];
+      child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
+
+      const { code, signal } = await waitForExit(child, 15_000);
+
+      expect(signal).toBeNull();
+      expect(code).toBe(1);
+      const lines = parseLogLines(Buffer.concat(stderrChunks));
+      const deadline = lines.filter((line) => line.message === 'Shutdown deadline reached');
+      expect(deadline).toHaveLength(1);
+      expect(deadline[0]?.metadata).toEqual({ pendingStep: 'handle-free-hang', deadlineMs: 200 });
     },
     CASE_TIMEOUT_MS
   );

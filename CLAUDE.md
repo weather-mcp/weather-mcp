@@ -21,7 +21,7 @@ src/
 ├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown triggers (stdin EOF, transport close, signals)
 ├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
 ├── server/lightningPrewarm.ts  # Saved-location lightning pre-warm: gate, guarded store read, refresh timer (never evicts)
-├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one unref'd deadline, stderr only
+├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one ref'd deadline that bounds teardown, stderr only
 ├── handlers/                # One handler per MCP tool (saved locations share one file)
 │   ├── forecastHandler.ts           # get_forecast (+ compare_models, ensemble_spread, normals, astronomy)
 │   ├── currentConditionsHandler.ts  # get_current_conditions (NOAA / Open-Meteo / METAR; fire weather, thermal stress)

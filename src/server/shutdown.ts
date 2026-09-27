@@ -8,8 +8,10 @@
  *   inside a step, as `server.close()` fires `server.onclose` — returns the same promise.
  * - **Every step runs, in order.** A step that throws is logged and does not skip the steps after it.
  * - **Bounded.** One deadline covers the whole run. When it fires, the pending step is named in a
- *   warning and the process exits 1. The deadline timer is `unref()`'d, so it never holds the
- *   process open on its own.
+ *   warning and the process exits 1. The deadline timer is deliberately **ref'd**: a pending
+ *   promise holds no handle, so with an unref'd deadline a step that hangs without I/O would let
+ *   the loop drain and exit 0 before the deadline fired. It exists only during teardown and is
+ *   cleared when the walk completes, so it holds the process for at most `deadlineMs`.
  * - **Exit 0** when every step completed, **exit 1** when a step threw or the deadline fired.
  *   `exit` is called at most once.
  * - **Stderr only.** Everything goes through `logger`. After stdin EOF the client may already have
@@ -73,8 +75,6 @@ export function createShutdown(deps: ShutdownDeps): (reason: string) => Promise<
       logger.warn('Shutdown deadline reached', { pendingStep: pending, deadlineMs: deps.deadlineMs });
       finish(1);
     }, deps.deadlineMs);
-    // An injected fake scheduler's handle need not be a Node timer.
-    (deadline as { unref?: () => void }).unref?.();
 
     let failed = false;
     for (const step of deps.steps) {
