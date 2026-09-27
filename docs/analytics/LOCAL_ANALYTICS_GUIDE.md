@@ -48,6 +48,12 @@ An endpoint that fails any check **disables analytics**. The server logs one
 affected. These checks look only at the configured string. They cannot see what a domain name
 resolves to.
 
+There is **no default endpoint**. With `ANALYTICS_ENABLED=true` and `ANALYTICS_ENDPOINT` unset or
+empty, the server logs one warning at startup —
+`ANALYTICS_ENABLED=true but ANALYTICS_ENDPOINT is not set; analytics stays off (there is no default endpoint)` —
+and analytics stays off. The server keeps running and no tool is affected. With `ANALYTICS_ENABLED`
+unset, nothing is sent and the only analytics line logged is `Analytics disabled by user preference`.
+
 ## Testing Analytics Integration
 
 ### Option 1: Quick Test Script
@@ -188,7 +194,9 @@ Check the analytics server logs for validation errors. Common issues:
 ### Analytics not being sent
 
 1. Verify `ANALYTICS_ENABLED=true` in `.env`
-2. Check `ANALYTICS_ENDPOINT` points to correct URL, and that it meets the
+2. Check that `ANALYTICS_ENDPOINT` is set at all — there is no default, and without it the server
+   logs `ANALYTICS_ENABLED=true but ANALYTICS_ENDPOINT is not set; …` at startup. Then check it
+   points to the correct URL, and that it meets the
    [endpoint requirements](#endpoint-requirements) — look for an
    `Invalid ANALYTICS_ENDPOINT configuration` error at startup
 3. Ensure analytics server is running on port 3100, behind your HTTPS proxy or tunnel
@@ -210,7 +218,7 @@ LOG_LEVEL=0
 # Analytics is opt-in: nothing is sent unless ANALYTICS_ENABLED=true.
 ANALYTICS_ENABLED=false
 ANALYTICS_LEVEL=minimal
-ANALYTICS_ENDPOINT=https://analytics.weather-mcp.com/v1/events
+# ANALYTICS_ENDPOINT is unset — there is no default. Analytics needs an explicit HTTPS endpoint.
 LOG_LEVEL=1
 ```
 

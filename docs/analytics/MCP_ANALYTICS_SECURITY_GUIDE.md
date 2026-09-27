@@ -359,16 +359,16 @@ import type { AnalyticsEvent } from '../types/analytics.js';
 
 export class AnalyticsService {
   private apiKey?: string;
-  private endpoint: string;
+  private endpoint: string | undefined;
   private enabled: boolean;
 
   constructor() {
     this.apiKey = process.env.ANALYTICS_API_KEY;
-    this.endpoint = process.env.ANALYTICS_ENDPOINT || 'https://analytics.yourservice.com/v1/events';
-    this.enabled = !!this.apiKey;
+    this.endpoint = process.env.ANALYTICS_ENDPOINT; // no default — events go only where the operator names
+    this.enabled = !!this.apiKey && !!this.endpoint;
 
     if (!this.enabled) {
-      console.error('Analytics disabled: No API key configured');
+      console.error('Analytics disabled: no API key or no endpoint configured');
     }
   }
 
@@ -391,7 +391,7 @@ export class AnalyticsService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      const response = await fetch(this.endpoint, {
+      const response = await fetch(this.endpoint!, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -521,6 +521,7 @@ NOAA_CDO_TOKEN=your_token_here
 # Analytics (Optional)
 # Get your analytics API key at: https://analytics.yourservice.com/signup
 # Analytics helps improve the service but is completely optional
+# Enabling it needs both values below; there is no default endpoint
 # ANALYTICS_API_KEY=wmc_your_analytics_key_here
 # ANALYTICS_ENDPOINT=https://analytics.yourservice.com/v1/events
 ```
@@ -548,7 +549,8 @@ If you enable analytics, only these events are recorded:
 ### Enable Analytics
 
 1. Sign up for a free analytics key at: https://analytics.yourservice.com/signup
-2. Add to your MCP configuration:
+2. Add both the key and the endpoint to your MCP configuration — analytics stays off unless both
+   are set:
 
 ```json
 {
@@ -558,7 +560,8 @@ If you enable analytics, only these events are recorded:
       "args": ["/path/to/weather-mcp/dist/index.js"],
       "env": {
         "NOAA_CDO_TOKEN": "your_cdo_token",
-        "ANALYTICS_API_KEY": "wmc_your_analytics_key"
+        "ANALYTICS_API_KEY": "wmc_your_analytics_key",
+        "ANALYTICS_ENDPOINT": "https://analytics.yourservice.com/v1/events"
       }
     }
   }
@@ -612,7 +615,7 @@ export class AnalyticsService {
 
     const signature = this.generateSignature(payload, timestamp);
 
-    await fetch(this.endpoint, {
+    await fetch(this.endpoint!, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -688,8 +691,8 @@ testAnalytics();
 
 ### Manual Testing Checklist
 
-- [ ] Analytics disabled without API key
-- [ ] Valid API key allows events
+- [ ] Analytics disabled without API key or endpoint
+- [ ] Valid API key plus endpoint allows events
 - [ ] Invalid API key rejected (401)
 - [ ] Rate limit enforced (429)
 - [ ] Malformed payload rejected (400)
@@ -861,7 +864,7 @@ If users are in EU:
 
 1. **Set up analytics server** with API key validation and rate limiting
 2. **Add analytics client** to MCP server (fails gracefully)
-3. **Make it opt-in** - require user-provided API key
+3. **Make it opt-in** - require a user-provided API key and endpoint
 4. **Monitor and adjust** - watch for abuse patterns
 5. **Keep it simple** - don't over-engineer
 
