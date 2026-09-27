@@ -186,6 +186,18 @@ export class AnalyticsCollector {
       return;
     }
 
+    const endpoint = this.config.endpoint;
+    if (endpoint === null) {
+      // AnalyticsConfig's invariant: enabled ⇒ endpoint !== null. Unreachable through
+      // loadAnalyticsConfig(); if it is ever reached, drop the batch rather than send nowhere.
+      logger.error('Analytics enabled with no endpoint; dropping buffered events', undefined, {
+        count: this.buffer.length,
+        securityEvent: true,
+      });
+      this.buffer = [];
+      return;
+    }
+
     // Check circuit breaker (3.7)
     if (this.circuitOpen) {
       if (this.circuitOpenUntil && new Date() < this.circuitOpenUntil) {
@@ -225,7 +237,7 @@ export class AnalyticsCollector {
         count: eventsToSend.length,
       });
 
-      await sendBatch(eventsToSend, this.config.endpoint, this.config.version);
+      await sendBatch(eventsToSend, endpoint, this.config.version);
 
       logger.debug('Analytics batch sent successfully', {
         count: eventsToSend.length,

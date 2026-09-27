@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.4] - 2026-09-26
+
+Analytics is off unless you turn it on. If you did turn it on without naming a server, it still tried to send usage events to a built-in address on a domain this project does not own. That address did not even resolve. If anyone ever registered it, opted-in servers would have started sending to them with no further consent. This release removes the built-in address. Analytics now sends only to a server you name yourself. If you name none, it tells you so at startup and stays off. The default setup, with analytics off, is unchanged.
+
+### Changed
+
+- **Analytics no longer has a default endpoint.** `ANALYTICS_ENABLED=true` with no `ANALYTICS_ENDPOINT` used to post usage events to `https://analytics.weather-mcp.com/v1/events`, a host on a domain this project does not use, and which does not resolve. Now the server logs one warning — `ANALYTICS_ENABLED=true but ANALYTICS_ENDPOINT is not set; analytics stays off (there is no default endpoint)` — and sends nothing. Events go only to an endpoint you name, after the same HTTPS and domain-name checks as before; an endpoint that fails them still logs `Invalid ANALYTICS_ENDPOINT configuration: …` and disables analytics. With `ANALYTICS_ENABLED` unset nothing changes: analytics is off by default and stays off, and startup logs the same lines as before. (`src/analytics/config.ts`, `src/analytics/types.ts`, `src/analytics/collector.ts`, `.env.example`, `docs/analytics/LOCAL_ANALYTICS_GUIDE.md`, `docs/analytics/MCP_ANALYTICS_SECURITY_GUIDE.md`)
+
 ## [1.33.3] - 2026-09-26
 
 Airport (METAR) reports could turn a missing measurement into a false zero. If a station sent its temperature or wind speed as an explicit `null`, the report showed 32°F or "0 mph", which looks like a real reading. This release leaves those lines out instead. Reports that carry their measurements look exactly as before.
@@ -1902,7 +1910,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.3...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.4...HEAD
+[1.33.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.3...v1.33.4
 [1.33.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.2...v1.33.3
 [1.33.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.1...v1.33.2
 [1.33.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.0...v1.33.1

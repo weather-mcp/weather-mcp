@@ -1097,6 +1097,18 @@ The technique only applies when the entry point you need is reachable below
 temp-cwd discipline above. Check the importer set (`grep -rn dotenv src/`) rather
 than assuming it is still one file.
 
+**A "fresh home" is per process, not per row (2026-09-26, analytics-no-default-endpoint,
+plan-review codex R2).** The same isolation applies to `$HOME` when a probe compares
+*first-run* output across two processes — base against branch, keyed against keyless.
+`getOrGenerateAnalyticsSalt()` (`src/analytics/config.ts`) writes
+`$HOME/.weather-mcp/analytics-salt` and logs `Generated new analytics salt` only when the
+file is absent, and it runs on every startup whose endpoint is not rejected, analytics
+enabled or not. Two spawns sharing one `HOME=$(mktemp -d)` therefore disagree by one line:
+the first consumed the precondition the second was meant to see. Give every compared
+process its own empty home, and record each path. The plan as first written shared one;
+the review caught it before the run, and T2 then showed each side logging the line in
+its own home, byte-identical after timestamps were stripped.
+
 **Status:** active, **extended 2026-08-29**. **Verify line re-run 2026-08-27** (wildfire band-rounding
 T3): the live probe spawned the built dist from a temp cwd with `ENABLED_TOOLS`
 **unset** and got **6 tools, `get_wildfire_info` absent**, against the 17 a
@@ -3437,7 +3449,7 @@ required together:
    filesystem: `loadAnalyticsConfig()` builds the analytics singleton at module
    load and calls `getOrGenerateAnalyticsSalt()` **regardless of
    `ANALYTICS_ENABLED`**, which writes `~/.weather-mcp/analytics-salt` when it is
-   absent. A fixed salt returns at `src/analytics/config.ts:94` before any
+   absent. A fixed salt returns at `src/analytics/config.ts:93` before any
    filesystem access.
 3. **Import it exactly once, statically.** Never re-import it under
    `vi.resetModules()` — that re-runs `main()` ([G21] point 3). If the same file
@@ -3460,9 +3472,9 @@ factory constructs no transport, registers no signal handler and calls no
 `WEATHER_LIGHTNING_PREWARM` (the prewarm stayed in the entry). What survives is
 point 2's **two analytics pins** and point 3. The factory imports `withAnalytics`
 from `src/analytics/index.js`, which re-exports the singleton built at module
-load in `src/analytics/config.ts:193`; `loadAnalyticsConfig()` calls
-`getOrGenerateAnalyticsSalt()` at `:167` regardless of `ANALYTICS_ENABLED`, and a
-fixed `ANALYTICS_SALT` returns at `:94-95` before any filesystem access. So:
+load in `src/analytics/config.ts:206`; `loadAnalyticsConfig()` calls
+`getOrGenerateAnalyticsSalt()` at `:169` regardless of `ANALYTICS_ENABLED`, and a
+fixed `ANALYTICS_SALT` returns at `:93-94` before any filesystem access. So:
 `ANALYTICS_ENABLED='false'` and `ANALYTICS_SALT='<any fixed string>'`, hoisted;
 and import once, statically, never under `vi.resetModules()` — that re-runs
 sixteen service constructors and their `Cache` timers ([G21] point 3).
