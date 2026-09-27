@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.4] - 2026-09-26
+
 Analytics is off unless you turn it on. If you did turn it on without naming a server, it still tried to send usage events to a built-in address on a domain this project does not own. That address did not even resolve. If anyone ever registered it, opted-in servers would have started sending to them with no further consent. This release removes the built-in address. Analytics now sends only to a server you name yourself. If you name none, it tells you so at startup and stays off. The default setup, with analytics off, is unchanged.
 
 ### Changed
@@ -1908,7 +1910,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.3...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.4...HEAD
+[1.33.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.3...v1.33.4
 [1.33.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.2...v1.33.3
 [1.33.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.1...v1.33.2
 [1.33.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.0...v1.33.1
