@@ -223,7 +223,7 @@ describe('loadAnalyticsConfig — fail-safe fallback', () => {
       expect(errorSpy).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy.mock.calls[0][0]).toBe(NO_ENDPOINT_WARNING);
-      expect(infoSpy).not.toHaveBeenCalledWith('Analytics configuration loaded', expect.anything());
+      expect(infoSpy.mock.calls.map(([m]) => m)).not.toContain('Analytics configuration loaded');
     }
   );
 
