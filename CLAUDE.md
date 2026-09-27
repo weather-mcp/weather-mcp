@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.33.5 (Production Ready)
+- **Version:** 1.33.6 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -18,9 +18,10 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 
 ```
 src/
-├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown
+├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown triggers (stdin EOF, transport close, signals)
 ├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
 ├── server/lightningPrewarm.ts  # Saved-location lightning pre-warm: gate, guarded store read, refresh timer (never evicts)
+├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one ref'd deadline that bounds teardown, stderr only
 ├── handlers/                # One handler per MCP tool (saved locations share one file)
 │   ├── forecastHandler.ts           # get_forecast (+ compare_models, ensemble_spread, normals, astronomy)
 │   ├── currentConditionsHandler.ts  # get_current_conditions (NOAA / Open-Meteo / METAR; fire weather, thermal stress)
@@ -427,7 +428,7 @@ via `src/utils/unitFormat.ts`.
 - **Algorithm:** LRU (Least Recently Used) eviction
 - **Size limits:** Configurable max size (default 1000 entries)
 - **Automatic cleanup:** Every 5 minutes
-- **Graceful shutdown:** Cleanup on SIGTERM/SIGINT
+- **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process
 
 ## Commit Conventions
 
@@ -633,15 +634,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.33.5 — Production Ready ✅
-- **Test Coverage:** 3,807 tests, 100% pass rate
+- **Version:** 1.33.6 — Production Ready ✅
+- **Test Coverage:** 3,826 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.33.6:** The server exits when its client closes stdin
 - **New in v1.33.5:** The lightning broker's credentials no longer reach the log
 - **New in v1.33.4:** Analytics no longer has a default endpoint
-- **New in v1.33.3:** METAR reports no longer render a null measurement as zero
 
 ## Useful References
 
@@ -664,7 +665,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-27 (v1.33.5)
+**Last Updated:** 2026-09-27 (v1.33.6)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

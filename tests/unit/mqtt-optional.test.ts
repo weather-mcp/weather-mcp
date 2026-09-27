@@ -120,11 +120,12 @@ function createDeferred<T = void>() {
  *
  * Timer trap: `vi.resetModules()` + re-import re-executes the module body,
  * whose last line is `export const blitzortungService = new
- * BlitzortungService()`. That constructor starts TWO `setInterval`s with no
- * `.unref()` (5-min buffer cleanup, 15-min subscription pruning). This file
- * is the first in the repo to construct the real `BlitzortungService` more
- * than once, so every fresh import leaves a live real timer behind unless
- * handled. Wrapping the import in `vi.useFakeTimers()` routes both
+ * BlitzortungService()`. That constructor starts TWO `setInterval`s (5-min
+ * buffer cleanup, 15-min subscription pruning). Both are now `.unref()`'d, so
+ * they no longer hold the event loop open — but a fresh import under
+ * `vi.resetModules()` still arms two live timers per import, and this file is
+ * the first in the repo to construct the real `BlitzortungService` more than
+ * once. Wrapping the import in `vi.useFakeTimers()` routes both
  * `setInterval` calls onto the fake clock — inert, and abandoned (not
  * converted to real timers) the moment `vi.useRealTimers()` runs immediately
  * afterward. Tests then run under real timers, so contract 6 can race a

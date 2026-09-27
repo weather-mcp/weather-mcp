@@ -639,6 +639,7 @@ export class BlitzortungService {
    * Periodically prune stale subscriptions (not accessed in last hour)
    */
   private startSubscriptionPruning(): void {
+    // Housekeeping only — must not keep the process alive once nothing else is live.
     setInterval(async () => {
       if (!this.client || this.subscribedGeohashes.size === 0) {
         return;
@@ -687,7 +688,7 @@ export class BlitzortungService {
           remainingSubscriptions: this.subscribedGeohashes.size
         });
       }
-    }, SUBSCRIPTION_PRUNE_INTERVAL_MS);
+    }, SUBSCRIPTION_PRUNE_INTERVAL_MS).unref();
   }
 
   /**
@@ -969,9 +970,10 @@ export class BlitzortungService {
    */
   private startCleanupInterval(): void {
     // Clean up every 5 minutes
+    // Housekeeping only — must not keep the process alive once nothing else is live.
     setInterval(() => {
       this.cleanupBuffer();
-    }, 5 * 60 * 1000);
+    }, 5 * 60 * 1000).unref();
   }
 
   /**
@@ -984,16 +986,25 @@ export class BlitzortungService {
         activeSubscriptions: this.subscribedGeohashes.size
       });
 
-      await new Promise<void>((resolve) => {
-        this.client!.end(false, {}, () => {
-          this.isConnected = false;
-          this.subscribedGeohashes.clear();
-          this.geohashFirstSubscribed.clear();
-          logger.info('Disconnected from Blitzortung MQTT broker');
-          resolve();
+      try {
+        await new Promise<void>((resolve, reject) => {
+          this.client!.end(false, {}, (error?: Error) => {
+            this.isConnected = false;
+            this.subscribedGeohashes.clear();
+            this.geohashFirstSubscribed.clear();
+            if (error) {
+              // No log here: mqtt's errors can carry the broker host. The caller (the shutdown
+              // coordinator) logs the failure by name and code only.
+              reject(error);
+              return;
+            }
+            logger.info('Disconnected from Blitzortung MQTT broker');
+            resolve();
+          });
         });
-      });
-      this.client = null;
+      } finally {
+        this.client = null;
+      }
     }
   }
 }

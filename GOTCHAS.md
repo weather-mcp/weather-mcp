@@ -1767,11 +1767,20 @@ diagnose by **CPU and process tree**, never by log silence: compare
 `pgrep -a -P <pid>`. If the children are stranded drivers, kill **them**, not
 the chain — the CLI then flushes and exits 0 with its work intact.
 
-**Why:** every service constructor calls `new Cache(...)`, which arms a ref'd
-5-minute `setInterval` at `src/utils/cache.ts:42` and never `.unref()`s it —
-`src/analytics/collector.ts:274` is the only unref'd timer in the tree. One
-constructed service therefore holds Node's event loop open forever: the script
-body runs, prints, and the process stays. Nothing in the output says "hung".
+**Why:** until v1.33.5, every service constructor called `new Cache(...)`, which
+armed a ref'd 5-minute `setInterval` at `src/utils/cache.ts:42`, and
+`src/analytics/collector.ts:274` (now `:286`) was the only unref'd timer in the
+tree. One constructed service therefore held Node's event loop open forever: the
+script body ran, printed, and the process stayed. Nothing in the output said
+"hung".
+
+**Since `stdio-eof-shutdown` (`2c4cc31`, 2026-09-27)** the cache interval and
+both `BlitzortungService` housekeeping intervals are `unref()`'d, so a driver
+that only constructs services now exits on its own. It still does **not** exit
+while it holds a socket — a Blitzortung MQTT connection (auto-reconnecting), an
+in-flight upstream request — and a driver that opens one still hangs exactly as
+described. So the rule stands as hygiene: `process.exit(0)` in every driver,
+one at a time.
 
 The second half is what makes this expensive. A vendor CLI invoked
 non-interactively (`agy -p`, and the other `--print`-style modes) **buffers its
@@ -1788,8 +1797,10 @@ and nothing else prints its line and then hangs —
 node -e 'import("./dist/services/nifc.js").then(m=>{new (Object.values(m).find(v=>typeof v==="function"))();console.log("body finished")})'
 ```
 
-exits 124 under `timeout 10`, not 0. Adding `process.exit(0)` after the log
-makes it exit 0 immediately.
+exited 124 under `timeout 10` before `2c4cc31`. **Re-run 2026-09-27 against
+`feat/stdio-eof-shutdown` @ `4846e9e`'s dist: exit 0** — the body finishes and
+the loop drains. To reproduce the hang now, the driver must open a socket (for
+example `blitzortungService.prewarmLocation(...)` against a reachable broker).
 
 **Evidence:** 2026-08-27, `post-run-pipeline.sh` on `feat/wildfire-band-rounding`
 — the Antigravity/Gemini diff-review leg appeared dead for 16 minutes: `agy`
@@ -3434,7 +3445,11 @@ it into the checking process.
 **Rule.** The four points below apply to an import of the **entry**,
 `src/index.ts`. `src/index.ts` calls `main()` unconditionally at module scope, so the
 import *is* a server start: it constructs a `StdioServerTransport`, calls
-`server.connect()`, and registers `SIGTERM`/`SIGINT` handlers. Four things, all
+`server.connect()`, registers `SIGTERM`/`SIGINT` handlers, and — since
+`ba58043` (2026-09-27) — attaches `end`/`close` listeners to **`process.stdin`
+itself** and sets `server.onclose`, all wired to a coordinator that ends in
+`process.exit`. Stubbing the transport does not stub those listeners: the
+worker's own stdin closing would run the shutdown. Four things, all
 required together:
 
 1. `vi.mock('@modelcontextprotocol/sdk/server/stdio.js', …)` with a stub class
@@ -3500,7 +3515,12 @@ DOTENV_CONFIG_PATH=/nonexistent npx vitest run <file>`) — the suite stays gree
 and `analytics-salt` appears under the temp `HOME`, which is the whole point (the
 pin's absence is invisible to the assertions and visible only on the filesystem).
 Measured 2026-09-09: 64 bytes, mode 0600. For the four points themselves there is
-no live example left — nothing imports the entry.
+no live example left — nothing imports the entry. **To test the entry's
+behaviour, spawn it instead:** `tests/integration/stdio-shutdown.test.ts`
+(`4846e9e`) runs `node --import <tsx resolved via import.meta.resolve('tsx')>
+src/index.ts` from a temp cwd and `HOME` with this entry's offline variables, and
+is the working template. Resolve `tsx` from the test file: `--import tsx`
+resolves against the child's cwd, which is deliberately outside the repo.
 
 **Evidence:** 2026-09-01 (`a4252ca`, tool-name-single-source T3). Until that
 commit **no test imported `src/index.ts` at all**, so the trap had never been
@@ -6077,9 +6097,87 @@ over `git diff main`; the fixture lines match.
 T2/T4). Ten hits over the branch diff: two in docs (reworded before commit),
 eight in the two new test files.
 
+**Second data point, 2026-09-27** (`fa6dbd9`, stdio-eof-shutdown T2): **zero
+hits** is achievable and worth aiming for. The regex needs one of its four words
+followed by `=`/`:`. A userinfo URL (`mqtt://u5er-eof:pw-eof-hyg@host`) does not
+match, and neither does a fixture held in a variable named `marker` rather than
+`token`/`password`. The absence assertion is exactly as strong.
+
 **Status:** active. Lint candidate: the scan could exclude `tests/` lines whose
 token value matches a declared synthetic-fixture marker (e.g. a `-hyg` suffix).
 Related: [G13], [G62].
+
+---
+
+## G113 — `memo = asyncRun()` does not publish the memo before the pre-`await` body runs
+
+**Trigger:** a run-once or single-flight wrapper that stores the promise of an
+`async` function in its own memo — `if (running) return running; running =
+run();` — where `run()` can reach the wrapper again synchronously, directly or
+through a callback it fires (a `close()` that fires an `onclose` handler).
+
+**Rule:** publish the promise before the body starts:
+`running = Promise.resolve().then(() => run(reason));`. Lock it with a test
+whose **first** step re-enters the wrapper synchronously. A re-entry in a later
+step proves nothing, because an earlier `await` has already published the memo.
+
+**Why:** the right-hand side is evaluated before the assignment, and an `async`
+function runs synchronously up to its first suspension, including evaluating
+the first awaited expression. A re-entry in that window sees an empty memo and
+starts a second run. This is [G20]'s window moved inside a single expression:
+there is no visible `await` between check and assignment, so the G20 check
+passes on a line that is still unsound. Production can be safe by accident — the
+shutdown coordinator's real re-entry (`server.close()` → `server.onclose`) is
+its fourth step, after three awaits — while the exported contract is broken.
+
+**Verify:** in `src/server/shutdown.ts`, replace the deferred launch with
+`running = run(reason)` and run `tests/unit/shutdown.test.ts`. Only
+"a FIRST step that re-enters the trigger synchronously does not start a second
+run" goes red.
+
+**Evidence:** 2026-09-27, stdio-eof-shutdown. Found at plan review (codex R1)
+against a plan that prescribed `running = run(reason)` and justified it with
+G20's same-synchronous-run argument. Fixed before any code was written
+(`fa6dbd9`). The mutation above (T2 M7) reddened exactly that one case.
+
+**Status:** active. Related: [G20] (the boolean-flag form of the same window),
+[G17]/[G24] (the memoised `mqtt` import, the repo's other single-flight). Not
+lintable in general: whether `run()` can re-enter is a property of its callers.
+
+---
+
+## G114 — An unref'd deadline timer cannot enforce the deadline
+
+**Trigger:** a coordinator that awaits cleanup steps and promises to force an
+exit when a deadline fires, where the deadline's timer is `.unref()`'d — usually
+because "timers must not hold the process open" was applied to every timer.
+
+**Rule:** a deadline that is the mechanism guaranteeing termination stays
+**ref'd** while the work it bounds is running, and is cleared when the work
+completes. Unref only housekeeping timers whose firing nobody depends on.
+
+**Why:** a pending promise owns no libuv handle. When the hung step holds no
+socket or timer of its own, an unref'd deadline is the only thing left, so
+nothing keeps the loop alive. Node drains and exits **0** without the warning and
+without the forced exit, which reads as a clean shutdown. A ref'd deadline cannot
+cause the hang it exists to prevent: it holds the process for at most the
+deadline. A unit test with a fake scheduler cannot see any of this, because the
+Vitest worker owns handles of its own. The proof has to run in a subprocess.
+
+**Verify:** add `.unref()` back to the deadline in `src/server/shutdown.ts`.
+`tests/integration/stdio-shutdown.test.ts` "a step that hangs without holding any
+handle still exits 1 at the deadline" goes red (exit 0, no warning), and so does
+`tests/unit/shutdown.test.ts` contract 6.
+
+**Evidence:** 2026-09-27, stdio-eof-shutdown. The design plan (§1) prescribed
+the unref'd deadline. The impl plan pinned it with a `hasRef() === false`
+contract and a mutation row, and both plan review and `/run-plan` accepted it.
+The codex diff review (DR-M1) reproduced the exit-0 drain in a subprocess.
+Fixed in `6d04e5a`. The mutation above reddened exactly those two tests.
+
+**Status:** active. Related: [G37] (event-loop liveness — the other direction),
+[G45] (a mutation-checked lock can pin the wrong property), [G34] (a claim about
+the process has to be made in a process).
 
 ---
 

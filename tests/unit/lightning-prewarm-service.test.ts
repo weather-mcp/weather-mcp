@@ -66,10 +66,12 @@ function createPresentMqttModule(client: ReturnType<typeof createFakeMqttClient>
 
 /**
  * Re-import blitzortung.js (and the logger singleton, for spies to observe the same
- * instance — G21) from a clean module registry. Wrapped in fake timers so the
- * constructor's two un-unref'd setIntervals land on the fake clock and are abandoned
- * rather than leaking real timers (G21 rule 3); the test body then switches to its own
- * fake timers for the 10s accumulation wait and the LRU-ordering advances.
+ * instance — G21) from a clean module registry. The constructor's two setIntervals
+ * are now unref'd, so they no longer hold the event loop open — but a fresh import
+ * under vi.resetModules() still arms two live timers per import, so this stays
+ * wrapped in fake timers to land them on the fake clock and abandon them there
+ * rather than leaking real timers (G21 rule 3); the test body then switches to its
+ * own fake timers for the 10s accumulation wait and the LRU-ordering advances.
  */
 async function importFreshBlitzortung() {
   vi.useFakeTimers();

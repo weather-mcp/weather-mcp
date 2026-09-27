@@ -15,10 +15,10 @@
  *   and can share one static top-level import, matching the plain-import precedent in
  *   tests/unit/lightning-safe-message.test.ts and friends (this module transitively
  *   imports src/services/blitzortung.ts, which constructs the real `blitzortungService`
- *   singleton and starts its two un-`unref`'d `setInterval`s at import time; those are
- *   accepted as leaked, inert real timers for the life of this test worker, same as
- *   every other test file that imports the service — the file never advances real time
- *   far enough for them to matter).
+ *   singleton and starts its two `setInterval`s at import time; both are `.unref()`'d,
+ *   so they no longer hold the event loop open, and are accepted as leaked, inert real
+ *   timers for the life of this test worker, same as every other test file that imports
+ *   the service — the file never advances real time far enough for them to matter).
  *
  * - Block B drives `startLightningPrewarm` against the REAL `BlitzortungService`, to
  *   prove the pre-warm interval actually keeps a saved location's subscription alive
