@@ -6146,6 +6146,41 @@ lintable in general: whether `run()` can re-enter is a property of its callers.
 
 ---
 
+## G114 — An unref'd deadline timer cannot enforce the deadline
+
+**Trigger:** a coordinator that awaits cleanup steps and promises to force an
+exit when a deadline fires, where the deadline's timer is `.unref()`'d — usually
+because "timers must not hold the process open" was applied to every timer.
+
+**Rule:** a deadline that is the mechanism guaranteeing termination stays
+**ref'd** while the work it bounds is running, and is cleared when the work
+completes. Unref only housekeeping timers whose firing nobody depends on.
+
+**Why:** a pending promise owns no libuv handle. When the hung step holds no
+socket or timer of its own, an unref'd deadline is the only thing left, so
+nothing keeps the loop alive. Node drains and exits **0** without the warning and
+without the forced exit, which reads as a clean shutdown. A ref'd deadline cannot
+cause the hang it exists to prevent: it holds the process for at most the
+deadline. A unit test with a fake scheduler cannot see any of this, because the
+Vitest worker owns handles of its own. The proof has to run in a subprocess.
+
+**Verify:** add `.unref()` back to the deadline in `src/server/shutdown.ts`.
+`tests/integration/stdio-shutdown.test.ts` "a step that hangs without holding any
+handle still exits 1 at the deadline" goes red (exit 0, no warning), and so does
+`tests/unit/shutdown.test.ts` contract 6.
+
+**Evidence:** 2026-09-27, stdio-eof-shutdown. The design plan (§1) prescribed
+the unref'd deadline. The impl plan pinned it with a `hasRef() === false`
+contract and a mutation row, and both plan review and `/run-plan` accepted it.
+The codex diff review (DR-M1) reproduced the exit-0 drain in a subprocess.
+Fixed in `6d04e5a`. The mutation above reddened exactly those two tests.
+
+**Status:** active. Related: [G37] (event-loop liveness — the other direction),
+[G45] (a mutation-checked lock can pin the wrong property), [G34] (a claim about
+the process has to be made in a process).
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
