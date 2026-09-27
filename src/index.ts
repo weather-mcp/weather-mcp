@@ -15,12 +15,9 @@ import { CacheConfig } from './config/cache.js';
 import { toolConfig } from './config/tools.js';
 import { logger, LogLevel } from './utils/logger.js';
 import { analytics } from './analytics/index.js';
-import {
-  createWeatherServer,
-  SERVER_VERSION,
-  clearServiceCaches
-} from './server/weatherServer.js';
+import { createWeatherServer, SERVER_VERSION } from './server/weatherServer.js';
 import { startLightningPrewarm, type LightningPrewarmHandle } from './server/lightningPrewarm.js';
+import { createShutdown, SHUTDOWN_DEADLINE_MS } from './server/shutdown.js';
 
 /**
  * Initialize the LocationStore for managing saved/favorite locations
@@ -39,35 +36,33 @@ let lightningPrewarm: LightningPrewarmHandle | undefined;
 async function main() {
   const transport = new StdioServerTransport();
 
-  // Set up graceful shutdown handlers
-  const shutdown = async (signal: string) => {
-    logger.info(`Received ${signal}, shutting down gracefully...`);
+  // One bounded, run-once shutdown for every way the session can end (src/server/shutdown.ts).
+  // Each step reads its target at call time: `lightningPrewarm` is assigned after connect.
+  const shutdown = createShutdown({
+    deadlineMs: SHUTDOWN_DEADLINE_MS,
+    exit: (code) => process.exit(code),
+    steps: [
+      // No new pre-warm subscriptions during teardown.
+      { name: 'lightning-prewarm', run: () => lightningPrewarm?.stop() },
+      // Garnish: the deadline truncates a stalled flush.
+      { name: 'analytics', run: () => analytics.shutdown() },
+      // A no-op when no broker connection exists; never touches the lazy mqtt import.
+      { name: 'mqtt', run: () => blitzortungService.disconnect() },
+      // Fires server.onclose synchronously; the memo returns the in-flight run.
+      { name: 'server', run: () => server.close() }
+    ]
+  });
 
-    try {
-      // 1. Flush analytics first (fast)
-      await analytics.shutdown();
-      logger.info('Analytics flushed');
-
-      // 2. Stop the lightning pre-warm refresh
-      lightningPrewarm?.stop();
-
-      // 3. Clean up resources
-      clearServiceCaches();
-      logger.info('Cache cleared');
-
-      // 4. Close server connection
-      await server.close();
-      logger.info('Server closed');
-
-      process.exit(0);
-    } catch (error) {
-      logger.error('Error during shutdown', error as Error);
-      process.exit(1);
-    }
-  };
-
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+  // Registered before connect so an early EOF cannot be missed. An 'end' listener does not
+  // switch stdin to flowing mode; the transport's 'data' listener does, at connect.
+  // Stdin EOF is the MCP stdio client's primary shutdown signal; 'close' covers a pipe
+  // destroyed without a clean EOF.
+  process.stdin.once('end', () => { void shutdown('stdin end'); });
+  process.stdin.once('close', () => { void shutdown('stdin close'); });
+  // The SDK closes the transport itself when the read buffer fails; the server is then deaf.
+  server.onclose = () => { void shutdown('transport closed'); };
+  process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
+  process.on('SIGINT', () => { void shutdown('SIGINT'); });
 
   try {
     await server.connect(transport);
