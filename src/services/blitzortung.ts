@@ -986,16 +986,25 @@ export class BlitzortungService {
         activeSubscriptions: this.subscribedGeohashes.size
       });
 
-      await new Promise<void>((resolve) => {
-        this.client!.end(false, {}, () => {
-          this.isConnected = false;
-          this.subscribedGeohashes.clear();
-          this.geohashFirstSubscribed.clear();
-          logger.info('Disconnected from Blitzortung MQTT broker');
-          resolve();
+      try {
+        await new Promise<void>((resolve, reject) => {
+          this.client!.end(false, {}, (error?: Error) => {
+            this.isConnected = false;
+            this.subscribedGeohashes.clear();
+            this.geohashFirstSubscribed.clear();
+            if (error) {
+              // No log here: mqtt's errors can carry the broker host. The caller (the shutdown
+              // coordinator) logs the failure by name and code only.
+              reject(error);
+              return;
+            }
+            logger.info('Disconnected from Blitzortung MQTT broker');
+            resolve();
+          });
         });
-      });
-      this.client = null;
+      } finally {
+        this.client = null;
+      }
     }
   }
 }
