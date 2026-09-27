@@ -186,6 +186,23 @@ describe('loadAnalyticsConfig — fail-safe fallback', () => {
     expect(infoSpy).toHaveBeenCalledWith('Analytics disabled by user preference');
   });
 
+  it('carries no endpoint when ANALYTICS_ENABLED=false and a valid ANALYTICS_ENDPOINT is set', () => {
+    vi.stubEnv('ANALYTICS_ENABLED', 'false');
+    vi.stubEnv('ANALYTICS_ENDPOINT', 'https://analytics.example.com/v1/events');
+    vi.stubEnv('ANALYTICS_SALT', 'analytics-endpoint-validation-test');
+    const errorSpy = vi.spyOn(logger, 'error');
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const infoSpy = vi.spyOn(logger, 'info');
+
+    const config = loadAnalyticsConfig();
+
+    expect(config.enabled).toBe(false);
+    expect(config.endpoint).toBeNull();
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledWith('Analytics disabled by user preference');
+  });
+
   it.each([
     ['unset', undefined],
     ['empty', ''],

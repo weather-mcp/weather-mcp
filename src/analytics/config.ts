@@ -185,7 +185,8 @@ export function loadAnalyticsConfig(): AnalyticsConfig {
   const config: AnalyticsConfig = {
     enabled,
     level,
-    endpoint,
+    // A disabled config carries no endpoint, even when a valid one was supplied
+    endpoint: enabled ? endpoint : null,
     version: packageJson.version,
     salt,
   };
