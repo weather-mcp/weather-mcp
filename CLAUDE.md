@@ -74,7 +74,7 @@ src/
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
 │   ├── serviceStatusProbe.ts     # check_service_status probe outcome type + 200/429/other classification; both probes import it (pure)
-│   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing
+│   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing; log redaction (coordinates, URLs)
 │   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates; shared country-code resolution
 │   ├── geography.ts         # isInUS and region helpers
 │   ├── timezone.ts          # Local-time formatting, formatObservationAge
@@ -224,6 +224,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 ### Keys, secrets, attribution
 
 - **Key-in-URL services** (FIRMS, Google Pollen, Google Weather): never log or throw URLs or raw axios errors; every thrown error is a fixed pre-written string; logs carry only `{ status, code }`; unit tests assert the key appears in no thrown message and no logger argument.
+- **The MQTT broker URL** (`BLITZORTUNG_MQTT_URL`) is in the same class: it can carry credentials in userinfo or the query, and `mqtt` forwards both. Never log it raw; `redactUrlForLogging` (`src/utils/logger.ts`) is the accessor, and it has no `LOG_PII` opt-in.
 - **Env vars are permanent and per-feature** — a new Google-backed feature gets its own var (key restrictions make a shared var break silently).
 - **Standing key policy:** no tool ever *requires* a key; a keyed feature needs a usable free tier; say plainly when a "free tier" still needs a billing account.
 - **Attribution strings that a licence mandates are exact** (`Source: Includes weather data from Google`, `Source: Includes pollen data from Google`) — do not reword. Licensed alert text renders verbatim with issue times as published.
