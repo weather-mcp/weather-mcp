@@ -18,9 +18,10 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 
 ```
 src/
-├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown
+├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown triggers (stdin EOF, transport close, signals)
 ├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
 ├── server/lightningPrewarm.ts  # Saved-location lightning pre-warm: gate, guarded store read, refresh timer (never evicts)
+├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one unref'd deadline, stderr only
 ├── handlers/                # One handler per MCP tool (saved locations share one file)
 │   ├── forecastHandler.ts           # get_forecast (+ compare_models, ensemble_spread, normals, astronomy)
 │   ├── currentConditionsHandler.ts  # get_current_conditions (NOAA / Open-Meteo / METAR; fire weather, thermal stress)
@@ -427,7 +428,7 @@ via `src/utils/unitFormat.ts`.
 - **Algorithm:** LRU (Least Recently Used) eviction
 - **Size limits:** Configurable max size (default 1000 entries)
 - **Automatic cleanup:** Every 5 minutes
-- **Graceful shutdown:** Cleanup on SIGTERM/SIGINT
+- **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process
 
 ## Commit Conventions
 

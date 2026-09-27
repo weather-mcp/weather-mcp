@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The server now exits when its client closes stdin.** MCP clients end a stdio session by closing the server's input. The server ignored that and stayed running until the client fell back to `SIGTERM`. It now shuts down on stdin EOF, when the transport closes, or on `SIGTERM`/`SIGINT`. It does this once however many of these arrive, and it takes at most 1.5 seconds. On the way out it also disconnects from the lightning broker. Background housekeeping timers no longer keep the process alive. (`src/server/shutdown.ts`, `src/index.ts`, `src/utils/cache.ts`, `src/services/blitzortung.ts`)
+
 ## [1.33.5] - 2026-09-27
 
 You can point the lightning tool at your own broker with `BLITZORTUNG_MQTT_URL`, and that address can carry a username and password. The server wrote the whole address, credentials included, to its log each time it connected, so anyone who could read the log could read the password. This release keeps the credentials out of the log. The log still names the broker by scheme, host and port. Nothing changes if you use the default broker, and the lightning report reads exactly as before.
