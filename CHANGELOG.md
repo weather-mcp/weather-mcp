@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.7] - 2026-09-27
+
 `get_alerts` shows Japan Meteorological Agency warnings, but no captured example showed one, so a reader could not see how they look. The Tokyo trip example now includes a live JMA capture. Each captured example also named a server version beside its capture date. That version was read when the example was captured, so it never matched the release the example shipped in. The stamp now names the date only. Tool output does not change.
 
 ### Documentation
@@ -1939,7 +1941,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.6...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.7...HEAD
+[1.33.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.6...v1.33.7
 [1.33.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.5...v1.33.6
 [1.33.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.4...v1.33.5
 [1.33.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.3...v1.33.4

@@ -126,6 +126,8 @@ npm run build && npm run examples
 
 **About imagery links:** the radar URLs inside captured output expire — RainViewer retains only ~2 hours of frames — and a tile over dry skies renders blank, since radar tiles are transparent precipitation overlays. So the imagery examples also commit a PNG snapshot (`images/`): the capture script downloads the radar tile and composites it onto an OpenStreetMap base layer (four z+1 tiles stitched, pure-JS via the `pngjs` devDependency) so the echoes have geography under them, and warns if the overlay looks echo-free so a rain-free snapshot never ships unnoticed. Verify the image visually after regenerating. Committed snapshots carry attribution: radar © RainViewer, base map © OpenStreetMap contributors. The server output itself now includes an **interactive map** link (RainViewer live map / NASA Worldview) for the layered, animated browser view.
 
+**About the Japanese alerts capture:** Japan Meteorological Agency warnings render with their Japanese name and English gloss only while something is in force. If Tokyo is quiet when you regenerate, the script prints a `⚠️` warning and still counts the capture as a success, because a quiet day is a true answer. Re-run on another day, or rewrite the trip example's alerts answer to say that nothing was in force.
+
 <!-- capture-stamp -->
 *Captured 2026-09-25 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->
