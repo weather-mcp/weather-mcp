@@ -132,5 +132,5 @@ Enjoy your usual outdoor activities.
 **Features shown:** `source: "metar"` — real airport instrument observations anywhere on earth (station, distance, bearing, observation age always disclosed) · European pollen levels on `get_air_quality` (automatic for European locations) · European EAQI air-quality scale · per-call `units: "metric"`.
 
 <!-- capture-stamp -->
-*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-02 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

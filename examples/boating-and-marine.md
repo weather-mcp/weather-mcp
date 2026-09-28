@@ -185,5 +185,5 @@ No lightning strikes detected in the search area during the time window.
 **Features shown:** `get_marine_conditions` with `forecast_days` (waves, swell, period, currents, safety assessment) · `get_lightning_activity` real-time strike detection with `radius`/`timeWindow` and a 4-level safety assessment · metric units for an Australian location.
 
 <!-- capture-stamp -->
-*Captured 2026-09-18 with weather-mcp v1.30.1 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-18 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

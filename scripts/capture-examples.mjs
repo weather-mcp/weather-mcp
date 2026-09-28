@@ -13,7 +13,7 @@
  * Hand-written prose outside the markers is never touched, so the example
  * files can be regenerated at any time (`npm run examples`) without losing
  * their conversational layer. A `<!-- capture-stamp -->` marker in each file
- * is refreshed with the capture date and server version.
+ * is refreshed with the capture date.
  *
  * Run:  npm run build && npm run examples
  * Re-capture one scenario: npm run examples -- <filename-substring>
@@ -36,7 +36,6 @@ import { tmpdir } from 'node:os';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const SERVER = resolve(ROOT, 'dist', 'index.js');
-const VERSION = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
 const TODAY = new Date().toISOString().slice(0, 10);
 
 const CALL_GAP_MS = 2000;      // between ordinary calls
@@ -56,6 +55,13 @@ const GEO_UNAVAILABLE = /no locations found|could not find|not found/i;
 //                own), and commit the result (imagery URLs expire in ~2h).
 //                A warning fires when the overlay is small enough to be
 //                echo-free, so a rain-free snapshot never ships unnoticed.
+//   expect    -> optional RegExp the captured text is expected to match. A
+//                miss does not fail the capture (a quiet day is true output,
+//                not an error) — it prints a `⚠️` warning naming expectNote,
+//                so a captured "nothing in force" answer is never mistaken
+//                for the rendering the example exists to show.
+//   expectNote -> human-readable reason `expect` might legitimately miss;
+//                printed alongside the `⚠️` warning.
 // ---------------------------------------------------------------------------
 const EXAMPLES = [
   {
@@ -72,6 +78,16 @@ const EXAMPLES = [
         tool: 'get_weather_imagery',
         args: { latitude: 35.6769, longitude: 139.7639, type: 'radar' },
         image: 'images/tokyo-radar.png',
+      },
+      // The JMA branch writes `⚠️ **N active warning(s) for <area>**` (and the
+      // `### <name> — <gloss>` lines under it) only while something is in
+      // force; a quiet day is a true, expected result (see `expect` below).
+      {
+        id: 'tokyo-alerts',
+        tool: 'get_alerts',
+        args: { latitude: 35.6769, longitude: 139.7639, detail: 'full' },
+        expect: /^⚠️ \*\*\d+ active warnings? for /m,
+        expectNote: 'no JMA warning in force — the Japanese names and English gloss are not shown',
       },
     ],
   },
@@ -323,7 +339,7 @@ function splice(content, id, replacement, file) {
 function spliceStamp(content, file) {
   const re = /(<!-- capture-stamp -->)[\s\S]*?(<!-- \/capture-stamp -->)/;
   if (!re.test(content)) return content; // stamp is optional per file
-  const stamp = `*Captured ${TODAY} with weather-mcp v${VERSION} — raw output is live data and will differ when regenerated (\`npm run examples\`).*`;
+  const stamp = `*Captured ${TODAY} — raw output is live data and will differ when regenerated (\`npm run examples\`).*`;
   return content.replace(re, `$1\n${stamp}\n$2`);
 }
 
@@ -460,6 +476,9 @@ async function main() {
         }
         content = splice(content, call.id, renderCapture(call, res.text), example.file);
         console.log(`  ✅ ${call.id} (${res.text.length} chars)`);
+        if (call.expect && !call.expect.test(res.text)) {
+          console.log(`  ⚠️  ${call.id}: ${call.expectNote} — verify, or re-run on another day`);
+        }
         if (call.image) {
           const saved = await saveImageSnapshot(res.text, call.image);
           if (!saved.ok) {

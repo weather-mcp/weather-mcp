@@ -319,5 +319,5 @@ Use `save_location` to save new locations.
 *The activities you save travel with the location — ask "can we fish at the cabin Saturday?" and the assistant knows what and where "the cabin" is.*
 
 <!-- capture-stamp -->
-*Captured 2026-09-08 with weather-mcp v1.28.1 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-08 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

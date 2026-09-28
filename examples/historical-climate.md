@@ -377,5 +377,5 @@ Records: NOAA Regional Climate Centers (ACIS)
 **Features shown:** `get_historical_weather` — any date range back to 1940, anywhere (Open-Meteo archive) · `include_normals` — 30-year normal high/low with departure from normal, plus the US record high/low for the date and the year it was set (NOAA Regional Climate Centers).
 
 <!-- capture-stamp -->
-*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-02 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

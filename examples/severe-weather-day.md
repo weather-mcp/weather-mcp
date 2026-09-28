@@ -310,5 +310,5 @@ get_weather_imagery({
 **Features shown:** `get_weather_summary` one-call overview (current + forecast + alerts) · `get_alerts` `detail` levels (`standard` vs `full` alert text) · `get_weather_imagery` animated radar (RainViewer).
 
 <!-- capture-stamp -->
-*Captured 2026-09-08 with weather-mcp v1.28.1 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-08 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->
