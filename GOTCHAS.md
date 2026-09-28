@@ -2208,7 +2208,7 @@ phrases: T4's `not.toContain('✅ Operational')` list in `tests/unit/status-hand
 the same plan adds a negative lock and a retired-phrase grep, exclude the lock file from the
 grep's pathspec, or the check fails on correct code.
 
-**Status:** active, **extended twice on 2026-09-01, again 2026-09-03 and 2026-09-25**. Lint candidate on the vacuous half — a plan-authoring check
+**Status:** active, **extended twice on 2026-09-01, again 2026-09-03 and 2026-09-25; shape 3 recurred 2026-09-28** (service-status-empty-answer T4, `119aae0` — an impl plan called `check-doc-versions.sh` "a regression check, not a conditional requirement" on a branch whose T2/T3 added 26 tests; 8 test-count sites failed, every other sub-check passed). Lint candidate on the vacuous half — a plan-authoring check
 could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
 contains a file marked **new**. Related: [G10] (prove the hash is not vacuous —
 same family, a check that cannot fail is not evidence), [G40] (a plan's claim
@@ -6024,7 +6024,12 @@ check above returned `{"data":"","isNull":false,"truthy":false}` on axios 1.20.0
 
 **Status:** active. Related: [G13]/[G45]/[G70] (prove a stub reaches the real code path before
 trusting it). This is the same idea for the *payload*: a stub can reach the real interceptor and
-still hand it a value the network never sends.
+still hand it a value the network never sends. **Extended 2026-09-28**
+(service-status-empty-answer, `028ab8c`): the trap was latent in the NOAA probe too — it read the
+status alone, so an empty 200 rendered `✅ Answered normally`. Both probes now classify through
+`classifyProbeAnswer` / `isEmptyBody` in `src/utils/serviceStatusProbe.ts`, so the `''` rule is
+stated once; the `''` rows for both services are pinned in `tests/unit/service-status-probes.test.ts`
+(`8d9eb79`). A new probe that reads a body should call `isEmptyBody`, not restate the predicate.
 
 ---
 

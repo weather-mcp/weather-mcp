@@ -27,6 +27,8 @@ function statusLabel(result: ServiceProbeResult): string {
       return '⚠️ Rate limited (HTTP 429)';
     case 'http_error':
       return `❌ Error status (HTTP ${answeredStatus(result)})`;
+    case 'empty_body':
+      return '❌ Empty answer (HTTP 200)';
     case 'no_response':
       return '❌ No response';
   }
@@ -34,8 +36,9 @@ function statusLabel(result: ServiceProbeResult): string {
 
 /**
  * The Recommended Actions block for one service, or '' for a normal answer.
- * The upstream's contacts render only when it answered with an error; with no
- * HTTP response the block points at this machine's network instead.
+ * The upstream's contacts render only when it answered with an error or an
+ * empty body; with no HTTP response the block points at this machine's network
+ * instead.
  */
 function recommendedActions(result: ServiceProbeResult, service: ProbedService): string {
   switch (result.outcome) {
@@ -50,6 +53,7 @@ function recommendedActions(result: ServiceProbeResult, service: ProbedService):
           : `- Check production status: https://open-meteo.com/en/docs/model-updates\n\n`)
       );
     case 'http_error':
+    case 'empty_body':
       return service === 'NOAA'
         ? `**Recommended Actions:**\n` +
             `- Check planned outages: https://weather-gov.github.io/api/planned-outages\n` +
@@ -77,6 +81,8 @@ function outcomePhrase(result: ServiceProbeResult): string {
       return 'answered HTTP 429 and is rate limiting this caller';
     case 'http_error':
       return `answered with HTTP ${answeredStatus(result)}`;
+    case 'empty_body':
+      return 'answered HTTP 200 with an empty body';
     case 'no_response':
       return 'gave no HTTP response';
   }

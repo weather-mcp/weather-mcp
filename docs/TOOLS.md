@@ -599,7 +599,7 @@ Check if the weather services are operational
 - Whether the NOAA API (forecasts & current conditions) answered, and with what HTTP status
 - Whether the Open-Meteo API (the historical-archive host) answered, and with what HTTP status
 - Cache statistics (hit rate, size, API call reduction)
-- Status page links, and recommended actions: this machine's network when no response arrived, the upstream's status page and contacts when it answered with an error
+- Status page links, and recommended actions: this machine's network when no response arrived, the upstream's status page and contacts when it answered with an error or an empty body
 - Overall verdict for the two checked services, and the list of upstreams not checked; when neither service returned an HTTP response, the verdict points at the local network before the APIs
 
 ### 8. get_air_quality

@@ -27,7 +27,7 @@ import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { computeNormalsTable, getNormalsTableCacheKey, type NormalsTable } from '../utils/normals.js';
 import { getUserAgent } from '../utils/version.js';
-import { classifyProbeStatus, type ServiceProbeResult } from '../utils/serviceStatusProbe.js';
+import { classifyProbeAnswer, type ServiceProbeResult } from '../utils/serviceStatusProbe.js';
 import { UnitPreferences, IMPERIAL_PREFERENCES } from '../config/units.js';
 import { openMeteoUnitParams } from '../utils/unitFormat.js';
 import { COMPARISON_MODELS } from '../utils/modelComparison.js';
@@ -374,12 +374,9 @@ export class OpenMeteoService {
       });
 
       const httpStatus = response.status;
-      const classified = classifyProbeStatus(httpStatus);
-      // A 200 with no body answered, but not usably. Axios delivers an empty body as ''
-      const emptyBody = classified === 'ok' && (response.data == null || response.data === '');
-      const outcome = emptyBody ? 'http_error' : classified;
+      const outcome = classifyProbeAnswer(httpStatus, response.data);
       let message: string;
-      if (emptyBody) {
+      if (outcome === 'empty_body') {
         message = 'Open-Meteo API answered HTTP 200 with an empty body';
       } else if (outcome === 'ok') {
         message = 'Open-Meteo API answered normally (HTTP 200)';

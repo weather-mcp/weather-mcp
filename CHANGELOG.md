@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.8] - 2026-09-28
+
+When a weather service answered the `check_service_status` probe with HTTP 200 and no body, the report labelled it an error status, and the verdict said the service "answered with HTTP 200". A success code was called an error, and only the message line said what happened. The report now names it an empty answer, and the label, the message and the verdict agree. The NOAA probe did not check the body at all, so an empty NOAA answer read as a normal one. It now gets the same check as Open-Meteo.
+
+### Changed
+
+- **`check_service_status` has a fifth per-service label.** A 200 with no body now renders `❌ Empty answer (HTTP 200)`, and the verdict names it as "answered HTTP 200 with an empty body". Its Recommended Actions block is the upstream's status page and contacts, the same block an error answer gets. Anything that matched `❌ Error status (HTTP 200)` needs updating. The four existing labels, every existing verdict, the not-checked line, and the version and cache sections are byte-identical. (`src/utils/serviceStatusProbe.ts`, `src/handlers/statusHandler.ts`, `docs/ERROR_HANDLING.md`, `docs/TOOLS.md`)
+
+### Fixed
+
+- **An empty 200 no longer renders as an error status.** The probe outcome type had no member for an answer with a good status and no body, so the Open-Meteo probe filed it under the error outcome, and every render site then printed "error status" beside a 200. The outcome type gains `empty_body`, classified once in `src/utils/serviceStatusProbe.ts`, and each of the three render sites has its own arm for it.
+- **The NOAA probe now treats an empty 200 the way the Open-Meteo probe has since v1.33.1.** It read the status alone, so a 200 with no body rendered `✅ Answered normally` and counted the service as reachable. Both probes now classify through the same function. Proof: the adapter-seam unit tests drive both probes through their real interceptor with an empty-string, `null` and `undefined` body (`tests/unit/service-status-probes.test.ts`); the handler tests pin the new label, section and verdicts whole (`tests/unit/status-handler.test.ts`). (`src/services/noaa.ts`, `src/services/openmeteo.ts`)
+
 ## [1.33.7] - 2026-09-27
 
 `get_alerts` shows Japan Meteorological Agency warnings, but no captured example showed one, so a reader could not see how they look. The Tokyo trip example now includes a live JMA capture. Each captured example also named a server version beside its capture date. That version was read when the example was captured, so it never matched the release the example shipped in. The stamp now names the date only. Tool output does not change.
@@ -1941,7 +1954,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.7...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.8...HEAD
+[1.33.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.7...v1.33.8
 [1.33.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.6...v1.33.7
 [1.33.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.5...v1.33.6
 [1.33.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.4...v1.33.5

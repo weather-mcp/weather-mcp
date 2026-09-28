@@ -1,6 +1,6 @@
 /**
- * Locks the four `check_service_status` probe outcomes (`ok`, `rate_limited`,
- * `http_error`, `no_response`) for both `NOAAService.checkServiceStatus()` and
+ * Locks the five `check_service_status` probe outcomes (`ok`, `rate_limited`,
+ * `http_error`, `empty_body`, `no_response`) for both `NOAAService.checkServiceStatus()` and
  * `OpenMeteoService.checkServiceStatus()`, driven through the *real* axios
  * client and its *real* response interceptor.
  *
@@ -27,7 +27,12 @@ import settle from 'axios/unsafe/core/settle.js';
 import { NOAAService } from '../../src/services/noaa.js';
 import { OpenMeteoService } from '../../src/services/openmeteo.js';
 import { DataNotFoundError, ServiceUnavailableError } from '../../src/errors/ApiError.js';
-import { classifyProbeStatus, type ServiceProbeResult } from '../../src/utils/serviceStatusProbe.js';
+import {
+  classifyProbeStatus,
+  classifyProbeAnswer,
+  isEmptyBody,
+  type ServiceProbeResult,
+} from '../../src/utils/serviceStatusProbe.js';
 import { logger } from '../../src/utils/logger.js';
 
 // -----------------------------------------------------------------------
@@ -102,6 +107,40 @@ describe('classifyProbeStatus', () => {
   it.each([400, 404, 500, 503, 304, 204])('maps %i to http_error', (status) => {
     expect(classifyProbeStatus(status)).toBe('http_error');
   });
+});
+
+describe('classifyProbeAnswer', () => {
+  it.each([
+    ['', 200],
+    [null, 200],
+    [undefined, 200],
+  ])('classifies (200, %p) as empty_body', (data, status) => {
+    expect(classifyProbeAnswer(status, data)).toBe('empty_body');
+  });
+
+  it.each([
+    [{}, 200],
+    ['x', 200],
+  ])('classifies (200, %p) as ok', (data, status) => {
+    expect(classifyProbeAnswer(status, data)).toBe('ok');
+  });
+
+  it("classifies (429, '') as rate_limited", () => {
+    expect(classifyProbeAnswer(429, '')).toBe('rate_limited');
+  });
+
+  it("classifies (503, '') as http_error", () => {
+    expect(classifyProbeAnswer(503, '')).toBe('http_error');
+  });
+});
+
+describe('isEmptyBody', () => {
+  it.each([['', true], [null, true], [undefined, true], [{}, false], ['x', false]])(
+    'classifies %p as %p',
+    (data, expected) => {
+      expect(isEmptyBody(data)).toBe(expected);
+    }
+  );
 });
 
 // -----------------------------------------------------------------------
@@ -293,40 +332,109 @@ describe.each(CONFIGS)('$serviceName checkServiceStatus()', (config) => {
 // -----------------------------------------------------------------------
 
 describe('Open-Meteo checkServiceStatus() empty-body handling', () => {
-  it('200 with data: undefined -> http_error, httpStatus 200, empty-body message', async () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it('200 with data: undefined -> empty_body, httpStatus 200, empty-body message', async () => {
     const service = new OpenMeteoService();
     stubAdapter(getClient(service), { status: 200, data: undefined });
 
     const result = await service.checkServiceStatus();
 
-    expect(result.outcome).toBe('http_error');
+    expect(result.outcome).toBe('empty_body');
     expect(result.operational).toBe(false);
     expect(result.httpStatus).toBe(200);
     expect(result.message).toBe('Open-Meteo API answered HTTP 200 with an empty body');
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('200 with data: null -> http_error, httpStatus 200, empty-body message', async () => {
+  it('200 with data: null -> empty_body, httpStatus 200, empty-body message', async () => {
     const service = new OpenMeteoService();
     stubAdapter(getClient(service), { status: 200, data: null });
 
     const result = await service.checkServiceStatus();
 
-    expect(result.outcome).toBe('http_error');
+    expect(result.outcome).toBe('empty_body');
     expect(result.operational).toBe(false);
     expect(result.httpStatus).toBe(200);
     expect(result.message).toBe('Open-Meteo API answered HTTP 200 with an empty body');
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   // The shape a real empty body has: axios 1.x delivers it as '', not null
-  it("200 with data: '' -> http_error, httpStatus 200, empty-body message", async () => {
+  it("200 with data: '' -> empty_body, httpStatus 200, empty-body message", async () => {
     const service = new OpenMeteoService();
     stubAdapter(getClient(service), { status: 200, data: '' });
 
     const result = await service.checkServiceStatus();
 
-    expect(result.outcome).toBe('http_error');
+    expect(result.outcome).toBe('empty_body');
     expect(result.operational).toBe(false);
     expect(result.httpStatus).toBe(200);
     expect(result.message).toBe('Open-Meteo API answered HTTP 200 with an empty body');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
+
+// -----------------------------------------------------------------------
+// NOAA: HTTP 200 with an empty body is not usably "ok"
+// -----------------------------------------------------------------------
+
+describe('NOAA checkServiceStatus() empty-body handling', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it('200 with data: undefined -> empty_body, httpStatus 200, empty-body message', async () => {
+    const service = new NOAAService();
+    stubAdapter(getClient(service), { status: 200, data: undefined });
+
+    const result = await service.checkServiceStatus();
+
+    expect(result.outcome).toBe('empty_body');
+    expect(result.operational).toBe(false);
+    expect(result.httpStatus).toBe(200);
+    expect(result.message).toBe('NOAA Weather API answered HTTP 200 with an empty body');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('200 with data: null -> empty_body, httpStatus 200, empty-body message', async () => {
+    const service = new NOAAService();
+    stubAdapter(getClient(service), { status: 200, data: null });
+
+    const result = await service.checkServiceStatus();
+
+    expect(result.outcome).toBe('empty_body');
+    expect(result.operational).toBe(false);
+    expect(result.httpStatus).toBe(200);
+    expect(result.message).toBe('NOAA Weather API answered HTTP 200 with an empty body');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  // The shape a real empty body has: axios 1.x delivers it as '', not null
+  it("200 with data: '' -> empty_body, httpStatus 200, empty-body message", async () => {
+    const service = new NOAAService();
+    stubAdapter(getClient(service), { status: 200, data: '' });
+
+    const result = await service.checkServiceStatus();
+
+    expect(result.outcome).toBe('empty_body');
+    expect(result.operational).toBe(false);
+    expect(result.httpStatus).toBe(200);
+    expect(result.message).toBe('NOAA Weather API answered HTTP 200 with an empty body');
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });

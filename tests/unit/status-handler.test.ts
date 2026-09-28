@@ -87,6 +87,14 @@ const NOAA_NO_RESPONSE: ServiceProbeResult = {
   statusPage: NOAA_STATUS_PAGE,
   timestamp: TS,
 };
+const NOAA_EMPTY: ServiceProbeResult = {
+  operational: false,
+  outcome: 'empty_body',
+  httpStatus: 200,
+  message: 'NOAA Weather API answered HTTP 200 with an empty body',
+  statusPage: NOAA_STATUS_PAGE,
+  timestamp: TS,
+};
 const OPENMETEO_OK: ServiceProbeResult = {
   operational: true,
   outcome: 'ok',
@@ -123,6 +131,14 @@ const OPENMETEO_NO_RESPONSE: ServiceProbeResult = {
   operational: false,
   outcome: 'no_response',
   message: 'No HTTP response from the Open-Meteo API',
+  statusPage: OPENMETEO_STATUS_PAGE,
+  timestamp: TS,
+};
+const OPENMETEO_EMPTY: ServiceProbeResult = {
+  operational: false,
+  outcome: 'empty_body',
+  httpStatus: 200,
+  message: 'Open-Meteo API answered HTTP 200 with an empty body',
   statusPage: OPENMETEO_STATUS_PAGE,
   timestamp: TS,
 };
@@ -276,6 +292,20 @@ const BOTH_NOT_OK_MIXED_NORESPONSE_429_VERDICT =
   '## Overall Status: ❌ Neither Service Answered Normally\n\n' +
   "NOAA API gave no HTTP response. Open-Meteo API answered HTTP 429 and is rate limiting this caller. See each service's section above for what to check.\n";
 
+const PARTIAL_NOAA_UP_OPENMETEO_EMPTY_VERDICT =
+  '## Overall Status: ⚠️ One Service Answered Normally\n\n' +
+  'NOAA API answered, so it is reachable. This does not confirm that US forecasts and current conditions will succeed.\n' +
+  'Open-Meteo API answered HTTP 200 with an empty body: Historical weather data may be unavailable.\n';
+
+const PARTIAL_OPENMETEO_UP_NOAA_EMPTY_VERDICT =
+  '## Overall Status: ⚠️ One Service Answered Normally\n\n' +
+  'Open-Meteo API answered, so it is reachable. This does not confirm that historical weather requests will succeed.\n' +
+  'NOAA API answered HTTP 200 with an empty body: Forecasts and current conditions for US locations may be unavailable.\n';
+
+const BOTH_NOT_OK_MIXED_EMPTY_NORESPONSE_VERDICT =
+  '## Overall Status: ❌ Neither Service Answered Normally\n\n' +
+  "NOAA API answered HTTP 200 with an empty body. Open-Meteo API gave no HTTP response. See each service's section above for what to check.\n";
+
 describe('handleCheckServiceStatus', () => {
   describe('no coverage claim', () => {
     it('carries neither retired phrase when both probes succeed', async () => {
@@ -319,6 +349,8 @@ describe('handleCheckServiceStatus', () => {
       ['Open-Meteo down only', NOAA_OK, OPENMETEO_503],
       ['both no response', NOAA_NO_RESPONSE, OPENMETEO_NO_RESPONSE],
       ['mixed not-ok', NOAA_503, OPENMETEO_NO_RESPONSE],
+      ['Open-Meteo empty only', NOAA_OK, OPENMETEO_EMPTY],
+      ['both empty', NOAA_EMPTY, OPENMETEO_EMPTY],
     ];
 
     for (const [label, noaaStatus, openMeteoStatus] of cases) {
@@ -370,6 +402,7 @@ describe('handleCheckServiceStatus', () => {
       ['NOAA http_error 404', NOAA_404, '**Status:** ❌ Error status (HTTP 404)'],
       ['NOAA http_error 503', NOAA_503, '**Status:** ❌ Error status (HTTP 503)'],
       ['NOAA no_response', NOAA_NO_RESPONSE, '**Status:** ❌ No response'],
+      ['NOAA empty_body', NOAA_EMPTY, '**Status:** ❌ Empty answer (HTTP 200)'],
     ];
     for (const [label, noaaStatus, expectedLine] of noaaCases) {
       it(label, async () => {
@@ -385,6 +418,7 @@ describe('handleCheckServiceStatus', () => {
       ['Open-Meteo http_error 400', OPENMETEO_400, '**Status:** ❌ Error status (HTTP 400)'],
       ['Open-Meteo http_error 503', OPENMETEO_503, '**Status:** ❌ Error status (HTTP 503)'],
       ['Open-Meteo no_response', OPENMETEO_NO_RESPONSE, '**Status:** ❌ No response'],
+      ['Open-Meteo empty_body', OPENMETEO_EMPTY, '**Status:** ❌ Empty answer (HTTP 200)'],
     ];
     for (const [label, openMeteoStatus, expectedLine] of openMeteoCases) {
       it(label, async () => {
@@ -415,6 +449,7 @@ describe('handleCheckServiceStatus', () => {
       '❌ Issues Detected',
       'Partial Service Availability',
       'Both weather APIs are experiencing issues',
+      '❌ Error status (HTTP 200)',
     ];
 
     const renders: Array<[string, ServiceProbeResult, ServiceProbeResult]> = [
@@ -424,6 +459,8 @@ describe('handleCheckServiceStatus', () => {
       ['both no response', NOAA_NO_RESPONSE, OPENMETEO_NO_RESPONSE],
       ['mixed not-ok', NOAA_503, OPENMETEO_NO_RESPONSE],
       ['both http_error', NOAA_404, OPENMETEO_400],
+      ['partial, Open-Meteo empty', NOAA_OK, OPENMETEO_EMPTY],
+      ['both empty', NOAA_EMPTY, OPENMETEO_EMPTY],
     ];
 
     for (const [label, noaaStatus, openMeteoStatus] of renders) {
@@ -536,9 +573,47 @@ describe('handleCheckServiceStatus', () => {
       expect(section).not.toContain('github.com/open-meteo');
       expect(section).not.toContain('weather.gov/notification');
     });
+
+    it('empty_body section equals header, fixed lines and the upstream three-bullet contact block — NOAA', async () => {
+      const text = await renderStatus(NOAA_EMPTY, OPENMETEO_OK);
+      const section = extractServiceSection(text, NOAA_HEADER);
+      expect(section).toBe(
+        '## NOAA Weather API (Forecasts & Current Conditions)\n\n' +
+          '**Status:** ❌ Empty answer (HTTP 200)\n' +
+          '**Message:** NOAA Weather API answered HTTP 200 with an empty body\n' +
+          '**Status Page:** https://weather-gov.github.io/api/planned-outages\n' +
+          '**Coverage:** United States locations only\n\n' +
+          '**Recommended Actions:**\n' +
+          '- Check planned outages: https://weather-gov.github.io/api/planned-outages\n' +
+          '- View service notices: https://www.weather.gov/notification\n' +
+          '- Report issues: nco.ops@noaa.gov or (301) 683-1518\n\n'
+      );
+      expect(section).not.toContain('Error status');
+      expect(section).not.toContain('✅');
+      expect(section).not.toContain('No HTTP response reached this machine');
+    });
+
+    it('empty_body section equals header, fixed lines and the upstream three-bullet contact block — Open-Meteo', async () => {
+      const text = await renderStatus(NOAA_OK, OPENMETEO_EMPTY);
+      const section = extractServiceSection(text, OPENMETEO_HEADER);
+      expect(section).toBe(
+        '## Open-Meteo API (Historical Weather Data)\n\n' +
+          '**Status:** ❌ Empty answer (HTTP 200)\n' +
+          '**Message:** Open-Meteo API answered HTTP 200 with an empty body\n' +
+          '**Status Page:** https://open-meteo.com/en/docs/model-updates\n' +
+          '**Coverage:** Global (worldwide locations)\n\n' +
+          '**Recommended Actions:**\n' +
+          '- Check production status: https://open-meteo.com/en/docs/model-updates\n' +
+          '- View GitHub issues: https://github.com/open-meteo/open-meteo/issues\n' +
+          '- Review documentation: https://open-meteo.com/en/docs\n\n'
+      );
+      expect(section).not.toContain('Error status');
+      expect(section).not.toContain('✅');
+      expect(section).not.toContain('No HTTP response reached this machine');
+    });
   });
 
-  describe("partial verdict names the other side's outcome — all seven pins (G65)", () => {
+  describe("partial verdict names the other side's outcome — all nine pins (G65)", () => {
     const cases: Array<[string, ServiceProbeResult, ServiceProbeResult, string]> = [
       ['NOAA ok, Open-Meteo rate_limited', NOAA_OK, OPENMETEO_429, PARTIAL_NOAA_UP_OPENMETEO_429_VERDICT],
       ['NOAA ok, Open-Meteo http_error 503', NOAA_OK, OPENMETEO_503, PARTIAL_NOAA_UP_VERDICT],
@@ -547,6 +622,8 @@ describe('handleCheckServiceStatus', () => {
       ['Open-Meteo ok, NOAA rate_limited', NOAA_429, OPENMETEO_OK, PARTIAL_OPENMETEO_UP_NOAA_429_VERDICT],
       ['Open-Meteo ok, NOAA http_error 503', NOAA_503, OPENMETEO_OK, PARTIAL_OPENMETEO_UP_VERDICT],
       ['Open-Meteo ok, NOAA no_response', NOAA_NO_RESPONSE, OPENMETEO_OK, PARTIAL_OPENMETEO_UP_NOAA_NO_RESPONSE_VERDICT],
+      ['NOAA ok, Open-Meteo empty_body', NOAA_OK, OPENMETEO_EMPTY, PARTIAL_NOAA_UP_OPENMETEO_EMPTY_VERDICT],
+      ['Open-Meteo ok, NOAA empty_body', NOAA_EMPTY, OPENMETEO_OK, PARTIAL_OPENMETEO_UP_NOAA_EMPTY_VERDICT],
     ];
 
     for (const [label, noaaStatus, openMeteoStatus, expected] of cases) {
@@ -569,6 +646,7 @@ describe('handleCheckServiceStatus', () => {
     const cases: Array<[string, ServiceProbeResult, ServiceProbeResult, string]> = [
       ['NOAA 503, Open-Meteo no_response', NOAA_503, OPENMETEO_NO_RESPONSE, BOTH_NOT_OK_MIXED_VERDICT],
       ['NOAA no_response, Open-Meteo 429', NOAA_NO_RESPONSE, OPENMETEO_429, BOTH_NOT_OK_MIXED_NORESPONSE_429_VERDICT],
+      ['NOAA empty_body, Open-Meteo no_response', NOAA_EMPTY, OPENMETEO_NO_RESPONSE, BOTH_NOT_OK_MIXED_EMPTY_NORESPONSE_VERDICT],
     ];
 
     for (const [label, noaaStatus, openMeteoStatus, expected] of cases) {
