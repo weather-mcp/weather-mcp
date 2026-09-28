@@ -22,7 +22,7 @@ New `check_service_status` MCP tool performs health checks on both APIs:
 - NOAA Weather API (forecasts & current conditions)
 - Open-Meteo API (historical weather data)
 
-Reports whether each API answered and how (normally, rate limited, with an error status, or not at all), with status-page links and recommendations that depend on the outcome.
+Reports whether each API answered and how (normally, rate limited, with an error status, with an empty body, or not at all), with status-page links and recommendations that depend on the outcome.
 
 ## Error Message Examples
 
@@ -371,21 +371,21 @@ Call the `check_service_status` tool with no parameters:
 
 ## NOAA Weather API (Forecasts & Current Conditions)
 
-**Status:** ✅ Answered normally | ⚠️ Rate limited (HTTP 429) | ❌ Error status (HTTP nnn) | ❌ No response
+**Status:** ✅ Answered normally | ⚠️ Rate limited (HTTP 429) | ❌ Error status (HTTP nnn) | ❌ Empty answer (HTTP 200) | ❌ No response
 **Message:** [status message]
 **Status Page:** https://weather-gov.github.io/api/planned-outages
 **Coverage:** United States locations only
 
-[Recommended Actions — this machine's network first when there was no response; the upstream's status page and contacts when it answered with an error; none when it answered normally]
+[Recommended Actions — this machine's network first when there was no response; the upstream's status page and contacts when it answered with an error or with an empty body; none when it answered normally]
 
 ## Open-Meteo API (Historical Weather Data)
 
-**Status:** ✅ Answered normally | ⚠️ Rate limited (HTTP 429) | ❌ Error status (HTTP nnn) | ❌ No response
+**Status:** ✅ Answered normally | ⚠️ Rate limited (HTTP 429) | ❌ Error status (HTTP nnn) | ❌ Empty answer (HTTP 200) | ❌ No response
 **Message:** [status message]
 **Status Page:** https://open-meteo.com/en/docs/model-updates
 **Coverage:** Global (worldwide locations)
 
-[Recommended Actions — this machine's network first when there was no response; the upstream's status page and contacts when it answered with an error; none when it answered normally]
+[Recommended Actions — this machine's network first when there was no response; the upstream's status page and contacts when it answered with an error or with an empty body; none when it answered normally]
 
 ## Overall Status: ✅ NOAA and Open-Meteo Reachable | ⚠️ One Service Answered Normally | ❌ Neither Service Answered | ❌ Neither Service Answered Normally
 
@@ -406,17 +406,17 @@ Call the `check_service_status` tool with no parameters:
 
 The status checker performs two lightweight API requests, concurrently. They measure **reachability** — whether the service answered — not whether a given weather request will succeed:
 
-Each probe reads the HTTP status itself (the request accepts every status), so an answer with an error and no answer at all render differently; when both probes get no answer the verdict names the local network first.
+Each probe reads the HTTP status and the response body itself (the request accepts every status), so a rate limit, an error answer, an empty answer and no answer at all render differently; when both probes get no answer the verdict names the local network first.
 
 **NOAA API:**
 - Tests: `/points/39.8283,-98.5795` (geographic center of US mainland)
 - Timeout: 10 seconds
-- Interprets: 200 = answered normally; 429 = answered, rate limiting this caller; any other status = answered with an error (the status is shown); no HTTP response = no response — the connection, DNS, proxy or timeout, undifferentiated
+- Interprets: 200 with a body = answered normally (200 with an empty body = an empty answer); 429 = answered, rate limiting this caller; any other status = answered with an error (the status is shown); no HTTP response = no response — the connection, DNS, proxy or timeout, undifferentiated
 
 **Open-Meteo API:**
 - Tests: Historical data request for London, 30 days ago
 - Timeout: 10 seconds
-- Interprets: 200 with a body = answered normally (200 with an empty body = answered with an error); 429 = answered, rate limiting this caller; any other status = answered with an error (the status is shown); no HTTP response = no response — the connection, DNS, proxy or timeout, undifferentiated
+- Interprets: 200 with a body = answered normally (200 with an empty body = an empty answer); 429 = answered, rate limiting this caller; any other status = answered with an error (the status is shown); no HTTP response = no response — the connection, DNS, proxy or timeout, undifferentiated
 
 ## Implementation Details
 
@@ -439,7 +439,7 @@ Both service classes expose public status check methods:
 ```typescript
 async checkServiceStatus(): Promise<{
   operational: boolean;
-  outcome: 'ok' | 'rate_limited' | 'http_error' | 'no_response';
+  outcome: 'ok' | 'rate_limited' | 'http_error' | 'empty_body' | 'no_response';
   httpStatus?: number;
   message: string;
   statusPage: string;
@@ -447,7 +447,7 @@ async checkServiceStatus(): Promise<{
 }>
 ```
 
-The type is `ServiceProbeResult` from `src/utils/serviceStatusProbe.ts`. `operational` is `outcome === 'ok'`; `httpStatus` is present for every outcome except `no_response`. The probe never rejects.
+The type is `ServiceProbeResult` from `src/utils/serviceStatusProbe.ts`. `operational` is `outcome === 'ok'`; `httpStatus` is present for every outcome except `no_response`. `empty_body` is a 200 with no body, so `httpStatus` is 200 on it. The probe never rejects.
 
 ### MCP Tool Integration
 
@@ -455,7 +455,7 @@ The `check_service_status` tool in `src/server/weatherServer.ts`:
 - Calls both service status checkers in parallel
 - Formats results with markdown for AI client display
 - Provides overall system status summary
-- Includes recommended actions that depend on the outcome: none for a normal answer, this machine's network first for no response, the upstream's status page and contacts for an error answer
+- Includes recommended actions that depend on the outcome: none for a normal answer, this machine's network first for no response, the upstream's status page and contacts for an error or empty answer
 
 ## Official Status Resources
 
