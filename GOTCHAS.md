@@ -5350,7 +5350,7 @@ produces.
 
 **Rule:** regenerate **only** the example whose output shape actually changed,
 and **read the capture before committing it**. The script takes a filter
-argument (`scripts/capture-examples.mjs:418-419`), so
+argument (`scripts/capture-examples.mjs:435-436`), so
 `npm run examples boating` rewrites one file. Then grep the regenerated files
 for a captured failure before staging:
 
