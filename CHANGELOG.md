@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.10] - 2026-09-28
+
+Two names were not treated as names. A saved location called `__proto__` or `constructor` could not be saved, looked up or removed correctly: one was silently dropped, and the other appeared to exist on an empty list. The same two words in `ENABLED_TOOLS` stopped the server from starting. Both are now ordinary names everywhere: a saved alias round-trips like any other, and an unknown tool name gets the usual warning.
+
 ### Fixed
 
 - **Saved-location aliases named `__proto__` and `constructor` now work like any other alias.** `save_location` with the alias `__proto__` reported success and saved nothing. `constructor` behaved as if it already existed: it was reported as "Updated" and saved without a `saved_at`. On an empty list, `get_saved_location`, `remove_saved_location` and any weather tool's `location_name` answered for these two names as if a broken entry existed, and `remove_saved_location` reported a removal. Every lowercase alias is now an ordinary name. (`src/services/locationStore.ts`)
@@ -1973,7 +1977,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.9...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.10...HEAD
+[1.33.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.9...v1.33.10
 [1.33.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.8...v1.33.9
 [1.33.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.7...v1.33.8
 [1.33.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.6...v1.33.7
