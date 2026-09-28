@@ -552,6 +552,11 @@ tools use to skip the reverse-geocode lookup.
 - **Last-writer-wins across processes**: there is no lockfile. The read-modify-write is one
   synchronous run, so the collision window is microseconds between two humans driving two clients;
   the loser loses one update and the file stays valid
+- **Own keys only**: `load()` returns a null-prototype object on both of its return paths, and
+  `get`/`has`/`set`/`remove` look an alias up by own key, so any lowercase alias round-trips,
+  `__proto__` and `constructor` included. The two layers are redundant on purpose. Do not rebuild
+  the object with spread: `{ ...parsed }` restores `Object.prototype`, and then
+  `locations['__proto__'] = record` hits the setter and the entry is never written
 - **Keep the store synchronous** (G20): the no-lockfile argument rests on the read and the write
   being one synchronous run. Do not make these methods `async`, and do not put an `await` between
   a caller's read and its `set` — `savedLocationsHandler.ts` re-reads its merge base *after* the
