@@ -155,6 +155,20 @@ export function clearCityGeocodeCache(): void {
 }
 
 /**
+ * Thrown when a saved alias is found but its stored coordinates are not usable
+ * (a hand-edited string, NaN or out-of-range value). A distinct type so the
+ * WEATHER_DEFAULT_LOCATION fallback can tell "this alias is saved but broken"
+ * from "this is not a saved alias" — only the second may be geocoded as a place
+ * name. Renders exactly like a plain Error.
+ */
+export class SavedLocationCoordinateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SavedLocationCoordinateError';
+  }
+}
+
+/**
  * Resolve location coordinates from either direct coordinates or a saved location name
  *
  * @param args - Arguments containing either (latitude + longitude) OR location_name
@@ -183,8 +197,14 @@ export function resolveLocation(
       const allLocations = locationStore.getAll();
 
       for (const [alias, location] of Object.entries(allLocations)) {
-        // Check if query matches any alternate names
-        if (location.alternateNames && location.alternateNames.length > 0) {
+        // Check if query matches any alternate names. A hand-edited neighbour
+        // whose alternateNames is not a list of strings is skipped, so it
+        // cannot break every lookup that misses an exact alias.
+        if (
+          Array.isArray(location.alternateNames) &&
+          location.alternateNames.every((n: unknown) => typeof n === 'string') &&
+          location.alternateNames.length > 0
+        ) {
           const normalizedAlternates = location.alternateNames.map(name =>
             name.toLowerCase().trim()
           );
@@ -209,12 +229,29 @@ export function resolveLocation(
       );
     }
 
+    // The file is hand-editable: refuse a stored coordinate that is not usable
+    // rather than send it upstream. Only the coordinates are checked — a bad
+    // name does not stop a weather tool, because nothing here reads it.
+    try {
+      validateLatitude(savedLocation.latitude);
+      validateLongitude(savedLocation.longitude);
+    } catch (error) {
+      throw new SavedLocationCoordinateError(
+        `Saved location "${matchedAlias}" has an invalid coordinate: ` +
+        `${error instanceof Error ? error.message : String(error)}. Repair or remove it.`
+      );
+    }
+
     return {
       latitude: savedLocation.latitude,
       longitude: savedLocation.longitude,
       source: 'saved_location',
       location_name: matchedAlias,
-      country_code: savedLocation.country_code
+      // An unusable optional country code is dropped, not refused: the caller
+      // then takes the coordinate-based country lookup instead.
+      country_code: typeof savedLocation.country_code === 'string'
+        ? savedLocation.country_code
+        : undefined
     };
   }
 
@@ -432,7 +469,12 @@ async function resolveDefaultLocation(
     // place name and return the weather for wherever Nominatim puts "home",
     // which is worse than an error. Every other failure here really does mean
     // "not a saved alias" and still falls through to the geocode below.
-    if (error instanceof LocationStoreUnreadableError) {
+    // A saved alias with an unusable coordinate is the same case: the alias is
+    // there, it is broken, and geocoding its name would be a wrong-place answer.
+    if (
+      error instanceof LocationStoreUnreadableError ||
+      error instanceof SavedLocationCoordinateError
+    ) {
       throw error;
     }
   }

@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.33.8 (Production Ready)
+- **Version:** 1.33.9 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -73,6 +73,7 @@ src/
 │   ├── criticalAlert.ts     # Life-threatening-alert gate, selection, banner copy (pure)
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
+│   ├── savedLocationShape.ts  # Saved-location record-shape contract — write-side validator and read-side describer (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
 │   ├── serviceStatusProbe.ts     # check_service_status probe outcome type + 200/429/other classification; both probes import it (pure)
 │   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing; log redaction (coordinates, URLs)
@@ -530,7 +531,7 @@ tools use to skip the reverse-geocode lookup.
 
 - **Aliases are normalized**: Always lowercased and trimmed for consistency
 - **Max alias length**: 50 characters
-- **Validation**: Coordinates validated on save
+- **Validation**: coordinates and every metadata field are type-checked before any write, on every branch, in the handler and again in `LocationStore.set()`; a malformed on-disk entry is named by the renderers and never dropped (`src/utils/savedLocationShape.ts`). The resolver refuses only a bad coordinate (`SavedLocationCoordinateError`, which `WEATHER_DEFAULT_LOCATION` must never fall through to geocoding)
 - **Geocoding**: Uses Nominatim service (rate-limited to 1 req/sec)
 - **Error handling**: Helpful messages if location not found or invalid
 - **No cache**: `load()` reads and parses the file on **every** operation and returns a fresh
@@ -556,7 +557,7 @@ tools use to skip the reverse-geocode lookup.
   a caller's read and its `set` — `savedLocationsHandler.ts` re-reads its merge base *after* the
   geocoder await for exactly this reason
 - **Activities (optional)**: array of strings, lowercased/trimmed, ≤ 50 chars each, empties dropped; helps the AI tailor weather context
-- **Smart Updates**: if the alias exists and no location details are provided, only the specified fields change (`description`/`alternateNames`/`notes` preserved when omitted, cleared when explicitly `""`/`[]`); new locations still need `location_query` or lat/long
+- **Smart Updates**: if the alias exists and no location details are provided, only the specified fields change (`description`/`alternateNames`/`notes` preserved when omitted, cleared when explicitly `""`/`[]`); new locations still need `location_query` or lat/long — `name` cannot be cleared; empty means omitted
 
 ### Currently Supported Tools
 
@@ -634,15 +635,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.33.8 — Production Ready ✅
-- **Test Coverage:** 3,852 tests, 100% pass rate
+- **Version:** 1.33.9 — Production Ready ✅
+- **Test Coverage:** 3,980 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.33.9:** A malformed saved location is refused before it is written, and named if it is already on disk
 - **New in v1.33.8:** An empty answer from a weather service is labelled as one
 - **New in v1.33.7:** Tokyo example shows Japanese alerts; capture stamps name the date only
-- **New in v1.33.6:** The server exits when its client closes stdin
 
 ## Useful References
 
@@ -665,7 +666,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-28 (v1.33.8)
+**Last Updated:** 2026-09-28 (v1.33.9)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

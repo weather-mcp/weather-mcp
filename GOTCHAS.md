@@ -6143,6 +6143,74 @@ the process has to be made in a process).
 
 ---
 
+## G115 — A "found but unusable" error must not fall through a "try the next source" catch
+
+**Trigger:** a fallback chain that tries one resolver, catches its failure, and
+tries the next source with the same input — the shape being
+`WEATHER_DEFAULT_LOCATION`: saved alias first, then geocode the same text as a
+place name (`resolveDefaultLocation`, `src/utils/locationResolver.ts`). It fires
+when you **add a new refusal** inside the first resolver.
+
+**Rule:** the catch must tell "not found here" from "found here, and broken".
+Only not-found may fall through. Every "found but unusable" refusal gets its own
+error type, and the catch rethrows it by `instanceof` — never by matching the
+message. When you add a throw inside a resolver, grep every caller for a catch
+that swallows it.
+
+**Why:** a new validation turns a record that used to resolve into a thrown
+error. A broad catch reads that refusal as "not a saved alias", geocodes the
+word `home`, and returns valid-looking weather for wherever the geocoder puts
+it. That is a wrong-place answer, and it is worse than the error. The unreadable
+file (`LocationStoreUnreadableError`) had already been through this, so the
+catch named one type. The new coordinate refusal was a plain `Error`, and the
+impl plan as written would have shipped the fall-through.
+
+**Verify:** in `resolveDefaultLocation`, delete
+`|| error instanceof SavedLocationCoordinateError`.
+`tests/unit/saved-locations-malformed-entry.test.ts`'s default-location
+bad-coordinate case goes red: it resolves through the geocoder stub instead
+(mutation M10).
+
+**Evidence:** 2026-09-28, saved-location-metadata-validation. The codex plan
+review (R1) found it before the run. It was fixed in `bcc60dd` and pinned in
+`22b9011`. M10 reddened exactly that one case.
+
+**Status:** active. Related: [G100] (the same handler family; a read before an
+await), [G45] (the lock must execute the fallback path, not the resolver alone).
+
+---
+
+## G116 — `escapeMarkdown` inside a code span prints its backslashes
+
+**Trigger:** interpolating `escapeMarkdown(x)` between backticks — the
+saved-location headings ``## `${escapeMarkdown(alias)}` ``
+(`src/handlers/savedLocationsHandler.ts`, list and get) and any new code span.
+
+**Rule:** do not escape Markdown inside a code span. CommonMark does not process
+backslash escapes there, so `lake_cabin` renders as `lake\_cabin`. Inside
+backticks, strip or refuse backticks and newlines instead. Keep
+`escapeMarkdown` for text outside code.
+
+**Why:** the saved-location headings have always done this. Every alias with an
+`_`, `*`, `(` or `!` shows a stray backslash in `list_saved_locations` and
+`get_saved_location`. The malformed-entry warning line (`bcc60dd`) avoided it by
+using the raw alias with backticks and newlines stripped. The headings are left
+as they were: changing them changes output for valid input, and that needs its
+own decision.
+
+**Verify:** save alias `lake_cabin` and call `list_saved_locations`. The heading
+reads ``## `lake\_cabin` ``, while the warning line's
+`remove_saved_location(alias="lake_cabin")` has no backslash.
+
+**Evidence:** 2026-09-28, saved-location-metadata-validation. Seen in the dist
+render of T4, and in T5's subagent, which had to mirror the escaping in its
+assertions.
+
+**Status:** active — a pre-existing rendering defect, untasked. It is a follow-up
+candidate for `/prioritize`.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the

@@ -349,6 +349,55 @@ Pre-warm also never displaces an area you queried: a saved location that does no
 `Lightning pre-warm skipped saved locations: subscription limit reached` warning when the skipped
 count changes.
 
+### Saved Location Entry Malformed
+
+The file parses, but one entry in it holds a value of the wrong type — a `name` that is a number, a
+coordinate written as a string, an `alternateNames` that is not a list. That happens only through a
+hand edit: `save_location` refuses a wrong-typed value before anything is written, and so does the
+store itself, whatever wrote it.
+
+`list_saved_locations` names the entry and the field, and renders every other entry as usual:
+
+```
+## `home`
+
+⚠️ This entry cannot be shown: `name` is not text. Remove it with `remove_saved_location(alias="home")` or repair it in the file below.
+```
+
+`get_saved_location` on that alias refuses it with the same field and the file's path:
+
+```
+Error: Saved location "home" cannot be shown: name is not text.
+
+Remove it with remove_saved_location or repair it in /home/you/.weather-mcp/locations.json.
+```
+
+**Weather tools refuse only a bad coordinate.** Called with `location_name` — or through a
+`WEATHER_DEFAULT_LOCATION` set to that alias — a saved entry whose coordinates are not usable
+numbers is refused with its alias named, rather than sent to a weather service:
+
+```
+Error: Saved location "lake_cabin" has an invalid coordinate: Invalid latitude: must be a finite number, received string. Repair or remove it.
+```
+
+A default location in that state is **never** geocoded as a place name instead — that would
+return the weather for wherever the geocoder puts the word "home". Any other malformed field does
+not stop a weather tool: a bad `name` is never read on that path, and a country code that is not
+text is ignored and looked up from the coordinates.
+
+**The file is never modified.** Nothing is dropped, repaired or rewritten on your behalf. Every
+other alias keeps working.
+
+**Two remedies:** `remove_saved_location(alias="…")` — it never reads the broken field, so it
+always works — then save the location again; or repair the value in the file by hand. No restart
+is needed.
+
+A wrong-typed value sent to `save_location` itself is refused before anything is written:
+
+```
+Error: name must be a string
+```
+
 ## Service Status Tool
 
 ### Usage

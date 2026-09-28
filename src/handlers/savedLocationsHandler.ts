@@ -5,12 +5,14 @@
 import { LocationStore } from '../services/locationStore.js';
 import { NominatimService } from '../services/nominatim.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import { describeSavedLocationDefect } from '../utils/savedLocationShape.js';
 
 interface SaveLocationArgs {
   alias?: string;
   location_query?: string;
   latitude?: number;
   longitude?: number;
+  /** An empty or whitespace-only name is treated as not supplied — it keeps the current name. */
   name?: string;
   description?: string;
   alternateNames?: string[];
@@ -156,6 +158,14 @@ export async function handleSaveLocation(
     notes = trimmed.length > 0 ? trimmed : undefined;
   }
 
+  // Validate name if provided. Unlike the fields above, an empty name does not
+  // clear anything: it is treated as not supplied, and the branch below decides
+  // what "no name" means (keep the stored one, use the geocoded one, or refuse).
+  if (saveArgs.name !== undefined && typeof saveArgs.name !== 'string') {
+    throw new Error('name must be a string');
+  }
+  const providedName = saveArgs.name?.trim() || undefined;
+
   // Check for partial update mode (updating existing location without re-specifying coordinates)
   const hasLocationDetails = saveArgs.location_query ||
     (typeof saveArgs.latitude === 'number' && typeof saveArgs.longitude === 'number');
@@ -174,7 +184,7 @@ export async function handleSaveLocation(
     // Partial update: preserve existing location data, only update specified fields
     latitude = existingLocation.latitude;
     longitude = existingLocation.longitude;
-    name = saveArgs.name || existingLocation.name;
+    name = providedName ?? existingLocation.name;
     timezone = existingLocation.timezone;
     country_code = existingLocation.country_code;
     admin1 = existingLocation.admin1;
@@ -196,7 +206,7 @@ export async function handleSaveLocation(
     const location = results.results[0];
     latitude = location.latitude;
     longitude = location.longitude;
-    name = saveArgs.name || location.name;
+    name = providedName ?? location.name;
     timezone = location.timezone;
     country_code = location.country_code;
     admin1 = location.admin1;
@@ -211,12 +221,12 @@ export async function handleSaveLocation(
     validateLatitude(latitude);
     validateLongitude(longitude);
 
-    if (!saveArgs.name || typeof saveArgs.name !== 'string') {
+    if (providedName === undefined) {
       throw new Error(
         'name parameter is required when providing coordinates directly'
       );
     }
-    name = saveArgs.name;
+    name = providedName;
   } else {
     throw new Error(
       'Either location_query OR (latitude + longitude + name) must be provided'
@@ -375,9 +385,23 @@ export async function handleListSavedLocations(
   output += `**Total:** ${aliases.length} location${aliases.length > 1 ? 's' : ''}\n\n`;
   output += `---\n\n`;
 
+  // A hand-edited entry the renderer cannot show is named, not rendered — so
+  // one bad entry cannot take the whole listing down with it.
+  const malformed = new Set<string>();
+
   for (const alias of aliases) {
     const location = locations[alias];
     output += `## \`${escapeMarkdown(alias)}\`\n\n`;
+
+    const defect = describeSavedLocationDefect(location);
+    if (defect) {
+      malformed.add(alias);
+      output += `⚠️ This entry cannot be shown: \`${defect.field}\` ${defect.problem}. ` +
+        `Remove it with \`remove_saved_location(alias="${alias.replace(/[`\r\n]/g, '')}")\` ` +
+        `or repair it in the file below.\n\n`;
+      continue;
+    }
+
     output += `**Name:** ${escapeMarkdown(location.name)}\n`;
     output += `**Coordinates:** ${location.latitude.toFixed(4)}°, ${location.longitude.toFixed(4)}°\n`;
 
@@ -418,13 +442,16 @@ export async function handleListSavedLocations(
     output += `\n`;
   }
 
+  const healthy = aliases.filter(a => !malformed.has(a));
   output += `---\n\n`;
-  output += `**Usage Examples:**\n\n`;
-  output += `\`\`\`\n`;
-  for (const alias of aliases.slice(0, 3)) {
-    output += `get_forecast(location_name="${alias}")\n`;
+  if (healthy.length > 0) {
+    output += `**Usage Examples:**\n\n`;
+    output += `\`\`\`\n`;
+    for (const alias of healthy.slice(0, 3)) {
+      output += `get_forecast(location_name="${alias}")\n`;
+    }
+    output += `\`\`\`\n\n`;
   }
-  output += `\`\`\`\n\n`;
   output += `*Storage location: ${locationStore.getStorePath()}*\n`;
 
   return {
@@ -461,6 +488,14 @@ export async function handleGetSavedLocation(
         ? `Available locations: ${available.join(', ')}\n\n`
         : 'No saved locations yet. Use save_location to create one.\n\n') +
       `Use list_saved_locations to see all saved locations.`
+    );
+  }
+
+  const defect = describeSavedLocationDefect(location);
+  if (defect) {
+    throw new Error(
+      `Saved location "${alias}" cannot be shown: ${defect.field} ${defect.problem}.\n\n` +
+      `Remove it with remove_saved_location or repair it in ${locationStore.getStorePath()}.`
     );
   }
 

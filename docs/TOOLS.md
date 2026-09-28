@@ -947,17 +947,19 @@ Save a location with an alias for easy reuse in weather queries.
 - `location_query` (optional): Location to geocode and save (e.g., "Seattle, WA", "Paris, France"). Not required if latitude/longitude provided.
 - `latitude` (optional): Latitude if providing coordinates directly. Not required if location_query provided.
 - `longitude` (optional): Longitude if providing coordinates directly. Not required if location_query provided.
-- `name` (optional): Display name (required when using latitude/longitude directly)
+- `name` (optional): Display name (required when using latitude/longitude directly). Must be text. An empty or whitespace-only `name` is treated as not supplied — it keeps the current name on an update and uses the geocoded name on a new save; it cannot be cleared.
 - `activities` (optional): Activities you do at this location (e.g., ["boating", "fishing"]). Helps AI provide relevant weather information. Each activity max 50 characters.
 
 **Description:**
 Saves a location to persistent storage (`~/.weather-mcp/locations.json`) for easy reuse. Accepts either a location query (which will be automatically geocoded using Nominatim/OpenStreetMap) or direct coordinates. Once saved, the location can be used in any weather tool by providing `location_name` instead of coordinates.
 
-**Smart Updates:** If the alias already exists and you only provide `name` and/or `activities` (without location details), it will update just those fields while preserving all coordinates and metadata. This makes it easy to add activities or rename locations without re-specifying the full address.
+**Smart Updates:** If the alias already exists and you only provide `name` and/or `activities` (without location details), it will update just those fields while preserving all coordinates and metadata. This makes it easy to add activities or rename locations without re-specifying the full address. `name` is the one field an empty value does not clear.
 
 **Shared across your MCP clients.** `~/.weather-mcp/locations.json` is one file per machine, and every client you have configured reads and writes it. A save made in one client is visible to the others on their very next call — the file is read on every operation, so nothing needs restarting. Two saves made at the same moment resolve last-writer-wins on that one update; the file always stays valid.
 
 **An unreadable file is refused, never replaced.** If `locations.json` exists but cannot be read or parsed, every saved-locations tool reports the error and names the path, and the file is left exactly as it is — not renamed, not copied, not overwritten. A file that does not exist yet is simply an empty store. See [ERROR_HANDLING.md](./ERROR_HANDLING.md#saved-locations-file-unreadable).
+
+**A malformed entry is named, never dropped.** If a hand edit leaves one entry with a value the server cannot show, `list_saved_locations` and `get_saved_location` name that alias and the field at fault, and every other alias keeps working. `remove_saved_location` or a repair in the file clears it. A saved alias whose coordinates are not numbers is refused by every weather tool with a message naming the alias — including when it is `WEATHER_DEFAULT_LOCATION`, which is never geocoded as a place name instead. See [ERROR_HANDLING.md](./ERROR_HANDLING.md#saved-location-entry-malformed).
 
 **Examples:**
 ```
