@@ -11,6 +11,7 @@ interface SaveLocationArgs {
   location_query?: string;
   latitude?: number;
   longitude?: number;
+  /** An empty or whitespace-only name is treated as not supplied — it keeps the current name. */
   name?: string;
   description?: string;
   alternateNames?: string[];
@@ -156,6 +157,14 @@ export async function handleSaveLocation(
     notes = trimmed.length > 0 ? trimmed : undefined;
   }
 
+  // Validate name if provided. Unlike the fields above, an empty name does not
+  // clear anything: it is treated as not supplied, and the branch below decides
+  // what "no name" means (keep the stored one, use the geocoded one, or refuse).
+  if (saveArgs.name !== undefined && typeof saveArgs.name !== 'string') {
+    throw new Error('name must be a string');
+  }
+  const providedName = saveArgs.name?.trim() || undefined;
+
   // Check for partial update mode (updating existing location without re-specifying coordinates)
   const hasLocationDetails = saveArgs.location_query ||
     (typeof saveArgs.latitude === 'number' && typeof saveArgs.longitude === 'number');
@@ -174,7 +183,7 @@ export async function handleSaveLocation(
     // Partial update: preserve existing location data, only update specified fields
     latitude = existingLocation.latitude;
     longitude = existingLocation.longitude;
-    name = saveArgs.name || existingLocation.name;
+    name = providedName ?? existingLocation.name;
     timezone = existingLocation.timezone;
     country_code = existingLocation.country_code;
     admin1 = existingLocation.admin1;
@@ -196,7 +205,7 @@ export async function handleSaveLocation(
     const location = results.results[0];
     latitude = location.latitude;
     longitude = location.longitude;
-    name = saveArgs.name || location.name;
+    name = providedName ?? location.name;
     timezone = location.timezone;
     country_code = location.country_code;
     admin1 = location.admin1;
@@ -211,12 +220,12 @@ export async function handleSaveLocation(
     validateLatitude(latitude);
     validateLongitude(longitude);
 
-    if (!saveArgs.name || typeof saveArgs.name !== 'string') {
+    if (providedName === undefined) {
       throw new Error(
         'name parameter is required when providing coordinates directly'
       );
     }
-    name = saveArgs.name;
+    name = providedName;
   } else {
     throw new Error(
       'Either location_query OR (latitude + longitude + name) must be provided'

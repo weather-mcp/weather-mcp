@@ -23,7 +23,7 @@ import { homedir } from 'os';
 import { join, dirname, basename, resolve, isAbsolute } from 'path';
 import type { SavedLocation, SavedLocationsStore } from '../types/savedLocations.js';
 import { logger } from '../utils/logger.js';
-import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import { validateSavedLocationInput } from '../utils/savedLocationShape.js';
 
 /**
  * Thrown when `~/.weather-mcp/locations.json` exists but cannot be read, parsed,
@@ -305,16 +305,16 @@ export class LocationStore {
       throw new Error('Location alias must be 50 characters or less');
     }
 
-    // Validate coordinates
-    validateLatitude(location.latitude);
-    validateLongitude(location.longitude);
+    // Validate the whole record before the file is read or written, so a bad
+    // record from any writer is refused and the file is left untouched.
+    const validated = validateSavedLocationInput(location);
 
     const locations = this.load();
     const isUpdate = normalized in locations;
     const now = new Date().toISOString();
 
     const savedLocation: SavedLocation = {
-      ...location,
+      ...validated,
       saved_at: isUpdate ? locations[normalized].saved_at : now,
       updated_at: now
     };
@@ -324,7 +324,7 @@ export class LocationStore {
 
     logger.info(isUpdate ? 'Updated saved location' : 'Created new saved location', {
       alias: normalized,
-      name: location.name
+      name: validated.name
     });
 
     return savedLocation;
