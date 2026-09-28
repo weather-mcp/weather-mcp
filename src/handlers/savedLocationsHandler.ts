@@ -5,6 +5,7 @@
 import { LocationStore } from '../services/locationStore.js';
 import { NominatimService } from '../services/nominatim.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import { describeSavedLocationDefect } from '../utils/savedLocationShape.js';
 
 interface SaveLocationArgs {
   alias?: string;
@@ -384,9 +385,23 @@ export async function handleListSavedLocations(
   output += `**Total:** ${aliases.length} location${aliases.length > 1 ? 's' : ''}\n\n`;
   output += `---\n\n`;
 
+  // A hand-edited entry the renderer cannot show is named, not rendered — so
+  // one bad entry cannot take the whole listing down with it.
+  const malformed = new Set<string>();
+
   for (const alias of aliases) {
     const location = locations[alias];
     output += `## \`${escapeMarkdown(alias)}\`\n\n`;
+
+    const defect = describeSavedLocationDefect(location);
+    if (defect) {
+      malformed.add(alias);
+      output += `⚠️ This entry cannot be shown: \`${defect.field}\` ${defect.problem}. ` +
+        `Remove it with \`remove_saved_location(alias="${alias.replace(/[`\r\n]/g, '')}")\` ` +
+        `or repair it in the file below.\n\n`;
+      continue;
+    }
+
     output += `**Name:** ${escapeMarkdown(location.name)}\n`;
     output += `**Coordinates:** ${location.latitude.toFixed(4)}°, ${location.longitude.toFixed(4)}°\n`;
 
@@ -427,13 +442,16 @@ export async function handleListSavedLocations(
     output += `\n`;
   }
 
+  const healthy = aliases.filter(a => !malformed.has(a));
   output += `---\n\n`;
-  output += `**Usage Examples:**\n\n`;
-  output += `\`\`\`\n`;
-  for (const alias of aliases.slice(0, 3)) {
-    output += `get_forecast(location_name="${alias}")\n`;
+  if (healthy.length > 0) {
+    output += `**Usage Examples:**\n\n`;
+    output += `\`\`\`\n`;
+    for (const alias of healthy.slice(0, 3)) {
+      output += `get_forecast(location_name="${alias}")\n`;
+    }
+    output += `\`\`\`\n\n`;
   }
-  output += `\`\`\`\n\n`;
   output += `*Storage location: ${locationStore.getStorePath()}*\n`;
 
   return {
@@ -470,6 +488,14 @@ export async function handleGetSavedLocation(
         ? `Available locations: ${available.join(', ')}\n\n`
         : 'No saved locations yet. Use save_location to create one.\n\n') +
       `Use list_saved_locations to see all saved locations.`
+    );
+  }
+
+  const defect = describeSavedLocationDefect(location);
+  if (defect) {
+    throw new Error(
+      `Saved location "${alias}" cannot be shown: ${defect.field} ${defect.problem}.\n\n` +
+      `Remove it with remove_saved_location or repair it in ${locationStore.getStorePath()}.`
     );
   }
 
