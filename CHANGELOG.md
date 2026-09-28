@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+`get_alerts` shows Japan Meteorological Agency warnings, but no captured example showed one, so a reader could not see how they look. The Tokyo trip example now includes a live JMA capture. Each captured example also named a server version beside its capture date. That version was read when the example was captured, so it never matched the release the example shipped in. The stamp now names the date only. Tool output does not change.
+
 ### Documentation
 
-- The Tokyo trip example now includes a live `get_alerts` capture from the Japan Meteorological Agency, showing a thunderstorm advisory with its Japanese name, an English gloss, and JMA's required attribution.
-- Captured examples are now stamped with their capture date only. They no longer name a version, which never matched the release they shipped in.
+- **The Tokyo trip example now shows Japanese weather warnings.** A third exchange asks about warnings before an evening harbor cruise. It answers from a live `get_alerts` capture: a 雷注意報 (Advisory for Thunderstorm) for the Tokyo Region, with the Japanese name as published, an English gloss, the warning's status and JMA code, and JMA's required attribution. The trip's forecast and radar answers are rewritten against the new captures. The forecast answer had named August dates over a capture of late-September days. (`examples/weekend-trip-planning.md`, `examples/README.md`)
+- **Captured examples are stamped with their capture date only.** Each example now ends `*Captured <date> — …*`, with no server version. The dates on the other examples are kept, because each still records when that file was captured. (`examples/`, `scripts/capture-examples.mjs`)
+- **The example harness warns when a capture comes back without what it exists to show.** If JMA has nothing in force for Tokyo when the examples are regenerated, the harness prints a warning, and the capture still succeeds. A quiet day is a true answer, so it is flagged for the person regenerating the examples, not treated as a failure. (`scripts/capture-examples.mjs`)
 
 ## [1.33.6] - 2026-09-27
 
