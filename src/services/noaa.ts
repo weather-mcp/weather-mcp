@@ -20,7 +20,7 @@ import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
-import { classifyProbeStatus, type ServiceProbeResult } from '../utils/serviceStatusProbe.js';
+import { classifyProbeAnswer, type ServiceProbeResult } from '../utils/serviceStatusProbe.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -231,9 +231,11 @@ export class NOAAService {
       });
 
       const httpStatus = response.status;
-      const outcome = classifyProbeStatus(httpStatus);
+      const outcome = classifyProbeAnswer(httpStatus, response.data);
       let message: string;
-      if (outcome === 'ok') {
+      if (outcome === 'empty_body') {
+        message = 'NOAA Weather API answered HTTP 200 with an empty body';
+      } else if (outcome === 'ok') {
         message = 'NOAA Weather API answered normally (HTTP 200)';
       } else if (outcome === 'rate_limited') {
         logger.warn('Rate limit exceeded', {

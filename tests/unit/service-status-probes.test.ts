@@ -299,7 +299,7 @@ describe('Open-Meteo checkServiceStatus() empty-body handling', () => {
 
     const result = await service.checkServiceStatus();
 
-    expect(result.outcome).toBe('http_error');
+    expect(result.outcome).toBe('empty_body');
     expect(result.operational).toBe(false);
     expect(result.httpStatus).toBe(200);
     expect(result.message).toBe('Open-Meteo API answered HTTP 200 with an empty body');
@@ -311,7 +311,7 @@ describe('Open-Meteo checkServiceStatus() empty-body handling', () => {
 
     const result = await service.checkServiceStatus();
 
-    expect(result.outcome).toBe('http_error');
+    expect(result.outcome).toBe('empty_body');
     expect(result.operational).toBe(false);
     expect(result.httpStatus).toBe(200);
     expect(result.message).toBe('Open-Meteo API answered HTTP 200 with an empty body');
@@ -324,7 +324,7 @@ describe('Open-Meteo checkServiceStatus() empty-body handling', () => {
 
     const result = await service.checkServiceStatus();
 
-    expect(result.outcome).toBe('http_error');
+    expect(result.outcome).toBe('empty_body');
     expect(result.operational).toBe(false);
     expect(result.httpStatus).toBe(200);
     expect(result.message).toBe('Open-Meteo API answered HTTP 200 with an empty body');
