@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The `save_location` description says that `name` cannot be cleared.** It said an empty value clears a field. That holds for `description`, `alternateNames`, `notes` and `activities`; an empty `name` is treated as not supplied and keeps the current one. (`src/server/weatherServer.ts`)
+
+### Fixed
+
+- **`save_location` no longer writes a non-string `name` before it fails.** On a partial update or a geocoded save, a `name` such as `42` was written to `~/.weather-mcp/locations.json`, and only the confirmation then failed — after which every `list_saved_locations` and `get_saved_location` failed on it too. A non-string `name` is now refused before anything is written, on every branch, with `name must be a string`, and the store refuses any wrong-typed record whatever writes it. The direct-coordinate branch now gives that message for a non-string `name`; an omitted one still gets the "required" message. (RF-02, September review C2; `src/handlers/savedLocationsHandler.ts`, `src/services/locationStore.ts`, `src/utils/savedLocationShape.ts`)
+- **A malformed hand-edited entry is named instead of breaking every listing.** `list_saved_locations` names the alias and the field at fault and renders every other entry; `get_saved_location` refuses it with the field and the file's path; the file is never modified. A saved alias whose coordinates are not numbers is refused by every weather tool with its alias named, instead of being sent upstream — and a `WEATHER_DEFAULT_LOCATION` set to it is refused rather than geocoded as a place name. A malformed neighbour's `alternateNames` no longer breaks other lookups, and a country code that is not text is ignored in favour of the coordinate lookup. (`src/handlers/savedLocationsHandler.ts`, `src/utils/locationResolver.ts`, `docs/ERROR_HANDLING.md`)
+
 ## [1.33.8] - 2026-09-28
 
 When a weather service answered the `check_service_status` probe with HTTP 200 and no body, the report labelled it an error status, and the verdict said the service "answered with HTTP 200". A success code was called an error, and only the message line said what happened. The report now names it an empty answer, and the label, the message and the verdict agree. The NOAA probe did not check the body at all, so an empty NOAA answer read as a normal one. It now gets the same check as Open-Meteo.
