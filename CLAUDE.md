@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.33.9 (Production Ready)
+- **Version:** 1.33.10 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -552,6 +552,11 @@ tools use to skip the reverse-geocode lookup.
 - **Last-writer-wins across processes**: there is no lockfile. The read-modify-write is one
   synchronous run, so the collision window is microseconds between two humans driving two clients;
   the loser loses one update and the file stays valid
+- **Own keys only**: `load()` returns a null-prototype object on both of its return paths, and
+  `get`/`has`/`set`/`remove` look an alias up by own key, so any lowercase alias round-trips,
+  `__proto__` and `constructor` included. The two layers are redundant on purpose. Do not rebuild
+  the object with spread: `{ ...parsed }` restores `Object.prototype`, and then
+  `locations['__proto__'] = record` hits the setter and the entry is never written
 - **Keep the store synchronous** (G20): the no-lockfile argument rests on the read and the write
   being one synchronous run. Do not make these methods `async`, and do not put an `await` between
   a caller's read and its `set` — `savedLocationsHandler.ts` re-reads its merge base *after* the
@@ -635,15 +640,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.33.9 — Production Ready ✅
-- **Test Coverage:** 3,980 tests, 100% pass rate
+- **Version:** 1.33.10 — Production Ready ✅
+- **Test Coverage:** 4,023 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.33.10:** Saved-location aliases and ENABLED_TOOLS names like constructor and __proto__ work as ordinary names
 - **New in v1.33.9:** A malformed saved location is refused before it is written, and named if it is already on disk
 - **New in v1.33.8:** An empty answer from a weather service is labelled as one
-- **New in v1.33.7:** Tokyo example shows Japanese alerts; capture stamps name the date only
 
 ## Useful References
 
@@ -666,7 +671,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-28 (v1.33.9)
+**Last Updated:** 2026-09-28 (v1.33.10)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

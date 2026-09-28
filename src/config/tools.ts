@@ -205,7 +205,7 @@ function parseEnabledTools(envValue: string | undefined): Set<ToolName> {
     }
 
     // Handle presets
-    if (part in TOOL_PRESETS) {
+    if (Object.prototype.hasOwnProperty.call(TOOL_PRESETS, part)) {
       if (!hasBaseSet) {
         // First preset replaces the default
         enabledTools = new Set(TOOL_PRESETS[part]);
@@ -251,7 +251,7 @@ function resolveToolName(name: string): ToolName | undefined {
   }
 
   // Check aliases
-  if (normalized in TOOL_ALIASES) {
+  if (Object.prototype.hasOwnProperty.call(TOOL_ALIASES, normalized)) {
     return TOOL_ALIASES[normalized];
   }
 

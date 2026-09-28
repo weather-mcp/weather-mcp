@@ -6209,6 +6209,40 @@ assertions.
 **Status:** active — a pre-existing rendering defect, untasked. It is a follow-up
 candidate for `/prioritize`.
 
+## G117 — A table keyed by a caller's string must be looked up by own key, and a copy of it must keep a null prototype
+
+**Trigger:** looking up a caller- or operator-supplied string in an object — `key in table`,
+`table[key]` truthiness — or copying such an object before writing it back
+(`{ ...obj }`, `Object.assign({}, obj)`, `structuredClone`). Also: writing a test fixture that
+contains a `__proto__` key.
+
+**Rule:** look the key up with `Object.prototype.hasOwnProperty.call(table, key)` (the repo
+idiom). When the object is written back, build it on `Object.create(null)`
+(`Object.assign(Object.create(null), parsed)`), never with spread. Write a `__proto__` fixture as a
+raw JSON **string**, never as an object literal.
+
+**Why:** lowercased input reaches exactly two `Object.prototype` members, `constructor` and
+`__proto__`, and both misbehave. `in` reports them present, so an empty saved-location store
+answered "Successfully removed" and "Updated", and `ENABLED_TOOLS=constructor` crashed the server
+at import. A copy that has `Object.prototype` turns `obj['__proto__'] = record` into a prototype
+swap, and `JSON.stringify` then drops the entry while the tool reports success. The fixture trap is
+the same setter: `JSON.stringify({ __proto__: { … } })` sets the literal's prototype and serialises
+nothing, so the test never exercises the key it names.
+
+**Verify:** `node -e "const s={...JSON.parse('{\"home\":{}}')}; s['__proto__']={n:1}; console.log(JSON.stringify(s))"`
+prints `{"home":{}}`. `grep -rnE "\(\!?\(?[a-zA-Z_.]+ in [a-zA-Z_.]+\)" src` lists every `in` test;
+read each and confirm its key is not a caller string.
+
+**Evidence:** 2026-09-28, own-key-lookups (RF-03): `ce15d99` (store), `7feb739`
+(`src/config/tools.ts`). The spread half was a plan-review finding (gemini R1): the impl plan
+predicted a spread mutation would stay green, and it went red with the same set as the
+parsed-path revert. A related mutation lesson: reverting the alias check in `resolveToolName`
+also reddened the whole-value cases, because a non-preset whole value falls through to that
+helper. A mutation in a shared helper reaches every caller of it, so predict its red set from
+the callers, not from the syntax the task names.
+
+**Status:** active. Lint candidate: the `grep` in Verify, run over `src/`.
+
 ---
 
 ## Graveyard

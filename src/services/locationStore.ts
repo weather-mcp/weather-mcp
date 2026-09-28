@@ -93,6 +93,9 @@ export class LocationStore {
    * machine share this file, so a cached copy written back whole silently deletes
    * the other client's saves. Every call returns a fresh object.
    *
+   * The returned object has no prototype, so every lowercase alias, `__proto__`
+   * and `constructor` included, is an ordinary key.
+   *
    * @throws {LocationStoreUnreadableError} when the file exists but cannot be
    *   read, cannot be parsed, or is not a plain JSON object at the top level.
    *   A zero-byte or whitespace-only file is a parse failure like any other.
@@ -106,7 +109,7 @@ export class LocationStore {
         logger.debug('No saved locations file found, starting fresh', {
           path: this.storePath
         });
-        return {};
+        return Object.create(null) as SavedLocationsStore;
       }
       // Any other read failure (EISDIR, EACCES, EIO, ENOTDIR) is unreadable, not empty.
       logger.error('Failed to read saved locations', error as Error, {
@@ -137,7 +140,14 @@ export class LocationStore {
       path: this.storePath
     });
 
-    return parsed as SavedLocationsStore;
+    return Object.assign(Object.create(null) as SavedLocationsStore, parsed);
+  }
+
+  /**
+   * Whether `alias` is an own key of `locations`, never one inherited from a prototype.
+   */
+  private static owns(locations: SavedLocationsStore, alias: string): boolean {
+    return Object.prototype.hasOwnProperty.call(locations, alias);
   }
 
   /**
@@ -281,7 +291,7 @@ export class LocationStore {
   get(alias: string): SavedLocation | undefined {
     const locations = this.load();
     const normalized = alias.toLowerCase().trim();
-    return locations[normalized];
+    return LocationStore.owns(locations, normalized) ? locations[normalized] : undefined;
   }
 
   /**
@@ -310,7 +320,7 @@ export class LocationStore {
     const validated = validateSavedLocationInput(location);
 
     const locations = this.load();
-    const isUpdate = normalized in locations;
+    const isUpdate = LocationStore.owns(locations, normalized);
     const now = new Date().toISOString();
 
     const savedLocation: SavedLocation = {
@@ -337,7 +347,7 @@ export class LocationStore {
     const locations = this.load();
     const normalized = alias.toLowerCase().trim();
 
-    if (!(normalized in locations)) {
+    if (!LocationStore.owns(locations, normalized)) {
       return false;
     }
 
@@ -354,7 +364,7 @@ export class LocationStore {
   has(alias: string): boolean {
     const locations = this.load();
     const normalized = alias.toLowerCase().trim();
-    return normalized in locations;
+    return LocationStore.owns(locations, normalized);
   }
 
   /**
