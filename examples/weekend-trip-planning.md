@@ -154,6 +154,17 @@ get_weather_imagery({
 </details>
 <!-- /capture:tokyo-radar -->
 
+> **You:** Before we head out on the harbor cruise tonight — any weather warnings in effect for Tokyo?
+
+**Claude Code answered** (using `get_alerts`):
+
+<!-- answer-3 -->
+Checking Tokyo's alerts now — I'll let you know what JMA has in force.
+<!-- /answer-3 -->
+
+<!-- capture:tokyo-alerts -->
+<!-- /capture:tokyo-alerts -->
+
 ---
 
 **Features shown:** `city_name` free-text geocoding (no coordinates needed) · `include_astronomy` (moon phase, moonrise/moonset, twilight times — computed locally, no extra API call) · `days` forecast-length control · `get_weather_imagery` radar (RainViewer) with a committed snapshot.

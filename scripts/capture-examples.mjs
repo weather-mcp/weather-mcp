@@ -55,6 +55,13 @@ const GEO_UNAVAILABLE = /no locations found|could not find|not found/i;
 //                own), and commit the result (imagery URLs expire in ~2h).
 //                A warning fires when the overlay is small enough to be
 //                echo-free, so a rain-free snapshot never ships unnoticed.
+//   expect    -> optional RegExp the captured text is expected to match. A
+//                miss does not fail the capture (a quiet day is true output,
+//                not an error) — it prints a `⚠️` warning naming expectNote,
+//                so a captured "nothing in force" answer is never mistaken
+//                for the rendering the example exists to show.
+//   expectNote -> human-readable reason `expect` might legitimately miss;
+//                printed alongside the `⚠️` warning.
 // ---------------------------------------------------------------------------
 const EXAMPLES = [
   {
@@ -71,6 +78,15 @@ const EXAMPLES = [
         tool: 'get_weather_imagery',
         args: { latitude: 35.6769, longitude: 139.7639, type: 'radar' },
         image: 'images/tokyo-radar.png',
+      },
+      // JMA warnings render as `### <name> — <gloss>` only while something is
+      // in force; a quiet day is a true, expected result (see `expect` below).
+      {
+        id: 'tokyo-alerts',
+        tool: 'get_alerts',
+        args: { latitude: 35.6769, longitude: 139.7639, detail: 'full' },
+        expect: /^### /m,
+        expectNote: 'no JMA warning in force — the Japanese names and English gloss are not shown',
       },
     ],
   },
@@ -459,6 +475,9 @@ async function main() {
         }
         content = splice(content, call.id, renderCapture(call, res.text), example.file);
         console.log(`  ✅ ${call.id} (${res.text.length} chars)`);
+        if (call.expect && !call.expect.test(res.text)) {
+          console.log(`  ⚠️  ${call.id}: ${call.expectNote} — verify, or re-run on another day`);
+        }
         if (call.image) {
           const saved = await saveImageSnapshot(res.text, call.image);
           if (!saved.ok) {
