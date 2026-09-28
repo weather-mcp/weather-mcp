@@ -8,7 +8,7 @@ Each file in this folder is a realistic session: a user prompt, the answer **Cla
 
 | Example | Location(s) | What it shows off |
 |---|---|---|
-| [Planning a weekend trip](./weekend-trip-planning.md) | Tokyo | Forecast by free-text city name, moon phase & twilight (`include_astronomy`), live radar with a committed snapshot |
+| [Planning a weekend trip](./weekend-trip-planning.md) | Tokyo | Forecast by free-text city name, moon phase & twilight (`include_astronomy`), live radar with a committed snapshot, Japan Meteorological Agency warnings with Japanese names and English glosses |
 | [A hazardous-weather day](./severe-weather-day.md) | Oklahoma City | One-call weather summary, full alert text (`detail: "full"`), animated radar |
 | [A day on the water](./boating-and-marine.md) | Sydney | Marine forecast (waves, swell, currents), real-time lightning detection, metric units |
 | [Traveling abroad](./international-travel.md) | Paris | Real airport station observations anywhere on earth (`source: "metar"`), European pollen levels |
@@ -25,7 +25,7 @@ All 17 tools appear across these examples:
 |---|---|
 | `get_forecast` | [trip planning](./weekend-trip-planning.md), [saved locations](./saved-locations-workflow.md) |
 | `get_current_conditions` | [international travel](./international-travel.md) (METAR), [historical & climate](./historical-climate.md) (normals + records), [wildfire](./wildfire-awareness.md) (fire weather, both paths) |
-| `get_alerts` | [severe weather](./severe-weather-day.md) |
+| `get_alerts` | [severe weather](./severe-weather-day.md), [trip planning](./weekend-trip-planning.md) (JMA, Japan) |
 | `get_historical_weather` | [historical & climate](./historical-climate.md) |
 | `get_weather_summary` | [severe weather](./severe-weather-day.md) |
 | `check_service_status` | below on this page |

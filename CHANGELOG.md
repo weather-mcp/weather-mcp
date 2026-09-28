@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- The Tokyo trip example now includes a live `get_alerts` capture from the Japan Meteorological Agency, showing a thunderstorm advisory with its Japanese name, an English gloss, and JMA's required attribution.
+- Captured examples are now stamped with their capture date only. They no longer name a version, which never matched the release they shipped in.
+
 ## [1.33.6] - 2026-09-27
 
 An MCP client ends a session by closing the server's input and waiting for it to exit. This server did not notice. It kept running until the client gave up and sent `SIGTERM`, which the MCP SDK's own client does after a 2-second wait. With lightning pre-warm on it stayed connected to the lightning broker the whole time. This release makes the server shut down as soon as its client closes the session. The shutdown is bounded and happens once, and it disconnects from the broker on the way out. Weather output does not change.

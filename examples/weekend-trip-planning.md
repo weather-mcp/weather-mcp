@@ -203,7 +203,7 @@ get_alerts({
 
 ---
 
-**Features shown:** `city_name` free-text geocoding (no coordinates needed) · `include_astronomy` (moon phase, moonrise/moonset, twilight times — computed locally, no extra API call) · `days` forecast-length control · `get_weather_imagery` radar (RainViewer) with a committed snapshot.
+**Features shown:** `city_name` free-text geocoding (no coordinates needed) · `include_astronomy` (moon phase, moonrise/moonset, twilight times — computed locally, no extra API call) · `days` forecast-length control · `get_weather_imagery` radar (RainViewer) with a committed snapshot · `get_alerts` in Japan — JMA warnings shown with the Japanese name as published, an English gloss, and JMA's required attribution.
 
 <!-- capture-stamp -->
 *Captured 2026-09-28 — raw output is live data and will differ when regenerated (`npm run examples`).*
