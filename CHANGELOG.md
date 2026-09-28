@@ -7,13 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.9] - 2026-09-28
+
+`save_location` checked the type of a new `name` only when you gave coordinates directly. On an update or a geocoded save, a `name` such as `42` was written to your saved-locations file before anything noticed, and from then on `list_saved_locations` and `get_saved_location` failed for every location, not just that one. A value is now checked before anything is written. An entry that a hand edit has already broken is named, with the field at fault, and every other location keeps working. A saved location with a broken coordinate is refused with its name, never sent to a weather service and never swapped for a place name.
+
 ### Changed
 
 - **The `save_location` description says that `name` cannot be cleared.** It said an empty value clears a field. That holds for `description`, `alternateNames`, `notes` and `activities`; an empty `name` is treated as not supplied and keeps the current one. (`src/server/weatherServer.ts`)
+- **A non-string `name` with direct coordinates now reads `name must be a string`.** It used to read "name parameter is required when providing coordinates directly", which was wrong for a name that was given but not text. An omitted or empty `name` still gets the "required" message.
 
 ### Fixed
 
-- **`save_location` no longer writes a non-string `name` before it fails.** On a partial update or a geocoded save, a `name` such as `42` was written to `~/.weather-mcp/locations.json`, and only the confirmation then failed — after which every `list_saved_locations` and `get_saved_location` failed on it too. A non-string `name` is now refused before anything is written, on every branch, with `name must be a string`, and the store refuses any wrong-typed record whatever writes it. The direct-coordinate branch now gives that message for a non-string `name`; an omitted one still gets the "required" message. (RF-02, September review C2; `src/handlers/savedLocationsHandler.ts`, `src/services/locationStore.ts`, `src/utils/savedLocationShape.ts`)
+- **`save_location` no longer writes a non-string `name` before it fails.** On a partial update or a geocoded save, a `name` such as `42` was written to `~/.weather-mcp/locations.json`, and only the confirmation then failed — after which every `list_saved_locations` and `get_saved_location` failed on it too. A non-string `name` is now refused before anything is written, on every branch, with `name must be a string`, and the store refuses any wrong-typed record whatever writes it. (`src/handlers/savedLocationsHandler.ts`, `src/services/locationStore.ts`, `src/utils/savedLocationShape.ts`)
 - **A malformed hand-edited entry is named instead of breaking every listing.** `list_saved_locations` names the alias and the field at fault and renders every other entry; `get_saved_location` refuses it with the field and the file's path; the file is never modified. A saved alias whose coordinates are not numbers is refused by every weather tool with its alias named, instead of being sent upstream — and a `WEATHER_DEFAULT_LOCATION` set to it is refused rather than geocoded as a place name. A malformed neighbour's `alternateNames` no longer breaks other lookups, and a country code that is not text is ignored in favour of the coordinate lookup. (`src/handlers/savedLocationsHandler.ts`, `src/utils/locationResolver.ts`, `docs/ERROR_HANDLING.md`)
 
 ## [1.33.8] - 2026-09-28
@@ -1963,7 +1968,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.8...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.9...HEAD
+[1.33.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.8...v1.33.9
 [1.33.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.7...v1.33.8
 [1.33.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.6...v1.33.7
 [1.33.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.5...v1.33.6
