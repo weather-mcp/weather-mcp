@@ -1032,5 +1032,5 @@ get_river_conditions({
 **Features shown:** US path — NWPS gauge observations, official flood categories, observed trend, forecast series (`detail: "full"`) · Great Britain path — Environment Agency observed river levels against each gauge's published typical range, with the measurement basis stated per gauge and no forecast or flood categories · global path — GloFAS v4 modeled discharge snapped to the river channel, framed against its own 31-day history and forecast ensemble, `forecast_days` up to 210.
 
 <!-- capture-stamp -->
-*Captured 2026-09-02 with weather-mcp v1.25.18 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-02 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

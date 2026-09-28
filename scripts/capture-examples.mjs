@@ -13,7 +13,7 @@
  * Hand-written prose outside the markers is never touched, so the example
  * files can be regenerated at any time (`npm run examples`) without losing
  * their conversational layer. A `<!-- capture-stamp -->` marker in each file
- * is refreshed with the capture date and server version.
+ * is refreshed with the capture date.
  *
  * Run:  npm run build && npm run examples
  * Re-capture one scenario: npm run examples -- <filename-substring>
@@ -36,7 +36,6 @@ import { tmpdir } from 'node:os';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const SERVER = resolve(ROOT, 'dist', 'index.js');
-const VERSION = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
 const TODAY = new Date().toISOString().slice(0, 10);
 
 const CALL_GAP_MS = 2000;      // between ordinary calls
@@ -323,7 +322,7 @@ function splice(content, id, replacement, file) {
 function spliceStamp(content, file) {
   const re = /(<!-- capture-stamp -->)[\s\S]*?(<!-- \/capture-stamp -->)/;
   if (!re.test(content)) return content; // stamp is optional per file
-  const stamp = `*Captured ${TODAY} with weather-mcp v${VERSION} — raw output is live data and will differ when regenerated (\`npm run examples\`).*`;
+  const stamp = `*Captured ${TODAY} — raw output is live data and will differ when regenerated (\`npm run examples\`).*`;
   return content.replace(re, `$1\n${stamp}\n$2`);
 }
 

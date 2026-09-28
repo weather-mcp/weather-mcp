@@ -4828,49 +4828,6 @@ sub-handler contract a composite inherits without restating).
 
 ---
 
-## G86 — A captured example stamps the version in `package.json` at capture time, which is never the version it ships under
-
-**Trigger:** reading a version number inside `examples/`, or deciding whether
-`npm run examples` needs to run during `/release`.
-
-**Rule:** `scripts/capture-examples.mjs:326` interpolates
-`require('./package.json').version` into each file's `*Captured <date> with
-weather-mcp v<version>*` footer. During feature work that is the **previous**
-release's number — the code that rendered the output is unreleased and has no
-number yet — and after `/release` bumps the version it is stale in the other
-direction unless the captures are regenerated, which drifts every file against
-live upstreams. Read the stamp as *"captured on this date, from a tree at
-roughly this version"*, never as a claim that the shipped release renders it.
-The stamps across `examples/` are legitimately mixed and are not a defect.
-
-**Why:** it invites two opposite wrong conclusions. A reader who trusts the
-stamp will check out the named tag, find code that cannot produce the captured
-output, and conclude the example is fabricated. A release operator who tries to
-fix it by regenerating pays fresh live drift across every capture — and here
-specifically reintroduces trailing-whitespace bytes, because
-`forecastHandler.ts:624` renders `${period.windSpeed} ${period.windDirection}`
-and NOAA sends an empty direction at 0 mph, so `git diff --check` goes red.
-
-**Verify:**
-
-```bash
-grep -rn 'Captured .* with weather-mcp v' examples/ | sed 's/.*weather-mcp //'
-```
-
-More than one version across the set is the normal, expected state.
-
-**Evidence:** 2026-09-08, `codex-MINOR-2` on the forecast-auto-source-contract
-diff review, deferred at triage and dispositioned at `/release` v1.29.0 as
-**ship as captured**. `git show v1.28.1:src/handlers/forecastHandler.ts` still
-reads the dead `properties.updated`, so the two files stamped `v1.28.1` quote
-output that tag cannot render; the other seven read `v1.25.18`.
-
-**Status:** active. Related: [G12] (the doc anchors a release rewrites),
-[G11] (read the real output). Not lintable — the stamp is honest about capture
-time and wrong only if read as a release claim.
-
----
-
 ## G87 — A parser that anchors on `\n` reads a repository that has no EOL policy, and a Windows clone is the input nobody tests
 
 **Trigger:** writing or reviewing a regex that reads *source text* — a `.ts`, a
@@ -5393,7 +5350,7 @@ produces.
 
 **Rule:** regenerate **only** the example whose output shape actually changed,
 and **read the capture before committing it**. The script takes a filter
-argument (`scripts/capture-examples.mjs:419-420`), so
+argument (`scripts/capture-examples.mjs:418-419`), so
 `npm run examples boating` rewrites one file. Then grep the regenerated files
 for a captured failure before staging:
 
@@ -6185,6 +6142,51 @@ the process has to be made in a process).
 
 *(When an entry's trap is refactored away, move it here with the reason and the
 commit that removed it — never delete, never renumber.)*
+
+## G86 — A captured example stamps the version in `package.json` at capture time, which is never the version it ships under
+
+**Retired:** 2026-09-27, by the japan-alerts-example plan (`docs: Stamp captured examples with the capture date only`) — the stamp no longer names a version, so there is no version to misread. Dan's decision of 2026-09-26.
+
+**Trigger:** reading a version number inside `examples/`, or deciding whether
+`npm run examples` needs to run during `/release`.
+
+**Rule:** `scripts/capture-examples.mjs:326` interpolates
+`require('./package.json').version` into each file's `*Captured <date> with
+weather-mcp v<version>*` footer. During feature work that is the **previous**
+release's number — the code that rendered the output is unreleased and has no
+number yet — and after `/release` bumps the version it is stale in the other
+direction unless the captures are regenerated, which drifts every file against
+live upstreams. Read the stamp as *"captured on this date, from a tree at
+roughly this version"*, never as a claim that the shipped release renders it.
+The stamps across `examples/` are legitimately mixed and are not a defect.
+
+**Why:** it invites two opposite wrong conclusions. A reader who trusts the
+stamp will check out the named tag, find code that cannot produce the captured
+output, and conclude the example is fabricated. A release operator who tries to
+fix it by regenerating pays fresh live drift across every capture — and here
+specifically reintroduces trailing-whitespace bytes, because
+`forecastHandler.ts:624` renders `${period.windSpeed} ${period.windDirection}`
+and NOAA sends an empty direction at 0 mph, so `git diff --check` goes red.
+
+**Verify:**
+
+```bash
+grep -rn 'Captured .* with weather-mcp v' examples/ | sed 's/.*weather-mcp //'
+```
+
+More than one version across the set is the normal, expected state.
+
+**Evidence:** 2026-09-08, `codex-MINOR-2` on the forecast-auto-source-contract
+diff review, deferred at triage and dispositioned at `/release` v1.29.0 as
+**ship as captured**. `git show v1.28.1:src/handlers/forecastHandler.ts` still
+reads the dead `properties.updated`, so the two files stamped `v1.28.1` quote
+output that tag cannot render; the other seven read `v1.25.18`.
+
+**Status:** retired. Related: [G12] (the doc anchors a release rewrites),
+[G11] (read the real output). Not lintable — the stamp is honest about capture
+time and wrong only if read as a release claim.
+
+---
 
 ## G12 — `check-doc-versions.sh` validates fewer test-count and tool-count sites than `update-docs-for-release.sh` rewrites
 

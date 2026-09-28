@@ -441,5 +441,5 @@ Computed from current temperature, humidity, and sustained wind. Higher values m
 **Features shown:** `get_wildfire_info` on both paths — NIFC named incidents in the US (containment, distance, safety tier) and NASA FIRMS satellite heat detections everywhere else (clustered hotspots, no names or containment, never an all-clear) · `get_current_conditions` with `include_fire_weather` on both paths — NOAA's published indices in the US, a server-computed Fosberg index with dryness context elsewhere, each labeled for what it is · `get_air_quality` on the US path — US AQI scale, pollutant breakdown (PM2.5 is the smoke signal), UV index, health recommendations.
 
 <!-- capture-stamp -->
-*Captured 2026-09-17 with weather-mcp v1.30.0 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-09-17 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->
