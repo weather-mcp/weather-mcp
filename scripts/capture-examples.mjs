@@ -79,13 +79,14 @@ const EXAMPLES = [
         args: { latitude: 35.6769, longitude: 139.7639, type: 'radar' },
         image: 'images/tokyo-radar.png',
       },
-      // JMA warnings render as `### <name> — <gloss>` only while something is
-      // in force; a quiet day is a true, expected result (see `expect` below).
+      // The JMA branch writes `⚠️ **N active warning(s) for <area>**` (and the
+      // `### <name> — <gloss>` lines under it) only while something is in
+      // force; a quiet day is a true, expected result (see `expect` below).
       {
         id: 'tokyo-alerts',
         tool: 'get_alerts',
         args: { latitude: 35.6769, longitude: 139.7639, detail: 'full' },
-        expect: /^### /m,
+        expect: /^⚠️ \*\*\d+ active warnings? for /m,
         expectNote: 'no JMA warning in force — the Japanese names and English gloss are not shown',
       },
     ],
