@@ -342,7 +342,7 @@ describe('Open-Meteo checkServiceStatus() empty-body handling', () => {
     warnSpy.mockRestore();
   });
 
-  it('200 with data: undefined -> http_error, httpStatus 200, empty-body message', async () => {
+  it('200 with data: undefined -> empty_body, httpStatus 200, empty-body message', async () => {
     const service = new OpenMeteoService();
     stubAdapter(getClient(service), { status: 200, data: undefined });
 
@@ -355,7 +355,7 @@ describe('Open-Meteo checkServiceStatus() empty-body handling', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('200 with data: null -> http_error, httpStatus 200, empty-body message', async () => {
+  it('200 with data: null -> empty_body, httpStatus 200, empty-body message', async () => {
     const service = new OpenMeteoService();
     stubAdapter(getClient(service), { status: 200, data: null });
 
@@ -369,7 +369,7 @@ describe('Open-Meteo checkServiceStatus() empty-body handling', () => {
   });
 
   // The shape a real empty body has: axios 1.x delivers it as '', not null
-  it("200 with data: '' -> http_error, httpStatus 200, empty-body message", async () => {
+  it("200 with data: '' -> empty_body, httpStatus 200, empty-body message", async () => {
     const service = new OpenMeteoService();
     stubAdapter(getClient(service), { status: 200, data: '' });
 
