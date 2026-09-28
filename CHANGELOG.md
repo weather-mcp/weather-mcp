@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.8] - 2026-09-28
+
 When a weather service answered the `check_service_status` probe with HTTP 200 and no body, the report labelled it an error status, and the verdict said the service "answered with HTTP 200". A success code was called an error, and only the message line said what happened. The report now names it an empty answer, and the label, the message and the verdict agree. The NOAA probe did not check the body at all, so an empty NOAA answer read as a normal one. It now gets the same check as Open-Meteo.
 
 ### Changed
@@ -1952,7 +1954,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.7...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.8...HEAD
+[1.33.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.7...v1.33.8
 [1.33.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.6...v1.33.7
 [1.33.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.5...v1.33.6
 [1.33.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.4...v1.33.5
