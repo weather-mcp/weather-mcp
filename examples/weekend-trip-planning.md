@@ -101,7 +101,7 @@ get_forecast({
 **Claude Code answered** (using `get_weather_imagery`):
 
 <!-- answer-2 -->
-Not over central Tokyo yet. The current radar frame (11:30 AM Monday, Tokyo time) shows the city itself mostly dry, but a broad rain band sits just to the south and southwest — over Sagami Bay and the Izu Peninsula — with heavier storm cells, the orange-and-red cores, along the Shizuoka coast. That fits the forecast for today: a 90% chance of slight rain.
+Not over central Tokyo yet. The current radar frame (02:30 UTC — late morning in Tokyo) shows the city itself mostly dry, but a broad rain band sits just to the south and southwest — over Sagami Bay and the Izu Peninsula — with heavier storm cells, the orange-and-red cores, along the Shizuoka coast. That fits the rain in today's forecast above.
 <!-- /answer-2 -->
 
 ![Radar over Tokyo composited onto an OpenStreetMap base layer, saved at capture time](./images/tokyo-radar.png)
