@@ -714,7 +714,7 @@ export const TOOL_DEFINITIONS = {
 
   save_location: {
     name: 'save_location' as const,
-    description: 'Save a location for easy reuse in weather queries. Use this when a user wants to save a frequently used location like "home", "work", "cabin", or "aunt lisa\'s house". Accepts either a location query (which will be geocoded automatically) or direct coordinates. Saved locations can then be used with any weather tool by providing location_name instead of coordinates. SMART UPDATES: If the alias already exists, any field you omit is preserved (including description, alternateNames, and notes) — provide only what you want to change (e.g. just name/activities, without location details, to update those while preserving coordinates and metadata). Pass an empty value ("" or []) to explicitly clear a field.',
+    description: 'Save a location for easy reuse in weather queries. Use this when a user wants to save a frequently used location like "home", "work", "cabin", or "aunt lisa\'s house". Accepts either a location query (which will be geocoded automatically) or direct coordinates. Saved locations can then be used with any weather tool by providing location_name instead of coordinates. SMART UPDATES: If the alias already exists, any field you omit is preserved (including description, alternateNames, and notes) — provide only what you want to change (e.g. just name/activities, without location details, to update those while preserving coordinates and metadata). Pass an empty value ("" or []) to explicitly clear a field. (name cannot be cleared — an empty name keeps the current one.)',
     inputSchema: {
       type: 'object' as const,
       properties: {
