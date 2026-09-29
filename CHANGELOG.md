@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.15] - 2026-09-29
+
 This release changes nothing the server does. The unit tests could reach the real weather services, so a run could pass or fail depending on the network, and a test that was meant to be offline could be online without anyone noticing. The unit tests now refuse every outbound connection, and CI runs them that way. Tool replies, settings and logs are the same as in 1.33.14.
 
 ### Changed
@@ -2022,7 +2024,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.14...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.15...HEAD
+[1.33.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.14...v1.33.15
 [1.33.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.13...v1.33.14
 [1.33.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.12...v1.33.13
 [1.33.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.11...v1.33.12
