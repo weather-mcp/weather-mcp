@@ -2219,7 +2219,7 @@ phrases: T4's `not.toContain('✅ Operational')` list in `tests/unit/status-hand
 the same plan adds a negative lock and a retired-phrase grep, exclude the lock file from the
 grep's pathspec, or the check fails on correct code.
 
-**Status:** active, **extended twice on 2026-09-01, again 2026-09-03 and 2026-09-25; shape 3 recurred 2026-09-28** (service-status-empty-answer T4, `119aae0` — an impl plan called `check-doc-versions.sh` "a regression check, not a conditional requirement" on a branch whose T2/T3 added 26 tests; 8 test-count sites failed, every other sub-check passed). Lint candidate on the vacuous half — a plan-authoring check
+**Status:** active, **extended twice on 2026-09-01, again 2026-09-03 and 2026-09-25; shape 3 recurred 2026-09-28 and again 2026-09-29** (service-status-empty-answer T4, `119aae0` — an impl plan called `check-doc-versions.sh` "a regression check, not a conditional requirement" on a branch whose T2/T3 added 26 tests; 8 test-count sites failed, every other sub-check passed. Again in geocoding-rate-budget T6, `a95beb6`: the plan said the check was "unaffected" and "a no-op confirmation" on a branch whose T1–T3 added 21 tests; the same 8 sites failed (4,167 → 4,188), every version, tool-count and link row passed, and the counts were left for `/release`. Two consecutive plans in two days: any plan whose tasks add tests must expect this check red on count sites until `/release`). Lint candidate on the vacuous half — a plan-authoring check
 could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
 contains a file marked **new**. Related: [G10] (prove the hash is not vacuous —
 same family, a check that cannot fail is not evidence), [G40] (a plan's claim
