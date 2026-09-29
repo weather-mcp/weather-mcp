@@ -84,7 +84,7 @@
     "mqtt": "^5.14.1"
   },
   "overrides": {
-    "fast-uri": "3.1.6"
+    "fast-uri": "3.1.8"
   },
   "devDependencies": {
     "@types/luxon": "^3.7.5",
