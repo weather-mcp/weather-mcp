@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Default logs no longer name your locations.** With nothing configured, the server's stderr log carried the text of geocoding queries, the alias and full address of every saved location it wrote, precise coordinates when NOAA or Open-Meteo declined a point and in climate-normals lookups, and — when a tool call failed — the arguments and error text, which name the place the user asked about. Default logs now carry the tool name, the error class and the argument names, round coordinates to about 1 km, and omit place text at every `LOG_LEVEL`. Set `LOG_PII=true` to log queries, aliases, error text and full-precision coordinates while debugging; the saved address is never logged. Several log lines now name coordinates `lat`/`lon`, as the other rounded lines already did. (`src/utils/logger.ts`, `src/server/weatherServer.ts`, `src/services/nominatim.ts`, `src/services/geocoding.ts`, `src/services/locationStore.ts`, `src/utils/normals.ts`, `src/utils/locationResolver.ts`, the forecast, current-conditions, historical, alerts and summary handlers, `README.md`, `SECURITY.md`)
+
 ## [1.33.12] - 2026-09-29
 
 Radar imagery trusted two things it does not control: the tile paths in RainViewer's frame list, and the bytes of every map tile it downloads. A tampered frame list could have pointed the tile links, and the tiles fetched for a composite map, at another server, and an oversized or malformed tile was decoded in full before anything checked it. Both are now checked before they are used. In normal use nothing changes: the same radar links and the same composite maps come back. If RainViewer ever sends a frame list in an unexpected shape, the tool now reports an error rather than showing it.

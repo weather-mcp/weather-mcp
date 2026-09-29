@@ -26,7 +26,7 @@ ANALYTICS_LEVEL=detailed
 ANALYTICS_ENDPOINT=https://analytics.example.test/v1/events  # your HTTPS hostname
 
 # Debug Logging
-LOG_LEVEL=0  # 0=DEBUG for verbose output
+LOG_LEVEL=0  # 0=DEBUG for verbose output (never includes location text; see LOG_PII)
 ```
 
 The MCP server does not accept `http://localhost:3100/v1/events`: the endpoint must be HTTPS, and
