@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release changes nothing the server does. The unit tests could reach the real weather services, so a run could pass or fail depending on the network, and a test that was meant to be offline could be online without anyone noticing. The unit tests now refuse every outbound connection, and CI runs them that way. Tool replies, settings and logs are the same as in 1.33.14.
+
 ### Changed
 
 - **The unit test suite now refuses network connections.** It passes on a machine with no internet. The security suite's acceptance tests now check the request each service builds, not only that the call did not throw. No user-visible behaviour changed.
