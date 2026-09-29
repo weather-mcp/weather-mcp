@@ -39,6 +39,36 @@ import { PNG } from 'pngjs';
 
 export { PNG };
 
+// Live tile sizes: radar 1,096-41,085 B. Ceiling is one raw 512x512 RGBA tile (512^2 * 4 ~ 1 MiB) with headroom.
+export const RADAR_TILE_MAX_BYTES = 2 * 1024 * 1024;
+// Live tile sizes: GIBS 206-3,592 B. Ceiling is one raw 256x256 RGBA tile (256^2 * 4 = 256 KiB) with headroom.
+export const BASEMAP_TILE_MAX_BYTES = 1024 * 1024;
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/**
+ * Refuse a tile whose PNG header does not declare a `tileSize`×`tileSize`,
+ * non-interlaced image. Reads only the first 33 bytes (signature plus the
+ * complete IHDR chunk), so a tiny buffer that declares enormous dimensions is
+ * refused before `PNG.sync.read` allocates for them. The CRC is not checked:
+ * pngjs verifies it on decode and the bound does not depend on it.
+ *
+ * The message is fixed. It never echoes the declared dimensions or any byte.
+ */
+export function assertTileHeader(buffer: Buffer, tileSize: number): void {
+  const ok =
+    buffer.length >= 33 &&
+    buffer.subarray(0, 8).equals(PNG_SIGNATURE) &&
+    buffer.readUInt32BE(8) === 13 &&
+    buffer.toString('latin1', 12, 16) === 'IHDR' &&
+    buffer.readUInt32BE(16) === tileSize &&
+    buffer.readUInt32BE(20) === tileSize &&
+    buffer[28] === 0;
+  if (!ok) {
+    throw new Error(`Tile is not a ${tileSize}px non-interlaced PNG`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Stitching and blending
 // ---------------------------------------------------------------------------
@@ -59,6 +89,11 @@ export function assembleTiles(
 ): PNG {
   if (tileBuffers.length !== cols * rows) {
     throw new Error(`Expected ${cols * rows} tiles for a ${cols}x${rows} grid, got ${tileBuffers.length}`);
+  }
+
+  // Check every header before the first decode, so a bad last tile costs no decode of the first.
+  for (const buffer of tileBuffers) {
+    assertTileHeader(buffer, tileSize);
   }
 
   const out = new PNG({ width: cols * tileSize, height: rows * tileSize });
@@ -347,13 +382,18 @@ export function centeredWindowOrigin(
   };
 }
 
-/** `/512/{z}/{x}/{y}/` — the tile address RainViewer embeds in its frame URLs. */
-const RADAR_TILE_URL_PATTERN = /\/512\/(\d+)\/(\d+)\/(\d+)\//;
+/**
+ * `/512/{z}/{x}/{y}/` — the tile address RainViewer embeds in its frame URLs.
+ * Anchored to the tail (`{color}/{options}.png` then end of string) because a
+ * frame path may itself contain `/512/z/x/y/`; only the final address is ours.
+ */
+const RADAR_TILE_URL_PATTERN = /\/512\/(\d+)\/(\d+)\/(\d+)\/(?=[^/?#]+\/[^/?#]+\.png$)/;
 
 /**
  * Parse the `z/x/y` web-mercator tile address out of a RainViewer frame tile
- * URL (`…/512/{z}/{x}/{y}/{color}/{options}.png`) — the same regex proven in
- * `scripts/capture-examples.mjs`. Returns `null` on any URL that doesn't
+ * URL (`…/512/{z}/{x}/{y}/{color}/{options}.png`). The pattern is anchored
+ * to the tail (see above). `scripts/capture-examples.mjs` keeps its own copy,
+ * which parses only URLs this server built. Returns `null` on any URL that doesn't
  * carry this shape (a malformed or unexpected upstream URL), so the caller
  * can degrade to text-only output instead of throwing.
  */
