@@ -9,6 +9,13 @@
  * - Maximum 1 request per second
  * - Requires User-Agent header
  * - No bulk geocoding
+ *
+ * This server enforces the one-per-second limit **per process**, across both
+ * of its Nominatim clients (this service and `GeocodingService`'s provider),
+ * when the composition root hands them one `RequestSpacer`. Several server
+ * processes on one host each honour it separately and together do not.
+ * Revisit if a Nominatim 429 or 403 appears on a host running more than one
+ * instance.
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
@@ -23,6 +30,7 @@ import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { logger, redactCoordinatesForLogging, isPiiLoggingEnabled } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
+import { RequestSpacer } from '../utils/requestSpacer.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -30,16 +38,24 @@ import {
   ApiError
 } from '../errors/ApiError.js';
 
+/** 1 request per second (Nominatim usage policy). */
+export const NOMINATIM_MIN_INTERVAL_MS = 1000;
+
 export interface NominatimServiceConfig {
   baseURL?: string;
   timeout?: number;
+  /** Request-start budget. Share one instance to share the budget; omitted ⇒ a private one. */
+  spacer?: RequestSpacer;
 }
 
 export class NominatimService {
   private client: AxiosInstance;
   private cache: Cache;
-  private lastRequestTime: number = 0;
-  private readonly MIN_REQUEST_INTERVAL_MS = 1000; // 1 request per second (Nominatim policy)
+  private readonly spacer: RequestSpacer;
+  // Single-flight: concurrent lookups for one cache key share one request.
+  // Entries are deleted in `finally`, so a rejected pull is never kept.
+  private readonly searchInFlight = new Map<string, Promise<MappedGeocodingResponse>>();
+  private readonly reverseInFlight = new Map<string, Promise<string | null>>();
 
   constructor(config: NominatimServiceConfig = {}) {
     const {
@@ -48,6 +64,7 @@ export class NominatimService {
     } = config;
 
     this.cache = new Cache(CacheConfig.maxSize);
+    this.spacer = config.spacer ?? new RequestSpacer(NOMINATIM_MIN_INTERVAL_MS);
 
     this.client = axios.create({
       baseURL,
@@ -156,23 +173,19 @@ export class NominatimService {
   }
 
   /**
-   * Enforce rate limiting (1 request per second as per Nominatim usage policy)
+   * Enforce rate limiting (1 request per second as per Nominatim usage policy).
+   * The budget is shared with every holder of the same `RequestSpacer`; the
+   * slot is reserved synchronously, so concurrent callers start one interval
+   * apart.
    * @private
    */
   private async enforceRateLimit(): Promise<void> {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-
-    if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL_MS) {
-      const waitTime = this.MIN_REQUEST_INTERVAL_MS - timeSinceLastRequest;
+    await this.spacer.reserve((waitMs) => {
       logger.info('Rate limiting: waiting before next request', {
         service: 'Nominatim',
-        waitTimeMs: waitTime
+        waitTimeMs: waitMs
       });
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-
-    this.lastRequestTime = Date.now();
+    });
   }
 
   /**
@@ -270,15 +283,39 @@ export class NominatimService {
       );
     }
 
+    const cacheKey = Cache.generateKey('nominatim-geocoding', query, limit, language);
+
     // Check cache first
     if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('nominatim-geocoding', query, limit, language);
       const cached = this.cache.get(cacheKey);
       if (cached) {
         logger.info('Nominatim cache hit', isPiiLoggingEnabled() ? { query } : undefined);
         return cached as MappedGeocodingResponse;
       }
+    }
 
+    // No await between this check and the publish below (G20). The pull is
+    // started inside `.then` so the memo is published before its body runs (G113).
+    const pending = this.searchInFlight.get(cacheKey);
+    if (pending) return pending;
+    const pull = Promise.resolve()
+      .then(() => this.fetchSearch(query, limit, language, cacheKey))
+      .finally(() => { this.searchInFlight.delete(cacheKey); });
+    this.searchInFlight.set(cacheKey, pull);
+    return pull;
+  }
+
+  /**
+   * The network half of `searchLocation`, run once per in-flight key.
+   * @private
+   */
+  private async fetchSearch(
+    query: string,
+    limit: number,
+    language: string,
+    cacheKey: string
+  ): Promise<MappedGeocodingResponse> {
+    if (CacheConfig.enabled) {
       // Enforce rate limiting before making request
       await this.enforceRateLimit();
 
@@ -373,6 +410,26 @@ export class NominatimService {
       }
     }
 
+    // No await between this check and the publish below (G20); memo published
+    // before the body runs (G113).
+    const pending = this.reverseInFlight.get(cacheKey);
+    if (pending) return pending;
+    const pull = Promise.resolve()
+      .then(() => this.fetchReverseCountry(latitude, longitude, cacheKey))
+      .finally(() => { this.reverseInFlight.delete(cacheKey); });
+    this.reverseInFlight.set(cacheKey, pull);
+    return pull;
+  }
+
+  /**
+   * The network half of `reverseCountry`, run once per in-flight key.
+   * @private
+   */
+  private async fetchReverseCountry(
+    latitude: number,
+    longitude: number,
+    cacheKey: string
+  ): Promise<string | null> {
     await this.enforceRateLimit();
 
     const params = {
