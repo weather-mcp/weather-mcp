@@ -6315,6 +6315,94 @@ red. Add `NO_PROXY=127.0.0.1`: all green.
 
 ---
 
+## G120 — A live probe that feeds its requests with `< request.jsonl` shuts the server down before any upstream call answers
+
+**Trigger:** a plan's live-verification step (or a `/test-drive`, or a scratch probe) that spawns
+the built dist with its JSON-RPC requests redirected from a file or a finished pipe —
+`node dist/index.js < request.jsonl`, `printf … | node dist/index.js` — and any `tools/call` in
+the file that reaches the network.
+
+**Rule:** keep stdin open until every reply id has come back. Use a small Node driver that spawns
+the dist, writes one request at a time and awaits each reply by id, then ends in
+`process.exit(0)` ([G37]). The quick form is `(cat request.jsonl; sleep N) | node dist/index.js`,
+with `N` longer than the slowest call. Then count the replies: a `tools/call` id missing from
+stdout means the probe measured nothing, whatever stderr says.
+
+**Why:** since `stdio-eof-shutdown` (`2c4cc31`, 2026-09-27) the entry point runs its shutdown on
+`process.stdin` `end`/`close` (`src/index.ts:60-61`). A redirected file reaches EOF right after
+the last request is read, so the server shuts down while the first upstream request is still in
+flight. The process exits 0 and stderr ends with `Shutting down` / `Shutdown complete`, which reads
+like a clean run. A privacy or byte-identity probe on that output passes vacuously: a sentinel
+count of 0 is what a probe that never ran also prints ([G41], [G108]). Calls that fail before any
+I/O, such as a validation error or a missing alias, still answer, so a probe can look half-working.
+
+**Verify:** from a fresh `mktemp -d`, send `initialize`, `notifications/initialized` and one
+`get_forecast` at a US point with `< req.jsonl`: `grep -c '"id":2' out.jsonl` gives **0**. Send the
+same file as `(cat req.jsonl; sleep 20) |`: **1**.
+
+**Evidence:** 2026-09-29, default-log-privacy T5. The plan prescribed
+`timeout -s TERM 60 node <dist>/index.js < request.jsonl`. The orchestrator warned the executing
+subagent, which used a stdin-holding driver; all 6 `tools/call` ids replied on every base and
+branch run. The trap was confirmed afterwards on the branch dist (`6cb7464`): `< req.jsonl` gave 0
+replies and exit 0; the held-open pipe gave 1.
+
+**Status:** active. **Lint candidate:** `/impl-plan` could flag `< request` or a bare `|` into
+`dist/index.js` in a plan's live step. Related: [G37] (a driver that never exits — this is the
+opposite failure), [G26] (the same live step's cwd/`.env` trap), [G41] (a zero count needs a
+positive control).
+
+---
+
+## G121 — A line-based grep for log sites misses multi-line `logger.*` calls, so a log-hygiene enumeration is incomplete by construction
+
+**Trigger:** a plan or review that enumerates which `logger.*` calls carry a given field —
+coordinates, a query, an alias, an error message — to scope a log-hygiene change (RF-07, RF-08
+and their successors).
+
+**Rule:** enumerate by parsing each call, not by grepping lines. Extract every `logger.<level>(`
+call to its matching close paren, then test the whole call text for the field names, and skip
+calls that already route through the accessor. A grep for `logger.*latitude` matches only
+single-line calls. The house style puts each metadata key on its own line, so the key is never on
+the `logger.` line.
+
+**Why:** the design listed five raw-coordinate sites and the implementation plan's recon added
+four more (`normals.ts`). Both were built from greps and hand-reading. Two more sites existed in
+a file the plan already edited: the MET Norway fallback warn and the ensemble-ceiling warn in
+`src/handlers/forecastHandler.ts`, each with `latitude,` and `longitude,` on their own lines. The
+executing subagent found the first by reading the file. A parse-by-call sweep found the second
+and confirmed nothing else. Both would have shipped under a changelog bullet saying default logs
+carry no coordinate finer than 2 dp.
+
+**Verify:**
+
+```bash
+python3 - <<'EOF'
+import re, glob
+for f in glob.glob('src/**/*.ts', recursive=True):
+    s = open(f).read()
+    for m in re.finditer(r'logger\.(info|warn|error|debug)\(', s):
+        i, d = m.end(), 1
+        while d and i < len(s):
+            d += s[i] == '('; d -= s[i] == ')'; i += 1
+        call = s[m.start():i]
+        if re.search(r'\b(latitude|longitude|lat|lon|bbox)\b', call) and 'redact' not in call:
+            print(f"{f}:{s[:m.start()].count(chr(10)) + 1}: {' '.join(call.split())[:160]}")
+EOF
+```
+
+On `6cb7464` every hit uses an already-redacted variable (`redacted.lat`, the `sw`/`ne` pairs
+from `redactCoordinatesForLogging`, `hasLat: !!…`). A bare `latitude,` hit is a site to fix. Swap
+the field regex to sweep for another field.
+
+**Evidence:** 2026-09-29, default-log-privacy T3 (`47c9a91`). A subagent Surprise flagged
+`forecastHandler.ts:528`. The orchestrator's parse-by-call sweep then found `:1781`. Both were
+folded into T3 with drives and per-site mutants.
+
+**Status:** active. Related: [G40] (an absence claim is a grep: re-derive it per symbol), [G29]
+(the doc-side version: grep the whole set, classify every hit).
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
