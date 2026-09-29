@@ -6403,6 +6403,20 @@ folded into T3 with drives and per-site mutants.
 
 ---
 
+## G122 — Timer reservations coalesce into simultaneous starts when the event loop delivers overdue timers together
+
+**Trigger:** a rate spacer reserves absolute future slots and gives every caller an independent `setTimeout(slot - now)`, while claiming to space actual request starts — today `RequestSpacer` (`src/utils/requestSpacer.ts`), which carries Nominatim's shared 1 req/s budget.
+
+**Rule:** a spacer that claims spacing of *actual* starts must re-check on wake: compare the real (monotonic) time with the previous actual start plus the interval, and sleep the remainder before recording the start. Serialize only permit acquisition, never request completion. Test a delayed or coalesced wakeup, not just the requested sleep durations. Until that lands, describe the guarantee as spacing under normal scheduling, never as an absolute "at least N ms apart".
+
+**Why:** if the event loop is blocked past two deadlines, Node delivers both overdue timers in the same turn. Both promises resolve and both callers dispatch together, even though their requested sleeps differed. A test asserting `[1000, 2000]` sleep arguments stays green while the upstream sees a 0 ms gap. The reservation fixes [G20]'s duplicate *nominal* slots, not coalesced *actual* starts.
+
+**Verify:** reserve three 1,000 ms permits, let the first dispatch, block the event loop from 500 ms until after 2,000 ms, and record the real dispatch times. On `7688147`, `NominatimService.client.get` starts were `[8, 2601, 2601]` ms, gaps `[2593, 0]`.
+
+**Evidence:** 2026-09-29, geocoding-rate-budget diff review (codex-B1), against `7688147`. Deferred by Dan to a follow-up (ROADMAP Hardening); the CHANGELOG entry was qualified in the same branch. The residual needs a synchronous stall of at least one interval, and the coalesced pair follows at least one interval of silence, so the sustained rate still stays within budget.
+
+**Status:** active — the trap is live in `RequestSpacer` until the deferred re-check lands; retire it then. Related: [G20], [G45] (the current tests observe the requested sleep, the wrong layer), [G114] (a timer's liveness is not its punctuality).
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
