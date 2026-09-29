@@ -5,7 +5,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
-import { logger } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { RainViewerResponse, RainViewerFrame, ImageryFrame } from '../types/imagery.js';
 import { ServiceUnavailableError } from '../errors/ApiError.js';
 
@@ -187,7 +187,7 @@ export class RainViewerService {
 
     if (clampedLat !== latitude) {
       logger.warn('Latitude clamped to Web Mercator safe range', {
-        original: latitude,
+        original: redactCoordinatesForLogging(latitude, longitude).lat,
         clamped: clampedLat,
         maxLatitude: MAX_LATITUDE
       });

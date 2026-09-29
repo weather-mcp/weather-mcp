@@ -33,7 +33,7 @@ import {
   formatWindFromMps,
   formatPrecipFromMm,
 } from '../utils/unitFormat.js';
-import { logger } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import {
   extractSnowfallForecast,
   extractIceAccumulation,
@@ -439,8 +439,7 @@ export async function handleGetForecast(
           throw error;
         }
         logger.warn('NOAA rejected auto-routed location; falling back to Open-Meteo', {
-          latitude,
-          longitude,
+          ...redactCoordinatesForLogging(latitude, longitude),
           fallback: true
         });
         result = await formatOpenMeteoForecast(
@@ -527,8 +526,7 @@ export async function handleGetForecast(
         // naming MET Norway means it was actually served — which is the signal
         // the design's revisit trigger reads.
         logger.warn('Open-Meteo failed transiently; fell back to MET Norway', {
-          latitude,
-          longitude,
+          ...redactCoordinatesForLogging(latitude, longitude),
           fallback: true
         });
         result = fallback;
@@ -1780,8 +1778,7 @@ async function formatEnsembleSpreadForecast(
   // reports is logged here (assumption A6).
   if (spread.truncatedMembers) {
     logger.warn('Ensemble member series exceeded the parse ceiling', {
-      latitude,
-      longitude,
+      ...redactCoordinatesForLogging(latitude, longitude),
       memberCount: spread.memberCount,
       securityEvent: true
     });

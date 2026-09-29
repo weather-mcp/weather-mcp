@@ -26,7 +26,7 @@ import axios, { AxiosInstance } from 'axios';
 import type { BoundingBox, MetarObservation } from '../types/aviationWeather.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
-import { logger } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { VERSION } from '../utils/version.js';
 import { ApiError, ServiceUnavailableError } from '../errors/ApiError.js';
 
@@ -82,7 +82,10 @@ export function clampBoundingBox(bbox: BoundingBox): BoundingBox {
   let maxLon = clamp(bbox.maxLon, -180, 180);
   if (minLon > maxLon) {
     logger.warn('Clamped METAR bbox would invert; narrowing to a single-longitude line', {
-      original: bbox
+      original: {
+        sw: redactCoordinatesForLogging(bbox.minLat, bbox.minLon),
+        ne: redactCoordinatesForLogging(bbox.maxLat, bbox.maxLon)
+      }
     });
     maxLon = minLon;
   }
