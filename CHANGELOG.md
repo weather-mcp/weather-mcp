@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The unit test suite now refuses network connections.** It passes on a machine with no internet. The security suite's acceptance tests now check the request each service builds, not only that the call did not throw. No user-visible behaviour changed.
+
 ## [1.33.14] - 2026-09-29
 
 OpenStreetMap's geocoder allows one request per second. When several lookups ran at once, the server could send two or three in the same second. That breaks the geocoder's usage policy and risks a block, which would make alert routing fall back to a coarser method. Lookups now wait their turn, and identical lookups that arrive together go out once. Nothing changes in what the tools return.

@@ -265,7 +265,8 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 ```
 tests/
-├── unit/          # ~80 files; fast, no I/O. Fixture-based handler/service tests plus pure-module tests
+├── unit/          # ~80 files; fast, no I/O. Fixture-based handler/service tests plus pure-module tests.
+│                  #   Run under tests/setup/no-network.ts, which refuses every outbound socket
 └── integration/   # ~13 files; some make live network calls and can flake — re-run before blaming a diff
 ```
 
@@ -275,7 +276,7 @@ Named by subject (`<feature>-handler.test.ts`, `<util>.test.ts`, `<feature>-rout
 
 - **Framework:** Vitest (configured in `package.json`)
 - **Coverage Target:** 100% on critical utilities (cache, validation, units, errors)
-- **Performance:** Unit tests are fast; the full suite currently takes ~1 minute. Keep new unit tests I/O-free
+- **Performance:** Unit tests are fast; the full suite currently takes ~1 minute. Keep new unit tests I/O-free. The rule is enforced: a unit test that opens a socket fails with `EUNITNET`. Anything that must reach a network belongs in `tests/integration/`
 - **No Flakiness:** Unit tests must be deterministic (pin percentile methods, clustering order, time zones)
 
 ### Running Tests
@@ -285,6 +286,7 @@ npm test                    # Run all tests
 npm run test:watch         # Watch mode
 npm run test:coverage      # With coverage report
 npx vitest run tests/unit/cache.test.ts   # One file
+npx vitest run --project unit             # Unit tests only, offline-guarded (what CI runs)
 ```
 
 ### Writing Tests
