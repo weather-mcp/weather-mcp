@@ -247,8 +247,8 @@ service's own fixed transport strings; **rethrow** everything else. Put every
 an empty upstream explicitly rather than letting an all-items loop pass
 vacuously.
 
-**Why:** `vitest.config.ts` has no `include`, so `tests/integration/` runs on
-every `npm test`. A catch-all that swallows assertion and shape errors turns a
+**Why:** bare `vitest run` runs both projects in `vitest.config.ts` (`unit` and
+`integration`), so `tests/integration/` runs on every `npm test`. A catch-all that swallows assertion and shape errors turns a
 real upstream contract regression into a logged "network flake" that nobody
 investigates — and a vacuous loop over an empty feed makes a broken parser look
 healthy.
@@ -4087,7 +4087,14 @@ positive control (a direct `client.get` against a stubbed 503 rejects with
 reads `data.detail` on a 404 unconditionally, so a body-less stub throws `TypeError` and the
 control fails for the wrong reason.
 
-**Status:** active, **extended 2026-09-03 and 2026-09-25**. Lint candidate (see Verify). Related: [G45] (the mutation
+**Unit files now fail loud, 2026-09-29** (`097a701`, offline-unit-tests T2). The `unit` Vitest
+project loads `tests/setup/no-network.ts`, which fails every `net.Socket` connect with `EUNITNET`.
+An inert mock in a `tests/unit/` file therefore no longer passes on a fast network: the request it
+failed to intercept rejects with `unit tests must not open network connections`. **Read that
+message as this entry's symptom**, not as a flaky guard. The silent failure mode survives only
+in `tests/integration/`, which the guard deliberately does not reach.
+
+**Status:** active, **extended 2026-09-03, 2026-09-25 and 2026-09-29**. Lint candidate (see Verify). Related: [G45] (the mutation
 check that exposes it), [G21] (the other way a mock is not the thing you think
 it is), [G13] (a fixture that cannot discriminate — this is its mock-shaped
 sibling), and the project's determinism rule — anything mockable is mocked.
