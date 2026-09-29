@@ -66,7 +66,7 @@ import {
 import { validateOptionalBoolean, validateDetail } from '../utils/validation.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { isInUS } from '../utils/geography.js';
-import { logger } from '../utils/logger.js';
+import { logger, describeErrorForLogging } from '../utils/logger.js';
 
 interface AlertsArgs {
   latitude?: number;
@@ -126,9 +126,10 @@ export async function handleGetAlerts(
       countryCode = await nominatimService.reverseCountry(latitude, longitude);
     } catch (error) {
       reverseLookupFailed = true;
-      logger.warn('Reverse country lookup failed; falling back to coordinate routing', {
-        error: error instanceof Error ? error.message : 'unknown'
-      });
+      logger.warn(
+        'Reverse country lookup failed; falling back to coordinate routing',
+        describeErrorForLogging(error)
+      );
     }
   }
 

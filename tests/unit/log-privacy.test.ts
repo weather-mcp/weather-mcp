@@ -25,6 +25,25 @@ import type { OpenMeteoService } from '../../src/services/openmeteo.js';
 import type { NCEIService } from '../../src/services/ncei.js';
 import type { MetnoService } from '../../src/services/metno.js';
 
+// Pinned before the factory import evaluates, as in
+// tests/unit/weather-server-factory.test.ts:56-62: toolConfig is built from
+// ENABLED_TOOLS at import time (G26), and the analytics singleton reads a salt
+// at module load — a fixed one keeps the import off ~/.weather-mcp.
+vi.hoisted(() => {
+  process.env.ENABLED_TOOLS = 'all';
+  process.env.ANALYTICS_ENABLED = 'false';
+  process.env.ANALYTICS_SALT = 'log-privacy-test';
+  process.env.WEATHER_DEFAULT_LOCATION = '';
+});
+
+// Import only the factory, never src/index.ts (G61).
+import { createWeatherServer } from '../../src/server/weatherServer.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { handleGetAlerts } from '../../src/handlers/alertsHandler.js';
+import { handleGetWeatherSummary } from '../../src/handlers/weatherSummaryHandler.js';
+import { resolveCountryCode, clearCityGeocodeCache } from '../../src/utils/locationResolver.js';
+
 // One distinct sentinel per field, so a hit names its channel (G62).
 const ALIAS = 'zqalias7731';
 const NAME = 'Zqname Lane 7731';
@@ -651,6 +670,263 @@ describe('success-path log privacy', () => {
       expect(lines).toHaveLength(1);
       expect(lines[0].metadata?.lat).toBe(35.676213);
       expect(lines[0].metadata?.lon).toBe(139.650312);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Failure path: the dispatch catch, the summary section catch, and the two
+// reverse-lookup catches (locationResolver + its alertsHandler twin).
+// ---------------------------------------------------------------------------
+
+const CITY = 'Zqcity7731';
+const MISSING = 'zqmissing7731';
+const FAILURE_SENTINELS = [ALIAS, NAME, NOTES, ALT, DESC, QUERY, CITY, MISSING];
+
+describe('failure-path log privacy', () => {
+  let savedLevel: LogLevel;
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let dir: string;
+  let store: LocationStore;
+  let client: Client | undefined;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    savedLevel = logger.getLevel();
+    logger.setLevel(LogLevel.DEBUG);
+    vi.stubEnv('LOG_PII', '');
+    clearCityGeocodeCache();
+    dir = mkdtempSync(join(tmpdir(), 'log-privacy-fail-'));
+    store = new LocationStore(join(dir, 'locations.json'));
+    // Seeded so the not-found message lists the alias (a real leak channel).
+    store.set(ALIAS, {
+      name: NAME,
+      latitude: SEATTLE.latitude,
+      longitude: SEATTLE.longitude,
+      notes: NOTES,
+      alternateNames: [ALT],
+      description: DESC
+    });
+    errorSpy.mockClear();
+  });
+
+  afterEach(async () => {
+    await client?.close();
+    client = undefined;
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    logger.setLevel(savedLevel);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const records = (): LogRecord[] =>
+    errorSpy.mock.calls.map((call: unknown[]) => JSON.parse(String(call[0])) as LogRecord);
+  const find = (message: string): LogRecord[] => records().filter((r) => r.message === message);
+  const whole = (): string => JSON.stringify(records());
+
+  // Copied from tests/unit/weather-server-factory.test.ts:98-110 (a lock).
+  async function connect(): Promise<Client> {
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createWeatherServer({ locationStore: store });
+    await server.connect(serverTransport);
+    const c = new Client({ name: 'log-privacy-test', version: '0.0.0' });
+    await c.connect(clientTransport);
+    client = c;
+    return c;
+  }
+
+  async function call(tool: string, args: Record<string, unknown>): Promise<string> {
+    const c = await connect();
+    const result = (await c.callTool({ name: tool, arguments: args })) as {
+      isError?: boolean;
+      content: Array<{ type: string; text: string }>;
+    };
+    expect(result.isError).toBe(true);
+    return result.content.map((b) => b.text).join('\n');
+  }
+
+  function dispatchRecord(): LogRecord & { error?: unknown } {
+    const lines = find('Tool execution error');
+    expect(lines).toHaveLength(1);
+    return lines[0] as LogRecord & { error?: unknown };
+  }
+
+  const drives: Array<{
+    label: string;
+    tool: string;
+    args: Record<string, unknown>;
+    userText: string;
+    errorName: string;
+    arrange?: () => ReturnType<typeof vi.spyOn>;
+    absentCoords?: string[];
+  }> = [
+    {
+      label: '1: a missing saved alias',
+      tool: 'get_forecast',
+      args: { location_name: MISSING },
+      userText: `Saved location "${MISSING}" not found`,
+      errorName: 'Error'
+    },
+    {
+      label: '2: a city the geocoder cannot find',
+      tool: 'get_forecast',
+      args: { city_name: CITY },
+      userText: `Could not find a location matching "${CITY}"`,
+      errorName: 'Error',
+      arrange: () => vi.spyOn(GeocodingService.prototype, 'geocode').mockResolvedValue([])
+    },
+    {
+      label: '3: a geocoder rejection carrying the query',
+      tool: 'get_forecast',
+      args: { city_name: CITY },
+      userText: QUERY,
+      errorName: 'DataNotFoundError',
+      arrange: () =>
+        vi
+          .spyOn(GeocodingService.prototype, 'geocode')
+          .mockRejectedValue(
+            new DataNotFoundError('OpenMeteo', `No locations found matching "${QUERY}".`)
+          )
+    },
+    {
+      label: '4: an invalid latitude',
+      tool: 'get_forecast',
+      args: { latitude: 91.618273, longitude: SEATTLE.longitude },
+      userText: 'Invalid latitude: 91.618273',
+      errorName: 'Error',
+      absentCoords: ['91.618', '122.351']
+    },
+    {
+      label: '5: save_location refused, carrying every saved-location field',
+      tool: 'save_location',
+      args: { alias: 'zqnewalias7731', notes: NOTES, description: DESC, alternateNames: [ALT] },
+      userText: 'Either location_query OR (latitude + longitude + name) must be provided',
+      errorName: 'Error'
+    }
+  ];
+
+  describe('default logs — failure path', () => {
+    it.each(drives)('dispatch logs the call shape only — $label', async (d) => {
+      const spy = d.arrange?.();
+      const text = await call(d.tool, d.args);
+      if (spy) expect(spy).toHaveBeenCalledTimes(1);
+      // The user channel still carries the text (control).
+      expect(text).toContain(d.userText);
+
+      const rec = dispatchRecord();
+      expect(rec.metadata?.tool).toBe(d.tool);
+      expect(rec.metadata?.name).toBe(d.errorName);
+      expect([...(rec.metadata?.argKeys as string[])].sort()).toEqual(Object.keys(d.args).sort());
+      expect(rec.error).toBeUndefined();
+      expect(rec.metadata).not.toHaveProperty('args');
+      expect(rec.metadata).not.toHaveProperty('message');
+      expect(rec.metadata).not.toHaveProperty('stack');
+
+      const all = whole();
+      for (const s of [...FAILURE_SENTINELS, 'zqnewalias7731', ...(d.absentCoords ?? [])]) {
+        expect(all).not.toContain(s);
+      }
+    });
+
+    it('the resolver reverse-lookup catch logs the class only', async () => {
+      const reverseCountry = vi
+        .fn()
+        .mockRejectedValue(new Error(`reverse failed near ${QUERY}`));
+      const out = await resolveCountryCode(undefined, SEATTLE.latitude, SEATTLE.longitude, {
+        reverseCountry
+      } as unknown as NominatimService);
+      expect(reverseCountry).toHaveBeenCalledTimes(1);
+      expect(out.lookupFailed).toBe(true);
+      const lines = find('Reverse country lookup failed; falling back to coordinate routing');
+      expect(lines).toHaveLength(1);
+      expect(lines[0].metadata).toEqual({ name: 'Error' });
+      expect(whole()).not.toContain(QUERY);
+    });
+
+    it('the alerts reverse-lookup catch logs the class only', async () => {
+      const reverseCountry = vi
+        .fn()
+        .mockRejectedValue(new Error(`reverse failed near ${QUERY}`));
+      // Tokyo, no Google key, no JMA service: the handler reaches the
+      // not-covered result without any other upstream call.
+      const result = await handleGetAlerts(
+        { ...TOKYO },
+        {} as unknown as NOAAService,
+        noStore,
+        noGeocoder,
+        undefined,
+        undefined,
+        { reverseCountry } as unknown as NominatimService
+      );
+      expect(reverseCountry).toHaveBeenCalledTimes(1);
+      expect(result.content.length).toBeGreaterThan(0);
+      const lines = find('Reverse country lookup failed; falling back to coordinate routing');
+      expect(lines).toHaveLength(1);
+      expect(lines[0].metadata).toEqual({ name: 'Error' });
+      expect(whole()).not.toContain(QUERY);
+    });
+
+    it('the summary section catch logs the section and class only', async () => {
+      const getAlerts = vi.fn().mockRejectedValue(new Error(`section failed for ${CITY}`));
+      // Every NOAA method rejects; the alerts section at a US point reaches one.
+      const noaa = new Proxy({} as Record<string, unknown>, {
+        get: (_t, prop) => (prop === 'then' ? undefined : getAlerts)
+      });
+      const result = await handleGetWeatherSummary(
+        { ...SEATTLE, include: ['alerts'] },
+        noaa as unknown as NOAAService,
+        {} as unknown as OpenMeteoService,
+        {} as unknown as NCEIService,
+        noStore,
+        noGeocoder
+      );
+      expect(getAlerts).toHaveBeenCalled();
+      // The user channel is unchanged (control).
+      expect(result.content[0].text).toContain(CITY);
+      const lines = find('Weather summary section failed');
+      expect(lines).toHaveLength(1);
+      expect(lines[0].metadata).toEqual({ section: 'alerts', name: 'Error' });
+      expect(whole()).not.toContain(CITY);
+    });
+  });
+
+  describe('LOG_PII opt-in — failure path', () => {
+    beforeEach(() => {
+      vi.stubEnv('LOG_PII', 'true');
+    });
+
+    it.each([drives[0], drives[2], drives[4]])(
+      'dispatch carries message, stack and args — $label',
+      async (d) => {
+        d.arrange?.();
+        await call(d.tool, d.args);
+        const rec = dispatchRecord();
+        expect(typeof rec.metadata?.message).toBe('string');
+        expect(typeof rec.metadata?.stack).toBe('string');
+        const args = JSON.parse(String(rec.metadata?.args)) as Record<string, unknown>;
+        expect(args).toEqual(d.args);
+      }
+    );
+
+    it('drive 1 message names the missing alias and the saved one', async () => {
+      await call('get_forecast', { location_name: MISSING });
+      const message = String(dispatchRecord().metadata?.message);
+      expect(message).toContain(MISSING);
+      expect(message).toContain(ALIAS);
+    });
+
+    it('drive 3 message carries the query', async () => {
+      drives[2].arrange?.();
+      await call('get_forecast', { city_name: CITY });
+      expect(String(dispatchRecord().metadata?.message)).toContain(QUERY);
+    });
+
+    it('the resolver catch carries the message', async () => {
+      await resolveCountryCode(undefined, SEATTLE.latitude, SEATTLE.longitude, {
+        reverseCountry: vi.fn().mockRejectedValue(new Error(`reverse failed near ${QUERY}`))
+      } as unknown as NominatimService);
+      const rec = find('Reverse country lookup failed; falling back to coordinate routing')[0];
+      expect(rec.metadata?.message).toBe(`reverse failed near ${QUERY}`);
     });
   });
 });

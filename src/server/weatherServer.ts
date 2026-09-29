@@ -47,7 +47,7 @@ import { GeocodingService } from '../services/geocoding.js';
 import type { LocationStore } from '../services/locationStore.js';
 import { toolConfig } from '../config/tools.js';
 import { getDefaultLocation } from '../config/defaultLocation.js';
-import { logger } from '../utils/logger.js';
+import { logger, describeErrorForLogging, isPiiLoggingEnabled } from '../utils/logger.js';
 import { formatErrorForUser } from '../errors/ApiError.js';
 import { criticalAlertBannerFromError } from '../handlers/criticalAlertBanner.js';
 import { handleGetForecast } from '../handlers/forecastHandler.js';
@@ -82,35 +82,6 @@ import { VERSION } from '../utils/version.js';
  */
 export const SERVER_NAME = 'weather-mcp';
 export const SERVER_VERSION = VERSION;
-
-/**
- * Redact sensitive fields from tool arguments before logging
- * Removes PII like coordinates, location names, addresses
- */
-function redactSensitiveFields(args: unknown): unknown {
-  if (typeof args !== 'object' || args === null) {
-    return args;
-  }
-
-  const redacted: Record<string, unknown> = {};
-  const sensitiveFields = [
-    'latitude', 'longitude', 'lat', 'lon',
-    'location', 'city', 'city_name', 'state', 'address', 'query',
-    'zipcode', 'postalCode', 'place', 'coordinates'
-  ];
-
-  for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
-    if (sensitiveFields.includes(key)) {
-      redacted[key] = '[REDACTED]';
-    } else if (typeof value === 'object' && value !== null) {
-      redacted[key] = redactSensitiveFields(value);
-    } else {
-      redacted[key] = value;
-    }
-  }
-
-  return redacted;
-}
 
 /**
  * Initialize the NOAA service
@@ -966,13 +937,15 @@ export function createWeatherServer(options: WeatherServerOptions): Server {
           throw new Error(`Unknown tool: ${name}`);
       }
     } catch (error) {
-      // Redact sensitive fields from args before logging
-      const redactedArgs = args ? redactSensitiveFields(args) : undefined;
-
-      // Log the error with redacted details
-      logger.error('Tool execution error', error as Error, {
+      // What was called and how it failed — never what the user typed. Every
+      // message reaching this catch can embed a place name, query or coordinate,
+      // and a denylist of sensitive argument names is wrong the day a tool gains
+      // a parameter. The user still gets the full message via formatErrorForUser.
+      logger.error('Tool execution error', undefined, {
         tool: name,
-        args: redactedArgs ? JSON.stringify(redactedArgs) : undefined,
+        ...describeErrorForLogging(error),
+        argKeys: args ? Object.keys(args) : [],
+        ...(isPiiLoggingEnabled() && args ? { args: JSON.stringify(args) } : {}),
       });
       // Format error for user display (sanitized)
       const userMessage = formatErrorForUser(error as Error);

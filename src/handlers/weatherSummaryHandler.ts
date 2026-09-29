@@ -21,7 +21,7 @@ import { NationalCapService } from '../services/nationalCap.js';
 import { resolveLocationAsync, formatLocationLine } from '../utils/locationResolver.js';
 import { validateDetail, validateForecastDays, DetailLevel } from '../utils/validation.js';
 import { UnitArgs } from '../utils/unitPreferences.js';
-import { logger } from '../utils/logger.js';
+import { logger, describeErrorForLogging } from '../utils/logger.js';
 import { handleGetCurrentConditions } from './currentConditionsHandler.js';
 import { handleGetForecast } from './forecastHandler.js';
 import { handleGetAlerts } from './alertsHandler.js';
@@ -295,7 +295,7 @@ export async function handleGetWeatherSummary(
       body += `\n\n---\n\n`;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.warn('Weather summary section failed', { section, error: message });
+      logger.warn('Weather summary section failed', { section, ...describeErrorForLogging(error) });
       body += `## ${section} (unavailable)\n\n`;
       body += `⚠️ Could not retrieve ${section} data for this location: ${message}\n\n`;
       body += `---\n\n`;

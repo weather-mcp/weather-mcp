@@ -9,7 +9,7 @@ import { Cache } from './cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { getDefaultLocation } from '../config/defaultLocation.js';
 import { NominatimService } from '../services/nominatim.js';
-import { logger } from './logger.js';
+import { logger, describeErrorForLogging } from './logger.js';
 
 export interface LocationInput {
   latitude?: number;
@@ -417,9 +417,10 @@ export async function resolveCountryCode(
       countryCode = await nominatimService.reverseCountry(latitude, longitude);
     } catch (error) {
       lookupFailed = true;
-      logger.warn('Reverse country lookup failed; falling back to coordinate routing', {
-        error: error instanceof Error ? error.message : 'unknown'
-      });
+      logger.warn(
+        'Reverse country lookup failed; falling back to coordinate routing',
+        describeErrorForLogging(error)
+      );
     }
   }
 
