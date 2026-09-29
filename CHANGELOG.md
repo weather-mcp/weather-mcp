@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.14] - 2026-09-29
+
+OpenStreetMap's geocoder allows one request per second. When several lookups ran at once, the server could send two or three in the same second. That breaks the geocoder's usage policy and risks a block, which would make alert routing fall back to a coarser method. Lookups now wait their turn, and identical lookups that arrive together go out once. Nothing changes in what the tools return.
+
 ### Fixed
 
 - **Geocoding no longer breaks OpenStreetMap's one-request-per-second rule.** Several lookups at once — a place-name search alongside an alert check, or three tools asked about one point together — could send two or three requests to Nominatim in the same second. That breaks its usage policy and invites a block, which would push alert routing onto its coarser coordinate fallback. Requests from both of the server's Nominatim clients are now spaced one second apart, and identical lookups that arrive together are sent once. The pace holds within one server process; several server processes on one machine each keep their own. Tool replies do not change. (`src/utils/requestSpacer.ts`, `src/services/nominatim.ts`, `src/services/geocoding.ts`, `src/server/weatherServer.ts`)
@@ -2012,7 +2016,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.13...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.14...HEAD
+[1.33.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.13...v1.33.14
 [1.33.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.12...v1.33.13
 [1.33.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.11...v1.33.12
 [1.33.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.10...v1.33.11
