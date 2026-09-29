@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The server's log named the places you asked about. With no settings changed, it wrote your geocoding searches, saved-location aliases and addresses, precise coordinates, and the text of failed requests to stderr, where MCP clients keep it in their own log files. Default logs now carry none of that. You can switch the detail back on with `LOG_PII=true` while debugging. This release also clears the moderate `ip-address` advisory that earlier releases carried.
+
+### Changed
+
+- **Default log lines are shorter, and some fields have new names.** If you read or parse the server's stderr, a failed tool call now logs `argKeys` (the argument names) and the error class in place of `args` and the error message. Several coordinate fields are now named `lat`/`lon` and rounded to two decimals. Set `LOG_PII=true` to get queries, aliases, error text and full-precision coordinates back. Tool replies do not change. (`src/server/weatherServer.ts`, `src/utils/logger.ts`)
+
 ### Security
 
 - **Default logs no longer name your locations.** With nothing configured, the server's stderr log carried the text of geocoding queries, the alias and full address of every saved location it wrote, precise coordinates when NOAA or Open-Meteo declined a point and in climate-normals lookups, and — when a tool call failed — the arguments and error text, which name the place the user asked about. Default logs now carry the tool name, the error class and the argument names, round coordinates to about 1 km, and omit place text at every `LOG_LEVEL`. Set `LOG_PII=true` to log queries, aliases, error text and full-precision coordinates while debugging; the saved address is never logged. Several log lines now name coordinates `lat`/`lon`, as the other rounded lines already did. (`src/utils/logger.ts`, `src/server/weatherServer.ts`, `src/services/nominatim.ts`, `src/services/geocoding.ts`, `src/services/locationStore.ts`, `src/utils/normals.ts`, `src/utils/locationResolver.ts`, the forecast, current-conditions, historical, alerts and summary handlers, `README.md`, `SECURITY.md`)
+- **The moderate `ip-address` advisories are cleared.** `npm audit` reported `ip-address` 10.5.0 as **moderate**: GHSA-rpw4-54j3-4h4q (`isLinkLocal()` matches `fe80::/64` instead of `fe80::/10`) and GHSA-2vr4-cq9g-pvrc (the NAT64 local-use range is not classified). The package is reached through `@modelcontextprotocol/sdk` → `express-rate-limit` and through `mqtt` → `socks`. It is now 10.7.2, which was published on 2026-09-15 and is past npm's seven-day `min-release-age`. No other dependency changes. (`package-lock.json`)
 
 ## [1.33.12] - 2026-09-29
 
