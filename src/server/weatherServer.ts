@@ -29,7 +29,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { NOAAService } from '../services/noaa.js';
 import { OpenMeteoService } from '../services/openmeteo.js';
-import { NominatimService } from '../services/nominatim.js';
+import { NominatimService, NOMINATIM_MIN_INTERVAL_MS } from '../services/nominatim.js';
 import { NCEIService } from '../services/ncei.js';
 import { AcisService } from '../services/acis.js';
 import { AviationWeatherService } from '../services/aviationWeather.js';
@@ -45,6 +45,7 @@ import { MetnoService } from '../services/metno.js';
 import { EnvironmentAgencyService } from '../services/environmentAgency.js';
 import { GeocodingService } from '../services/geocoding.js';
 import type { LocationStore } from '../services/locationStore.js';
+import { RequestSpacer } from '../utils/requestSpacer.js';
 import { toolConfig } from '../config/tools.js';
 import { getDefaultLocation } from '../config/defaultLocation.js';
 import { logger, describeErrorForLogging, isPiiLoggingEnabled } from '../utils/logger.js';
@@ -96,13 +97,17 @@ const noaaService = new NOAAService({
  */
 const openMeteoService = new OpenMeteoService();
 
+// Both Nominatim clients — reverse lookup and geocoding — draw on this one budget.
+// The budget is per process; see nominatim.ts.
+const nominatimSpacer = new RequestSpacer(NOMINATIM_MIN_INTERVAL_MS);
+
 /**
  * Initialize the Nominatim service for geocoding
  * No API key required - uses OpenStreetMap data
  * Better coverage for small towns and villages than GeoNames
- * Rate limited to 1 request/second as per OSM usage policy
+ * Rate limited to 1 request/second as per OSM usage policy, shared with the geocoder
  */
-const nominatimService = new NominatimService();
+const nominatimService = new NominatimService({ spacer: nominatimSpacer });
 
 /**
  * Initialize the Environment Agency service for Great Britain river gauges
@@ -210,8 +215,9 @@ const googleWeatherService = new GoogleWeatherService();
  * Initialize the Geocoding service with multi-provider support
  * No API key required - uses Census.gov, Nominatim, and Open-Meteo
  * Automatic fallback strategy for maximum reliability
+ * Rate limited via shared Nominatim budget with reverse lookup
  */
-const geocodingService = new GeocodingService();
+const geocodingService = new GeocodingService({ nominatimSpacer });
 
 /**
  * Shared unit / localization parameters. Spread into weather tools so the AI can

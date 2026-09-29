@@ -7,6 +7,8 @@
 import axios, { AxiosInstance } from 'axios';
 import { DataNotFoundError, RateLimitError, ServiceUnavailableError } from '../errors/ApiError.js';
 import { logger, isPiiLoggingEnabled } from '../utils/logger.js';
+import { RequestSpacer } from '../utils/requestSpacer.js';
+import { NOMINATIM_MIN_INTERVAL_MS } from './nominatim.js';
 
 /**
  * Serialize query parameters using RFC 3986 percent-encoding (spaces -> %20).
@@ -62,30 +64,6 @@ interface GeocodingProvider {
 }
 
 /**
- * Rate limiter for controlling request frequency per provider
- */
-class RateLimiter {
-  private lastRequestTime: number = 0;
-  private minInterval: number; // milliseconds between requests
-
-  constructor(requestsPerSecond: number) {
-    this.minInterval = 1000 / requestsPerSecond;
-  }
-
-  async throttle(): Promise<void> {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-
-    if (timeSinceLastRequest < this.minInterval) {
-      const delay = this.minInterval - timeSinceLastRequest;
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-
-    this.lastRequestTime = Date.now();
-  }
-}
-
-/**
  * Census.gov Geocoding Provider
  * Best for: US locations (cities, states, addresses)
  * Coverage: United States only
@@ -94,7 +72,7 @@ class RateLimiter {
 class CensusGovProvider implements GeocodingProvider {
   name = 'Census.gov';
   private client: AxiosInstance;
-  private rateLimiter: RateLimiter;
+  private spacer: RequestSpacer;
 
   constructor() {
     this.client = axios.create({
@@ -107,11 +85,11 @@ class CensusGovProvider implements GeocodingProvider {
     });
 
     // Rate limit to 5 requests/second to be respectful
-    this.rateLimiter = new RateLimiter(5);
+    this.spacer = new RequestSpacer(1000 / 5);
   }
 
   async geocode(query: string, limit: number): Promise<GeocodingResult[]> {
-    await this.rateLimiter.throttle();
+    await this.spacer.reserve();
 
     try {
       logger.debug('Census.gov geocode', isPiiLoggingEnabled() ? { query } : undefined);
@@ -184,9 +162,9 @@ class CensusGovProvider implements GeocodingProvider {
 class NominatimProvider implements GeocodingProvider {
   name = 'Nominatim';
   private client: AxiosInstance;
-  private rateLimiter: RateLimiter;
+  private spacer: RequestSpacer;
 
-  constructor() {
+  constructor(spacer?: RequestSpacer) {
     this.client = axios.create({
       baseURL: 'https://nominatim.openstreetmap.org',
       timeout: 10000,
@@ -198,11 +176,11 @@ class NominatimProvider implements GeocodingProvider {
     });
 
     // Strict 1 request/second rate limit as per Nominatim usage policy
-    this.rateLimiter = new RateLimiter(1);
+    this.spacer = spacer ?? new RequestSpacer(NOMINATIM_MIN_INTERVAL_MS);
   }
 
   async geocode(query: string, limit: number): Promise<GeocodingResult[]> {
-    await this.rateLimiter.throttle();
+    await this.spacer.reserve();
 
     try {
       logger.debug('Nominatim geocode', isPiiLoggingEnabled() ? { query } : undefined);
@@ -369,9 +347,9 @@ export class GeocodingService {
   private nominatim: NominatimProvider;
   private openmeteo: OpenMeteoProvider;
 
-  constructor() {
+  constructor(options: { nominatimSpacer?: RequestSpacer } = {}) {
     this.census = new CensusGovProvider();
-    this.nominatim = new NominatimProvider();
+    this.nominatim = new NominatimProvider(options.nominatimSpacer);
     this.openmeteo = new OpenMeteoProvider();
   }
 
