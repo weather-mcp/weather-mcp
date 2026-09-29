@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.11] - 2026-09-28
+
 Your saved locations were stored where other people could read them. On a new install, the server created `~/.weather-mcp` and `locations.json` so that every account on the same machine could read the file and see the places you had saved, such as home and work. A new install now creates both so that only your account can read them. An install from an earlier version is not changed. To make it private, run `chmod 700 ~/.weather-mcp && chmod 600 ~/.weather-mcp/locations.json`. This release also clears two high-severity advisories in a dependency that the server uses to check tool inputs.
 
 ### Security
@@ -1985,7 +1987,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.10...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.11...HEAD
+[1.33.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.10...v1.33.11
 [1.33.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.9...v1.33.10
 [1.33.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.8...v1.33.9
 [1.33.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.7...v1.33.8
