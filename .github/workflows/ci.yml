@@ -29,5 +29,6 @@ jobs:
       # too flaky (and too impolite to the free upstreams) for every PR push.
       # The doc-consistency check (scripts/check-doc-versions.sh) also stays
       # out of CI for the same reason — it runs the full suite internally.
+      # The unit project runs under tests/setup/no-network.ts, so the step needs no network.
       - name: Test
-        run: npx vitest run tests/unit
+        run: npx vitest run --project unit

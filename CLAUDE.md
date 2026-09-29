@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.33.14 (Production Ready)
+- **Version:** 1.33.15 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -265,7 +265,8 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 ```
 tests/
-├── unit/          # ~80 files; fast, no I/O. Fixture-based handler/service tests plus pure-module tests
+├── unit/          # ~80 files; fast, no I/O. Fixture-based handler/service tests plus pure-module tests.
+│                  #   Run under tests/setup/no-network.ts, which refuses every outbound socket
 └── integration/   # ~13 files; some make live network calls and can flake — re-run before blaming a diff
 ```
 
@@ -275,7 +276,7 @@ Named by subject (`<feature>-handler.test.ts`, `<util>.test.ts`, `<feature>-rout
 
 - **Framework:** Vitest (configured in `package.json`)
 - **Coverage Target:** 100% on critical utilities (cache, validation, units, errors)
-- **Performance:** Unit tests are fast; the full suite currently takes ~1 minute. Keep new unit tests I/O-free
+- **Performance:** Unit tests are fast; the full suite currently takes ~1 minute. Keep new unit tests I/O-free. The rule is enforced: a unit test that opens a socket fails with `EUNITNET`. Anything that must reach a network belongs in `tests/integration/`
 - **No Flakiness:** Unit tests must be deterministic (pin percentile methods, clustering order, time zones)
 
 ### Running Tests
@@ -285,6 +286,7 @@ npm test                    # Run all tests
 npm run test:watch         # Watch mode
 npm run test:coverage      # With coverage report
 npx vitest run tests/unit/cache.test.ts   # One file
+npx vitest run --project unit             # Unit tests only, offline-guarded (what CI runs)
 ```
 
 ### Writing Tests
@@ -660,15 +662,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.33.14 — Production Ready ✅
-- **Test Coverage:** 4,188 tests, 100% pass rate
+- **Version:** 1.33.15 — Production Ready ✅
+- **Test Coverage:** 4,190 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.33.15:** Unit tests run offline; no change to what the server does
 - **New in v1.33.14:** Geocoding keeps to OpenStreetMap's one-request-per-second limit when several lookups run at once
 - **New in v1.33.13:** Default logs no longer name your locations; LOG_PII turns the detail back on
-- **New in v1.33.12:** Radar imagery checks every tile address and tile it receives before using it
 
 ## Useful References
 
@@ -691,7 +693,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-29 (v1.33.14)
+**Last Updated:** 2026-09-29 (v1.33.15)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

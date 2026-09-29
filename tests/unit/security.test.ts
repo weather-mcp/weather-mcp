@@ -6,6 +6,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { NOAAService } from '../../src/services/noaa.js';
 import { OpenMeteoService } from '../../src/services/openmeteo.js';
+import type { AxiosInstance } from 'axios';
+import { stubAdapter } from '../helpers/stubAdapter.js';
 
 describe('Security Features - v1.0.0', () => {
   describe('Defense-in-Depth Measures', () => {
@@ -56,8 +58,12 @@ describe('Security Features - v1.0.0', () => {
   });
 
   describe('Input Sanitization', () => {
-    it('should handle special characters in location queries safely', () => {
+    it('should handle special characters in location queries safely', async () => {
       const service = new OpenMeteoService();
+      const recorded = stubAdapter(
+        (service as unknown as { geocodingClient: AxiosInstance })['geocodingClient'],
+        { status: 200, data: { results: [] } }
+      );
 
       // Test that special characters don't cause issues
       const queries = [
@@ -68,8 +74,11 @@ describe('Security Features - v1.0.0', () => {
       ];
 
       for (const query of queries) {
-        // Should not throw on special characters
-        expect(() => service.searchLocation(query)).not.toThrow();
+        // Should not throw on special characters, and the query goes out verbatim
+        await expect(service.searchLocation(query)).resolves.toBeDefined();
+        const sent = recorded[recorded.length - 1];
+        expect(sent.params?.name).toBe(query);
+        expect(sent.params?.format).toBe('json');
       }
     });
 
@@ -119,19 +128,33 @@ describe('Security Features - v1.0.0', () => {
   });
 
   describe('Coordinate Validation', () => {
-    it('should accept valid coordinates', () => {
+    it('should accept valid coordinates', async () => {
       const service = new NOAAService();
+      const recorded = stubAdapter(
+        (service as unknown as { client: AxiosInstance })['client'],
+        { status: 200, data: { properties: {} } }
+      );
 
       // Valid US coordinates
-      expect(() => service.getPointData(40.7128, -74.0060)).not.toThrow(); // New York
-      expect(() => service.getPointData(34.0522, -118.2437)).not.toThrow(); // Los Angeles
-      expect(() => service.getPointData(25.7617, -80.1918)).not.toThrow(); // Miami
+      await expect(service.getPointData(40.7128, -74.0060)).resolves.toBeDefined(); // New York
+      expect(recorded[recorded.length - 1].url).toBe('/points/40.7128,-74.0060');
+      await expect(service.getPointData(34.0522, -118.2437)).resolves.toBeDefined(); // Los Angeles
+      expect(recorded[recorded.length - 1].url).toBe('/points/34.0522,-118.2437');
+      await expect(service.getPointData(25.7617, -80.1918)).resolves.toBeDefined(); // Miami
+      expect(recorded[recorded.length - 1].url).toBe('/points/25.7617,-80.1918');
 
       // Edge cases (valid)
-      expect(() => service.getPointData(90, 0)).not.toThrow(); // North pole
-      expect(() => service.getPointData(-90, 0)).not.toThrow(); // South pole
-      expect(() => service.getPointData(0, 180)).not.toThrow(); // Date line
-      expect(() => service.getPointData(0, -180)).not.toThrow(); // Date line
+      await expect(service.getPointData(90, 0)).resolves.toBeDefined(); // North pole
+      expect(recorded[recorded.length - 1].url).toBe('/points/90.0000,0.0000');
+      await expect(service.getPointData(-90, 0)).resolves.toBeDefined(); // South pole
+      expect(recorded[recorded.length - 1].url).toBe('/points/-90.0000,0.0000');
+      await expect(service.getPointData(0, 180)).resolves.toBeDefined(); // Date line
+      expect(recorded[recorded.length - 1].url).toBe('/points/0.0000,180.0000');
+      await expect(service.getPointData(0, -180)).resolves.toBeDefined(); // Date line
+      expect(recorded[recorded.length - 1].url).toBe('/points/0.0000,-180.0000');
+
+      // One request per point — none served from cache
+      expect(recorded).toHaveLength(7);
     });
 
     it('should reject out-of-range coordinates', async () => {
@@ -166,13 +189,21 @@ describe('Security Features - v1.0.0', () => {
   });
 
   describe('Forecast Parameter Validation', () => {
-    it('should validate forecast days parameter', () => {
+    it('should validate forecast days parameter', async () => {
       const service = new OpenMeteoService();
+      const recorded = stubAdapter(
+        (service as unknown as { forecastClient: AxiosInstance })['forecastClient'],
+        { status: 200, data: { daily: { time: ['2026-09-29'] } } }
+      );
 
       // Valid days
-      expect(() => service.getForecast(40.7128, -74.0060, 1)).not.toThrow();
-      expect(() => service.getForecast(40.7128, -74.0060, 7)).not.toThrow();
-      expect(() => service.getForecast(40.7128, -74.0060, 16)).not.toThrow();
+      await expect(service.getForecast(40.7128, -74.0060, 1)).resolves.toBeDefined();
+      expect(recorded[recorded.length - 1].params?.forecast_days).toBe(1);
+      await expect(service.getForecast(40.7128, -74.0060, 7)).resolves.toBeDefined();
+      expect(recorded[recorded.length - 1].params?.forecast_days).toBe(7);
+      await expect(service.getForecast(40.7128, -74.0060, 16)).resolves.toBeDefined();
+      expect(recorded[recorded.length - 1].params?.forecast_days).toBe(16);
+      expect(recorded).toHaveLength(3);
     });
 
     it('should reject invalid forecast days', async () => {
@@ -226,13 +257,21 @@ describe('Security Features - v1.0.0', () => {
       await expect(service.getObservations('KNYC', start, end)).rejects.toThrow('must be before end date');
     });
 
-    it('should accept valid date ranges', () => {
+    it('should accept valid date ranges', async () => {
       const service = new NOAAService();
       const start = new Date('2024-01-01');
       const end = new Date('2024-01-10');
+      const recorded = stubAdapter(
+        (service as unknown as { client: AxiosInstance })['client'],
+        { status: 200, data: { type: 'FeatureCollection', features: [] } }
+      );
 
       // Should not throw
-      expect(() => service.getObservations('KNYC', start, end)).not.toThrow();
+      await expect(service.getObservations('KNYC', start, end)).resolves.toBeDefined();
+      const sent = recorded[recorded.length - 1].url ?? '';
+      expect(sent.startsWith('/stations/KNYC/observations?')).toBe(true);
+      expect(sent).toContain('start=' + encodeURIComponent(start.toISOString()));
+      expect(sent).toContain('end=' + encodeURIComponent(end.toISOString()));
     });
   });
 
