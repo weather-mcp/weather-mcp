@@ -75,7 +75,9 @@ export class LocationStore {
   private ensureDirectoryExists(): void {
     if (!existsSync(this.storeDir)) {
       try {
-        mkdirSync(this.storeDir, { recursive: true });
+        // Private by default: the store holds where the user lives. umask can
+        // only tighten this. An existing directory is never touched.
+        mkdirSync(this.storeDir, { recursive: true, mode: 0o700 });
         logger.info('Created locations storage directory', { path: this.storeDir });
       } catch (error) {
         logger.error('Failed to create storage directory', error as Error, {
@@ -226,8 +228,9 @@ export class LocationStore {
     const target = this.resolveWriteTarget();
 
     // A rename replaces the directory entry, where an in-place write goes through
-    // it — so the mode has to be carried over explicitly or a user's 0600 is lost.
-    // A file that does not exist yet keeps the process default, as before.
+    // it — so an existing file's mode has to be carried over explicitly, whatever
+    // it is. A file that does not exist yet is created 0600. An existing mode is
+    // never tightened: migrating it is a separate decision.
     let mode: number | undefined;
     try {
       mode = statSync(target).mode & 0o777;
@@ -242,9 +245,10 @@ export class LocationStore {
 
     let fd: number | undefined;
     try {
-      fd = openSync(tmp, 'wx');
+      // 0600 at creation, so the temp file is never readable by others, even empty.
+      fd = openSync(tmp, 'wx', 0o600);
       if (mode !== undefined) {
-        // The open mode is masked by umask, so set it explicitly.
+        // Carry the existing target's mode, which umask would otherwise mask.
         fchmodSync(fd, mode);
       }
 
