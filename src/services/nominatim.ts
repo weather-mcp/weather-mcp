@@ -21,7 +21,7 @@ import type {
 } from '../types/nominatim.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
-import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging, isPiiLoggingEnabled } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
 import {
   RateLimitError,
@@ -275,7 +275,7 @@ export class NominatimService {
       const cacheKey = Cache.generateKey('nominatim-geocoding', query, limit, language);
       const cached = this.cache.get(cacheKey);
       if (cached) {
-        logger.info('Nominatim cache hit', { query });
+        logger.info('Nominatim cache hit', isPiiLoggingEnabled() ? { query } : undefined);
         return cached as MappedGeocodingResponse;
       }
 
@@ -291,7 +291,7 @@ export class NominatimService {
         'accept-language': language
       };
 
-      logger.info('Nominatim API request', { query, limit });
+      logger.info('Nominatim API request', { ...(isPiiLoggingEnabled() ? { query } : {}), limit });
       const response = await this.client.get<NominatimLocation[]>('/search', { params });
       const generationTime = Date.now() - startTime;
 
@@ -309,7 +309,7 @@ export class NominatimService {
       this.cache.set(cacheKey, result, 30 * 24 * 60 * 60 * 1000);
 
       logger.info('Nominatim search completed', {
-        query,
+        ...(isPiiLoggingEnabled() ? { query } : {}),
         resultCount: mappedResults.length,
         generationTimeMs: generationTime
       });

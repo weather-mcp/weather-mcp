@@ -6,7 +6,7 @@
 
 import axios, { AxiosInstance } from 'axios';
 import { DataNotFoundError, RateLimitError, ServiceUnavailableError } from '../errors/ApiError.js';
-import { logger } from '../utils/logger.js';
+import { logger, isPiiLoggingEnabled } from '../utils/logger.js';
 
 /**
  * Serialize query parameters using RFC 3986 percent-encoding (spaces -> %20).
@@ -114,7 +114,7 @@ class CensusGovProvider implements GeocodingProvider {
     await this.rateLimiter.throttle();
 
     try {
-      logger.debug(`Census.gov geocode: "${query}"`);
+      logger.debug('Census.gov geocode', isPiiLoggingEnabled() ? { query } : undefined);
 
       const response = await this.client.get('/locations/onelineaddress', {
         params: {
@@ -205,7 +205,7 @@ class NominatimProvider implements GeocodingProvider {
     await this.rateLimiter.throttle();
 
     try {
-      logger.debug(`Nominatim geocode: "${query}"`);
+      logger.debug('Nominatim geocode', isPiiLoggingEnabled() ? { query } : undefined);
 
       const response = await this.client.get('/search', {
         params: {
@@ -307,7 +307,7 @@ class OpenMeteoProvider implements GeocodingProvider {
 
   async geocode(query: string, limit: number): Promise<GeocodingResult[]> {
     try {
-      logger.debug(`Open-Meteo geocode: "${query}"`);
+      logger.debug('Open-Meteo geocode', isPiiLoggingEnabled() ? { query } : undefined);
 
       const response = await this.client.get('/search', {
         params: {
