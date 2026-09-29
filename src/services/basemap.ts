@@ -49,7 +49,9 @@ import {
   flattenOpaque,
   blendOnto,
   encodePng,
-  planTileWindow
+  planTileWindow,
+  assertTileHeader,
+  BASEMAP_TILE_MAX_BYTES
 } from '../utils/composite.js';
 
 /** WMTS REST base for EPSG:3857 "best" imagery — same endpoint family as `gibs.ts`. */
@@ -119,6 +121,8 @@ export class BasemapService {
     this.cache = new Cache(CacheConfig.maxSize);
     this.client = axios.create({
       timeout: CacheConfig.apiTimeoutMs,
+      maxRedirects: 0,
+      maxContentLength: BASEMAP_TILE_MAX_BYTES,
       headers: {
         'User-Agent': BASEMAP_USER_AGENT,
       },
@@ -128,7 +132,8 @@ export class BasemapService {
   /**
    * Fetch one raw tile buffer, serving from cache when available. Any
    * network/HTTP failure is rethrown as a plain `Error` (garnish precedent —
-   * see module doc comment); there is no retry ladder.
+   * see module doc comment); there is no retry ladder. Every tile's PNG
+   * header is checked before it is cached, so a bad tile is never held.
    * @private
    */
   private async fetchTile(layer: GibsLayer, z: number, x: number, y: number): Promise<Buffer> {
@@ -156,6 +161,9 @@ export class BasemapService {
         throw new Error(`GIBS basemap tile fetch failed for ${layer.name} ${z}/${y}/${x}: ${detail}`);
       }
     }
+
+    // Outside the catch above, so the optional-layer 404 tolerance never swallows it.
+    assertTileHeader(buffer, BASE_TILE_PIXELS);
 
     if (CacheConfig.enabled) {
       this.cache.set(cacheKey, buffer, CacheConfig.ttl.basemapTiles);
