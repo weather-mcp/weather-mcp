@@ -228,13 +228,20 @@ export class LocationStore {
     const target = this.resolveWriteTarget();
 
     // A rename replaces the directory entry, where an in-place write goes through
-    // it — so an existing file's mode has to be carried over explicitly, whatever
-    // it is. A file that does not exist yet is created 0600. An existing mode is
-    // never tightened: migrating it is a separate decision.
+    // it — so an existing file's permission bits have to be carried over
+    // explicitly. A file that does not exist yet is created 0600. An existing
+    // mode is never tightened: migrating it is a separate decision.
+    //
+    // ENOENT, and only ENOENT, means there is no file yet. Any other stat
+    // failure is thrown before anything is created, so a 0600 file never
+    // replaces an existing file whose mode could not be read.
     let mode: number | undefined;
     try {
       mode = statSync(target).mode & 0o777;
-    } catch {
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
       mode = undefined;
     }
 

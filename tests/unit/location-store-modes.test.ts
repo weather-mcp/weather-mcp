@@ -17,6 +17,8 @@ import {
   mkdirSync,
   rmSync,
   writeFileSync,
+  readFileSync,
+  readdirSync,
   statSync,
   symlinkSync,
   chmodSync,
@@ -34,6 +36,7 @@ vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   return {
     ...actual,
+    statSync: vi.fn(actual.statSync),
     openSync: vi.fn(actual.openSync),
     fchmodSync: vi.fn(actual.fchmodSync)
   };
@@ -42,6 +45,7 @@ vi.mock('fs', async (importOriginal) => {
 const actualFs = await vi.importActual<typeof import('fs')>('fs');
 
 function resetFsSpies(): void {
+  vi.mocked(statSync).mockReset().mockImplementation(actualFs.statSync);
   vi.mocked(openSync).mockReset().mockImplementation(actualFs.openSync);
   vi.mocked(fchmodSync).mockReset().mockImplementation(actualFs.fchmodSync);
 }
@@ -166,5 +170,29 @@ describe('LocationStore file modes', () => {
     expect(tmpCalls[0][2]).toBe(0o600);
     expect(fchmodSync).toHaveBeenCalledTimes(1);
     expect(vi.mocked(fchmodSync).mock.calls[0][1]).toBe(0o644);
+  });
+
+  it.skipIf(POSIX_ONLY)('refuses to save, and leaves the file alone, when the existing file cannot be stat-ed', () => {
+    const storePath = join(tempDir, 'locations.json');
+    writeFileSync(storePath, '{}');
+    chmodSync(storePath, 0o644);
+
+    // Only the store's own stat of the target fails, with something other than ENOENT.
+    vi.mocked(statSync).mockImplementation(((path: Parameters<typeof statSync>[0], ...rest: unknown[]) => {
+      if (path === storePath) {
+        throw Object.assign(new Error('EIO: i/o error, stat'), { code: 'EIO' });
+      }
+      return (actualFs.statSync as (...a: unknown[]) => unknown)(path, ...rest);
+    }) as typeof statSync);
+
+    expect(() => new LocationStore(storePath).set('home', SEATTLE)).toThrow(
+      /Failed to save locations/
+    );
+
+    vi.mocked(statSync).mockImplementation(actualFs.statSync);
+    expect(readFileSync(storePath, 'utf-8')).toBe('{}');
+    expect(modeOf(storePath)).toBe(0o644);
+    expect(readdirSync(tempDir).filter((f) => f.endsWith('.tmp'))).toEqual([]);
+    expect(openSync).not.toHaveBeenCalled();
   });
 });
