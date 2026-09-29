@@ -344,6 +344,14 @@ nothing to you. While the file stays unreadable nothing is re-warmed, so existin
 subscriptions age out through the ordinary idle prune rather than being extended from data that
 could not be read. Every tool you actually call still reports the error.
 
+**A save that cannot finish reports a different error, and also leaves the file alone.**
+`save_location` and `remove_saved_location` report `Failed to save locations to <path>` when the
+new file cannot be written or put in place. For example, the disk is full, the directory is not
+writable, or the server cannot read the existing file's permissions for a reason other than the
+file being missing. The previous file keeps its content and its permissions, and no temporary file
+is left beside it. The cause goes to the stderr log. A new file is created readable by your account
+only (`0600`, in a `0700` directory); an existing file keeps the permissions it had.
+
 Pre-warm also never displaces an area you queried: a saved location that does not fit the
 50-subscription limit is skipped, with one
 `Lightning pre-warm skipped saved locations: subscription limit reached` warning when the skipped
