@@ -73,6 +73,7 @@ src/
 │   ├── criticalAlert.ts     # Life-threatening-alert gate, selection, banner copy (pure)
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
+│   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
 │   ├── savedLocationShape.ts  # Saved-location record-shape contract — write-side validator and read-side describer (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
 │   ├── serviceStatusProbe.ts     # check_service_status probe outcome type + 200/429/other classification; both probes import it (pure)
@@ -249,6 +250,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 - TTLs live in `CacheConfig.ttl.*` (`src/config/cache.ts`); reuse an existing entry when the data's volatility matches rather than adding one (Google alerts reuse `alerts`), and add a named entry when you'd otherwise hardcode `Infinity`.
 - Cache the *table*, not the per-date slice, for anything derived from a bulk pull (normals).
 - Dedupe concurrent same-key pulls with a `Map<string, Promise<T>>` deleted in `finally`, so a rejected pull is never cached nor left behind.
+- A per-upstream rate budget is one `RequestSpacer` (`src/utils/requestSpacer.ts`) per upstream, built in the composition root and passed to every client of that upstream. It reserves each start slot synchronously before any `await` (G20) and spaces **starts**, not completions, so a slow or failed request never stalls the next. Nominatim's is shared by `NominatimService` and `GeocodingService`'s provider, and it is per process.
 - Bound every upstream array (`securityEvent` warn + caveat when the cap trims): 5,000 FIRMS rows, 64 ensemble members, gridpoint series lengths.
 
 ### Process
