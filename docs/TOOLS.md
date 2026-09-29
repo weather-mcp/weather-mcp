@@ -955,7 +955,7 @@ Saves a location to persistent storage (`~/.weather-mcp/locations.json`) for eas
 
 **Smart Updates:** If the alias already exists and you only provide `name` and/or `activities` (without location details), it will update just those fields while preserving all coordinates and metadata. This makes it easy to add activities or rename locations without re-specifying the full address. `name` is the one field an empty value does not clear.
 
-**Shared across your MCP clients.** `~/.weather-mcp/locations.json` is one file per machine, and every client you have configured reads and writes it. A save made in one client is visible to the others on their very next call — the file is read on every operation, so nothing needs restarting. Two saves made at the same moment resolve last-writer-wins on that one update; the file always stays valid.
+**Shared across your MCP clients.** `~/.weather-mcp/locations.json` is one file per machine, and every client you have configured reads and writes it. A save made in one client is visible to the others on their very next call — the file is read on every operation, so nothing needs restarting. Two saves made at the same moment resolve last-writer-wins on that one update; the file always stays valid. The server creates the file so that only your account can read it. If the file already existed, it keeps the permissions it had.
 
 **An unreadable file is refused, never replaced.** If `locations.json` exists but cannot be read or parsed, every saved-locations tool reports the error and names the path, and the file is left exactly as it is — not renamed, not copied, not overwritten. A file that does not exist yet is simply an empty store. See [ERROR_HANDLING.md](./ERROR_HANDLING.md#saved-locations-file-unreadable).
 

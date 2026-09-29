@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Your saved locations were stored where other people could read them. On a new install, the server created `~/.weather-mcp` and `locations.json` so that every account on the same machine could read the file and see the places you had saved, such as home and work. A new install now creates both so that only your account can read them. An install from an earlier version is not changed. To make it private, run `chmod 700 ~/.weather-mcp && chmod 600 ~/.weather-mcp/locations.json`.
+
+### Security
+
+- **New saved-location files can be read only by your account.** Under the usual umask `022`, the directory was created `0755` and the file `0644`. The directory is now created `0700` and the file `0600`, and the temporary file each save writes is `0600` from the moment it is created. A file or directory that already exists keeps its permissions. A save never tightens them, because the file may be a symlink that another tool manages. To make an earlier install private, run the `chmod` line above once. This applies on Linux and macOS. Windows does not use these permission bits. (`src/services/locationStore.ts`)
+
 ## [1.33.10] - 2026-09-28
 
 Two names were not treated as names. A saved location called `__proto__` or `constructor` could not be saved, looked up or removed correctly: one was silently dropped, and the other appeared to exist on an empty list. The same two words in `ENABLED_TOOLS` stopped the server from starting. Both are now ordinary names everywhere: a saved alias round-trips like any other, and an unknown tool name gets the usual warning.

@@ -539,11 +539,13 @@ tools use to skip the reverse-geocode lookup.
   cached on first read and never refreshed, so an instance wrote "my stale copy plus my change"
   and deleted whatever another instance had saved meanwhile
 - **Atomic replace**: writes go to a temp file in the same directory, are `fsync`ed, then
-  `rename`d over the target — a reader sees the old file or the new one, never a partial.
-  Permission bits are carried across the rename; a symlinked `locations.json` stays a symlink and
-  its target is replaced, resolved by walking the link chain (never `realpathSync`, which cannot
-  distinguish an absent path from a dangling link). The buffer is written to completion before any
-  `fsync` or `rename`, so a short write can never be published as a successful save
+  `rename`d over the target — a reader sees the old file or the new one, never a partial. A fresh
+  file is created `0600` and a fresh directory `0700`; an existing file's permission bits are
+  carried across the rename and never migrated, and an existing directory is never touched. A
+  symlinked `locations.json` stays a symlink and its target is replaced, resolved by walking the
+  link chain (never `realpathSync`, which cannot distinguish an absent path from a dangling link).
+  The buffer is written to completion before any `fsync` or `rename`, so a short write can never
+  be published as a successful save
 - **Refuse-on-unreadable**: `ENOENT`, and only `ENOENT`, means an empty store. Any other read
   failure, a parse failure, or a top level that is not a plain object throws
   `LocationStoreUnreadableError` from every read and every write, `clear()` included. **The
