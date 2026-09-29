@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Radar imagery no longer trusts the tile paths and tile bytes it receives.** The radar frame list from RainViewer names a path for each frame, and the server joined that path straight onto the tile host. A path starting with `@` would have moved every tile URL to another host, both in the text the tool returns and in the tiles it fetches for `composite: true`. A frame time that was not a number stopped the tool with a raw `RangeError`. Tile downloads also had no size limit and followed redirects, and each tile was fully decoded before its dimensions were checked. Every frame path and time is now checked when the list arrives, and one bad frame refuses the whole list. A radar tile is fetched only from exactly `https://tilecache.rainviewer.com`. Every metadata and tile request follows no redirects and caps the response size, and every tile's PNG header is checked for the expected size, with no interlacing, before it is decoded or cached. A refused tile drops only the composite image, as any other composite failure does. This is hardening: nothing was exploited, and it needed control of RainViewer's response. (`src/services/rainviewer.ts`, `src/handlers/weatherImageryHandler.ts`, `src/services/basemap.ts`, `src/utils/composite.ts`)
+
 ## [1.33.11] - 2026-09-28
 
 Your saved locations were stored where other people could read them. On a new install, the server created `~/.weather-mcp` and `locations.json` so that every account on the same machine could read the file and see the places you had saved, such as home and work. A new install now creates both so that only your account can read them. An install from an earlier version is not changed. To make it private, run `chmod 700 ~/.weather-mcp && chmod 600 ~/.weather-mcp/locations.json`. This release also clears two high-severity advisories in a dependency that the server uses to check tool inputs.
