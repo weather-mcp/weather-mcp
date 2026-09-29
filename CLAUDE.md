@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.33.10 (Production Ready)
+- **Version:** 1.33.11 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -539,11 +539,13 @@ tools use to skip the reverse-geocode lookup.
   cached on first read and never refreshed, so an instance wrote "my stale copy plus my change"
   and deleted whatever another instance had saved meanwhile
 - **Atomic replace**: writes go to a temp file in the same directory, are `fsync`ed, then
-  `rename`d over the target — a reader sees the old file or the new one, never a partial.
-  Permission bits are carried across the rename; a symlinked `locations.json` stays a symlink and
-  its target is replaced, resolved by walking the link chain (never `realpathSync`, which cannot
-  distinguish an absent path from a dangling link). The buffer is written to completion before any
-  `fsync` or `rename`, so a short write can never be published as a successful save
+  `rename`d over the target — a reader sees the old file or the new one, never a partial. A fresh
+  file is created `0600` and a fresh directory `0700`; an existing file's permission bits are
+  carried across the rename and never migrated, and an existing directory is never touched. A
+  symlinked `locations.json` stays a symlink and its target is replaced, resolved by walking the
+  link chain (never `realpathSync`, which cannot distinguish an absent path from a dangling link).
+  The buffer is written to completion before any `fsync` or `rename`, so a short write can never
+  be published as a successful save
 - **Refuse-on-unreadable**: `ENOENT`, and only `ENOENT`, means an empty store. Any other read
   failure, a parse failure, or a top level that is not a plain object throws
   `LocationStoreUnreadableError` from every read and every write, `clear()` included. **The
@@ -640,15 +642,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.33.10 — Production Ready ✅
-- **Test Coverage:** 4,023 tests, 100% pass rate
+- **Version:** 1.33.11 — Production Ready ✅
+- **Test Coverage:** 4,032 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.33.11:** New saved-location files are private to your account, and two high-severity dependency advisories are cleared
 - **New in v1.33.10:** Saved-location aliases and ENABLED_TOOLS names like constructor and __proto__ work as ordinary names
 - **New in v1.33.9:** A malformed saved location is refused before it is written, and named if it is already on disk
-- **New in v1.33.8:** An empty answer from a weather service is labelled as one
 
 ## Useful References
 
@@ -671,7 +673,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-28 (v1.33.10)
+**Last Updated:** 2026-09-28 (v1.33.11)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

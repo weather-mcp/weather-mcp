@@ -6245,6 +6245,37 @@ the callers, not from the syntax the task names.
 
 ---
 
+## G118 — An exact-version `overrides` pin is a security fix that expires, and nothing bumps it
+
+**Trigger:** adding, or finding, an exact version in `package.json`'s `overrides` block, especially
+one that was added to clear an `npm audit` advisory. Also: a red `npm audit` at the baseline of a
+run, on a transitive package.
+
+**Rule:** treat every exact `overrides` entry as a standing item. Before any release, and at any
+red baseline, compare each pinned version with the package's newest published version, and run
+`npm audit --audit-level=high`. When a new advisory covers the pinned version, move the pin to the
+newest version past npm's 7-day `min-release-age` (**G66**). Land that bump as its own `security:`
+commit on `main`, never folded into an unrelated feature branch.
+
+**Why:** the override holds the tree on the version it names, so the fix that was correct on the
+day it landed becomes the vulnerable version when the next advisory covers it. The pipeline has no
+stage that re-reads the pin. The open Dependabot PRs at the time (#105, #107–#109) did not touch
+`fast-uri`. The first signal was a red `npm audit` at the baseline of an unrelated run.
+
+**Verify:** `node -p "JSON.stringify(require('./package.json').overrides)"`, then for each entry
+`npm view <pkg> version` and `npm audit --audit-level=high`. Exit 0 from audit, and a pin at the
+newest version past the cooldown, is clean.
+
+**Evidence:** 2026-09-28, saved-location-private-files baseline. `fast-uri` was pinned to 3.1.6
+on 2026-09-02 (`300c7a1`) to clear the 3.1.5 advisory. Two later advisories
+(GHSA-qw65-cvwx-89v3, GHSA-58mr-gqgx-xq4g) cover 3.0.0–3.1.6, so `main` @ `a39269f` failed the
+gate with 2 high. The pin moved to 3.1.8 (published 2026-09-15) in `873d2b7`, merged as `59ea6c3`.
+
+**Status:** active. Lint candidate: a check that fails when an `overrides` version is older than
+the newest version past the cooldown.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the

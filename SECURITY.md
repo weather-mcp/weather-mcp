@@ -150,6 +150,7 @@ This MCP server uses public weather APIs (NOAA and Open-Meteo) that do not requi
 - **No Personal Data**: No personal identifiable information is collected or stored
 - **Local Cache**: Weather data is cached locally on the user's machine
 - **No Tracking**: The server does not track users or send telemetry
+- **Saved Locations**: Aliases you save are stored in `~/.weather-mcp/locations.json`. On Linux and macOS, the server creates the directory `0700` and the file `0600`, so only your account can read them. A directory or file that already exists keeps its permissions. An install from an earlier version stays as it was until you run `chmod 700 ~/.weather-mcp && chmod 600 ~/.weather-mcp/locations.json`
 
 ### Network Security
 
