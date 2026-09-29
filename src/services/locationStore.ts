@@ -22,7 +22,7 @@ import { randomBytes } from 'crypto';
 import { homedir } from 'os';
 import { join, dirname, basename, resolve, isAbsolute } from 'path';
 import type { SavedLocation, SavedLocationsStore } from '../types/savedLocations.js';
-import { logger } from '../utils/logger.js';
+import { logger, isPiiLoggingEnabled } from '../utils/logger.js';
 import { validateSavedLocationInput } from '../utils/savedLocationShape.js';
 
 /**
@@ -343,9 +343,10 @@ export class LocationStore {
     locations[normalized] = savedLocation;
     this.save(locations);
 
+    // `name` is never logged: it is the geocoder's display_name, a full address. The alias identifies the record.
     logger.info(isUpdate ? 'Updated saved location' : 'Created new saved location', {
-      alias: normalized,
-      name: validated.name
+      isUpdate,
+      ...(isPiiLoggingEnabled() ? { alias: normalized } : {})
     });
 
     return savedLocation;
@@ -365,7 +366,7 @@ export class LocationStore {
     delete locations[normalized];
     this.save(locations);
 
-    logger.info('Removed saved location', { alias: normalized });
+    logger.info('Removed saved location', isPiiLoggingEnabled() ? { alias: normalized } : undefined);
     return true;
   }
 

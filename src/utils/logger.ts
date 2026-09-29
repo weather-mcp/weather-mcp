@@ -215,6 +215,66 @@ function createDefaultLogger(): Logger {
 export const logger = createDefaultLogger();
 
 /**
+ * The one read site for `LOG_PII`.
+ *
+ * Read per call, so a test flips the variable without re-importing the module.
+ * The flag lifts coordinate precision, geocoding queries, saved-location aliases
+ * and error text from user-driven paths, all at once. It does not lift the broker
+ * URL (`redactUrlForLogging` stays ungated) and it does not lift the saved `name`.
+ *
+ * @returns true only when `LOG_PII` is exactly the string `true`
+ */
+export function isPiiLoggingEnabled(): boolean {
+  return process.env.LOG_PII === 'true';
+}
+
+/**
+ * Describe an error for a log line without echoing what the user typed.
+ *
+ * By default a log line may say an error's class and code. The message and stack
+ * ride along only under `LOG_PII`, because every message that reaches a
+ * user-driven catch block embeds what the user typed.
+ *
+ * Total: never throws, so it is safe inside a catch block. A hostile getter
+ * yields `{ name: 'unknown' }`.
+ *
+ * @param error - Anything a catch block can receive
+ * @returns `name`, plus `code` when it is a string or finite number, plus
+ *          `message` and `stack` under `LOG_PII`
+ */
+export function describeErrorForLogging(error: unknown): {
+  name: string;
+  code?: string;
+  message?: string;
+  stack?: string;
+} {
+  try {
+    const isError = error instanceof Error;
+    const described: { name: string; code?: string; message?: string; stack?: string } = {
+      name: isError ? error.name : typeof error
+    };
+
+    if (typeof error === 'object' && error !== null) {
+      const code = (error as { code?: unknown }).code;
+      if (typeof code === 'string' || (typeof code === 'number' && Number.isFinite(code))) {
+        described.code = String(code);
+      }
+    }
+
+    if (isPiiLoggingEnabled()) {
+      described.message = isError ? error.message : String(error);
+      if (isError && typeof error.stack === 'string') {
+        described.stack = error.stack;
+      }
+    }
+
+    return described;
+  } catch {
+    return { name: 'unknown' };
+  }
+}
+
+/**
  * Round coordinates for logging to protect user privacy
  * Reduces precision to ~1.1km accuracy (2 decimal places)
  * Set LOG_PII=true environment variable to log full precision (not recommended for production)
@@ -228,7 +288,7 @@ export const logger = createDefaultLogger();
  */
 export function redactCoordinatesForLogging(latitude: number, longitude: number): { lat: number; lon: number } {
   // Check if PII logging is explicitly enabled (not recommended)
-  const logPII = process.env.LOG_PII === 'true';
+  const logPII = isPiiLoggingEnabled();
 
   if (logPII) {
     return { lat: latitude, lon: longitude };

@@ -151,6 +151,7 @@ This MCP server uses public weather APIs (NOAA and Open-Meteo) that do not requi
 - **Local Cache**: Weather data is cached locally on the user's machine
 - **No Tracking**: The server does not track users or send telemetry
 - **Saved Locations**: Aliases you save are stored in `~/.weather-mcp/locations.json`. On Linux and macOS, the server creates the directory `0700` and the file `0600`, so only your account can read them. A directory or file that already exists keeps its permissions. An install from an earlier version stays as it was until you run `chmod 700 ~/.weather-mcp && chmod 600 ~/.weather-mcp/locations.json`
+- **Logging**: By default the server's stderr log carries no saved names, aliases, geocoding queries or notes, and rounds coordinates to about 1 km. A failed tool call is logged by tool name, error class and argument names, not by its arguments or message. Setting `LOG_PII=true` lifts this for local debugging. The MQTT broker URL's credentials are never logged under any setting
 
 ### Network Security
 

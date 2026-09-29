@@ -15,7 +15,7 @@ import { UnitPreferences, IMPERIAL_PREFERENCES } from '../config/units.js';
 import { temperatureLabel, precipitationLabel } from './unitFormat.js';
 import type { OpenMeteoService } from '../services/openmeteo.js';
 import type { NCEIService } from '../services/ncei.js';
-import { logger } from './logger.js';
+import { logger, redactCoordinatesForLogging } from './logger.js';
 import { isInUS } from './geography.js';
 /**
  * The daily series are declared `(number | null)[]`, as Open-Meteo sends them.
@@ -381,16 +381,14 @@ export async function getClimateNormals(
   if (nceiService && nceiService.isAvailable() && isInUS(latitude, longitude)) {
     try {
       logger.info('Attempting to fetch climate normals from NCEI', {
-        latitude,
-        longitude,
+        ...redactCoordinatesForLogging(latitude, longitude),
         month,
         day
       });
 
       const normals = await nceiService.getClimateNormals(latitude, longitude, month, day);
       logger.info('Successfully retrieved climate normals from NCEI', {
-        latitude,
-        longitude,
+        ...redactCoordinatesForLogging(latitude, longitude),
         month,
         day
       });
@@ -399,8 +397,7 @@ export async function getClimateNormals(
     } catch (error) {
       // NCEI failed, fall back to Open-Meteo
       logger.warn('NCEI climate normals failed, falling back to Open-Meteo', {
-        latitude,
-        longitude,
+        ...redactCoordinatesForLogging(latitude, longitude),
         month,
         day,
         error: (error as Error).message
@@ -410,8 +407,7 @@ export async function getClimateNormals(
 
   // Use Open-Meteo (default, always works)
   logger.info('Using Open-Meteo for climate normals', {
-    latitude,
-    longitude,
+    ...redactCoordinatesForLogging(latitude, longitude),
     month,
     day,
     reason: nceiService && nceiService.isAvailable()

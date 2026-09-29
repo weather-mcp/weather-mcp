@@ -22,7 +22,7 @@ import {
 import { ApiConstants, FormatConstants, DisplayThresholds } from '../config/displayThresholds.js';
 import { isInUS } from '../utils/geography.js';
 import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
-import { logger } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 
 /** Note shown when an auto-routed NOAA request falls back to Open-Meteo. */
 const NOAA_FALLBACK_NOTE =
@@ -354,8 +354,7 @@ export async function handleGetHistoricalWeather(
       throw error;
     }
     logger.warn('NOAA rejected recent-date historical location; falling back to Open-Meteo', {
-      latitude,
-      longitude,
+      ...redactCoordinatesForLogging(latitude, longitude),
       fallback: true
     });
     return fetchFromOpenMeteo(NOAA_FALLBACK_NOTE);

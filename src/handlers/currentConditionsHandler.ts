@@ -60,7 +60,7 @@ import {
 } from '../utils/thermalStress.js';
 import { milesToKm } from '../utils/distance.js';
 import { DataNotFoundError, InvalidLocationError, ServiceUnavailableError } from '../errors/ApiError.js';
-import { logger } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { UnitPreferences } from '../config/units.js';
 import { DisplayThresholds } from '../config/displayThresholds.js';
 import { displayValue } from '../utils/displayBanding.js';
@@ -218,8 +218,7 @@ export async function handleGetCurrentConditions(
           throw error;
         }
         logger.warn('NOAA rejected auto-routed location; falling back to Open-Meteo', {
-          latitude,
-          longitude,
+          ...redactCoordinatesForLogging(latitude, longitude),
           fallback: true
         });
         output = insertNoteAfterHeading(

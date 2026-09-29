@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.33.12 (Production Ready)
+- **Version:** 1.33.13 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -76,7 +76,7 @@ src/
 │   ├── savedLocationShape.ts  # Saved-location record-shape contract — write-side validator and read-side describer (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
 │   ├── serviceStatusProbe.ts     # check_service_status probe outcome type + 200/429/other classification; both probes import it (pure)
-│   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing; log redaction (coordinates, URLs)
+│   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing; log redaction (coordinates, URLs, error text)
 │   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates; shared country-code resolution
 │   ├── geography.ts         # isInUS and region helpers
 │   ├── timezone.ts          # Local-time formatting, formatObservationAge
@@ -194,6 +194,17 @@ logger.error('API request failed', { error: err.message });
 
 **Important:** All logs go to `stderr` (MCP protocol requirement). Never log to `stdout`.
 
+**Default logs carry no identifying location text and no coordinate finer than 2 dp, at any
+`LOG_LEVEL`.** Identifying text is anything the user typed or the geocoder returned about a place:
+a query, a saved name, an alias, notes, alternate names, a description. Coordinates go through
+`redactCoordinatesForLogging`; identifying text is logged only behind `isPiiLoggingEnabled()`; an
+error caught on a user-driven path is logged through `describeErrorForLogging` (class and code;
+message and stack only under `LOG_PII`), never by passing the `Error` to `logger.error`, because its
+message is the user-facing text and embeds what they typed. The dispatch catch in
+`src/server/weatherServer.ts` logs `argKeys`, never `args`. The saved `name` is the geocoder's full
+address and is not logged even under `LOG_PII`. `tests/unit/log-privacy.test.ts` holds the sentinel
+contract.
+
 ## Project Conventions (hard-won rules)
 
 These are the cross-cutting rules that recur across releases. Each was learned the hard way; the per-feature reasoning lives in `.devdocs/archive/completed/<feature>-plan.md` (D-numbered decisions) and `CHANGELOG.md`.
@@ -227,6 +238,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 - **Key-in-URL services** (FIRMS, Google Pollen, Google Weather): never log or throw URLs or raw axios errors; every thrown error is a fixed pre-written string; logs carry only `{ status, code }`; unit tests assert the key appears in no thrown message and no logger argument.
 - **The MQTT broker URL** (`BLITZORTUNG_MQTT_URL`) is in the same class: it can carry credentials in userinfo or the query, and `mqtt` forwards both. Never log it raw; `redactUrlForLogging` (`src/utils/logger.ts`) is the accessor, and it has no `LOG_PII` opt-in.
+- **Default logs never identify a place.** No query, alias, saved name, notes or error message from a user-driven path, and no coordinate finer than 2 dp, at any level. `LOG_LEVEL` is verbosity; `LOG_PII` is identifiability; neither lifts the broker-URL redaction. See *Logging*.
 - **Env vars are permanent and per-feature** — a new Google-backed feature gets its own var (key restrictions make a shared var break silently).
 - **Standing key policy:** no tool ever *requires* a key; a keyed feature needs a usable free tier; say plainly when a "free tier" still needs a billing account.
 - **Attribution strings that a licence mandates are exact** (`Source: Includes weather data from Google`, `Source: Includes pollen data from Google`) — do not reword. Licensed alert text renders verbatim with issue times as published.
@@ -400,10 +412,14 @@ WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
 LOG_LEVEL=1                    # 0/DEBUG, 1/INFO, 2/WARN, 3/ERROR — number or name,
                                # names case-insensitive (default: 1). An unrecognized
                                # value warns on stderr and falls back to INFO.
+# LOG_PII=false                # true logs full-precision coordinates, geocoding
+                               # queries, saved-location aliases and failed-call error
+                               # text. Never the saved name or broker credentials.
 ```
 
 Cache and API variables are validated in `src/config/cache.ts`; `LOG_LEVEL` is parsed
-in `src/utils/logger.ts`; unit variables are parsed and validated in
+in `src/utils/logger.ts`, which is also the one read site for `LOG_PII`
+(`isPiiLoggingEnabled`); unit variables are parsed and validated in
 `src/config/units.ts`; optional keys in `src/config/api.ts`.
 Per-call unit parameters are resolved by `src/utils/unitPreferences.ts` and formatted
 via `src/utils/unitFormat.ts`.
@@ -642,15 +658,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.33.12 — Production Ready ✅
-- **Test Coverage:** 4,117 tests, 100% pass rate
+- **Version:** 1.33.13 — Production Ready ✅
+- **Test Coverage:** 4,167 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.33.13:** Default logs no longer name your locations; LOG_PII turns the detail back on
 - **New in v1.33.12:** Radar imagery checks every tile address and tile it receives before using it
 - **New in v1.33.11:** New saved-location files are private to your account, and two high-severity dependency advisories are cleared
-- **New in v1.33.10:** Saved-location aliases and ENABLED_TOOLS names like constructor and __proto__ work as ordinary names
 
 ## Useful References
 
@@ -673,7 +689,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-29 (v1.33.12)
+**Last Updated:** 2026-09-29 (v1.33.13)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
