@@ -166,6 +166,23 @@ This MCP server uses public weather APIs (NOAA and Open-Meteo) that do not requi
   after reading. A refused URL is counted, logged as a security event, and
   never fetched — and no log or error message ever contains the URL itself,
   a response body, or alert geometry.
+- **The same holds for the radar imagery feed.** RainViewer's metadata supplies
+  a `path` for each radar frame, which the server joins to the fixed tile host
+  `https://tilecache.rainviewer.com`. Every path must be `/`-separated segments
+  of letters, digits, `_` and `-`, at most 128 characters, and every frame time
+  must be a finite number in the date range. One bad frame refuses the whole
+  metadata response; the tool reports an error rather than show an older frame
+  as the latest. The metadata request follows no redirects and caps the body at
+  256 KiB. The upstream `host` field is ignored.
+- **Every imagery tile fetch is bounded.** A radar tile is requested only when
+  its URL is HTTPS on exactly `tilecache.rainviewer.com`, with no userinfo and no
+  explicit port. Radar tiles and NASA GIBS base-map tiles follow no redirects,
+  and each response is capped at the transport (2 MiB per radar tile, 1 MiB per
+  base-map tile). Each tile's PNG header is checked for the exact tile size and
+  for no interlacing before it is decoded, and before a base-map tile is cached,
+  so a small body cannot declare an image large enough to exhaust memory. A
+  refused frame or tile URL is logged as a security event with a count or a
+  reason code, never the path or the URL.
 
 ## Security Testing
 

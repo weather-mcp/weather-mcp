@@ -262,6 +262,32 @@ HTTP status and error type — never a URL and never the raw upstream error — 
 so a slow or dead NOAA alerts endpoint never adds latency to a forecast. Nothing about the failure
 reaches the tool result.
 
+### Radar Imagery Errors
+
+**Malformed radar metadata.** `get_weather_imagery` for radar or precipitation reads RainViewer's
+list of radar frames first. If any frame in that list has a path outside the expected character set,
+or a time that is not a usable number, the whole list is refused and the tool reports:
+
+```
+RainViewer API Error: RainViewer returned radar frames in an unexpected format
+
+For more information:
+- https://www.rainviewer.com/
+```
+
+**This is contract, not garnish.** The tool fails rather than drop the bad frames, because dropping
+the newest frame would show an older one labelled as the latest radar. A frame that fails the check is
+evidence that the feed changed or was tampered with, so it is not worked around. The refusal is
+recorded once to the **stderr log** as a `securityEvent` warning carrying a count and a reason code,
+never the path. A redirect or an oversized metadata response fails the same way through the existing
+`Failed to fetch radar data` message.
+
+**A composite tile that fails a check is dropped quietly.** With `composite: true`, every radar and
+base-map tile must come from its expected host, follow no redirects, stay under its size cap, and carry
+a PNG header of the exact tile size with no interlacing. If any tile fails, the composite image is left
+out and the response is the normal URL-based text plus the one-line note *Composite map unavailable for
+this request*. The tool call itself succeeds. The reason is logged to stderr, without the tile URL.
+
 ### Wildfire Containment: `not reported`
 
 `get_wildfire_info` renders `**Containment:** not reported` — with no percentage and no bar — for a

@@ -3,7 +3,7 @@
  * Provides weather radar, satellite, and precipitation imagery
  */
 
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import {
   WeatherImageryParams,
   WeatherImageryResponse,
@@ -35,7 +35,8 @@ import {
   blendOnto,
   drawMarker,
   encodePng,
-  MAX_COMPOSITE_BYTES
+  MAX_COMPOSITE_BYTES,
+  RADAR_TILE_MAX_BYTES
 } from '../utils/composite.js';
 
 interface WeatherImageryArgs {
@@ -94,13 +95,50 @@ const COMPOSITE_SIZE = 512;
 /** RainViewer's native radar tile size — the frame URLs embed `/512/`. */
 const RADAR_TILE_PIXELS = 512;
 
+/** The only host a radar tile may be fetched from. */
+const RADAR_TILE_HOST = 'tilecache.rainviewer.com';
+
+/**
+ * Request config for every radar tile fetch: no redirects, and a capped body.
+ * Exported so the transport test can prove this exact object against a real
+ * server.
+ */
+export const RADAR_TILE_REQUEST_CONFIG: AxiosRequestConfig = {
+  responseType: 'arraybuffer',
+  timeout: CacheConfig.apiTimeoutMs,
+  headers: { 'User-Agent': COMPOSITE_USER_AGENT },
+  maxRedirects: 0,
+  maxContentLength: RADAR_TILE_MAX_BYTES
+};
+
+/**
+ * True only for an https URL on exactly the RainViewer tile host, with no
+ * userinfo and no explicit port. The path grammar is checked at ingestion
+ * (`RainViewerService.getRadarData`); this is the second layer.
+ */
+function isAllowedRadarTileUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  return (
+    parsed.protocol === 'https:' &&
+    parsed.hostname === RADAR_TILE_HOST &&
+    parsed.username === '' &&
+    parsed.password === '' &&
+    parsed.port === ''
+  );
+}
+
 /** Fetch a single RainViewer overlay tile as a raw buffer. */
 async function fetchRadarTile(url: string): Promise<Buffer> {
-  const response = await axios.get<ArrayBuffer>(url, {
-    responseType: 'arraybuffer',
-    timeout: CacheConfig.apiTimeoutMs,
-    headers: { 'User-Agent': COMPOSITE_USER_AGENT }
-  });
+  if (!isAllowedRadarTileUrl(url)) {
+    logger.warn('Radar tile URL refused', { reason: 'origin', securityEvent: true });
+    throw new Error('Radar tile URL is outside the RainViewer tile host');
+  }
+  const response = await axios.get<ArrayBuffer>(url, RADAR_TILE_REQUEST_CONFIG);
   return Buffer.from(response.data);
 }
 

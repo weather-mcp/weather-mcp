@@ -9,6 +9,79 @@ import { logger } from '../utils/logger.js';
 import { RainViewerResponse, RainViewerFrame, ImageryFrame } from '../types/imagery.js';
 import { ServiceUnavailableError } from '../errors/ApiError.js';
 
+/** Metadata body cap. The live `weather-maps.json` measured 818 bytes (2026-09-28). */
+export const RAINVIEWER_MAX_METADATA_BYTES = 256 * 1024;
+
+/** Frame path length cap. Live paths measured 22 characters (2026-09-28). */
+const MAX_FRAME_PATH_LENGTH = 128;
+
+/**
+ * Frame path grammar: one or more `/`-led segments of letters, digits, `_` and `-`.
+ * No `@`, `\`, `%`, `.`, `:`, `?` or `#` can pass, so the URL built by joining the
+ * path to the fixed tile host always keeps that host as its authority.
+ */
+const FRAME_PATH_PATTERN = /^(\/[A-Za-z0-9_-]+)+$/;
+
+/** The largest `time` (seconds) for which `new Date(time * 1000)` is valid (ECMAScript limit). */
+const MAX_FRAME_TIME_SECONDS = 8.64e12;
+
+type FrameRejectReason = 'shape' | 'path' | 'time';
+
+/**
+ * Check one frame. Returns the reason it is invalid, or null when it is valid.
+ */
+function frameRejectReason(frame: unknown): FrameRejectReason | null {
+  if (typeof frame !== 'object' || frame === null) {
+    return 'shape';
+  }
+  const { path, time } = frame as { path?: unknown; time?: unknown };
+  if (
+    typeof path !== 'string' ||
+    path.length > MAX_FRAME_PATH_LENGTH ||
+    !FRAME_PATH_PATTERN.test(path)
+  ) {
+    return 'path';
+  }
+  if (
+    typeof time !== 'number' ||
+    !Number.isFinite(time) ||
+    Math.abs(time) > MAX_FRAME_TIME_SECONDS
+  ) {
+    return 'time';
+  }
+  return null;
+}
+
+/**
+ * Count the invalid frames in `past` and `nowcast`. An absent array is allowed;
+ * a present value that is not an array is invalid. `reason` is the first failure's code.
+ */
+function countInvalidFrames(radar: { past?: unknown; nowcast?: unknown }): {
+  count: number;
+  reason: FrameRejectReason | null;
+} {
+  let count = 0;
+  let reason: FrameRejectReason | null = null;
+  for (const frames of [radar.past, radar.nowcast]) {
+    if (frames === undefined) {
+      continue;
+    }
+    if (!Array.isArray(frames)) {
+      count += 1;
+      reason ??= 'shape';
+      continue;
+    }
+    for (const frame of frames) {
+      const frameReason = frameRejectReason(frame);
+      if (frameReason !== null) {
+        count += 1;
+        reason ??= frameReason;
+      }
+    }
+  }
+  return { count, reason };
+}
+
 export class RainViewerService {
   private client: AxiosInstance;
   private readonly baseUrl = 'https://api.rainviewer.com';
@@ -18,6 +91,8 @@ export class RainViewerService {
     this.client = axios.create({
       baseURL: this.baseUrl,
       timeout: 10000,
+      maxRedirects: 0,
+      maxContentLength: RAINVIEWER_MAX_METADATA_BYTES,
       headers: {
         'User-Agent': 'weather-mcp-server/1.4.0'
       }
@@ -38,6 +113,21 @@ export class RainViewerService {
         throw new ServiceUnavailableError(
           'RainViewer',
           'Invalid response format from RainViewer API'
+        );
+      }
+
+      // Every frame path is joined to the tile host and every time becomes a Date,
+      // so one bad frame refuses the whole response rather than being dropped.
+      const invalid = countInvalidFrames(response.data.radar);
+      if (invalid.count > 0) {
+        logger.warn('RainViewer radar metadata rejected', {
+          invalidFrames: invalid.count,
+          reason: invalid.reason,
+          securityEvent: true
+        });
+        throw new ServiceUnavailableError(
+          'RainViewer',
+          'RainViewer returned radar frames in an unexpected format'
         );
       }
 

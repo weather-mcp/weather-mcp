@@ -364,7 +364,7 @@ the hash only to summarise it** — a hash tells you two things differ, never wh
 line-oriented normalisation has to account for a rendered line's surrounding whitespace as well
 as its text.
 
-**Status:** active, **extended 2026-08-27, 2026-09-02 and 2026-09-03**, **re-run 2026-09-01**
+**Status:** active, **extended 2026-08-27, 2026-09-02, 2026-09-03 and 2026-09-29**, **re-run 2026-09-01**
 (openmeteo-nullable-scalar-types T1–T3: the plan told the sweep in advance that
 a probe landing on a wire null would differ from base by exactly the omitted
 line and to record that as the fix, not drift — Sydney Heads (two `Peak Period`
@@ -398,6 +398,17 @@ size — before rejecting a subject**: `detail="full"` turned the same coordinat
 into the verified subject carrying both constructs. Corollary for the plan
 author: "expected, given the live null share" is a claim about the feed, and the
 acceptance criterion is about the report.
+
+**A fixed run order turns a flaky upstream into a consistent "difference", 2026-09-29**
+(`d7414c9`, imagery-fetch-bounds live pass). Not a hash sweep, but the same A/B shape: a
+`composite: true` probe at Utqiagvik, run `main` then branch three times, gave `main` 3/3 images
+and the branch 0/3, each branch failure a GIBS `500` on `Reference_Features_15m`. It looked like a
+regression from the new `maxRedirects: 0`. Run branch-first, the split became branch 1/3 and
+`main` 2/3, and a direct probe showed GIBS answering 500 intermittently to **every** axios
+configuration, the default included. One plausible cause is that the first request of each pair
+warms a GIBS cache for the second; that is not proven. **When an A/B probe of a live upstream differs, swap the
+order before reading anything into it, and probe the upstream directly under both
+configurations.** A difference that follows the position rather than the build is the upstream.
 
 ---
 
@@ -6273,6 +6284,34 @@ gate with 2 high. The pin moved to 3.1.8 (published 2026-09-15) in `873d2b7`, me
 
 **Status:** active. Lint candidate: a check that fails when an `overrides` version is older than
 the newest version past the cooldown.
+
+---
+
+## G119 — A dead-proxy "no external calls" probe also captures loopback, so a loopback test goes red unless `NO_PROXY` exempts it
+
+**Trigger:** proving that a test file makes no external network call by exporting
+`HTTPS_PROXY=http://127.0.0.1:9` and `HTTP_PROXY=http://127.0.0.1:9`, when the file talks to its
+own `http.createServer` on `127.0.0.1`.
+
+**Rule:** export `NO_PROXY=127.0.0.1` (and `localhost` if the file uses it) with the two proxy
+variables. Then a green run proves the point: loopback bypasses the dead proxy, and any real
+external request would hit it and fail fast. Without `NO_PROXY`, record the red run as
+"probe misconfigured", not as evidence either way.
+
+**Why:** axios reads the proxy variables for every request, loopback included, unless `NO_PROXY`
+matches the host. The dead proxy then refuses the file's own server traffic, and the probe fails
+for a reason that says nothing about external calls. The probe is correct for a file that only
+stubs (G70's inert-mock check); it needs the exemption only once a real local server is involved.
+
+**Verify:** run a loopback test file with only the two proxy variables set: its loopback rows go
+red. Add `NO_PROXY=127.0.0.1`: all green.
+
+**Evidence:** 2026-09-29, imagery-fetch-bounds T7 (`f3bf6b5`),
+`tests/integration/imagery-transport-bounds.test.ts`. With only `HTTPS_PROXY`/`HTTP_PROXY` set,
+15 of 18 rows failed. With `NO_PROXY=127.0.0.1` added, 18 of 18 passed in 521 ms.
+
+**Status:** active. Related: [G70] (the unit-level inert-mock probe this extends), [G64]/[G71]
+(why a `tests/integration/` file must never reach the internet).
 
 ---
 
