@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Geocoding no longer breaks OpenStreetMap's one-request-per-second rule.** Several lookups at once — a place-name search alongside an alert check, or three tools asked about one point together — could send two or three requests to Nominatim in the same second. That breaks its usage policy and invites a block, which would push alert routing onto its coarser coordinate fallback. Requests from both of the server's Nominatim clients now start at least one second apart, and identical lookups that arrive together are sent once. The pace holds within one server process; several server processes on one machine each keep their own. Tool replies do not change. (`src/utils/requestSpacer.ts`, `src/services/nominatim.ts`, `src/services/geocoding.ts`, `src/server/weatherServer.ts`)
+- **Geocoding no longer breaks OpenStreetMap's one-request-per-second rule.** Several lookups at once — a place-name search alongside an alert check, or three tools asked about one point together — could send two or three requests to Nominatim in the same second. That breaks its usage policy and invites a block, which would push alert routing onto its coarser coordinate fallback. Requests from both of the server's Nominatim clients are now spaced one second apart, and identical lookups that arrive together are sent once. The pace holds within one server process; several server processes on one machine each keep their own. Tool replies do not change. (`src/utils/requestSpacer.ts`, `src/services/nominatim.ts`, `src/services/geocoding.ts`, `src/server/weatherServer.ts`)
 
 ## [1.33.13] - 2026-09-29
 
