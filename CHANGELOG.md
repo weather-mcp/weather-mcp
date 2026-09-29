@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.13] - 2026-09-29
+
 The server's log named the places you asked about. With no settings changed, it wrote your geocoding searches, saved-location aliases and addresses, precise coordinates, and the text of failed requests to stderr, where MCP clients keep it in their own log files. Default logs now carry none of that. You can switch the detail back on with `LOG_PII=true` while debugging. This release also clears the moderate `ip-address` advisory that earlier releases carried.
 
 ### Changed
@@ -2006,7 +2008,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.12...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.13...HEAD
+[1.33.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.12...v1.33.13
 [1.33.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.11...v1.33.12
 [1.33.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.10...v1.33.11
 [1.33.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.9...v1.33.10
