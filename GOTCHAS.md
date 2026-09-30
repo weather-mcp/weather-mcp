@@ -1428,7 +1428,8 @@ section states the rule the module now enforces.
 to hold an existing convention produces **no bullet of its own**; it is invisible
 inside the bullet for the fix it enabled. So the per-bullet walk cannot reach it,
 the per-page `<user-docs>` map does not list an architecture map as a page, and
-`check-doc-versions.sh` only checks version, tool and test counts. Nothing in the
+`check-doc-versions.sh` checks versions, tool and test counts, the changelog top
+entry and the `server.json` description length, but not the map. Nothing in the
 gate or the release procedure fails. The map simply goes quietly stale, one
 module at a time, and the file that new contributors and AI assistants read first
 stops describing the tree.
