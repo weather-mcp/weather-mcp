@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The security policy promised more privacy than the server delivers. It said no personal data was collected or stored, that the server sent no telemetry, that every call used HTTPS, and that nothing sensitive left your machine. None of that was true in every setup. `SECURITY.md` now says, service by service, what leaves your machine and what stays on it. No behaviour changed; only the documents did.
+
+### Changed
+- **`SECURITY.md` says what each service receives.** Your coordinates go to the weather service that answers the request. A place name you type goes, as typed, to Census.gov, Nominatim and the Open-Meteo geocoder. The NCEI token travels in a request header, the FIRMS key in the URL path and the Google keys in the URL query. The default lightning feed connection is unencrypted, and with pre-warming on it tells the broker roughly where your saved places are. The page also names the two files the server keeps in `~/.weather-mcp`. One is the analytics salt, which is created even when analytics is off.
+- **The analytics docs list the fields that are actually sent.** `.env.example` and the local analytics guide describe each analytics level as the server really fills it, and say which reserved fields are never filled. They also note that the endpoint sees your connection's IP address. The salt comment no longer calls it per-session, and a dead documentation link is fixed.
+- **The README says four optional keys, not three,** and "no telemetry unless you opt in".
+
 ## [1.33.18] - 2026-09-30
 
 When a place name could not be looked up, the error blamed Open-Meteo for every failure. It also reported a lookup service that was down as if the place did not exist, and asked you to check the spelling. During an outage you could spend time correcting a name that was never wrong. The error now says which service failed and how, and it tells an outage apart from a place that does not exist. Successful lookups return exactly what they did before.
