@@ -1,6 +1,6 @@
 /**
  * Data anonymization utilities for privacy-first analytics
- * Ensures no PII is collected as per docs/ANALYTICS_MCP_PLAN.md
+ * Ensures no PII is collected as per docs/analytics/LOCAL_ANALYTICS_GUIDE.md
  */
 
 import crypto from 'crypto';

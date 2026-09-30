@@ -1,6 +1,6 @@
 /**
  * Analytics module - Privacy-first usage tracking
- * Implements anonymous, opt-out analytics as defined in docs/ANALYTICS_MCP_PLAN.md
+ * Implements anonymous, opt-in analytics as defined in docs/analytics/LOCAL_ANALYTICS_GUIDE.md
  */
 
 export { analytics } from './config.js';
