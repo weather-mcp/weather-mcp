@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The analytics upload can no longer delay or fail shutdown.** It has an absolute deadline, discards the response body, and settles when the server drops the connection. At shutdown it flushes under its own shorter deadline, so a slow or unreachable analytics endpoint no longer turns a clean shutdown into exit 1. No analytics log line carries the endpoint's hostname. Analytics stays off unless `ANALYTICS_ENDPOINT` is set.
+
 ## [1.33.15] - 2026-09-29
 
 This release changes nothing the server does. The unit tests could reach the real weather services, so a run could pass or fail depending on the network, and a test that was meant to be offline could be online without anyone noticing. The unit tests now refuse every outbound connection, and CI runs them that way. Tool replies, settings and logs are the same as in 1.33.14.

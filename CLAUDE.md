@@ -449,7 +449,7 @@ via `src/utils/unitFormat.ts`.
 - **Algorithm:** LRU (Least Recently Used) eviction
 - **Size limits:** Configurable max size (default 1000 entries)
 - **Automatic cleanup:** Every 5 minutes
-- **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process
+- **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process; the analytics flush runs under its own deadline inside that budget and never sets the exit code
 
 ## Commit Conventions
 
