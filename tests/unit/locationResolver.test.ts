@@ -23,6 +23,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import type { GeocodingService, GeocodingResult } from '../../src/services/geocoding.js';
+import { GeocodingNotFoundError, GeocodingServiceUnavailableError } from '../../src/services/geocoding.js';
 import type { SavedLocation } from '../../src/types/savedLocations.js';
 
 /**
@@ -349,6 +350,52 @@ describe('resolveLocationAsync', () => {
       await expect(resolveLocationAsync({}, store, service)).rejects.toThrow(
         /WEATHER_DEFAULT_LOCATION/
       );
+    });
+
+    describe('geocode failure wording', () => {
+      const failWith = async (err: Error): Promise<string> => {
+        process.env[ENV_KEY] = 'Nonexistentville';
+        const store = makeLocationStore();
+        const geocode = vi.fn(async () => {
+          throw err;
+        });
+        const service = { geocode } as unknown as GeocodingService;
+        try {
+          await resolveLocationAsync({}, store, service);
+        } catch (e) {
+          return (e as Error).message;
+        }
+        throw new Error('expected rejection');
+      };
+
+      it('reports a geocoding outage as an outage, not as a bad place name', async () => {
+        const message = await failWith(
+          new GeocodingServiceUnavailableError(
+            'Location lookup is unavailable right now, so "Nonexistentville" could not be resolved.\n\n' +
+              'Tried 3 provider(s): Census.gov timed out; Nominatim is unavailable; Open-Meteo timed out\n\n' +
+              'Suggestions:\n- Retry in a minute or two\n' +
+              '- Pass latitude and longitude directly; that skips location lookup'
+          )
+        );
+        expect(message).toContain('WEATHER_DEFAULT_LOCATION');
+        expect(message).toContain('geocoding failed:');
+        expect(message).toContain('Location lookup is unavailable');
+        expect(message).not.toContain('geocodable place name');
+      });
+
+      it('keeps the place-name wording when a provider answered with no match', async () => {
+        const message = await failWith(
+          new GeocodingNotFoundError('No locations found matching "Nonexistentville".')
+        );
+        expect(message).toContain('WEATHER_DEFAULT_LOCATION');
+        expect(message).toContain('geocodable place name');
+      });
+
+      it('keeps the place-name wording for a plain Error', async () => {
+        const message = await failWith(new Error('boom'));
+        expect(message).toContain('WEATHER_DEFAULT_LOCATION');
+        expect(message).toContain('geocodable place name');
+      });
     });
 
     it('throws a WEATHER_DEFAULT_LOCATION-specific error when nothing matches', async () => {

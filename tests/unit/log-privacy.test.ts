@@ -14,6 +14,7 @@ import type { AxiosInstance } from 'axios';
 import { LocationStore } from '../../src/services/locationStore.js';
 import { NominatimService } from '../../src/services/nominatim.js';
 import { GeocodingService } from '../../src/services/geocoding.js';
+import { GeocodingNotFoundError, GeocodingServiceUnavailableError } from '../../src/services/geocoding.js';
 import { handleGetForecast } from '../../src/handlers/forecastHandler.js';
 import { handleGetCurrentConditions } from '../../src/handlers/currentConditionsHandler.js';
 import { handleGetHistoricalWeather } from '../../src/handlers/historicalWeatherHandler.js';
@@ -786,6 +787,32 @@ describe('failure-path log privacy', () => {
           .spyOn(GeocodingService.prototype, 'geocode')
           .mockRejectedValue(
             new DataNotFoundError('OpenMeteo', `No locations found matching "${QUERY}".`)
+          )
+    },
+    {
+      label: '3b: a geocoder not-found rejection carrying the query',
+      tool: 'get_forecast',
+      args: { city_name: CITY },
+      userText: QUERY,
+      errorName: 'GeocodingNotFoundError',
+      arrange: () =>
+        vi
+          .spyOn(GeocodingService.prototype, 'geocode')
+          .mockRejectedValue(new GeocodingNotFoundError(`No locations found matching "${QUERY}".`))
+    },
+    {
+      label: '3c: a geocoder outage rejection carrying the query',
+      tool: 'get_forecast',
+      args: { city_name: CITY },
+      userText: QUERY,
+      errorName: 'GeocodingServiceUnavailableError',
+      arrange: () =>
+        vi
+          .spyOn(GeocodingService.prototype, 'geocode')
+          .mockRejectedValue(
+            new GeocodingServiceUnavailableError(
+              `Location lookup is unavailable right now, so "${QUERY}" could not be resolved.`
+            )
           )
     },
     {

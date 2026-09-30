@@ -432,6 +432,86 @@ A wrong-typed value sent to `save_location` itself is refused before anything is
 Error: name must be a string
 ```
 
+### Location Lookup Errors
+
+A place name has to be looked up before any weather service is called. This applies to
+`search_location`, to `city_name` on every location tool, and to a `WEATHER_DEFAULT_LOCATION` that
+is not a saved alias or a `"lat,lon"` pair. The server tries up to three lookup services in turn:
+Census.gov (skipped for a place that is clearly outside the US), Nominatim (OpenStreetMap), then
+Open-Meteo. The first one that finds a match wins. When none does, you get one of two errors, and
+they ask you to do different things.
+
+**No match — check the input.** At least one service answered and found nothing:
+
+```
+Error: No locations found matching "Zzxqwplkjhg Nowhereville".
+
+Tried 3 provider(s): Census.gov found no match; Nominatim found no match; Open-Meteo found no match
+
+Suggestions:
+- Add more detail (e.g., "Paris, France" instead of "Paris")
+- Check spelling
+- Use a nearby major city
+- Try providing coordinates directly (latitude, longitude)
+```
+
+**Lookup unavailable — retry, or pass coordinates.** Every service tried failed to answer. It timed
+out, refused the request for rate limiting, returned a server error, could not be reached, or sent
+back something that could not be read. Nothing looked at your place name, so this error has no
+spelling advice:
+
+```
+Error: Location lookup is unavailable right now, so "Springfield, IL" could not be resolved.
+
+Tried 3 provider(s): Census.gov timed out; Nominatim rate-limited the request; Open-Meteo rate-limited the request
+
+Suggestions:
+- Retry in a minute or two
+- Pass latitude and longitude directly; that skips location lookup
+```
+
+Passing `latitude` and `longitude` skips the lookup completely. It works while every lookup
+service is down.
+
+**Each service is named for its own outcome.** The `Tried` line gives one of `found no match`,
+`timed out`, `rate-limited the request` or `is unavailable` for each service, in the order they
+were tried. A failure is always named for the service that failed.
+
+**A "no match" can list a failed service.** If one service fails and another answers with no match,
+the result is still "no match":
+
+```
+Tried 3 provider(s): Census.gov found no match; Nominatim is unavailable; Open-Meteo found no match
+```
+
+Open-Meteo and Nominatim both cover the whole world, so a service that answered "no match" has
+looked at your input. Calling that an outage would make every typo look like downtime whenever one
+service had a problem. The failed service stays listed, so you can see the answer rests on fewer
+services than usual. A service that rejects the input as invalid (for example, Census.gov refuses
+an address longer than 100 characters) counts as having answered.
+
+**A default location during an outage.** If `WEATHER_DEFAULT_LOCATION` holds a place name and every
+lookup service fails, the error says the lookup failed, not that the name is wrong:
+
+```
+Error: Could not resolve WEATHER_DEFAULT_LOCATION="Springfield, IL". It is not a saved location alias or a "lat,lon" pair, so it has to be geocoded, and geocoding failed:
+
+Location lookup is unavailable right now, so "Springfield, IL" could not be resolved.
+
+Tried 3 provider(s): Census.gov is unavailable; Nominatim is unavailable; Open-Meteo is unavailable
+
+Suggestions:
+- Retry in a minute or two
+- Pass latitude and longitude directly; that skips location lookup
+```
+
+When a service did answer, the default-location error keeps its usual wording. That wording says
+the value is not a saved alias, a `"lat,lon"` pair, or a geocodable place name.
+
+**Neither error is cached, and neither is retried.** A successful lookup is cached. A failure is
+not, so the next call tries the services again. The server does not retry a failed service within
+one call, because trying the next service already covers that.
+
 ## Service Status Tool
 
 ### Usage

@@ -3,7 +3,7 @@
  */
 
 import { LocationStore, LocationStoreUnreadableError } from '../services/locationStore.js';
-import { GeocodingService } from '../services/geocoding.js';
+import { GeocodingService, GeocodingServiceUnavailableError } from '../services/geocoding.js';
 import { validateLatitude, validateLongitude } from './validation.js';
 import { Cache } from './cache.js';
 import { CacheConfig } from '../config/cache.js';
@@ -485,6 +485,12 @@ async function resolveDefaultLocation(
     const geocoded = await resolveLocationAsync({ city_name: raw }, locationStore, geocodingService);
     return { ...geocoded, source: 'default' };
   } catch (error) {
+    if (error instanceof GeocodingServiceUnavailableError) {
+      throw new Error(
+        `Could not resolve WEATHER_DEFAULT_LOCATION="${raw}". It is not a saved location alias ` +
+        `or a "lat,lon" pair, so it has to be geocoded, and geocoding failed:\n\n${error.message}`
+      );
+    }
     throw new Error(
       `Could not resolve WEATHER_DEFAULT_LOCATION="${raw}" — it is not a saved ` +
       `location alias, a "lat,lon" pair, or a geocodable place name.\n\n` +

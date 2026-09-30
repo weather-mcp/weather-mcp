@@ -5,8 +5,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
-import { DataNotFoundError, RateLimitError, ServiceUnavailableError } from '../errors/ApiError.js';
-import { logger, isPiiLoggingEnabled } from '../utils/logger.js';
+import { logger, isPiiLoggingEnabled, describeErrorForLogging } from '../utils/logger.js';
 import { RequestSpacer } from '../utils/requestSpacer.js';
 import { NOMINATIM_MIN_INTERVAL_MS } from './nominatim.js';
 
@@ -56,6 +55,71 @@ export interface GeocodingResult {
 }
 
 /**
+ * No provider matched the query, and at least one of them answered (empty, or
+ * declined the input with a 4xx other than 429). The query is the likely problem.
+ */
+export class GeocodingNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GeocodingNotFoundError';
+  }
+}
+
+/**
+ * Every provider tried failed to answer (timeout, 429, 5xx, no response, or a body
+ * that could not be parsed). Nothing looked at the query, so it says nothing about it.
+ */
+export class GeocodingServiceUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GeocodingServiceUnavailableError';
+  }
+}
+
+/**
+ * A provider did not answer. The message is one of three fixed forms naming the
+ * provider — `<Name> timed out`, `<Name> rate-limited the request`,
+ * `<Name> is unavailable` — and never carries the query, a URL or upstream text.
+ * Exported for tests only.
+ */
+export class GeocodingProviderFailure extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GeocodingProviderFailure';
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Classify a provider's caught error. Returns `null` when the upstream answered by
+ * declining the input (a 4xx other than 429, e.g. Census's 400 for an address over
+ * 100 characters); the provider then reports an empty answer. Anything else is a
+ * failure. An existing `GeocodingProviderFailure` (a shape failure thrown inside the
+ * provider's `try`) passes through unchanged.
+ */
+function failureFor(name: string, error: unknown): GeocodingProviderFailure | null {
+  if (error instanceof GeocodingProviderFailure) {
+    return error;
+  }
+  if (axios.isAxiosError(error)) {
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return new GeocodingProviderFailure(`${name} timed out`);
+    }
+    const status = error.response?.status;
+    if (status === 429) {
+      return new GeocodingProviderFailure(`${name} rate-limited the request`);
+    }
+    if (status !== undefined && status >= 400 && status < 500) {
+      return null;
+    }
+  }
+  return new GeocodingProviderFailure(`${name} is unavailable`);
+}
+
+/**
  * Geocoding provider interface
  */
 interface GeocodingProvider {
@@ -102,12 +166,19 @@ class CensusGovProvider implements GeocodingProvider {
         }
       });
 
-      if (!response.data?.result?.addressMatches || response.data.result.addressMatches.length === 0) {
+      const body: unknown = response.data;
+      if (!isRecord(body)) {
+        throw new GeocodingProviderFailure(`${this.name} is unavailable`);
+      }
+      const matches = isRecord(body.result) ? body.result.addressMatches : undefined;
+      if (matches != null && !Array.isArray(matches)) {
+        throw new GeocodingProviderFailure(`${this.name} is unavailable`);
+      }
+      if (!Array.isArray(matches) || matches.length === 0) {
         logger.debug('Census.gov: No results found');
         return [];
       }
 
-      const matches = response.data.result.addressMatches;
       const results: GeocodingResult[] = [];
 
       for (let i = 0; i < Math.min(matches.length, limit); i++) {
@@ -139,16 +210,10 @@ class CensusGovProvider implements GeocodingProvider {
       return results;
 
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        if (error.code === 'ECONNABORTED') {
-          throw new ServiceUnavailableError('OpenMeteo', 'Census.gov geocoding service timed out');
-        }
-        if (error.response?.status === 429) {
-          throw new RateLimitError('OpenMeteo', 'Census.gov geocoding rate limit exceeded');
-        }
-      }
-      logger.debug(`Census.gov error: ${error instanceof Error ? error.message : 'Unknown'}`);
-      return []; // Return empty array for fallback
+      logger.debug('Census.gov error', describeErrorForLogging(error));
+      const failure = failureFor(this.name, error);
+      if (failure) throw failure;
+      return []; // Declined (4xx other than 429): an answer, not a failure
     }
   }
 }
@@ -195,7 +260,10 @@ class NominatimProvider implements GeocodingProvider {
         }
       });
 
-      if (!response.data || response.data.length === 0) {
+      if (!Array.isArray(response.data)) {
+        throw new GeocodingProviderFailure(`${this.name} is unavailable`);
+      }
+      if (response.data.length === 0) {
         logger.debug('Nominatim: No results found');
         return [];
       }
@@ -227,16 +295,10 @@ class NominatimProvider implements GeocodingProvider {
       return results;
 
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        if (error.code === 'ECONNABORTED') {
-          throw new ServiceUnavailableError('OpenMeteo', 'Nominatim geocoding service timed out');
-        }
-        if (error.response?.status === 429) {
-          throw new RateLimitError('OpenMeteo', 'Nominatim geocoding rate limit exceeded (1 req/sec limit)');
-        }
-      }
-      logger.debug(`Nominatim error: ${error instanceof Error ? error.message : 'Unknown'}`);
-      return []; // Return empty array for fallback
+      logger.debug('Nominatim error', describeErrorForLogging(error));
+      const failure = failureFor(this.name, error);
+      if (failure) throw failure;
+      return []; // Declined (4xx other than 429): an answer, not a failure
     }
   }
 
@@ -296,12 +358,20 @@ class OpenMeteoProvider implements GeocodingProvider {
         }
       });
 
-      if (!response.data?.results || response.data.results.length === 0) {
+      const body: unknown = response.data;
+      if (!isRecord(body)) {
+        throw new GeocodingProviderFailure(`${this.name} is unavailable`);
+      }
+      const found = body.results;
+      if (found != null && !Array.isArray(found)) {
+        throw new GeocodingProviderFailure(`${this.name} is unavailable`);
+      }
+      if (!Array.isArray(found) || found.length === 0) {
         logger.debug('Open-Meteo: No results found');
         return [];
       }
 
-      const results: GeocodingResult[] = response.data.results.map((item: any) => ({
+      const results: GeocodingResult[] = found.map((item: any) => ({
         name: item.name,
         display_name: [item.name, item.admin1, item.admin2, item.country]
           .filter(Boolean)
@@ -324,16 +394,10 @@ class OpenMeteoProvider implements GeocodingProvider {
       return results;
 
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        if (error.code === 'ECONNABORTED') {
-          throw new ServiceUnavailableError('OpenMeteo', 'Open-Meteo geocoding service timed out');
-        }
-        if (error.response?.status === 429) {
-          throw new RateLimitError('OpenMeteo', 'Open-Meteo geocoding rate limit exceeded');
-        }
-      }
-      logger.debug(`Open-Meteo error: ${error instanceof Error ? error.message : 'Unknown'}`);
-      return []; // Return empty array for fallback
+      logger.debug('Open-Meteo error', describeErrorForLogging(error));
+      const failure = failureFor(this.name, error);
+      if (failure) throw failure;
+      return []; // Declined (4xx other than 429): an answer, not a failure
     }
   }
 }
@@ -409,7 +473,11 @@ export class GeocodingService {
    *
    * @param query - Location search query (e.g., "Seattle, WA", "Paris, France")
    * @param limit - Maximum number of results to return
-   * @returns Array of geocoding results from first successful provider
+   * @returns Array of geocoding results from the first provider that found a match
+   * @throws {GeocodingNotFoundError} No provider matched, and at least one answered
+   *   (empty or declined) — the query is the likely problem
+   * @throws {GeocodingServiceUnavailableError} Every provider tried failed to answer —
+   *   nothing looked at the query
    */
   async geocode(query: string, limit: number = 5): Promise<GeocodingResult[]> {
     const isLikelyUS = this.isLikelyUSLocation(query);
@@ -430,7 +498,9 @@ export class GeocodingService {
       logger.debug('Provider strategy: Uncertain (Census → Nominatim → Open-Meteo)');
     }
 
-    const errors: string[] = [];
+    // One fixed-text outcome per provider tried, and whether any of them answered.
+    const outcomes: string[] = [];
+    let answered = false;
 
     // Always request at least PROVIDER_RESULT_FLOOR from upstream (providers rank
     // unreliably at limit=1), then slice to the caller's requested limit.
@@ -448,23 +518,41 @@ export class GeocodingService {
         }
 
         logger.debug(`${provider.name}: No results found`);
-        errors.push(`${provider.name}: No results found`);
+        answered = true;
+        outcomes.push(`${provider.name} found no match`);
 
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        logger.debug(`${provider.name} failed: ${errorMsg}`);
-        errors.push(`${provider.name}: ${errorMsg}`);
+        // A provider throws only GeocodingProviderFailure; anything else (a spacer
+        // rejection from reserve(), outside the provider's try) gets the same fixed
+        // text, so raw error text never reaches the message.
+        const outcome = error instanceof GeocodingProviderFailure
+          ? error.message
+          : `${provider.name} is unavailable`;
+        logger.debug(`${provider.name} failed: ${outcome}`);
+        outcomes.push(outcome);
 
         // Continue to next provider
         continue;
       }
     }
 
-    // All providers failed or returned no results
-    throw new DataNotFoundError(
-      'OpenMeteo',
+    const tried = `Tried ${providers.length} provider(s): ${outcomes.join('; ')}`;
+
+    // Every provider failed: nothing looked at the query, so give no spelling advice.
+    if (!answered) {
+      throw new GeocodingServiceUnavailableError(
+        `Location lookup is unavailable right now, so "${query}" could not be resolved.\n\n` +
+        `${tried}\n\n` +
+        `Suggestions:\n` +
+        `- Retry in a minute or two\n` +
+        `- Pass latitude and longitude directly; that skips location lookup`
+      );
+    }
+
+    // At least one provider answered with no match (any failures stay listed).
+    throw new GeocodingNotFoundError(
       `No locations found matching "${query}".\n\n` +
-      `Tried ${providers.length} provider(s): ${errors.join('; ')}\n\n` +
+      `${tried}\n\n` +
       `Suggestions:\n` +
       `- Add more detail (e.g., "Paris, France" instead of "Paris")\n` +
       `- Check spelling\n` +
