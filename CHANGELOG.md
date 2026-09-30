@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The server no longer creates `~/.weather-mcp/analytics-salt` on every start.** The salt only makes the detailed analytics level's session hash one-way, and nothing else reads it. It is now created only when analytics is enabled at the `detailed` level. A default install, and one at `minimal` or `standard`, writes nothing to your home directory for analytics. A salt file left by an earlier version is unused unless you turn on `detailed`, and you can delete it.
+
 ## [1.33.19] - 2026-09-30
 
 The security policy promised more privacy than the server delivers. It said no personal data was collected or stored, that the server sent no telemetry, that every call used HTTPS, and that nothing sensitive left your machine. None of that was true in every setup. `SECURITY.md` now says, service by service, what leaves your machine and what stays on it. No behaviour changed; only the documents did.
