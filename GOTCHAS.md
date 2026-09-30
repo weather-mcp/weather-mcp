@@ -5750,6 +5750,14 @@ then noticed nothing required it. Verified by the orchestrator before curation: 
 `npx vitest run` at **8/8 passing**; restored by `cp` with a green control run
 ([G27]).
 
+**A pre-existing file can already fail the one-file check, so compare against
+`main` before reading red as your regression.** 2026-09-30,
+geocoding-error-attribution T2 (`cd91514`): the one-file `tsc` on
+`tests/unit/locationResolver.test.ts` exits 1 with two errors (`TS2352`, `TS2339`)
+in lines the task never touched, and `main`'s copy reports the same two. Run the
+check on `git show main:<file>` written to a scratch path next to it, and report
+the delta, not the exit code.
+
 **Status:** active. **Lint candidate, and the better fix is in the config rather
 than in every reviewer** — a second `tsconfig.test.json` extending the base with
 `"include": ["src/**/*", "tests/**/*"]` and `"noEmit": true`, run as a gate step,
@@ -6194,6 +6202,11 @@ bad-coordinate case goes red: it resolves through the geocoder stub instead
 **Evidence:** 2026-09-28, saved-location-metadata-validation. The codex plan
 review (R1) found it before the run. It was fixed in `bcc60dd` and pinned in
 `22b9011`. M10 reddened exactly that one case.
+2026-09-30, geocoding-error-attribution: the rule was applied one layer down.
+`GeocodingService.geocode` now tells a provider that answered (empty or declined)
+apart from one that failed, and `resolveDefaultLocation` branches by
+`instanceof GeocodingServiceUnavailableError` (`cd91514`). The Verify line above
+was re-run on that branch, and the case still goes red.
 
 **Status:** active. Related: [G100] (the same handler family; a read before an
 await), [G45] (the lock must execute the fallback path, not the resolver alone).
