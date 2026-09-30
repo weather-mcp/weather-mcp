@@ -6,7 +6,7 @@ This guide explains how to test the Weather MCP server with local analytics in d
 
 1. **Analytics Server Running**
    ```bash
-   cd /home/dgahagan/work/personal/weather-mcp/analytics-server
+   cd ../analytics-server
    npm run dev
    ```
    Server should be running on `http://localhost:3100`
