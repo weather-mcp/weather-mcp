@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release only matters if you turned on the optional usage analytics. With analytics on, an analytics server that was slow or unreachable could hold the server open at shutdown until the shutdown time limit ran out, and then the server exited with an error code, even though nothing was wrong with the weather tools. A server that dropped the connection partway through its reply could leave an upload waiting forever. Uploads now have a fixed time limit, and shutdown always leaves room for the rest of its work. Tool replies do not change, and analytics stays off unless you configure it.
+
 ### Fixed
 
 - **The analytics upload can no longer delay or fail shutdown.** It has an absolute deadline, discards the response body, and settles when the server drops the connection. At shutdown it flushes under its own shorter deadline, so a slow or unreachable analytics endpoint no longer turns a clean shutdown into exit 1. No analytics log line carries the endpoint's hostname. Analytics stays off unless `ANALYTICS_ENDPOINT` is set.
