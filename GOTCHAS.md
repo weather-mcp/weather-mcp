@@ -2542,6 +2542,8 @@ conjunct of the same guard already rejects what the mutation lets through.**
 Both are this entry's 2026-08-29 rule — a mutation must diverge at the fixtures
 in play — applied one stage earlier, to the mutation table as written.
 
+**Extended 2026-09-30** (`e4ec0e3`, spacer-wake-recheck T2): **the order in which a test releases its waiters decides which mutation it can reach.** The plan's recurrence row resolved a re-sleeping waiter C before a newer waiter D, in the same turn. In that order C releases on its own first re-check, and D's re-check catches the gap. The single-re-check mutation (M2) therefore stayed green. Resolving D first means C's *second* wake has to re-check again, and M2 goes red on it. Before you list a mutation as red in a plan, walk the row by hand under that mutant.
+
 **Status:** active, **extended 2026-08-29, twice on 2026-09-01, 2026-09-03, and 2026-09-24**. Related: [G13] (a fixture that cannot discriminate),
 [G32] (mutating to every *rejected implementation* — this entry is about the
 *entry point*, that one about the *alternative*), [G11] (read the real output),
@@ -6410,20 +6412,6 @@ folded into T3 with drives and per-site mutants.
 
 ---
 
-## G122 — Timer reservations coalesce into simultaneous starts when the event loop delivers overdue timers together
-
-**Trigger:** a rate spacer reserves absolute future slots and gives every caller an independent `setTimeout(slot - now)`, while claiming to space actual request starts — today `RequestSpacer` (`src/utils/requestSpacer.ts`), which carries Nominatim's shared 1 req/s budget.
-
-**Rule:** a spacer that claims spacing of *actual* starts must re-check on wake: compare the real (monotonic) time with the previous actual start plus the interval, and sleep the remainder before recording the start. Serialize only permit acquisition, never request completion. Test a delayed or coalesced wakeup, not just the requested sleep durations. Until that lands, describe the guarantee as spacing under normal scheduling, never as an absolute "at least N ms apart".
-
-**Why:** if the event loop is blocked past two deadlines, Node delivers both overdue timers in the same turn. Both promises resolve and both callers dispatch together, even though their requested sleeps differed. A test asserting `[1000, 2000]` sleep arguments stays green while the upstream sees a 0 ms gap. The reservation fixes [G20]'s duplicate *nominal* slots, not coalesced *actual* starts.
-
-**Verify:** reserve three 1,000 ms permits, let the first dispatch, block the event loop from 500 ms until after 2,000 ms, and record the real dispatch times. On `7688147`, `NominatimService.client.get` starts were `[8, 2601, 2601]` ms, gaps `[2593, 0]`.
-
-**Evidence:** 2026-09-29, geocoding-rate-budget diff review (codex-B1), against `7688147`. Deferred by Dan to a follow-up (ROADMAP Hardening); the CHANGELOG entry was qualified in the same branch. The residual needs a synchronous stall of at least one interval, and the coalesced pair follows at least one interval of silence, so the sustained rate still stays within budget.
-
-**Status:** active — the trap is live in `RequestSpacer` until the deferred re-check lands; retire it then. Related: [G20], [G45] (the current tests observe the requested sleep, the wrong layer), [G114] (a timer's liveness is not its punctuality).
-
 ## G123 — Sanitizing an error at its producer does not sanitize the path: a downstream catch re-logs the message, and a startup line may log the value outright
 
 **Trigger:** removing identifying text (a hostname, a query, a URL) from the log lines of a function
@@ -6486,10 +6474,44 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 ---
 
+## G125 — A fresh `git worktree` has no `node_modules`, so a build there fails before it measures anything
+
+**Trigger:** a plan step, a probe or a test drive that runs `git worktree add` by hand and then builds, tests or runs the built dist inside the new worktree. This does not apply to a pipeline script that applies `DEVWF_WORKTREE_SETUP` itself.
+
+**Rule:** run the bindings' setup target (`npm ci`) in the fresh worktree before any build or test. Remove the worktree in a cleanup path that runs even when a step fails: `git worktree remove --force <path>`, then `git worktree prune`. Check that `git worktree list` is back to one entry.
+
+**Why:** a worktree shares Git objects and refs, but not ignored files such as `node_modules`. A tree that builds in the primary checkout fails at the first package binary (`tsc`) in the new worktree. A failed step that skips the cleanup leaves `main` checked out elsewhere.
+
+**Verify:** `git worktree add "$(mktemp -d)/w" main`, then `ls <path>/node_modules` gives nothing. `npm ci && npm run build` in the worktree succeeds. Remove the worktree afterwards.
+
+**Evidence:** 2026-09-30, spacer-wake-recheck. Plan review codex-R2 found that T3 built `main` in a new worktree with no install step, and `.claude/dev-workflow.conf:31` sets `DEVWF_WORKTREE_SETUP="npm ci"` for the same reason. T3 ran with `npm ci` added and left one worktree.
+
+**Status:** active.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
 commit that removed it — never delete, never renumber.)*
+
+## G122 — Timer reservations coalesce into simultaneous starts when the event loop delivers overdue timers together
+
+**Retired:** 2026-09-30, by the spacer-wake-recheck plan (`e4ec0e3`, `fix: Re-check the actual start on wake so overdue spacer timers cannot dispatch together`). The spacer re-checks the last actual start on every wake, so coalesced timers no longer dispatch together. Its Verify line, run on the built dist, gave `main` gaps of `[~2100, 0]` and a branch minimum of 1000.6 ms (`.devdocs/qa-spacer-wake-recheck.md`).
+
+**Trigger:** a rate spacer reserves absolute future slots and gives every caller an independent `setTimeout(slot - now)`, while claiming to space actual request starts — today `RequestSpacer` (`src/utils/requestSpacer.ts`), which carries Nominatim's shared 1 req/s budget.
+
+**Rule:** a spacer that claims spacing of *actual* starts must re-check on wake: compare the real (monotonic) time with the previous actual start plus the interval, and sleep the remainder before recording the start. Serialize only permit acquisition, never request completion. Test a delayed or coalesced wakeup, not just the requested sleep durations. Until that lands, describe the guarantee as spacing under normal scheduling, never as an absolute "at least N ms apart".
+
+**Why:** if the event loop is blocked past two deadlines, Node delivers both overdue timers in the same turn. Both promises resolve and both callers dispatch together, even though their requested sleeps differed. A test asserting `[1000, 2000]` sleep arguments stays green while the upstream sees a 0 ms gap. The reservation fixes [G20]'s duplicate *nominal* slots, not coalesced *actual* starts.
+
+**Verify:** reserve three 1,000 ms permits, let the first dispatch, block the event loop from 500 ms until after 2,000 ms, and record the real dispatch times. On `7688147`, `NominatimService.client.get` starts were `[8, 2601, 2601]` ms, gaps `[2593, 0]`.
+
+**Evidence:** 2026-09-29, geocoding-rate-budget diff review (codex-B1), against `7688147`. Deferred by Dan to a follow-up (ROADMAP Hardening); the CHANGELOG entry was qualified in the same branch. The residual needs a synchronous stall of at least one interval, and the coalesced pair follows at least one interval of silence, so the sustained rate still stays within budget.
+
+**Status:** retired 2026-09-30 (see above). Related: [G20], [G45] (the current tests observe the requested sleep, the wrong layer), [G114] (a timer's liveness is not its punctuality).
+
+---
 
 ## G86 — A captured example stamps the version in `package.json` at capture time, which is never the version it ships under
 

@@ -53,7 +53,7 @@ describe('RequestSpacer', () => {
   });
 
   it('moves no slot when an earlier caller fails', async () => {
-    const sleep = vi.fn((_ms: number) => Promise.resolve());
+    const sleep = makeNeverSleep();
     const spacer = new RequestSpacer(I, { now: () => 10_000, sleep });
 
     await spacer
@@ -84,15 +84,18 @@ describe('RequestSpacer', () => {
   });
 
   it('the default sleep looks up the global setTimeout at call time', async () => {
+    let t = 10_000;
+    // Constructed before the spy exists, so a sleep that captured the global
+    // at construction would miss the spy and this test would go red.
+    const spacer = new RequestSpacer(I, { now: () => t });
     const spy = vi
       .spyOn(global, 'setTimeout')
-      .mockImplementation(((fn: () => void) => {
+      .mockImplementation(((fn: () => void, ms?: number) => {
+        t += ms as number;
         fn();
         return 0 as unknown as NodeJS.Timeout;
       }) as unknown as typeof setTimeout);
     try {
-      const spacer = new RequestSpacer(I);
-
       await spacer.reserve();
       expect(spy).not.toHaveBeenCalled();
 
@@ -104,6 +107,129 @@ describe('RequestSpacer', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  describe('wake re-check (G122)', () => {
+    /** A sleep the test resolves by hand, recording each requested wait. */
+    function makeHandSleep() {
+      const pending: Array<{ ms: number; resolve: () => void }> = [];
+      const sleep = vi.fn(
+        (ms: number) => new Promise<void>((resolve) => pending.push({ ms, resolve }))
+      );
+      return { pending, sleep };
+    }
+
+    /** Let every queued continuation run. */
+    const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+    function track(p: Promise<void>): { done: boolean } {
+      const state = { done: false };
+      void p.then(() => {
+        state.done = true;
+      });
+      return state;
+    }
+
+    it('re-spaces two waiters whose overdue sleeps wake in the same turn', async () => {
+      let t = 10_000;
+      const { pending, sleep } = makeHandSleep();
+      const spacer = new RequestSpacer(I, { now: () => t, sleep });
+
+      await spacer.reserve();
+      const b = track(spacer.reserve());
+      const c = track(spacer.reserve());
+      expect(pending.map((p) => p.ms)).toEqual([1000, 2000]);
+
+      // A stall past both deadlines: both timers are delivered together.
+      t = 12_600;
+      pending[0]?.resolve();
+      pending[1]?.resolve();
+      await flush();
+
+      expect(b.done).toBe(true);
+      expect(c.done).toBe(false);
+      expect(pending.map((p) => p.ms)).toEqual([1000, 2000, 1000]);
+
+      t = 13_600;
+      pending[2]?.resolve();
+      await flush();
+      expect(c.done).toBe(true);
+    });
+
+    it('re-checks again when a re-sleeping waiter wakes behind a newer one', async () => {
+      let t = 10_000;
+      const { pending, sleep } = makeHandSleep();
+      const spacer = new RequestSpacer(I, { now: () => t, sleep });
+
+      await spacer.reserve();
+      const b = track(spacer.reserve());
+      const c = track(spacer.reserve());
+      t = 12_600;
+      pending[0]?.resolve();
+      pending[1]?.resolve();
+      await flush();
+      // Positive control: B started at 12_600 and C is on its re-sleep.
+      expect(b.done).toBe(true);
+      expect(c.done).toBe(false);
+
+      // D reserves behind B's actual start, not behind the stale nominal slot.
+      const d = track(spacer.reserve());
+      expect(pending.map((p) => p.ms)).toEqual([1000, 2000, 1000, 1000]);
+
+      // D's first sleep and C's re-sleep share a deadline; D wakes first.
+      t = 13_600;
+      pending[3]?.resolve();
+      pending[2]?.resolve();
+      await flush();
+
+      expect(d.done).toBe(true);
+      expect(c.done).toBe(false);
+      expect(pending[4]?.ms).toBe(1000);
+    });
+
+    it('rejects a sleep that resolves without moving the clock, instead of spinning', async () => {
+      const sleep = vi.fn((_ms: number) => Promise.resolve());
+      const spacer = new RequestSpacer(I, { now: () => 10_000, sleep });
+
+      await spacer.reserve();
+      await expect(spacer.reserve()).rejects.toThrow('without advancing');
+      expect(sleep).toHaveBeenCalledTimes(1);
+    });
+
+    it('defaults to the monotonic clock, not wall time', () => {
+      const perf = vi.spyOn(performance, 'now');
+      const wall = vi.spyOn(Date, 'now');
+      try {
+        const spacer = new RequestSpacer(I);
+        void spacer.reserve();
+
+        expect(perf).toHaveBeenCalled();
+        expect(wall).not.toHaveBeenCalled();
+      } finally {
+        perf.mockRestore();
+        wall.mockRestore();
+      }
+    });
+
+    it('calls onWait once with the first wait, never for a re-check sleep', async () => {
+      let t = 10_000;
+      const { pending, sleep } = makeHandSleep();
+      const onWait = vi.fn();
+      const spacer = new RequestSpacer(I, { now: () => t, sleep });
+
+      await spacer.reserve();
+      void spacer.reserve();
+      void spacer.reserve(onWait);
+      t = 12_600;
+      pending[0]?.resolve();
+      pending[1]?.resolve();
+      await flush();
+
+      // Positive control: the waiter did make a re-check sleep.
+      expect(pending).toHaveLength(3);
+      expect(onWait).toHaveBeenCalledTimes(1);
+      expect(onWait).toHaveBeenCalledWith(2000);
+    });
   });
 
   describe('constructor', () => {
