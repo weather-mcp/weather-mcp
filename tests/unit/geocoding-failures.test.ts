@@ -149,6 +149,12 @@ describe('GeocodingService failure attribution', () => {
         cause: 'is unavailable',
       },
       {
+        // Axios 1.x hands a bodiless JSON response over as data: '' (G111).
+        label: "axios's empty body ('')",
+        stubs: { census: resolve(''), nominatim: resolve(''), openmeteo: resolve('') },
+        cause: 'is unavailable',
+      },
+      {
         label: 'wrong-typed result lists',
         stubs: {
           census: resolve({ result: { addressMatches: 'x' } }),
