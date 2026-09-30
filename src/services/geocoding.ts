@@ -5,7 +5,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
-import { logger, isPiiLoggingEnabled } from '../utils/logger.js';
+import { logger, isPiiLoggingEnabled, describeErrorForLogging } from '../utils/logger.js';
 import { RequestSpacer } from '../utils/requestSpacer.js';
 import { NOMINATIM_MIN_INTERVAL_MS } from './nominatim.js';
 
@@ -210,7 +210,7 @@ class CensusGovProvider implements GeocodingProvider {
       return results;
 
     } catch (error) {
-      logger.debug(`Census.gov error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      logger.debug('Census.gov error', describeErrorForLogging(error));
       const failure = failureFor(this.name, error);
       if (failure) throw failure;
       return []; // Declined (4xx other than 429): an answer, not a failure
@@ -295,7 +295,7 @@ class NominatimProvider implements GeocodingProvider {
       return results;
 
     } catch (error) {
-      logger.debug(`Nominatim error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      logger.debug('Nominatim error', describeErrorForLogging(error));
       const failure = failureFor(this.name, error);
       if (failure) throw failure;
       return []; // Declined (4xx other than 429): an answer, not a failure
@@ -394,7 +394,7 @@ class OpenMeteoProvider implements GeocodingProvider {
       return results;
 
     } catch (error) {
-      logger.debug(`Open-Meteo error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      logger.debug('Open-Meteo error', describeErrorForLogging(error));
       const failure = failureFor(this.name, error);
       if (failure) throw failure;
       return []; // Declined (4xx other than 429): an answer, not a failure

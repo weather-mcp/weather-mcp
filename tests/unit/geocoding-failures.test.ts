@@ -21,6 +21,7 @@ import {
   GeocodingProviderFailure,
 } from '../../src/services/geocoding.js';
 import { formatErrorForUser } from '../../src/errors/ApiError.js';
+import { logger } from '../../src/utils/logger.js';
 
 type ProviderKey = 'census' | 'nominatim' | 'openmeteo';
 type Provider = { name: string; client: AxiosInstance; spacer?: { reserve: () => Promise<void> } };
@@ -294,6 +295,36 @@ describe('GeocodingService failure attribution', () => {
         vi.restoreAllMocks();
       }
     });
+  });
+
+  it('7c. default logs carry no upstream error text from the provider catches', async () => {
+    const SENTINEL_MSG = 'https://secret.example/?q=SENTINELQUERY';
+    const savedPii = process.env.LOG_PII;
+    delete process.env.LOG_PII;
+    try {
+      const calls: unknown[][] = [];
+      for (const level of ['debug', 'info', 'warn', 'error'] as const) {
+        vi.spyOn(logger, level).mockImplementation((...args: unknown[]) => {
+          calls.push(args);
+        });
+      }
+      const { svc } = serviceWith({
+        census: reject(codeError('ECONNABORTED', SENTINEL_MSG)),
+        nominatim: reject(httpError(429, SENTINEL_MSG)),
+        openmeteo: reject(httpError(503, SENTINEL_MSG)),
+      });
+      const err = await caught(svc.geocode('Springfield, IL', 1));
+      expect(err).toBeInstanceOf(GeocodingServiceUnavailableError);
+
+      // Positive control: each provider catch logged, with class and code.
+      const catchLines = calls.filter((c) => typeof c[0] === 'string' && / error$/.test(c[0] as string));
+      expect(catchLines.map((c) => c[0])).toEqual(['Census.gov error', 'Nominatim error', 'Open-Meteo error']);
+      expect(catchLines[0][1]).toMatchObject({ name: 'AxiosError', code: 'ECONNABORTED' });
+      expect(JSON.stringify(calls)).not.toContain('SENTINEL');
+    } finally {
+      if (savedPii === undefined) delete process.env.LOG_PII;
+      else process.env.LOG_PII = savedPii;
+    }
   });
 
   it('8. a later provider with a match still wins after an earlier failure', async () => {
