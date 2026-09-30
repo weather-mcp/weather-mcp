@@ -6504,6 +6504,38 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 ---
 
+## G126 — A claim scoped to one tool's enablement misses the composite that reaches the same upstream
+
+**Trigger:** writing a user-facing statement (docs, `SECURITY.md`, a tool description, a config comment) of the form "only when tool X is enabled", "X is not in the default preset", or "disable X to avoid contacting service Y". This is sharpest for the lightning broker, geocoders and keyed services.
+
+**Rule:** before you scope a data-flow claim to a tool, check whether `get_weather_summary` can reach the same handler through a section (`src/handlers/weatherSummaryHandler.ts`, the section `switch`). `ENABLED_TOOLS` gates *registration* of a tool, not its handler. The summary, which is in every preset, calls the sub-handlers directly. Scope the claim to the request ("when you ask for lightning, through the tool or the summary's lightning section"), or name both routes. Background work that *is* gated on the tool (lightning prewarm, `src/index.ts:89`) is the exception, and it should be named as such.
+
+**Why:** a privacy or safety statement that names one route reads as complete. A user in the `basic` preset who was told "the lightning tool is not in `basic`" concludes that the broker is never contacted. Yet a `get_weather_summary` call with its lightning section sends that broker, over plaintext by default, the cells around the point. G85 is the argument-level cousin of this trap.
+
+**Verify:** `grep -n "case '" src/handlers/weatherSummaryHandler.ts` lists the handlers the summary reaches. For each one, confirm that the claim you are writing also holds for the summary route.
+
+**Evidence:** 2026-09-30, security-policy-accuracy. The T5 claim trace found T2's `SECURITY.md` lightning bullet scoped to `get_lightning_activity` and the `basic` preset, while `weatherSummaryHandler.ts:288-289` reaches `handleGetLightningActivity`. The bullet was rewritten in `806504b`.
+
+**Status:** active.
+
+---
+
+## G127 — Optional credentials do not share one transport location
+
+**Trigger:** writing or reviewing any sentence about how the optional keys travel ("keys ride the URL query string", "the key is in the URL"), or adding a new keyed service and copying an existing one's hygiene.
+
+**Rule:** check each credential's transport at its service before you generalise. Today the NCEI token is a request **header** (`src/services/ncei.ts:93-96`), the FIRMS map key is part of the URL **path** (`src/services/firms.ts:171-174`), and the Google Pollen and Google Weather keys are URL **query** parameters. The hygiene rule (never log or throw a URL or raw axios error, fixed messages only) holds for all four. The exposure model does not: a header does not appear in a URL-shaped log line, and a path segment survives a query-string strip.
+
+**Why:** "keys ride the query string" was true of the first keyed services and was then repeated as a project fact, including in the bindings' API-key-hygiene anchor. It made its way into a design plan, and it would have been published in `SECURITY.md`.
+
+**Verify:** `grep -n -E "headers|params|\$\{key\}|mapKey|token" src/services/{ncei,firms,googlePollen,googleWeather}.ts`. Each credential's placement must match the sentence you are writing.
+
+**Evidence:** 2026-09-30, security-policy-accuracy. Plan review codex-R2 corrected the design and the impl plan before T2 ran. `SECURITY.md` states all three placements (`ede0292`).
+
+**Status:** active. The bindings' "API-key hygiene" review anchor still says the keys "ride the URL query string". That row is Dan's to correct.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the

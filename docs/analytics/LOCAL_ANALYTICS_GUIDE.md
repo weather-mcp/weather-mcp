@@ -132,29 +132,28 @@ You can change the analytics detail level in `.env`:
 ```bash
 ANALYTICS_LEVEL=minimal
 ```
+- Server version
 - Tool name
-- Success/error status
-- Timestamp (rounded to hour)
+- Success/error status (plus an error type on errors)
+- Timestamp (rounded down to the hour)
+- Analytics level
 
 ### standard
 ```bash
 ANALYTICS_LEVEL=standard
 ```
 - Everything in minimal
-- Response time
-- Service used (NOAA/Open-Meteo)
-- Cache hit status
-- Retry count
-- Country (broad region: US/CA/EU/AP/etc)
+- Response time (ms)
 
 ### detailed (Recommended for Development)
 ```bash
 ANALYTICS_LEVEL=detailed
 ```
 - Everything in standard
-- Anonymized parameters (safe values only)
-- Hashed session ID
+- Hashed session ID (16 hex characters, salted SHA-256 of a per-process ID)
 - Sequence number for workflow tracking
+
+The event schema reserves further fields (service, cache hit, retry count, country, parameters) that the server does not currently fill at any level.
 
 ## Privacy Guarantees
 
@@ -163,14 +162,12 @@ All analytics levels maintain strict privacy:
 ❌ **Never Collected:**
 - Coordinates or location data
 - User input or search queries
-- IP addresses
+- IP addresses in the payload (the endpoint still sees your connection's IP, like any HTTPS server)
 - Personal identifiable information
 
 ✅ **Always Anonymized:**
 - Session IDs are one-way hashed (SHA-256)
-- Timestamps rounded to nearest hour
-- Country detection intentionally vague
-- Parameters filtered through allowlist
+- Timestamps rounded down to the hour
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
 /**
  * Analytics type definitions for Weather MCP Server
- * Implements privacy-first analytics as defined in docs/ANALYTICS_MCP_PLAN.md
+ * Implements privacy-first analytics as defined in docs/analytics/LOCAL_ANALYTICS_GUIDE.md
  */
 
 export type AnalyticsLevel = 'minimal' | 'standard' | 'detailed';

@@ -82,11 +82,17 @@ Please include the following information in your report:
 
 ### Dependency Security
 
-This project has minimal runtime dependencies to reduce attack surface:
+These are the runtime dependencies `package.json` declares:
 
 - `@modelcontextprotocol/sdk` - Official MCP SDK from Anthropic
-- `axios` - Well-maintained HTTP client
-- `dotenv` - Simple environment variable loader
+- `axios` - HTTP client for every upstream request
+- `dotenv` - Environment variable loader
+- `luxon`, `tz-lookup` - Time zones and local-time formatting
+- `astronomy-engine` - Sunrise, sunset and moon phase
+- `ngeohash` - Geohash cells for lightning subscriptions
+- `pngjs` - Decoding and encoding composited radar images
+- `mqtt` (optional dependency) - The lightning feed. The server starts without
+  it; only `get_lightning_activity` needs it
 - `fast-xml-parser` - The project's first XML dependency, added for the
   national CAP alert feeds. Every document is refused before parsing if it
   carries a `<!DOCTYPE` declaration (defence in depth against the
@@ -128,7 +134,7 @@ updates:
 ### Environment Security
 
 - Never commit `.env` files or API keys to version control
-- This server uses **public APIs only** and requires no authentication credentials
+- No tool requires a credential. Four optional keys add coverage (see [Optional API keys](README.md#optional-api-keys)); set them only in the environment
 - Use environment variables for configuration (see README.md)
 
 ### Deployment Security
@@ -140,24 +146,32 @@ updates:
 
 ## Known Security Considerations
 
-### No Authentication Required
+### No Credentials Required
 
-This MCP server uses public weather APIs (NOAA and Open-Meteo) that do not require API keys or authentication. This is by design and reduces security complexity.
+Every tool works with no API key, token or account. Four optional keys (NCEI, NASA FIRMS, Google Pollen, Google Weather) extend coverage; see [Optional API keys](README.md#optional-api-keys).
 
-### Data Privacy
+### What leaves your machine, and what stays on it
 
-- **Location Data**: The server processes geographic coordinates (latitude/longitude) transiently for API requests
-- **No Personal Data**: No personal identifiable information is collected or stored
-- **Local Cache**: Weather data is cached locally on the user's machine
-- **No Tracking**: The server does not track users or send telemetry
+**Stays on your machine:**
+
+- **Cache**: Weather responses are cached in memory only. Nothing from the cache is written to disk, and it is gone when the server exits
 - **Saved Locations**: Aliases you save are stored in `~/.weather-mcp/locations.json`. On Linux and macOS, the server creates the directory `0700` and the file `0600`, so only your account can read them. A directory or file that already exists keeps its permissions. An install from an earlier version stays as it was until you run `chmod 700 ~/.weather-mcp && chmod 600 ~/.weather-mcp/locations.json`
 - **Logging**: By default the server's stderr log carries no saved names, aliases, geocoding queries or notes, and rounds coordinates to about 1 km. A failed tool call is logged by tool name, error class and argument names, not by its arguments or message. Setting `LOG_PII=true` lifts this for local debugging. The MQTT broker URL's credentials are never logged under any setting
+- **Analytics salt**: Unless `ANALYTICS_SALT` is set, the server generates a random salt at startup **even when analytics is off**, and stores it in `~/.weather-mcp/analytics-salt` (a new file is `0600`, a new directory `0700`). The salt is never sent anywhere; it only makes the detailed-level session hash one-way. If the file cannot be written, the server keeps the salt in memory and makes a new one at the next start. `ANALYTICS_SALT` supplies the salt without creating the file. An invalid `ANALYTICS_ENDPOINT` skips salt generation altogether
+
+**Sent to other services:**
+
+- **Weather data sources**: The coordinates of each request go to the service that answers it (see [Data sources](README.md#data-sources)). Saved-location names, aliases and notes are not sent
+- **Place-name lookup**: A `city_name`, a `location_query`, or a `WEATHER_DEFAULT_LOCATION` place name is sent as you typed it to the geocoders, tried in turn: Census.gov (for queries that look like US places), Nominatim (OpenStreetMap) and the Open-Meteo geocoding API
+- **Country lookup**: Tools that route by country (alerts, wildfire, rivers) send the coordinates to Nominatim's reverse lookup, unless the location already carries a country code
+- **Optional keys**: All four go over HTTPS, but not in one place. The NCEI token is a request header, the FIRMS map key is part of the URL path, and the two Google keys are URL query parameters. None is written to the logs or shown in error messages
+- **Lightning feed**: When you ask for lightning, through `get_lightning_activity` or a `get_weather_summary` request that includes its lightning section, the server subscribes to the Blitzortung MQTT broker for coarse geohash cells around that point. When `get_lightning_activity` is enabled and `WEATHER_LIGHTNING_PREWARM` is on (the default), it also subscribes around each saved location, before you ask. The cells cover an area, not a point, but they show the broker roughly where you are asking about and where your saved places are. The default broker connection is **unencrypted** (`mqtt://`, port 1883), and the server logs a security warning when it connects that way. Set `BLITZORTUNG_MQTT_URL` to an `mqtts://` or `wss://` broker for TLS
+- **Analytics**: Off by default, with no default destination. Nothing is sent unless you set `ANALYTICS_ENABLED=true` **and** `ANALYTICS_ENDPOINT`, which must be an `https://` URL on a domain name. Each event holds the server version, the tool name, success or error, the time rounded down to the hour and the analytics level; an error event adds an error category. `ANALYTICS_LEVEL=standard` adds the response time. `detailed` adds a one-way session hash and the event's sequence number in that session. No coordinates, place names, arguments or results are sent. The payload holds no IP address, but the endpoint sees the IP address of your connection, as any HTTPS server does
 
 ### Network Security
 
-- All external API calls use **HTTPS only**
+- Every weather, geocoding and imagery request uses HTTPS. The one exception is the lightning feed's default MQTT connection, described above
 - Certificate validation is enabled by default (via axios)
-- No sensitive data is transmitted to external services
 - **URLs taken from a feed body are allowlisted before they are fetched.** The
   national CAP feeds supply their own document and geometry URLs; each is
   checked against that feed's exact HTTPS host list and path prefixes, with
@@ -224,7 +238,7 @@ This MCP server uses public weather APIs (NOAA and Open-Meteo) that do not requi
 
 The following are **out of scope** for security reports:
 
-- Vulnerabilities in third-party APIs (NOAA, Open-Meteo)
+- Vulnerabilities in third-party upstream APIs
 - Runtime environment security (Node.js, OS)
 - Network infrastructure
 - Physical security
@@ -243,5 +257,4 @@ If you have questions about this security policy, please open a GitHub issue wit
 
 ---
 
-**Last Updated**: November 10, 2025
-**Next Security Review**: May 2026 (6 months) or upon major version release
+**Last Updated**: September 30, 2026
