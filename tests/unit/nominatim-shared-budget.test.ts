@@ -34,7 +34,10 @@ type Sleep = (ms: number) => Promise<void>;
 
 function makeSpacer(): { spacer: RequestSpacer; sleep: ReturnType<typeof vi.fn<Sleep>>; clock: { t: number } } {
   const clock = { t: 10_000 };
-  const sleep = vi.fn<Sleep>(() => Promise.resolve());
+  const sleep = vi.fn<Sleep>((ms) => {
+    clock.t += ms;
+    return Promise.resolve();
+  });
   const spacer = new RequestSpacer(NOMINATIM_MIN_INTERVAL_MS, { now: () => clock.t, sleep });
   return { spacer, sleep, clock };
 }
@@ -250,11 +253,15 @@ describe('one budget across both Nominatim clients', () => {
       census: { client: AxiosInstance; geocode(q: string, l: number): Promise<unknown[]> };
     }).census;
     const get = vi.spyOn(census.client, 'get').mockResolvedValue({ data: { result: { addressMatches: [] } } });
+    let t = 10_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => t);
+    vi.spyOn(performance, 'now').mockImplementation(() => t);
     const realSetTimeout = global.setTimeout;
     const scheduled: number[] = [];
     vi.spyOn(global, 'setTimeout').mockImplementation(((fn: () => void, ms?: number, ...rest: unknown[]) => {
       if (typeof ms === 'number' && ms > 0 && ms <= 1000) {
         scheduled.push(ms);
+        t += ms;
         fn();
         return 0 as unknown as ReturnType<typeof setTimeout>;
       }

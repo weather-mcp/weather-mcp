@@ -53,7 +53,7 @@ describe('RequestSpacer', () => {
   });
 
   it('moves no slot when an earlier caller fails', async () => {
-    const sleep = vi.fn((_ms: number) => Promise.resolve());
+    const sleep = makeNeverSleep();
     const spacer = new RequestSpacer(I, { now: () => 10_000, sleep });
 
     await spacer
@@ -84,14 +84,16 @@ describe('RequestSpacer', () => {
   });
 
   it('the default sleep looks up the global setTimeout at call time', async () => {
+    let t = 10_000;
     const spy = vi
       .spyOn(global, 'setTimeout')
-      .mockImplementation(((fn: () => void) => {
+      .mockImplementation(((fn: () => void, ms?: number) => {
+        t += ms as number;
         fn();
         return 0 as unknown as NodeJS.Timeout;
       }) as unknown as typeof setTimeout);
     try {
-      const spacer = new RequestSpacer(I);
+      const spacer = new RequestSpacer(I, { now: () => t });
 
       await spacer.reserve();
       expect(spy).not.toHaveBeenCalled();

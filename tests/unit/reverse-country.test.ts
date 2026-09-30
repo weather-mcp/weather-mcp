@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { RequestSpacer } from '../../src/utils/requestSpacer.js';
 
 // Mock the axios instance used by NominatimService so no real network calls
 // are made. Mirrors the aviationWeather/metar-service mocking template:
@@ -35,7 +36,7 @@ vi.mock('axios', () => ({
   }
 }));
 
-import { NominatimService } from '../../src/services/nominatim.js';
+import { NominatimService, NOMINATIM_MIN_INTERVAL_MS } from '../../src/services/nominatim.js';
 
 function jsonResponse(data: unknown, status = 200) {
   return Promise.resolve({ data, status });
@@ -158,18 +159,22 @@ describe('NominatimService.reverseCountry', () => {
   describe('rate limiting', () => {
     it('invokes the 1 req/s limiter (a delay) between two distinct-key requests', async () => {
       mockGet.mockImplementation(() => jsonResponse(MUNICH_RESPONSE));
+      let t = 10_000;
       const setTimeoutSpy = vi
         .spyOn(global, 'setTimeout')
         // Resolve immediately so the test doesn't actually wait ~1s, while
         // still proving the rate-limit wait path executed.
-        .mockImplementation(((fn: (...args: unknown[]) => void) => {
+        .mockImplementation(((fn: (...args: unknown[]) => void, ms?: number) => {
+          t += ms as number;
           fn();
           return 0 as unknown as ReturnType<typeof setTimeout>;
         }) as typeof setTimeout);
 
-      const service = new NominatimService();
+      const service = new NominatimService({
+        spacer: new RequestSpacer(NOMINATIM_MIN_INTERVAL_MS, { now: () => t })
+      });
 
-      // First call: lastRequestTime starts at 0, so no wait is scheduled.
+      // First call: the spacer is idle, so no wait is scheduled.
       await service.reverseCountry(48.1372, 11.5755);
       expect(setTimeoutSpy).not.toHaveBeenCalled();
 
