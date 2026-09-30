@@ -183,7 +183,8 @@ export class NominatimService {
     await this.spacer.reserve((waitMs) => {
       logger.info('Rate limiting: waiting before next request', {
         service: 'Nominatim',
-        waitTimeMs: waitMs
+        // The spacer's monotonic clock reads fractional ms; log whole ms.
+        waitTimeMs: Math.round(waitMs)
       });
     });
   }
