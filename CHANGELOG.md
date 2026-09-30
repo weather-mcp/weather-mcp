@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.18] - 2026-09-30
+
 When a place name could not be looked up, the error blamed Open-Meteo for every failure. It also reported a lookup service that was down as if the place did not exist, and asked you to check the spelling. During an outage you could spend time correcting a name that was never wrong. The error now says which service failed and how, and it tells an outage apart from a place that does not exist. Successful lookups return exactly what they did before.
 
 ### Fixed
@@ -2046,7 +2048,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.17...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.18...HEAD
+[1.33.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.17...v1.33.18
 [1.33.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.16...v1.33.17
 [1.33.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.15...v1.33.16
 [1.33.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.14...v1.33.15
