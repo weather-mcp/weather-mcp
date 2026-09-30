@@ -1113,14 +1113,16 @@ plan-review codex R2).** The same isolation applies to `$HOME` when a probe comp
 *first-run* output across two processes — base against branch, keyed against keyless.
 `getOrGenerateAnalyticsSalt()` (`src/analytics/config.ts`) writes
 `$HOME/.weather-mcp/analytics-salt` and logs `Generated new analytics salt` only when the
-file is absent, and it runs on every startup whose endpoint is not rejected, analytics
-enabled or not. Two spawns sharing one `HOME=$(mktemp -d)` therefore disagree by one line:
+file is absent. Since 2026-09-30 (analytics-salt-gate) it runs only when analytics is
+enabled at the `detailed` level, so the first-run line appears only in probes run with
+that configuration; a default or `minimal`/`standard` probe no longer consumes the
+precondition. For those that do, two spawns sharing one `HOME=$(mktemp -d)` disagree by one line:
 the first consumed the precondition the second was meant to see. Give every compared
 process its own empty home, and record each path. The plan as first written shared one;
 the review caught it before the run, and T2 then showed each side logging the line in
 its own home, byte-identical after timestamps were stripped.
 
-**Status:** active, **extended 2026-08-29**. **Verify line re-run 2026-08-27** (wildfire band-rounding
+**Status:** active, **extended 2026-08-29**; **fresh-home paragraph revised 2026-09-30** (analytics-salt-gate — the salt is now generated only for an enabled `detailed` config, so the first-run precondition exists only in probes run that way; the rule is unchanged). **Verify line re-run 2026-08-27** (wildfire band-rounding
 T3): the live probe spawned the built dist from a temp cwd with `ENABLED_TOOLS`
 **unset** and got **6 tools, `get_wildfire_info` absent**, against the 17 a
 repo-root spawn reports — run as an explicit control *before* the keyed and
@@ -3473,13 +3475,14 @@ required together:
    process.env.ANALYTICS_ENABLED = 'false';
    process.env.ANALYTICS_SALT = '<any fixed string>'; })` — all three must be set
    *before* the static import evaluates, which is what `vi.hoisted` buys over a
-   `beforeEach`. The first skips a live MQTT subscribe, the second keeps the
-   analytics client off its flush timer, and the third keeps the import off the
+   `beforeEach`. The first skips a live MQTT subscribe. The second keeps the
+   analytics client off its flush timer, and it also keeps the import off the
    filesystem: `loadAnalyticsConfig()` builds the analytics singleton at module
-   load and calls `getOrGenerateAnalyticsSalt()` **regardless of
-   `ANALYTICS_ENABLED`**, which writes `~/.weather-mcp/analytics-salt` when it is
-   absent. A fixed salt returns at `src/analytics/config.ts:93` before any
-   filesystem access.
+   load and calls `getOrGenerateAnalyticsSalt()` — which writes
+   `~/.weather-mcp/analytics-salt` when it is absent — **only for an enabled
+   `detailed` config** (since 2026-09-30). The third is a second guard: a fixed
+   salt makes `getOrGenerateAnalyticsSalt()` return before any filesystem access,
+   should a shell export an enabled detailed configuration past the second.
 3. **Import it exactly once, statically.** Never re-import it under
    `vi.resetModules()` — that re-runs `main()` ([G21] point 3). If the same file
    also needs fresh module state, re-import the *other* module
@@ -3500,10 +3503,13 @@ factory constructs no transport, registers no signal handler and calls no
 `process.exit`, so points 1 and 4's first half do not apply and neither does
 `WEATHER_LIGHTNING_PREWARM` (the prewarm stayed in the entry). What survives is
 point 2's **two analytics pins** and point 3. The factory imports `withAnalytics`
-from `src/analytics/index.js`, which re-exports the singleton built at module
-load in `src/analytics/config.ts:206`; `loadAnalyticsConfig()` calls
-`getOrGenerateAnalyticsSalt()` at `:169` regardless of `ANALYTICS_ENABLED`, and a
-fixed `ANALYTICS_SALT` returns at `:93-94` before any filesystem access. So:
+from `src/analytics/index.js`, which re-exports the singleton that
+`loadAnalyticsConfig()` builds at module load. That function calls
+`getOrGenerateAnalyticsSalt()` only for an enabled `detailed` config, so
+`ANALYTICS_ENABLED='false'` alone keeps the import off the filesystem; a fixed
+`ANALYTICS_SALT` makes `getOrGenerateAnalyticsSalt()` return before any filesystem
+access, the second guard against a shell that exports an enabled detailed
+configuration. So:
 `ANALYTICS_ENABLED='false'` and `ANALYTICS_SALT='<any fixed string>'`, hoisted;
 and import once, statically, never under `vi.resetModules()` — that re-runs
 sixteen service constructors and their `Cache` timers ([G21] point 3).
@@ -3523,12 +3529,22 @@ load the repo's own `.env` ([G26]), so nothing such a test asserts may depend on
 a key or on `ENABLED_TOOLS`.
 
 **Verify:** `tests/unit/tool-name-parity.test.ts` no longer imports the entry, so
-it now verifies the **residue** rather than the four points: delete its two
-`ANALYTICS_*` pins and run it CI-shaped (`HOME=$(mktemp -d)
-DOTENV_CONFIG_PATH=/nonexistent npx vitest run <file>`) — the suite stays green
-and `analytics-salt` appears under the temp `HOME`, which is the whole point (the
-pin's absence is invisible to the assertions and visible only on the filesystem).
-Measured 2026-09-09: 64 bytes, mode 0600. For the four points themselves there is
+it now verifies the **residue** rather than the four points. Since the salt gate
+(2026-09-30) a default environment writes nothing even with no pins, so the probe must
+supply the one configuration that does. Delete **both** `ANALYTICS_*` pins and run
+`HOME=$(mktemp -d) ANALYTICS_ENABLED=true
+ANALYTICS_ENDPOINT=https://analytics.example.com/v1/events ANALYTICS_LEVEL=detailed
+npx vitest run tests/unit/tool-name-parity.test.ts` — the suite stays green and
+`$HOME/.weather-mcp/analytics-salt` appears. Restore the `ANALYTICS_ENABLED` pin alone,
+re-run in a fresh `HOME` — green, and no `.weather-mcp/`. Then `git checkout --` the
+file. The pin's absence is invisible to the assertions and visible only on the
+filesystem, which is the whole point. Check `.weather-mcp/` by name: `npx` itself
+writes `.npm/` into the temp `HOME`, so an "is the home empty" check is always false.
+**Re-run 2026-09-30** (analytics-salt-gate T3): both pins deleted → 43 passed,
+`analytics-salt` mode `600`, 64 bytes, directory `700`; `ANALYTICS_ENABLED` pin
+restored → 43 passed, no `.weather-mcp/`. The pre-gate recipe (delete the pins, no
+enabling variables; measured 2026-09-09, 64 bytes, mode 0600) no longer writes a file
+and would now pass vacuously. For the four points themselves there is
 no live example left — nothing imports the entry. **To test the entry's
 behaviour, spawn it instead:** `tests/integration/stdio-shutdown.test.ts`
 (`4846e9e`) runs `node --import <tsx resolved via import.meta.resolve('tsx')>
@@ -3557,7 +3573,11 @@ which needs a `Server` the caller connects. The entry is **not** retired: the ru
 about the entry is still true of the entry, and it is the reason nothing may import
 it. Related: [G21] (why point 3 is not optional), [G26] (the `.env` the entry
 loads — still exactly one importer), [G37] (a driver that constructs services and
-never exits), [G31] (the new directory this created).
+never exits), [G31] (the new directory this created). **Revised 2026-09-30**
+(analytics-salt-gate): `loadAnalyticsConfig()` now generates the salt only for an
+enabled `detailed` config, so point 2, the residue and the Verify line were rewritten
+— `ANALYTICS_ENABLED='false'` is now the pin that keeps the import off the
+filesystem, and `ANALYTICS_SALT` is the second guard. Both pins stay in the rule.
 
 ---
 
