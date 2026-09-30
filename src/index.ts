@@ -20,6 +20,13 @@ import { startLightningPrewarm, type LightningPrewarmHandle } from './server/lig
 import { createShutdown, SHUTDOWN_DEADLINE_MS } from './server/shutdown.js';
 
 /**
+ * The shutdown flush's own deadline. It must end before the coordinator's, with room for the
+ * steps after it: the MQTT disconnect measured 316 ms with a live broker. Half the budget leaves
+ * 750 ms for those steps. A constant, not an env var: garnish is not tuned per install.
+ */
+const ANALYTICS_SHUTDOWN_FLUSH_MS = SHUTDOWN_DEADLINE_MS / 2;
+
+/**
  * Initialize the LocationStore for managing saved/favorite locations
  * Stores locations in ~/.weather-mcp/locations.json
  * No configuration required
@@ -44,8 +51,9 @@ async function main() {
     steps: [
       // No new pre-warm subscriptions during teardown.
       { name: 'lightning-prewarm', run: () => lightningPrewarm?.stop() },
-      // Garnish: the deadline truncates a stalled flush.
-      { name: 'analytics', run: () => analytics.shutdown() },
+      // Garnish: it flushes under its own deadline, inside the budget, and never reaches the
+      // coordinator's — a slow or unreachable analytics endpoint cannot set the exit code.
+      { name: 'analytics', run: () => analytics.shutdown({ deadlineMs: ANALYTICS_SHUTDOWN_FLUSH_MS }) },
       // A no-op when no broker connection exists; never touches the lazy mqtt import.
       { name: 'mqtt', run: () => blitzortungService.disconnect() },
       // Fires server.onclose synchronously; the memo returns the in-flight run.
