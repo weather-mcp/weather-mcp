@@ -5779,6 +5779,16 @@ in lines the task never touched, and `main`'s copy reports the same two. Run the
 check on `git show main:<file>` written to a scratch path next to it, and report
 the delta, not the exit code.
 
+**A spy typed as `ReturnType<typeof vi.spyOn>` erases the spied signature.**
+2026-09-30, analytics-salt-gate T1 (`a2255f8`): `let infoSpy: ReturnType<typeof
+vi.spyOn>` compiled, under a temp tsconfig that included the new test file, to
+`TS7006` (implicit `any`) on the `mock.calls.map((c) => c[0])` callback. The gate, the
+suite and the subagent's report were all green, and the prompt had pasted this
+entry. Type a spy held across hooks as `MockInstance<typeof obj.method>` (vitest 5,
+`import { type MockInstance } from 'vitest'`). Run the one-file check yourself on
+any new test file; a subagent that was told to may report "not typechecked" in its
+Surprises rather than doing it.
+
 **Status:** active. **Lint candidate, and the better fix is in the config rather
 than in every reviewer** — a second `tsconfig.test.json` extending the base with
 `"include": ["src/**/*", "tests/**/*"]` and `"noEmit": true`, run as a gate step,
