@@ -85,7 +85,8 @@ export function validateAnalyticsEndpoint(endpoint: string): void {
 
 /**
  * Get or generate analytics salt for session ID hashing
- * Generates a unique salt per installation and persists it
+ * Generates a unique salt per installation and persists it.
+ * Runs only for an enabled detailed-level config (see loadAnalyticsConfig).
  */
 function getOrGenerateAnalyticsSalt(): string {
   // Check environment variable first
@@ -165,9 +166,6 @@ export function loadAnalyticsConfig(): AnalyticsConfig {
     }
   }
 
-  // Salt for session ID hashing (auto-generated if not provided)
-  const salt = getOrGenerateAnalyticsSalt();
-
   if (enabled && endpoint === null) {
     logger.warn(
       'ANALYTICS_ENABLED=true but ANALYTICS_ENDPOINT is not set; analytics stays off (there is no default endpoint)',
@@ -178,9 +176,12 @@ export function loadAnalyticsConfig(): AnalyticsConfig {
       level,
       endpoint: null,
       version: packageJson.version,
-      salt,
     };
   }
+
+  // The salt is read only by the detailed level's session hash (anonymizer.ts
+  // hashSessionId), so it is generated only then.
+  const salt = enabled && level === 'detailed' ? getOrGenerateAnalyticsSalt() : undefined;
 
   const config: AnalyticsConfig = {
     enabled,
@@ -188,7 +189,7 @@ export function loadAnalyticsConfig(): AnalyticsConfig {
     // A disabled config carries no endpoint, even when a valid one was supplied
     endpoint: enabled ? endpoint : null,
     version: packageJson.version,
-    salt,
+    ...(salt !== undefined ? { salt } : {}),
   };
 
   if (enabled) {

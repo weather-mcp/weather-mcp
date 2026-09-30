@@ -15,6 +15,8 @@
  *     ANALYTICS_LEVEL via vi.hoisted before the static import evaluates,
  *     so a developer shell's exported vars (or the repo .env, though
  *     Vitest doesn't load it) can't change the configuration under test.
+ *     loadAnalyticsConfig reads the environment at module load, so the pins
+ *     must land first.
  *   G65 — assert every thrown message WHOLE (toThrow with the full
  *     string), never a prefix.
  *   G103 — this file is outside tsconfig.json's `include`, so nothing
@@ -34,9 +36,9 @@ const BEFORE = vi.hoisted(() => {
 void BEFORE;
 
 // Import the module exactly once, statically. Importing it constructs the
-// `analytics` singleton (src/analytics/config.ts:193) via
-// loadAnalyticsConfig() -> getOrGenerateAnalyticsSalt(), which is why
-// ANALYTICS_SALT must already be pinned above.
+// `analytics` singleton via loadAnalyticsConfig(), which reads the analytics
+// environment at module load, which is why ANALYTICS_ENABLED and ANALYTICS_SALT
+// must already be pinned above.
 import {
   validateAnalyticsEndpoint,
   loadAnalyticsConfig,

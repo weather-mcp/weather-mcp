@@ -11,8 +11,8 @@
  * module that reads a .env from the caller's cwd is a trap — see GOTCHAS G26),
  * it constructs no transport, and it registers no process signal handler and
  * calls no process.exit. Importing it is therefore inert, with one exception:
- * `withAnalytics` pulls in the analytics singleton built at module load in
- * src/analytics/config.ts:193, which reads ANALYTICS_SALT. A test that imports
+ * `withAnalytics` pulls in the analytics singleton that reads the analytics
+ * environment at module load (via loadAnalyticsConfig). A test that imports
  * this module pins ANALYTICS_ENABLED and ANALYTICS_SALT for that reason and no
  * other.
  *
