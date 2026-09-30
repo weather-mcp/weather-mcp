@@ -46,8 +46,9 @@ import type { GeocodingService, GeocodingResult } from '../../src/services/geoco
 // Pinned before the factory's static import evaluates (GOTCHAS G61 residue,
 // G26): 'standard' is the preset with save_location/list_saved_locations/
 // get_saved_location/remove_saved_location IN (src/config/tools.ts), matching
-// tests/unit/weather-server-factory.test.ts's own pin. ANALYTICS_* keep the
-// import's module-scope salt lookup off the filesystem. WEATHER_DEFAULT_LOCATION
+// tests/unit/weather-server-factory.test.ts's own pin. ANALYTICS_ENABLED='false'
+// keeps the import off ~/.weather-mcp; ANALYTICS_SALT is a second guard in case a
+// developer shell exports an enabled detailed configuration. WEATHER_DEFAULT_LOCATION
 // starts empty; the default-location describe block below saves/restores it
 // itself before mutating it further.
 const BEFORE = vi.hoisted(() => {

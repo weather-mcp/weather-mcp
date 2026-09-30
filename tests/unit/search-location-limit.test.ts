@@ -19,12 +19,11 @@
  * --- G61 / G21: why this imports weatherServer.js, once, statically ---
  *
  * TOOL_DEFINITIONS now lives in src/server/weatherServer.ts, whose import is
- * inert but for the analytics singleton (loadAnalyticsConfig() builds it at
- * module load and calls getOrGenerateAnalyticsSalt() regardless of
- * ANALYTICS_ENABLED). The two ANALYTICS_* env vars below are hoisted so they
- * land before the static import evaluates, and the import happens exactly
- * once — never re-imported under vi.resetModules(), which would re-construct
- * every service and its Cache timers.
+ * inert but for the analytics singleton (loadAnalyticsConfig reads the
+ * analytics environment at module load). The two ANALYTICS_* env vars below
+ * are hoisted so they land before the static import evaluates, and the import
+ * happens exactly once — never re-imported under vi.resetModules(), which
+ * would re-construct every service and its Cache timers.
  *
  * --- G70: the seam under test ---
  *

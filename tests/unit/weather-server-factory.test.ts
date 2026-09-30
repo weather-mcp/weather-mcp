@@ -44,11 +44,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 //     import or the preset this file measures against is whatever the runner's
 //     shell happens to carry. 'standard' is the preset with list_saved_locations
 //     IN and get_marine_conditions OUT, at 12 tools (src/config/tools.ts).
-//   - ANALYTICS_ENABLED / ANALYTICS_SALT: src/server/weatherServer.ts imports
-//     ../analytics/index.js, which builds the analytics singleton at module
-//     load (src/analytics/config.ts:193) and calls getOrGenerateAnalyticsSalt()
-//     regardless of ANALYTICS_ENABLED. A fixed salt returns before any
-//     filesystem access, keeping the import from touching ~/.weather-mcp.
+//   - ANALYTICS_ENABLED / ANALYTICS_SALT: The analytics singleton that
+//     src/server/weatherServer.ts imports reads the analytics environment at
+//     module load (via loadAnalyticsConfig). ANALYTICS_ENABLED='false' keeps
+//     the import off ~/.weather-mcp; the fixed ANALYTICS_SALT is a second guard
+//     in case a developer shell exports an enabled detailed configuration.
 //   - WEATHER_DEFAULT_LOCATION: forced empty so DEFAULT_LOCATION_HINT text in
 //     the location schema fragments stays off — an inherited value would change
 //     TOOL_DEFINITIONS's schema strings out from under the deep-equal in the

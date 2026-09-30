@@ -29,13 +29,12 @@ import { describe, it, expect, vi } from 'vitest';
 import type { ToolName } from '../../src/config/tools.js';
 
 // Both must be set before the static import below evaluates: ANALYTICS_ENABLED keeps
-// the analytics client from doing anything beyond its in-memory no-op path, and
-// ANALYTICS_SALT keeps the import off the filesystem: src/server/weatherServer.ts
-// imports ../analytics/index.js, which re-exports the analytics singleton built at
-// module load in src/analytics/config.ts:193 — loadAnalyticsConfig() calls
-// getOrGenerateAnalyticsSalt() at src/analytics/config.ts:167 regardless of
-// ANALYTICS_ENABLED, writing ~/.weather-mcp/analytics-salt when it is absent. A fixed
-// salt returns at src/analytics/config.ts:94-95 before any filesystem access.
+// the analytics client from doing anything beyond its in-memory no-op path, and it
+// keeps the import off the filesystem: src/server/weatherServer.ts imports
+// ../analytics/index.js, whose singleton is built at module load by
+// loadAnalyticsConfig(), and that generates ~/.weather-mcp/analytics-salt only for an
+// enabled detailed config. ANALYTICS_SALT is a second guard, in case a developer
+// shell exports an enabled detailed configuration past the first pin.
 vi.hoisted(() => {
   process.env.ANALYTICS_ENABLED = 'false';
   process.env.ANALYTICS_SALT = 'tool-name-parity-test';

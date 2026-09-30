@@ -28,8 +28,9 @@ import type { MetnoService } from '../../src/services/metno.js';
 
 // Pinned before the factory import evaluates, as in
 // tests/unit/weather-server-factory.test.ts:56-62: toolConfig is built from
-// ENABLED_TOOLS at import time (G26), and the analytics singleton reads a salt
-// at module load — a fixed one keeps the import off ~/.weather-mcp.
+// ENABLED_TOOLS at import time (G26), and the analytics singleton reads the
+// analytics environment at module load — ANALYTICS_ENABLED='false' keeps the
+// import off ~/.weather-mcp, with ANALYTICS_SALT as a second guard.
 vi.hoisted(() => {
   process.env.ENABLED_TOOLS = 'all';
   process.env.ANALYTICS_ENABLED = 'false';
