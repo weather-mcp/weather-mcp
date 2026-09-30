@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.20] - 2026-09-30
+
+Every start of the server wrote a small secret file into your home directory, even with analytics switched off. Analytics is off by default, so almost every install carried a file for a feature it never used. Only the most detailed analytics level ever reads that file. The server now creates it only then. Weather tools and their output are unchanged.
+
 ### Fixed
 - **The server no longer creates `~/.weather-mcp/analytics-salt` on every start.** The salt only makes the detailed analytics level's session hash one-way, and nothing else reads it. It is now created only when analytics is enabled at the `detailed` level. A default install, and one at `minimal` or `standard`, writes nothing to your home directory for analytics. A salt file left by an earlier version is unused unless you turn on `detailed`, and you can delete it.
 
@@ -2061,7 +2065,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.19...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.20...HEAD
+[1.33.20]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.19...v1.33.20
 [1.33.19]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.18...v1.33.19
 [1.33.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.17...v1.33.18
 [1.33.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.16...v1.33.17
