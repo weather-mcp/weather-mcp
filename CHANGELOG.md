@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.19] - 2026-09-30
+
 The security policy promised more privacy than the server delivers. It said no personal data was collected or stored, that the server sent no telemetry, that every call used HTTPS, and that nothing sensitive left your machine. None of that was true in every setup. `SECURITY.md` now says, service by service, what leaves your machine and what stays on it. No behaviour changed; only the documents did.
 
 ### Changed
@@ -2056,7 +2058,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.18...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.19...HEAD
+[1.33.19]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.18...v1.33.19
 [1.33.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.17...v1.33.18
 [1.33.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.16...v1.33.17
 [1.33.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.15...v1.33.16
