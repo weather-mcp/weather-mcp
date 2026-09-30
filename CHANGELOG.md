@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Geocoding keeps its one-second spacing even when the server is briefly stalled.** If the server was busy for more than a second while several OpenStreetMap lookups were waiting, the waiting lookups could all be sent at the same moment once it resumed. Each waiting lookup now checks when the previous one actually started before it goes out, so they still leave at least one second apart. The spacing also no longer stretches when the system clock is corrected. Tool replies do not change. (`src/utils/requestSpacer.ts`)
+
 ## [1.33.16] - 2026-09-29
 
 This release only matters if you turned on the optional usage analytics. With analytics on, an analytics server that was slow or unreachable could hold the server open at shutdown until the shutdown time limit ran out, and then the server exited with an error code, even though nothing was wrong with the weather tools. A server that dropped the connection partway through its reply could leave an upload waiting forever. Uploads now have a fixed time limit, and shutdown always leaves room for the rest of its work. Tool replies do not change, and analytics stays off unless you configure it.
