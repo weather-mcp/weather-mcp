@@ -85,6 +85,9 @@ describe('RequestSpacer', () => {
 
   it('the default sleep looks up the global setTimeout at call time', async () => {
     let t = 10_000;
+    // Constructed before the spy exists, so a sleep that captured the global
+    // at construction would miss the spy and this test would go red.
+    const spacer = new RequestSpacer(I, { now: () => t });
     const spy = vi
       .spyOn(global, 'setTimeout')
       .mockImplementation(((fn: () => void, ms?: number) => {
@@ -93,8 +96,6 @@ describe('RequestSpacer', () => {
         return 0 as unknown as NodeJS.Timeout;
       }) as unknown as typeof setTimeout);
     try {
-      const spacer = new RequestSpacer(I, { now: () => t });
-
       await spacer.reserve();
       expect(spy).not.toHaveBeenCalled();
 
