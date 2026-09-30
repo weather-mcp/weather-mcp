@@ -24,7 +24,7 @@ echo "1. Checking if analytics server is running on localhost:3100..."
 if ! curl -s http://localhost:3100/v1/health > /dev/null; then
   echo "❌ Analytics server is not running on localhost:3100"
   echo "   Please start the analytics server first:"
-  echo "   cd /home/dgahagan/work/personal/weather-mcp/analytics-server"
+  echo "   cd ../analytics-server"
   echo "   npm run dev"
   exit 1
 fi
