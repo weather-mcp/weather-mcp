@@ -1780,7 +1780,7 @@ the chain — the CLI then flushes and exits 0 with its work intact.
 
 **Why:** until v1.33.5, every service constructor called `new Cache(...)`, which
 armed a ref'd 5-minute `setInterval` at `src/utils/cache.ts:42`, and
-`src/analytics/collector.ts:274` (now `:286`) was the only unref'd timer in the
+`src/analytics/collector.ts`'s flush timer (the `.unref()` in `startFlushTimer`) was the only unref'd timer in the
 tree. One constructed service therefore held Node's event loop open forever: the
 script body ran, printed, and the process stayed. Nothing in the output said
 "hung".
@@ -6336,7 +6336,7 @@ with `N` longer than the slowest call. Then count the replies: a `tools/call` id
 stdout means the probe measured nothing, whatever stderr says.
 
 **Why:** since `stdio-eof-shutdown` (`2c4cc31`, 2026-09-27) the entry point runs its shutdown on
-`process.stdin` `end`/`close` (`src/index.ts:60-61`). A redirected file reaches EOF right after
+`process.stdin` `end`/`close` (the two `process.stdin.once` listeners in `main()`, `src/index.ts`). A redirected file reaches EOF right after
 the last request is read, so the server shuts down while the first upstream request is still in
 flight. The process exits 0 and stderr ends with `Shutting down` / `Shutdown complete`, which reads
 like a clean run. A privacy or byte-identity probe on that output passes vacuously: a sentinel
@@ -6423,6 +6423,68 @@ folded into T3 with drives and per-site mutants.
 **Evidence:** 2026-09-29, geocoding-rate-budget diff review (codex-B1), against `7688147`. Deferred by Dan to a follow-up (ROADMAP Hardening); the CHANGELOG entry was qualified in the same branch. The residual needs a synchronous stall of at least one interval, and the coalesced pair follows at least one interval of silence, so the sustained rate still stays within budget.
 
 **Status:** active — the trap is live in `RequestSpacer` until the deferred re-check lands; retire it then. Related: [G20], [G45] (the current tests observe the requested sleep, the wrong layer), [G114] (a timer's liveness is not its punctuality).
+
+## G123 — Sanitizing an error at its producer does not sanitize the path: a downstream catch re-logs the message, and a startup line may log the value outright
+
+**Trigger:** removing identifying text (a hostname, a query, a URL) from the log lines of a function
+whose rejection another layer catches — or claiming "no log line carries X" for a subsystem.
+
+**Rule:** enumerate every logger call on the path, not only the producer's: every `catch` that
+receives the same `Error` (it still carries the message you stopped logging), and every
+construction or startup line that logs the configured value directly, at **every** level including
+`debug`. Test the composed path with a unique sentinel in `Error.message` *and* in the configured
+value, and scan every logger spy's arguments from construction onward. A `mockClear()` after
+construction to "focus the test" is the symptom: it hides exactly the line this entry is about.
+
+**Why:** the producer's sanitised warning does not change the rejected object. The next layer logs
+`error.message` as a second warning that looks unrelated in review, and a producer-only test stays
+green. Separately, an init line written before the hygiene rule existed logs the whole configured
+value, so a live `LOG_LEVEL=0` check fails on startup regardless of the fix.
+
+**Verify:** in `tests/unit/analytics-collector.test.ts`, restore `error: error.message` in
+`flush`'s catch, or `endpoint: this.config.endpoint` in the constructor's `Analytics collector
+initialized` debug line: contract 6 goes red either way.
+
+**Evidence:** 2026-09-29, analytics-transport-deadline. T1 kept the hostname out of
+`transport.ts`'s `req 'error'` warn. The codex plan review (R1) found `flush`'s catch re-logging the
+same message; the T2 subagent then found the constructor logging `{ endpoint }` at debug. Both
+fixed in `2051163`. The live row (`.devdocs/qa-analytics-transport-deadline.md`) shows 1 hostname
+hit on the base and 0 on the branch at `LOG_LEVEL=0`.
+
+**Status:** active. Related: [G121] (a line-based grep misses multi-line `logger.*` calls — the
+same enumeration, a different way to fall short of it).
+
+---
+
+## G124 — A raw `http`/`https` response closed mid-body emits no `'error'` unless something listens for it, so a promise settled on `'end'` never settles
+
+**Trigger:** writing or reviewing code that wraps `http.request`/`https.request` (not axios) in a
+promise, with listeners for `res 'data'`/`'end'` and `req 'error'`/`'timeout'` only.
+
+**Rule:** settle on a path that every lifecycle reaches: the response headers (if the status is the
+answer), `req 'error'`, and `req 'close'` as the backstop — behind one settle-once guard. Attach
+`res.on('error')` explicitly. Bound the whole request with one **absolute** ref'd timer that calls
+`req.destroy(err)` and is cleared on `req 'close'`; the `timeout` option is socket *inactivity*, and
+every trickled byte resets it.
+
+**Why:** measured on Node 22.23.2 with loopback probes. A server that sends headers and part of the
+body and then destroys the socket produces `req 'close'` and `res 'close'` (`complete: false`) and
+**no** `'error'` on either, so an `'end'`-settled promise hangs forever and a caller's failure
+accounting never runs. With `res.on('error')` attached, the same close emits `ECONNRESET`
+"aborted". A server trickling one byte every 400 ms held a 1000 ms inactivity timeout open for 4.8 s.
+A silent server fired `'timeout'` and *then* `'error'`, so a promise without a settle guard rejected
+twice and logged twice.
+
+**Verify:** `tests/unit/analytics-transport.test.ts` contracts 4, 5 and 7; mutations M1 (no
+deadline), M2 (settle on `'end'`) and M3 (no guard) redden them.
+
+**Evidence:** 2026-09-29, analytics-transport-deadline design recon (the scratch probes are recorded in
+the design plan's Problem table); fixed in `4d0623b`.
+
+**Status:** active. The only raw request in `src/` is `src/analytics/transport.ts`; everything else
+goes through axios, whose timeout is also an inactivity timer (the design's deferred sweep).
+
+---
 
 ## Graveyard
 

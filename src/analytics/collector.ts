@@ -9,6 +9,16 @@ import { anonymizeEvent, roundToHour } from './anonymizer.js';
 import { sendBatch } from './transport.js';
 import { AnalyticsConfig, AnalyticsEvent, ToolExecutionMetadata } from './types.js';
 
+/** Per-call options for `flush` and `shutdown`. Absent means the transport's own default. */
+export interface FlushOptions {
+  deadlineMs?: number;
+}
+
+/** Injectable seams; the default is the real transport. */
+export interface AnalyticsCollectorDeps {
+  sendBatch?: typeof sendBatch;
+}
+
 /**
  * AnalyticsCollector - Manages event buffering and batch sending
  * Implements privacy-first analytics with automatic flushing
@@ -20,6 +30,7 @@ export class AnalyticsCollector {
   private sessionId: string;
   private sequenceNumber = 0;
   private isShuttingDown = false;
+  private readonly sendBatch: typeof sendBatch;
 
   // Rate limiting state
   private consecutiveFailures = 0;
@@ -44,15 +55,16 @@ export class AnalyticsCollector {
   private readonly MAX_BUFFER_SIZE = 100;
   private readonly FLUSH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
-  constructor(config: AnalyticsConfig) {
+  constructor(config: AnalyticsConfig, deps: AnalyticsCollectorDeps = {}) {
     this.config = config;
+    this.sendBatch = deps.sendBatch ?? sendBatch;
     this.sessionId = this.generateSessionId();
 
     if (this.config.enabled) {
       this.startFlushTimer();
       logger.debug('Analytics collector initialized', {
+        // Never the endpoint: its hostname is operator configuration, and no analytics log carries it.
         level: this.config.level,
-        endpoint: this.config.endpoint,
       });
     }
   }
@@ -181,7 +193,7 @@ export class AnalyticsCollector {
    * Called automatically on timer or when buffer is full
    * Implements circuit breaker pattern (3.7)
    */
-  public async flush(): Promise<void> {
+  public async flush(options: FlushOptions = {}): Promise<void> {
     if (!this.config.enabled || this.buffer.length === 0) {
       return;
     }
@@ -237,7 +249,9 @@ export class AnalyticsCollector {
         count: eventsToSend.length,
       });
 
-      await sendBatch(eventsToSend, endpoint, this.config.version);
+      await this.sendBatch(eventsToSend, endpoint, this.config.version, {
+        deadlineMs: options.deadlineMs,
+      });
 
       logger.debug('Analytics batch sent successfully', {
         count: eventsToSend.length,
@@ -248,8 +262,10 @@ export class AnalyticsCollector {
     } catch (error) {
       this.consecutiveFailures++;
 
+      const failure = error as NodeJS.ErrnoException;
       logger.warn('Analytics batch send failed', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+        name: failure?.name,
+        code: failure?.code,
         count: eventsToSend.length,
         consecutiveFailures: this.consecutiveFailures,
       });
@@ -308,7 +324,7 @@ export class AnalyticsCollector {
    * Public shutdown method called by main shutdown handler
    * Ensures buffered events are sent before process exits
    */
-  public async shutdown(): Promise<void> {
+  public async shutdown(options: FlushOptions = {}): Promise<void> {
     if (this.isShuttingDown) {
       return;
     }
@@ -323,7 +339,7 @@ export class AnalyticsCollector {
 
     // Flush remaining events
     if (this.buffer.length > 0) {
-      await this.flush();
+      await this.flush(options);
     }
   }
 

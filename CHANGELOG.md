@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.16] - 2026-09-29
+
+This release only matters if you turned on the optional usage analytics. With analytics on, an analytics server that was slow or unreachable could hold the server open at shutdown until the shutdown time limit ran out, and then the server exited with an error code, even though nothing was wrong with the weather tools. A server that dropped the connection partway through its reply could leave an upload waiting forever. Uploads now have a fixed time limit, and shutdown always leaves room for the rest of its work. Tool replies do not change, and analytics stays off unless you configure it.
+
+### Fixed
+
+- **The analytics upload can no longer delay or fail shutdown.** It has an absolute deadline, discards the response body, and settles when the server drops the connection. At shutdown it flushes under its own shorter deadline, so a slow or unreachable analytics endpoint no longer turns a clean shutdown into exit 1. No analytics log line carries the endpoint's hostname. Analytics stays off unless `ANALYTICS_ENDPOINT` is set.
+
 ## [1.33.15] - 2026-09-29
 
 This release changes nothing the server does. The unit tests could reach the real weather services, so a run could pass or fail depending on the network, and a test that was meant to be offline could be online without anyone noticing. The unit tests now refuse every outbound connection, and CI runs them that way. Tool replies, settings and logs are the same as in 1.33.14.
@@ -2024,7 +2032,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.15...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.16...HEAD
+[1.33.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.15...v1.33.16
 [1.33.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.14...v1.33.15
 [1.33.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.13...v1.33.14
 [1.33.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.12...v1.33.13
