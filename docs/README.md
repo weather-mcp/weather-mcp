@@ -32,7 +32,7 @@ extend coverage beyond their keyless path:
 - **[TEST_SUITE_README.md](./testing/TEST_SUITE_README.md)** - Test suite overview and structure
 
 ### 📁 Analytics (`analytics/`)
-- **[MCP_ANALYTICS_SECURITY_GUIDE.md](./analytics/MCP_ANALYTICS_SECURITY_GUIDE.md)** - Security guide for analytics
+- **[MCP_ANALYTICS_SECURITY_GUIDE.md](./analytics/MCP_ANALYTICS_SECURITY_GUIDE.md)** - Early analytics design (historical; see SECURITY.md for current behaviour)
 - **[LOCAL_ANALYTICS_GUIDE.md](./analytics/LOCAL_ANALYTICS_GUIDE.md)** - Local analytics setup and usage
 
 ### 📁 Publishing (`publishing/`)
@@ -70,7 +70,7 @@ extend coverage beyond their keyless path:
 
 ### 🔒 Security
 - [Security Policy](../SECURITY.md)
-- [Analytics Security Guide](./analytics/MCP_ANALYTICS_SECURITY_GUIDE.md)
+- [Early analytics design (historical)](./analytics/MCP_ANALYTICS_SECURITY_GUIDE.md)
 
 ## Version Information
 

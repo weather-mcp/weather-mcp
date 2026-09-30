@@ -57,9 +57,9 @@ There are excellent commercial weather MCPs backed by paid APIs and full-time te
 Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
-- **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Three optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
+- **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Four optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
 - **Fully open source** — MIT licensed, readable TypeScript, 4,235 tests. Audit it, fork it, fix it.
-- **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, no telemetry.
+- **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, and no telemetry unless you opt in.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
 The tradeoff is honest: US data (NOAA) is richer than international data (Open-Meteo), some tools are US-only, and free APIs come with fair-use rate limits. See [Coverage & Limitations](#coverage--limitations).
@@ -180,7 +180,7 @@ npm run build
 
 Then point your MCP client at `node /absolute/path/to/weather-mcp/dist/index.js`.
 
-Requires Node.js 18+. No API keys, tokens, or accounts needed — see [Optional API keys](#optional-api-keys) for the three that add optional extras, and [Optional dependency](#optional-dependency) if you want a smaller install.
+Requires Node.js 18+. No API keys, tokens, or accounts needed — see [Optional API keys](#optional-api-keys) for the four that add optional extras, and [Optional dependency](#optional-dependency) if you want a smaller install.
 
 ### Works with
 

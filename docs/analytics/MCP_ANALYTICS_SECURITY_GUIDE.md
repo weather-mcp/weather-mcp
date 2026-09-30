@@ -1,5 +1,8 @@
 # MCP Analytics Security Implementation Guide
 
+> **Historical:** this is an early design that was not built as written.
+> For current behaviour see [SECURITY.md](../../SECURITY.md) and [LOCAL_ANALYTICS_GUIDE.md](./LOCAL_ANALYTICS_GUIDE.md).
+
 ## Table of Contents
 - [Overview](#overview)
 - [Security Challenges](#security-challenges)
