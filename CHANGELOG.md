@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A failed location lookup now names the service that actually failed.** When a place name could not be looked up, the error blamed Open-Meteo even when Census.gov or OpenStreetMap was the service that failed. A server error or an unreachable service was listed as "No results found". The error now names each service with what happened to it: found no match, timed out, rate-limited, or unavailable. When every lookup service is down, the message says the lookup is unavailable and suggests retrying or passing coordinates. It no longer says that no place matched and asks you to check the spelling. A `WEATHER_DEFAULT_LOCATION` place name that cannot be looked up during an outage is no longer called "not a geocodable place name". (`src/services/geocoding.ts`, `src/utils/locationResolver.ts`)
+
 ## [1.33.17] - 2026-09-30
 
 Version 1.33.14 spaced OpenStreetMap geocoding requests one second apart, but it assumed the server was never busy for longer than that. If the server stalled for more than a second while several lookups were waiting, those lookups could leave together as soon as it resumed. That can break the geocoder's usage policy. The spacing now holds through a stall. Nothing changes in what the tools return.
