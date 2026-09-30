@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+When a place name could not be looked up, the error blamed Open-Meteo for every failure. It also reported a lookup service that was down as if the place did not exist, and asked you to check the spelling. During an outage you could spend time correcting a name that was never wrong. The error now says which service failed and how, and it tells an outage apart from a place that does not exist. Successful lookups return exactly what they did before.
+
 ### Fixed
 
-- **A failed location lookup now names the service that actually failed.** When a place name could not be looked up, the error blamed Open-Meteo even when Census.gov or OpenStreetMap was the service that failed. A server error or an unreachable service was listed as "No results found". The error now names each service with what happened to it: found no match, timed out, rate-limited, or unavailable. When every lookup service is down, the message says the lookup is unavailable and suggests retrying or passing coordinates. It no longer says that no place matched and asks you to check the spelling. A `WEATHER_DEFAULT_LOCATION` place name that cannot be looked up during an outage is no longer called "not a geocodable place name". (`src/services/geocoding.ts`, `src/utils/locationResolver.ts`)
+- **A failed location lookup now names the service that actually failed.** When a place name could not be looked up, the error blamed Open-Meteo even when Census.gov or OpenStreetMap was the service that failed. A server error or an unreachable service was listed as "No results found". The error now names each service with what happened to it: found no match, timed out, rate-limited, or unavailable. When every lookup service is down, the message says the lookup is unavailable and suggests retrying or passing coordinates. It no longer says that no place matched and asks you to check the spelling. A `WEATHER_DEFAULT_LOCATION` place name that cannot be looked up during an outage is no longer called "not a geocodable place name". With debug logging on, a failed lookup no longer writes the upstream error text to the log unless `LOG_PII` is set. (`src/services/geocoding.ts`, `src/utils/locationResolver.ts`)
 
 ## [1.33.17] - 2026-09-30
 
