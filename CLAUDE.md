@@ -106,6 +106,8 @@ src/
 │   ├── config.ts            # Env parsing, endpoint validation; salt generated only at the detailed level
 │   ├── transport.ts         # One bounded request with an absolute deadline, settle-once
 │   └── anonymizer.ts        # Event anonymisation; session hashing at the detailed level
+├── vendor/                  # Third-party code transcribed in, with upstream licence + provenance
+│   └── ngeohash.ts          # Geohash encode/decode/neighbor (ngeohash 0.6.4, MIT); proven by a differential test
 └── errors/
     └── ApiError.ts          # Custom error hierarchy; ApiServiceName is a closed union
 ```
