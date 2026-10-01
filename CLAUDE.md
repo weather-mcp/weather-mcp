@@ -250,6 +250,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 - **Standing key policy:** no tool ever *requires* a key; a keyed feature needs a usable free tier; say plainly when a "free tier" still needs a billing account.
 - **Attribution strings that a licence mandates are exact** (`Source: Includes weather data from Google`, `Source: Includes pollen data from Google`) — do not reword. Licensed alert text renders verbatim with issue times as published.
 - Persist nothing from Google APIs beyond the in-memory cache (ToS).
+- **Vendored third-party code lives in `src/vendor/`**, carries its upstream licence and provenance (package, version, upstream commit) in the file header, and is proven equivalent by a differential test against the upstream package, which stays a devDependency for that test alone (`ngeohash` → `tests/unit/vendor-ngeohash.test.ts`). The small zero-dependency leaf packages (`tz-lookup`, `astronomy-engine`) are pinned **exactly** in `package.json`: the lockfile does not ship, so a range is what a consumer resolves.
 
 ### Caching and concurrency
 

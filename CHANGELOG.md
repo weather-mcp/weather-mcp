@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **One fewer package is installed with the server, and three are pinned exactly.** `ngeohash` is no longer a runtime dependency: the three functions the server calls (`encode`, `decode`, `neighbor`) are now vendored in `src/vendor/ngeohash.ts`, with the upstream MIT notice and provenance in its header, and a test compares them with the upstream package across a coordinate sweep that includes the antimeridian, the poles and uppercase or invalid characters. The reason is the package itself: `ngeohash` 0.6.4 ships about 280 KB of unrelated AI-agent review transcripts inside its published tarball, roughly 85% of its size, and that landed in every install of this server. `tz-lookup` and `astronomy-engine` stay dependencies but are now pinned to exact versions (`6.1.25`, `2.1.19`) instead of caret ranges, because `package-lock.json` is not published: a range is what your install resolves, so it could pick up a release nobody here has seen. Lightning subscriptions, local times and astronomy output are unchanged, checked byte for byte against the previous release. A future security fix in either pinned package now needs a deliberate bump rather than arriving on its own. Closes [#73](https://github.com/weather-mcp/weather-mcp/issues/73) part (b); part (a) shipped in 1.25.0. (`src/vendor/ngeohash.ts`, `src/utils/geohash.ts`, `tests/unit/vendor-ngeohash.test.ts`, `package.json`, `package-lock.json`, `SECURITY.md`, `CLAUDE.md`)
+
 ## [1.33.22] - 2026-10-01
 
 With analytics switched on at the most detailed level, an empty salt file in your home directory made the server drop every analytics event, on every start, without saying so. An interrupted first start could leave that file empty. Analytics is off by default and no analytics endpoint is live, so this reached only someone who had opted in. Weather tools and their output are unchanged.
