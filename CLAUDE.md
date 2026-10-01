@@ -649,8 +649,10 @@ Note: MCP clients spawn `dist/index.js` at session start — a rebuild alone is 
 ```bash
 npm run build          # TypeScript compilation (0 errors)
 npm test              # All tests passing (100%)
-npm audit             # No critical vulnerabilities
+npm audit             # Broad pre-commit check: all deps, moderate
 ```
+
+The publish path enforces a stricter, narrower gate: `npm audit --omit=dev --audit-level=high`, in `publish.yml` and in `prepublishOnly`, with no bypass. `./scripts/check-doc-versions.sh` also fails on a `src/` directory with no map row, on a module in an enumerated directory that the map does not name (`types/` and `analytics/` are excluded), and on a committed home path.
 
 ### Code Review Checklist
 

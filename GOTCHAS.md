@@ -1457,9 +1457,12 @@ case for this entry, because the `Verify` loop is a fixed glob list and a direct
 it does not name cannot produce a `MISSING FROM MAP` line: the check passes by not
 looking. The glob now names `src/server/*.ts` and the Trigger says to extend it.
 Also load-bearing for plans 2 and 3 of the band-rounding sequence, which consume
-the same helper and may add their own. Lintable — the `Verify` loop above is a
-two-line check that belongs in `check-doc-versions.sh`; until it is there, it is a
-manual step in `## Docs impact`.
+the same helper and may add their own. Now enforced by
+`scripts/check-doc-versions.sh` (commit `bd0e9d3`, 2026-09-30) at two levels: a row
+for every `src/` directory, and a name for every module in a directory not on the
+script's `EXCLUDED_DIRS` list (`types`, `analytics`). The match is anchored on the
+left, so a suffix (`a.ts` vs `jma.ts`) cannot pass. The `Verify` loop stays as the
+hand reproduction, and the entry stays active as the why.
 
 ---
 

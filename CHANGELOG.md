@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Nothing changes in the package itself. A release now stops on a high or critical advisory in a shipped dependency, on a `src/` module or directory missing from the `CLAUDE.md` architecture map, and on an absolute home path committed to the repo. The September `qs` advisories were moderate and would still pass this gate.
+
+### Added
+- **The publish workflow audits the shipped dependency tree.** A new step runs `npm audit --omit=dev --audit-level=high` after the tests and before publishing. A high or critical advisory in a dependency that ships stops the release. There is no bypass.
+- **`check-doc-versions.sh` fails on two more things.** It fails when a `src/` directory has no row in the `CLAUDE.md` architecture map, or when a module in an enumerated directory is not named there; `types/` and `analytics/` are described by pattern and are excluded. It also fails when any tracked file holds an absolute home path, other than the placeholders `/home/you/` and `/home/user/`.
+
+### Changed
+- **`prepublishOnly` now audits the shipped tree after building,** so a workstation `npm publish` is gated too. `npm run audit` keeps its broader pre-commit check over all dependencies at `moderate`.
+
 ## [1.33.20] - 2026-09-30
 
 Every start of the server wrote a small secret file into your home directory, even with analytics switched off. Analytics is off by default, so almost every install carried a file for a feature it never used. Only the most detailed analytics level ever reads that file. The server now creates it only then. Weather tools and their output are unchanged.
