@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.21] - 2026-09-30
+
 Nothing changes in the package itself. A release now stops on a high or critical advisory in a shipped dependency, on a `src/` module or directory missing from the `CLAUDE.md` architecture map, and on an absolute home path committed to the repo. The September `qs` advisories were moderate and would still pass this gate.
 
 ### Added
 - **The publish workflow audits the shipped dependency tree.** A new step runs `npm audit --omit=dev --audit-level=high` after the tests and before publishing. A high or critical advisory in a dependency that ships stops the release. There is no bypass.
-- **`check-doc-versions.sh` fails on two more things.** It fails when a `src/` directory has no row in the `CLAUDE.md` architecture map, or when a module in an enumerated directory is not named there; `types/` and `analytics/` are described by pattern and are excluded. It also fails when any tracked file holds an absolute home path, other than the placeholders `/home/you/` and `/home/user/`.
+- **`check-doc-versions.sh` fails on two more things.** It fails when a top-level `src/` file or a `src/` directory has no row in the `CLAUDE.md` architecture map, or when a module in an enumerated directory is not named in the map; `types/` and `analytics/` are described by pattern and are excluded. Only the map itself counts, so a file mentioned elsewhere in `CLAUDE.md` is still reported as missing. It also fails when any tracked file holds an absolute home path, other than the placeholders `/home/you/` and `/home/user/`.
 
 ### Changed
 - **`prepublishOnly` now audits the shipped tree after building,** so a workstation `npm publish` is gated too. `npm run audit` keeps its broader pre-commit check over all dependencies at `moderate`.
@@ -2074,7 +2076,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.20...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.21...HEAD
+[1.33.21]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.20...v1.33.21
 [1.33.20]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.19...v1.33.20
 [1.33.19]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.18...v1.33.19
 [1.33.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.17...v1.33.18
