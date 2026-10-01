@@ -251,6 +251,11 @@ type FingerprintEntry = {
  * d7f13f4559bc36018315f752350a63f8.) The previous base was 80d901a, whose
  * dump was byte-identical to its branch.
  *
+ * Since moved, deliberately, under plan-minutely-nowcast (T3):
+ *
+ *   - get_forecast.enums.granularity gains 'minutely' (the 15-minute
+ *     precipitation nowcast).
+ *
  * The four projected fields are exactly what `deriveFingerprint` below
  * derives. Nothing else is locked: descriptions are Contract 2's job, and
  * `type`/`minimum`/`maximum` are deliberately outside the fingerprint — say
@@ -315,7 +320,7 @@ const EXPECTED_FINGERPRINT_FROM_MAIN: Record<string, FingerprintEntry> = {
     enums: {
       detail: ['full', 'standard', 'summary'],
       distance_unit: ['km', 'mi'],
-      granularity: ['daily', 'hourly'],
+      granularity: ['daily', 'hourly', 'minutely'],
       precipitation_unit: ['inch', 'mm'],
       pressure_unit: ['hPa', 'inHg'],
       source: ['auto', 'noaa', 'openmeteo'],
