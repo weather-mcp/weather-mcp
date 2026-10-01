@@ -72,6 +72,7 @@ src/
 │   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
 │   ├── criticalAlert.ts     # Life-threatening-alert gate, selection, banner copy (pure)
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
+│   ├── nowcast.ts           # minutely_15 nowcast: model superset boxes, 3-state response classification, quarter bands, hourly-probability pick (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
 │   ├── savedLocationShape.ts  # Saved-location record-shape contract — write-side validator and read-side describer (pure)
