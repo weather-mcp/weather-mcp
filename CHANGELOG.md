@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **An empty analytics salt file no longer drops every analytics event.** With analytics enabled at the `detailed` level, an empty or whitespace-only `~/.weather-mcp/analytics-salt` was used as the salt. Every event was then dropped, on every start, with no visible error. The server now replaces an empty file with a new salt. A salt file that holds a value is still never overwritten. A salt file the server cannot read is now left untouched, and a new salt is kept in memory for that run; before, the server could try to overwrite it. The file is now written through a temporary file and renamed into place, so an interrupted first start can no longer leave it empty. Weather tools and their output are unchanged.
+
 ## [1.33.21] - 2026-09-30
 
 Nothing changes in the package itself. A release now stops on a high or critical advisory in a shipped dependency, on a `src/` module or directory missing from the `CLAUDE.md` architecture map, and on an absolute home path committed to the repo. The September `qs` advisories were moderate and would still pass this gate.
