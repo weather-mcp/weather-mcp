@@ -51,7 +51,7 @@ Get weather forecast for any location worldwide.
 - `location_name` (optional): Name of a saved location (e.g., "home") — use instead of coordinates
 - `city_name` (optional): Free-text place name to geocode (e.g., "Paris, France", "Bend, Oregon") — use instead of coordinates when you only have a place name
 - `days` (optional): Number of days in forecast (1-16, default: 7). **NOAA's own horizon is shorter than the maximum:** in the US it publishes a 7-day daily forecast and about 6.5 days (156 hours) of hourly forecast. A larger `days` on the NOAA path renders everything NOAA published plus a line disclosing the shortfall; `source: "openmeteo"` gives the full 1-16 day range worldwide
-- `granularity` (optional): "daily" or "hourly" (default: "daily")
+- `granularity` (optional): "daily", "hourly" or "minutely" (default: "daily"). `"minutely"` is a 2-hour precipitation nowcast in 15-minute steps, available in the contiguous US and nearby Canada and Mexico and in Central Europe — see **15-minute nowcast** below
 - `include_precipitation_probability` (optional): Include rain chances (default: true)
 - `include_normals` (optional): Include climate normals for comparison (default: false). Normals are **global**: official NCEI station normals when an `NCEI_API_TOKEN` is configured and the point is in the US, and 1991-2020 normals computed from the Open-Meteo archive everywhere else — which, since the server ships keyless, is the default path. One full-year archive pull is made per location and reused for every date there. For US locations, also appends the record high/low for the date and the year it was set (source: NOAA Regional Climate Centers / ACIS)
 - `include_astronomy` (optional): Include a per-day astronomy block — moon phase name, illumination %, moonrise/moonset, and civil/nautical/astronomical twilight times — plus one next-full-moon / next-new-moon line per response (default: false, daily forecasts only; computed locally, no API calls). Polar days render explicit "none (polar day)" / "none (polar night)" wording
@@ -98,6 +98,52 @@ through this handler.
 
 Every request Open-Meteo answers normally is byte-for-byte unchanged.
 
+**15-minute nowcast (`granularity: "minutely"`).**
+Answers "will it rain in the next half hour?" — the question an hourly bucket
+cannot. It shows the next two hours in eight 15-minute steps, in local time.
+
+- **Coverage.** Native 15-minute precipitation exists only behind two regional
+  models: **HRRR** (NOAA; the contiguous US and nearby Canada and Mexico,
+  updated hourly) and **ICON-D2** (DWD; Central Europe, updated every 3
+  hours). The server asks the model by name, and the **response** decides
+  coverage, not a bounding box: some points near a domain edge (Edmonton,
+  Kraków) are refused even though they look close. Alaska, Hawaii and Puerto
+  Rico are not covered.
+- **Not covered** is said plainly. You get one paragraph naming the two
+  regions and stating that it is **not a forecast of dry weather**, with a
+  pointer to `granularity: "hourly"`. No table is shown. Without the model
+  named, Open-Meteo would return plausible-looking 15-minute numbers
+  everywhere by interpolating its hourly forecast, so that request is never
+  sent.
+- **Amounts are bands, not figures.** Each 15-minute row shows a band, never a
+  number, because consecutive model runs can disagree about an individual
+  shower and a two-decimal amount reads as more certain than it is. The bands
+  are this server's heuristic, applied to the 15-minute amount rounded to
+  0.01 mm. A missing value reads `no data`, never `none`:
+
+  | Band | 15-minute amount (mm) | (inches) |
+  |---|---|---|
+  | none | 0.00 | 0 |
+  | trace | above 0, below 0.10 | below ~0.004 |
+  | light | 0.10 to below 0.70 | ~0.004 to ~0.028 |
+  | moderate | 0.70 to below 2.00 | ~0.028 to ~0.079 |
+  | heavy | 2.00 and above | ~0.079 and above |
+
+- **Chance of precipitation is hourly.** Open-Meteo's 15-minute probability
+  series is the hourly figure interpolated between hours, so the nowcast shows
+  it once per hour, labelled as an hourly figure (`include_precipitation_probability`
+  turns it off).
+- **Contract.** A failed fetch is an error. Unlike the hourly and daily
+  forecasts, the nowcast has **no MET Norway fallback**, because MET Norway
+  publishes no 15-minute product. `source: "noaa"` is a validation error
+  (NOAA has no 15-minute product); `"auto"` and `"openmeteo"` both reach the
+  nowcast, US points included. `compare_models` and `ensemble_spread` are
+  validation errors with it. `days`, `detail`, `include_normals`,
+  `include_astronomy` and `include_severe_weather` are ignored. The output is
+  the same in imperial and metric apart from the clock format.
+- The life-threatening NWS alert banner appears above the nowcast exactly as it
+  does above any other `get_forecast` answer.
+
 **Model comparison (`compare_models=true`).**
 Answers "how confident is this forecast?" — a question a single deterministic
 forecast cannot address. Fetches five global models in one request —
@@ -125,6 +171,7 @@ Interactions, each deliberate:
 | With | Behavior |
 |------|----------|
 | `granularity: "hourly"` | **Validation error.** The comparison is the requested product, so it fails loudly rather than silently returning a plain hourly forecast |
+| `granularity: "minutely"` | **Validation error**, for the same reason |
 | `source: "noaa"` | **Validation error** — the comparison is Open-Meteo-only. Use `"auto"` or `"openmeteo"` |
 | `source: "auto"` at a US point | Goes straight to the comparison; NOAA is never called. The footer discloses that the NOAA/NWS point forecast is not among the compared models (`gfs_seamless` represents the US global model) |
 | `include_normals`, `include_astronomy` | **Silently ignored** — the comparison is a focused agreement product; both remain available in the standard view |
@@ -178,6 +225,7 @@ Interactions, each deliberate:
 |------|----------|
 | `compare_models: true` | **Validation error** — the two are mutually exclusive. They are distinct products answering different questions; request one view at a time |
 | `granularity: "hourly"` | **Validation error.** The spread is the requested product, so it fails loudly rather than silently returning a plain hourly forecast |
+| `granularity: "minutely"` | **Validation error**, for the same reason |
 | `source: "noaa"` | **Validation error** — the ensemble is Open-Meteo-only. Use `"auto"` or `"openmeteo"` |
 | `source: "auto"` at a US point | Goes straight to the spread; NOAA is never called. The footer discloses that the NOAA/NWS point forecast is not the model being spread |
 | `include_normals`, `include_astronomy`, `include_severe_weather` | **Silently ignored** — the spread is a focused confidence product; all remain available in the standard view |
