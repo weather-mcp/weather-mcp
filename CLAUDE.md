@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.33.20 (Production Ready)
+- **Version:** 1.33.21 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -102,6 +102,10 @@ src/
 │   ├── defaultLocation.ts   # WEATHER_DEFAULT_LOCATION
 │   ├── api.ts               # Optional API keys (NCEI, FIRMS, Google)
 │   └── displayThresholds.ts # Display logic constants
+├── analytics/               # Opt-in usage analytics client (ANALYTICS_ENABLED=true; off by default, no default endpoint)
+│   ├── config.ts            # Env parsing, endpoint validation; salt generated only at the detailed level
+│   ├── transport.ts         # One bounded request with an absolute deadline, settle-once
+│   └── anonymizer.ts        # Event anonymisation; session hashing at the detailed level
 └── errors/
     └── ApiError.ts          # Custom error hierarchy; ApiServiceName is a closed union
 ```
@@ -645,8 +649,10 @@ Note: MCP clients spawn `dist/index.js` at session start — a rebuild alone is 
 ```bash
 npm run build          # TypeScript compilation (0 errors)
 npm test              # All tests passing (100%)
-npm audit             # No critical vulnerabilities
+npm audit             # Broad pre-commit check: all deps, moderate
 ```
+
+The publish path enforces a stricter, narrower gate: `npm audit --omit=dev --audit-level=high`, in `publish.yml` and in `prepublishOnly`, with no bypass. `./scripts/check-doc-versions.sh` also fails on a `src/` directory with no map row, on a module in an enumerated directory that the map does not name (`types/` and `analytics/` are excluded), and on a committed home path.
 
 ### Code Review Checklist
 
@@ -662,15 +668,15 @@ npm audit             # No critical vulnerabilities
 
 ## Project Status
 
-- **Version:** 1.33.20 — Production Ready ✅
+- **Version:** 1.33.21 — Production Ready ✅
 - **Test Coverage:** 4,244 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.33.21:** Releases stop on a high advisory in a shipped dependency, an unmapped module, or a committed home path
 - **New in v1.33.20:** The analytics salt file is created only when the detailed analytics level will read it
 - **New in v1.33.19:** The security policy says what leaves your machine and what stays on it
-- **New in v1.33.18:** Location lookup errors name the service that failed, and an outage no longer reads as a misspelling
 
 ## Useful References
 
@@ -693,7 +699,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-09-30 (v1.33.20)
+**Last Updated:** 2026-09-30 (v1.33.21)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

@@ -55,6 +55,81 @@ else
   echo "   Note: This is OK if working on next release (unreleased section)"
 fi
 
+# --- Tree checks: map coverage and home paths (begin) ---------------------------
+# Two rules this project states as fact and nothing ran until now. Both read the
+# tracked tree, not a diff, so a defect that landed in an earlier release still
+# fails here. They run before the test suite below, so a failure costs seconds.
+#
+# 1. CLAUDE.md's src/ architecture map (GOTCHAS G31). Every top-level src/*.ts
+#    file and every directory under src/ has a row, and every module in a
+#    directory the map enumerates file by file is named — in the map block itself. The default is include: a new directory is checked until someone
+#    adds it to EXCLUDED_DIRS, which is a visible edit. The two excluded
+#    directories are described in the map by pattern rather than file by file.
+#    Matching is by basename, so config/cache.ts and utils/cache.ts cannot tell
+#    each other apart; that grain is accepted (plan-release-governance-gates).
+# 2. No absolute home path in a committed file (bindings, "Never in a committed
+#    file"). The /release leak scan reads only the outgoing diff. The two
+#    placeholder usernames are the documented examples; anything else is a real
+#    path. The owner's own name is never written here, for the same reason.
+echo ""
+echo "🗺️  Checking the src/ architecture map in CLAUDE.md..."
+EXCLUDED_DIRS="types analytics"
+MAP_ERRORS=0
+# Only the fenced block that opens with "src/" counts as the map: a module named
+# in prose elsewhere in CLAUDE.md is not mapped (diff-review copilot-F1).
+MAP_BLOCK=$(awk '/^```$/ { if (in_map) exit; getline next_line; if (next_line == "src/") in_map = 1; next } in_map' CLAUDE.md)
+if [ -z "$MAP_BLOCK" ]; then
+  echo "❌ CLAUDE.md has no fenced block opening with 'src/' — the architecture map could not be read"
+  MAP_ERRORS=$((MAP_ERRORS+1))
+fi
+for f in src/*.ts; do
+  [ -n "$MAP_BLOCK" ] || break   # one error above, not one per module
+  [ -e "$f" ] || continue
+  base_re=$(basename "$f" | sed 's/\./\\./g')
+  if ! grep -qE "^[├└]── ${base_re}" <<< "$MAP_BLOCK"; then
+    echo "❌ ${f} has no row in CLAUDE.md's map — add a '── $(basename "$f")' row to the src/ tree"
+    MAP_ERRORS=$((MAP_ERRORS+1))
+  fi
+done
+for d in src/*/; do
+  [ -n "$MAP_BLOCK" ] || break
+  name=$(basename "$d")
+  if ! grep -qE "^[├└]── ${name}/" <<< "$MAP_BLOCK"; then
+    echo "❌ src/${name}/ has no row in CLAUDE.md's map — add a '── ${name}/' row to the src/ tree"
+    MAP_ERRORS=$((MAP_ERRORS+1))
+  fi
+  case " $EXCLUDED_DIRS " in *" $name "*) continue ;; esac
+  for f in "$d"*.ts; do
+    [ -e "$f" ] || continue
+    # Anchored on the left: a bare substring match lets a.ts pass on jma.ts.
+    base_re=$(basename "$f" | sed 's/\./\\./g')
+    if ! grep -qE "(^|[^A-Za-z0-9_])${base_re}" <<< "$MAP_BLOCK"; then
+      echo "❌ ${f} is not named in CLAUDE.md's map — add a line for it under src/${name}/"
+      MAP_ERRORS=$((MAP_ERRORS+1))
+    fi
+  done
+done
+if [ $MAP_ERRORS -eq 0 ]; then
+  echo "✅ Architecture map: ${GREEN}every src/ directory has a row; every enumerated module is named${NC}"
+fi
+ERRORS=$((ERRORS+MAP_ERRORS))
+
+echo ""
+echo "🏠 Checking tracked files for absolute home paths..."
+HOME_PLACEHOLDERS='you|user'
+HOME_HITS=$(git grep -n -E '(/var)?/home/[A-Za-z0-9_-]+/|/Users/[A-Za-z0-9_.-]+/|[A-Z]:\\Users\\' -- . |
+  grep -vE "/home/(${HOME_PLACEHOLDERS})/" || true)
+if [ -z "$HOME_HITS" ]; then
+  echo "✅ Home paths: ${GREEN}none outside the placeholders (/home/you/, /home/user/)${NC}"
+else
+  while IFS= read -r hit; do
+    echo "❌ Home path in a committed file: ${RED}${hit}${NC}"
+    echo "   Replace it with a placeholder (/home/you/) or a relative path"
+    ERRORS=$((ERRORS+1))
+  done <<< "$HOME_HITS"
+fi
+# --- Tree checks (end) ------------------------------------------------------------
+
 # Check test count consistency
 echo ""
 echo "🧪 Checking test count consistency..."

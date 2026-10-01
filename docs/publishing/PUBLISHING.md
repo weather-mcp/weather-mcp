@@ -7,12 +7,12 @@ This guide covers how to publish the Weather MCP Server to npm, create GitHub re
 For experienced users, here's the recommended publishing workflow:
 
 1. **Pre-release quality checks** → Run code-reviewer & security-auditor in parallel; review reports; fix all CRITICAL/HIGH findings; run test-automator (see "Pre-Release Quality Automation")
-2. **Prepare the release (automated)** → Run `./scripts/update-docs-for-release.sh <patch|minor|major|X.Y.Z> ["summary"]`. This bumps `package.json` + `server.json`, promotes the CHANGELOG `[Unreleased]` section (or seeds a draft from conventional commits since the last tag), maintains the CHANGELOG link-reference block (adds the new version's compare-link definition and re-points `[Unreleased]:` at it), updates version, test-count (including the README badge), and tool-count references in CLAUDE.md, README.md, docs/README.md, docs/TOOLS.md, package.json, server.json, and SECURITY.md, re-renders `.github/social-preview.png` if the tool count changed (re-upload it manually at GitHub → Settings → Social preview), and runs `check-doc-versions.sh`. Tip: write CHANGELOG notes under `[Unreleased]` as you develop — the script promotes them verbatim.
+2. **Prepare the release (automated)** → Run `./scripts/update-docs-for-release.sh <patch|minor|major|X.Y.Z> ["summary"]`. This bumps `package.json` + `server.json`, promotes the CHANGELOG `[Unreleased]` section (or seeds a draft from conventional commits since the last tag), maintains the CHANGELOG link-reference block (adds the new version's compare-link definition and re-points `[Unreleased]:` at it), updates version, test-count (including the README badge), and tool-count references in CLAUDE.md, README.md, docs/README.md, docs/TOOLS.md, package.json, server.json, and SECURITY.md, re-renders `.github/social-preview.png` if the tool count changed (re-upload it manually at GitHub → Settings → Social preview), and runs `check-doc-versions.sh` (which also fails on an unmapped `src/` module or directory and on a committed home path). Tip: write CHANGELOG notes under `[Unreleased]` as you develop — the script promotes them verbatim.
 3. **Review & edit** → `git diff` — especially CHANGELOG wording if it was seeded from commit subjects
 4. **Commit & push** → `git add -A && git commit -m "chore: Release vX.Y.Z" && git push origin main`
 5. **Build & test** → Run `npm run build` and `npm test` (CI re-runs these before publishing)
 6. **Tag & create GitHub release** → `git tag vX.Y.Z && git push origin vX.Y.Z`, then `gh release create vX.Y.Z`
-7. **npm publish (automated)** → Pushing the `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which verifies versions match, builds, tests, and publishes to npm with provenance. Auth is via npm Trusted Publishing (OIDC) — configured on npmjs.com under the package's Settings → Trusted Publisher (repo `weather-mcp/weather-mcp`, workflow `publish.yml`); no token or secret needed. Manual fallback: `npm publish --access public`.
+7. **npm publish (automated)** → Pushing the `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which verifies versions match, builds, tests, audits the shipped dependency tree (`npm audit --omit=dev --audit-level=high`) after the tests and before publishing, and publishes to npm with provenance. A high or critical advisory in a shipped dependency stops the release. There is no bypass flag: a blocked publish is a decision to record in the open in the CHANGELOG's `### Security` section. Auth is via npm Trusted Publishing (OIDC) — configured on npmjs.com under the package's Settings → Trusted Publisher (repo `weather-mcp/weather-mcp`, workflow `publish.yml`); no token or secret needed. Manual fallback: `npm publish --access public`.
 8. **Publish to MCP registry (manual)** → Run `./mcp-publisher login github` then `./mcp-publisher publish`. This cannot be automated in CI: GitHub Actions OIDC authenticates the `io.github.weather-mcp/*` namespace (the repo owner), but this server is registered as `io.github.dgahagan/*`, which requires interactive login as the `dgahagan` GitHub user.
 9. **Verify** → Check npm, GitHub releases, MCP registry, and documentation consistency (`./scripts/check-doc-versions.sh`). A **⚠ warning on an otherwise green publish run** is not a problem: it means npm accepted and signed the tarball but was still not serving it when the `Verify publication` step finished polling at ~10 minutes. The release shipped and is propagating. Confirm with `curl -s https://registry.npmjs.org/@dangahagan/weather-mcp | jq -r '.["dist-tags"].latest'` — do not re-run the workflow and do not `npm publish` by hand, because the version already exists.
 
@@ -50,7 +50,7 @@ Before you begin:
 - [ ] All pre-release fixes committed (see "Pre-Release Quality Automation" for details)
 
 ### Documentation Updates (see "Pre-Release Documentation Update")
-- [ ] **Run documentation version check** → `./scripts/check-doc-versions.sh`
+- [ ] **Run documentation version check** → `./scripts/check-doc-versions.sh` (fails on an unmapped module/directory or a committed home path)
 - [ ] **Update CHANGELOG.md** → Add new version entry with release notes
 - [ ] **Update README.md** → Update test counts, feature descriptions, remove outdated version references
 - [ ] **Update CLAUDE.md** → Update version, test count, project structure (if changed), last updated date
@@ -59,7 +59,7 @@ Before you begin:
 - [ ] **Create TEST_COVERAGE_REPORT** → (if minor/major release) Document new test coverage
 - [ ] **Update CODE_REVIEW.md** → (if major release or significant changes) Reflect current code quality
 - [ ] **Update SECURITY_AUDIT.md** → (if major release or security changes) Reflect current security posture
-- [ ] **Re-run version check** → `./scripts/check-doc-versions.sh` should pass with 0 errors
+- [ ] **Re-run version check** → `./scripts/check-doc-versions.sh` should pass with 0 errors (including no unmapped module/directory and no home path)
 - [ ] All documentation updates committed
 
 ### Version Updates
@@ -206,7 +206,7 @@ Please run the code-reviewer and security-auditor agents in parallel to assess t
    ```bash
    npm run build  # Must succeed
    npm test       # All tests must pass
-   npm audit      # Zero critical/high vulnerabilities
+   npm audit --omit=dev --audit-level=high  # The gate the publish workflow enforces
    ```
 
 **Why This Order Matters:**
@@ -263,7 +263,7 @@ npm run build  # Must succeed with 0 errors
 npm test  # All tests must pass
 
 # 4. Check for vulnerabilities
-npm audit  # Should show 0 critical/high vulnerabilities
+npm audit --omit=dev --audit-level=high  # The gate the publish workflow enforces; must exit 0
 
 # 5. Verify test coverage (optional but recommended)
 npm run test:coverage  # Check coverage metrics
@@ -599,7 +599,7 @@ npm publish --access public
 ```
 
 This will:
-1. Run `prepublishOnly` script (builds the project)
+1. Run `prepublishOnly` script (builds the project and audits the shipped tree with `npm audit --omit=dev --audit-level=high`; the publish stops if that audit fails)
 2. Create tarball
 3. Upload to npm registry
 
