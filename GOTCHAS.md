@@ -514,7 +514,7 @@ file and echo `$?` in the same command. There is no cheap second look, and
 re-running it only to find out whether it passed costs another full suite.
 
 **Why:** `check-doc-versions.sh` shells out to `npm test` to get the count it
-validates against (`:70`), so every invocation costs ~65 s. `update-docs-for-release.sh`
+validates against (`:128` since the 2026-09-30 tree checks; was `:70`), so every invocation costs ~65 s. `update-docs-for-release.sh`
 runs the suite itself (`:163`) **and** then invokes the checker (`:277`), which
 runs it again — so a release dry run is ~2.5 minutes, and neither cost is
 visible from reading the script's top. A five-case truth table iterated against
@@ -6566,6 +6566,22 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 **Evidence:** 2026-09-30, security-policy-accuracy. Plan review codex-R2 corrected the design and the impl plan before T2 ran. `SECURITY.md` states all three placements (`ede0292`).
 
 **Status:** active. The bindings' "API-key hygiene" review anchor still says the keys "ride the URL query string". That row is Dan's to correct.
+
+---
+
+## G128 — Proving an audit gate blocks: seed the dependency spec, read the severity audit reports, restore by copy
+
+**Trigger:** proving that an `npm audit` gate (`publish.yml`'s "Audit shipped dependencies" step, `prepublishOnly`) fails when it should, or proving that its `--omit=dev` scoping lets a dev-only advisory through.
+
+**Rule:** seed by changing the **dependency spec itself** (`npm pkg set dependencies.<pkg>=<old>`, or `devDependencies.<pkg>` for the scoping control), then `npm install --package-lock-only --ignore-scripts`, so `node_modules` and the build are untouched. `overrides` cannot do this for a package that is a direct dependency. Read the severity from the audit output, not from the advisory you looked up: pick the version by what `npm audit` reports at it. For the dev-only control, prefer a package that is not already in the tree's peer graph (`minimist`) over a downgrade of a toolchain package (`vitest`), whose exact peers turn a lockfile-only install into an `ERESOLVE`. `cp` `package.json` **and** `package-lock.json` before each seed and restore both from the copies (G27). Finish with `npm ci` and the gate.
+
+**Why:** the impl plan cited GHSA-6w63-h3fj-q4vw for `fast-xml-parser@4.2.4`, but 4.2.4 is the version that advisory is *fixed* in. The seed worked only because other advisories (GHSA-8gc5-j5rx-235r, GHSA-jmr7-xgp7-cmfj) still cover it, and audit rated it **critical**. A probe built on the cited advisory alone would have "proved" a gate with an input it does not flag, and the probe would have passed for the wrong reason.
+
+**Verify:** after the seed, `npm audit --omit=dev --audit-level=high; echo $?` is non-zero and names the seeded package. After the restore, `git diff --stat` shows no `package-lock.json` change.
+
+**Evidence:** 2026-09-30, release-governance-gates T3 (`8ac3676`). Runtime seed `fast-xml-parser@4.2.4`: gate exit 1 and `npm run prepublishOnly` exit 1 after `tsc`. Dev seed `minimist@1.2.5` (critical, GHSA-xvch-5gv4-984h): plain `npm audit` exit 1, gate exit 0.
+
+**Status:** active. Related: [G27] (restore by copy), [G66] (`npm audit fix` and the release cooldown), [G118] (`overrides` pins expire).
 
 ---
 
