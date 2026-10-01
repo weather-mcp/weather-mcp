@@ -1461,7 +1461,9 @@ the same helper and may add their own. Now enforced by
 `scripts/check-doc-versions.sh` (commit `bd0e9d3`, 2026-09-30) at two levels: a row
 for every `src/` directory, and a name for every module in a directory not on the
 script's `EXCLUDED_DIRS` list (`types`, `analytics`). The match is anchored on the
-left, so a suffix (`a.ts` vs `jma.ts`) cannot pass. The `Verify` loop stays as the
+left, so a suffix (`a.ts` vs `jma.ts`) cannot pass. It reads only the fenced block that opens with `src/`, so
+a mention in prose does not count as mapped, and it also requires a row for each
+top-level `src/*.ts` (diff-review copilot-F1). The `Verify` loop stays as the
 hand reproduction, and the entry stays active as the why.
 
 ---
