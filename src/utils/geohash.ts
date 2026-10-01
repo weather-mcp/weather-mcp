@@ -3,7 +3,7 @@
  * Based on the homeassistant-blitzortung implementation
  */
 
-import geohash from 'ngeohash';
+import * as geohash from '../vendor/ngeohash.js';
 
 /**
  * Bounding box for geographic area
