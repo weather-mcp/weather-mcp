@@ -53,6 +53,14 @@ jobs:
       - name: Test
         run: npm test
 
+      # The shipped tree only (--omit=dev), at the project's stated bar (high).
+      # It runs here, while everything is still reversible, and prepublishOnly
+      # runs it again inside `npm publish` below for the workstation path, so CI
+      # audits twice by design. There is no bypass: a blocked publish is a
+      # decision to make in the open (CHANGELOG ### Security), not a flag.
+      - name: Audit shipped dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Skip if version already published
         id: check
         run: |
