@@ -1113,7 +1113,7 @@ plan-review codex R2).** The same isolation applies to `$HOME` when a probe comp
 *first-run* output across two processes — base against branch, keyed against keyless.
 `getOrGenerateAnalyticsSalt()` (`src/analytics/config.ts`) writes
 `$HOME/.weather-mcp/analytics-salt` and logs `Generated new analytics salt` only when the
-file is absent. Since 2026-09-30 (analytics-salt-gate) it runs only when analytics is
+file is absent or empty. Since 2026-09-30 (analytics-salt-gate) it runs only when analytics is
 enabled at the `detailed` level, so the first-run line appears only in probes run with
 that configuration; a default or `minimal`/`standard` probe no longer consumes the
 precondition. For those that do, two spawns sharing one `HOME=$(mktemp -d)` disagree by one line:
@@ -1122,7 +1122,16 @@ process its own empty home, and record each path. The plan as first written shar
 the review caught it before the run, and T2 then showed each side logging the line in
 its own home, byte-identical after timestamps were stripped.
 
-**Status:** active, **extended 2026-08-29**; **fresh-home paragraph revised 2026-09-30** (analytics-salt-gate — the salt is now generated only for an enabled `detailed` config, so the first-run precondition exists only in probes run that way; the rule is unchanged). **Verify line re-run 2026-08-27** (wildfire band-rounding
+**The clean environment also drops the repo's tool preset (2026-10-01,
+analytics-salt-empty-file).** A temp-cwd spawn runs the `basic` preset. A probe that calls a
+tool outside it (`list_saved_locations`, for one) gets an error result **before**
+`withAnalytics` runs, so no analytics event is attempted and the base and the branch print
+the same silence. The first two passes of that plan's empty-salt probe compared exactly
+this and looked like a no-op fix. Set `ENABLED_TOOLS=all` in the probe's own env (or call a
+`basic` tool), and print the tool result, so an unregistered tool shows up as an error and
+not as an empty log.
+
+**Status:** active, **extended 2026-08-29**; **fresh-home paragraph revised 2026-09-30** (analytics-salt-gate — the salt is now generated only for an enabled `detailed` config, so the first-run precondition exists only in probes run that way; the rule is unchanged); **revised again 2026-10-01** (analytics-salt-empty-file — an empty or whitespace-only salt file is now replaced, so a home pre-seeded with an empty file also produces the first-run line; the rule is unchanged); **preset paragraph added 2026-10-01** (same plan, `5472546` probe). **Verify line re-run 2026-08-27** (wildfire band-rounding
 T3): the live probe spawned the built dist from a temp cwd with `ENABLED_TOOLS`
 **unset** and got **6 tools, `get_wildfire_info` absent**, against the 17 a
 repo-root spawn reports — run as an explicit control *before* the keyed and
@@ -3484,7 +3493,7 @@ required together:
    analytics client off its flush timer, and it also keeps the import off the
    filesystem: `loadAnalyticsConfig()` builds the analytics singleton at module
    load and calls `getOrGenerateAnalyticsSalt()` — which writes
-   `~/.weather-mcp/analytics-salt` when it is absent — **only for an enabled
+   `~/.weather-mcp/analytics-salt` when it is absent or empty — **only for an enabled
    `detailed` config** (since 2026-09-30). The third is a second guard: a fixed
    salt makes `getOrGenerateAnalyticsSalt()` return before any filesystem access,
    should a shell export an enabled detailed configuration past the second.
@@ -3570,7 +3579,7 @@ temp `HOME` — the test created `analytics-salt` (64 bytes, mode 0600) on every
 run until the hoisted `ANALYTICS_SALT` of point 2 landed (diff-review copilot
 DR-1, 2026-09-01).
 
-**Status:** active, **narrowed 2026-09-09** (issue-95). The relocation this
+**Status:** active, **narrowed 2026-09-09** (issue-95); **point 2 wording revised 2026-10-01** (analytics-salt-empty-file — the salt file is now written when absent *or empty*; the pins and the rule are unchanged). The relocation this
 entry's Status once rejected has shipped, as `src/server/weatherServer.ts` — and
 the trigger it named was the wrong one. It said *revisit if a second test needs a
 second symbol from this file*; what actually forced it was a second **transport**,

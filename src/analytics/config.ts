@@ -86,6 +86,9 @@ export function validateAnalyticsEndpoint(endpoint: string): void {
 /**
  * Get or generate analytics salt for session ID hashing
  * Generates a unique salt per installation and persists it.
+ * An absent or empty (whitespace-only) salt file is replaced with a new salt;
+ * a non-empty one is returned unchanged and never overwritten; one that cannot
+ * be read is left alone and a fresh salt is kept in memory for this run.
  * Runs only for an enabled detailed-level config (see loadAnalyticsConfig).
  */
 function getOrGenerateAnalyticsSalt(): string {
@@ -100,22 +103,64 @@ function getOrGenerateAnalyticsSalt(): string {
 
   try {
     if (fs.existsSync(saltFile)) {
-      return fs.readFileSync(saltFile, 'utf8').trim();
+      const existing = fs.readFileSync(saltFile, 'utf8').trim();
+      if (existing !== '') {
+        return existing;
+      }
+      logger.warn('Analytics salt file is empty; replacing it');
     }
   } catch (err) {
     logger.warn('Could not read analytics salt file', {
       error: err instanceof Error ? err.message : 'Unknown error',
     });
+    // Return without writing: a rename would succeed where the old in-place write
+    // failed, and a transient read error must not rotate a good salt.
+    return crypto.randomBytes(32).toString('hex');
   }
 
   // Generate new random salt
   const newSalt = crypto.randomBytes(32).toString('hex');
 
+  const tmp = path.join(
+    configDir,
+    `.analytics-salt.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`
+  );
+  let fd: number | undefined;
   try {
     fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
-    fs.writeFileSync(saltFile, newSalt, { mode: 0o600 });
+    // 0600 at creation, so the temp file is never readable by others, even empty.
+    fd = fs.openSync(tmp, 'wx', 0o600);
+
+    // writeSync is not documented to write the buffer whole; loop to completion
+    // so a short write is never renamed into place as the salt.
+    const buf = Buffer.from(newSalt, 'utf8');
+    for (let off = 0; off < buf.length; ) {
+      const written = fs.writeSync(fd, buf, off, buf.length - off);
+      if (!(written > 0)) {
+        throw new Error('Salt write made no progress');
+      }
+      off += written;
+    }
+
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+
+    fs.renameSync(tmp, saltFile);
     logger.info('Generated new analytics salt');
   } catch (err) {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // Ignore: the original error is what matters.
+      }
+    }
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      // Ignore: the temp file may never have been created.
+    }
     logger.warn('Could not persist analytics salt', {
       error: err instanceof Error ? err.message : 'Unknown error',
     });

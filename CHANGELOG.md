@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.22] - 2026-10-01
+
+With analytics switched on at the most detailed level, an empty salt file in your home directory made the server drop every analytics event, on every start, without saying so. An interrupted first start could leave that file empty. Analytics is off by default and no analytics endpoint is live, so this reached only someone who had opted in. Weather tools and their output are unchanged.
+
+### Fixed
+- **An empty analytics salt file no longer drops every analytics event.** With analytics enabled at the `detailed` level, an empty or whitespace-only `~/.weather-mcp/analytics-salt` was used as the salt, and every event was dropped. The server now replaces an empty file with a new salt. A salt file that holds a value is still never overwritten. The file is now written to a temporary file and renamed into place, so an interrupted first start can no longer leave it empty.
+
+### Changed
+- **A salt file the server cannot read is now left untouched.** Before, the server could try to overwrite it with a new salt. Now it keeps a new salt in memory for that run and changes nothing on disk, so a passing read error can never replace a salt that was fine.
+
 ## [1.33.21] - 2026-09-30
 
 Nothing changes in the package itself. A release now stops on a high or critical advisory in a shipped dependency, on a `src/` module or directory missing from the `CLAUDE.md` architecture map, and on an absolute home path committed to the repo. The September `qs` advisories were moderate and would still pass this gate.
@@ -2076,7 +2086,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.21...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...HEAD
+[1.33.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.21...v1.33.22
 [1.33.21]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.20...v1.33.21
 [1.33.20]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.19...v1.33.20
 [1.33.19]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.18...v1.33.19

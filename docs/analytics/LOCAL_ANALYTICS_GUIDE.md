@@ -54,7 +54,7 @@ empty, the server logs one warning at startup —
 and analytics stays off. The server keeps running and no tool is affected. With `ANALYTICS_ENABLED`
 unset, nothing is sent and the server logs `Analytics disabled by user preference`. With
 `ANALYTICS_LEVEL=detailed`, the first run — no `ANALYTICS_SALT` set and no
-`~/.weather-mcp/analytics-salt` file yet — logs `Generated new analytics salt` just before
+`~/.weather-mcp/analytics-salt` file yet, or an empty one — logs `Generated new analytics salt` just before
 `Analytics configuration loaded`.
 
 ## Testing Analytics Integration

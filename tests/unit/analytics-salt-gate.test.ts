@@ -16,6 +16,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import * as fs from 'fs';
+import fsDefault from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
@@ -30,10 +31,12 @@ void BEFORE;
 
 import { loadAnalyticsConfig } from '../../src/analytics/config.js';
 import { logger } from '../../src/utils/logger.js';
+import { AnalyticsCollector } from '../../src/analytics/collector.js';
 
 const ENDPOINT = 'https://analytics.example.com/v1/events';
 const GENERATED = 'Generated new analytics salt';
 const LOADED = 'Analytics configuration loaded';
+const HEX64 = /^[0-9a-f]{64}$/;
 
 interface Env {
   enabled?: string;
@@ -120,5 +123,93 @@ describe('analytics salt gate', () => {
     const config = loadAnalyticsConfig();
     expect(config.salt).toBe('env-salt');
     expect(fs.readdirSync(tmp)).toEqual([]);
+  });
+
+  function saltDirEntries(): string[] {
+    return fs.readdirSync(path.join(tmp, '.weather-mcp'));
+  }
+
+  function seedSaltFile(content: string): string {
+    const dir = path.join(tmp, '.weather-mcp');
+    const file = path.join(dir, 'analytics-salt');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, content, { mode: 0o644 });
+    return file;
+  }
+
+  it.each<[string, string]>([
+    ['empty', ''],
+    ['whitespace only', '   \n\t'],
+  ])('replaces a salt file that is %s with a new persisted salt', (_name, content) => {
+    const file = seedSaltFile(content);
+    stub({ enabled: 'true', endpoint: ENDPOINT, level: 'detailed' });
+    const config = loadAnalyticsConfig();
+    expect(config.salt).toMatch(HEX64);
+    expect(fs.readFileSync(file, 'utf8')).toBe(config.salt);
+    const st = fs.statSync(file);
+    expect(st.size).toBe(64);
+    expect(st.mode & 0o777).toBe(0o600);
+    expect(saltDirEntries()).toEqual(['analytics-salt']);
+    expect(infoMessages()).toContain(GENERATED);
+  });
+
+  it('leaves an unreadable salt file alone and keeps a fresh salt in memory', () => {
+    const file = seedSaltFile('known-salt-value');
+    const realRead = fsDefault.readFileSync;
+    const readSpy = vi.spyOn(fsDefault, 'readFileSync').mockImplementation(((
+      ...args: Parameters<typeof fsDefault.readFileSync>
+    ) => {
+      if (args[0] === file) {
+        throw Object.assign(new Error('read failed'), { code: 'EIO' });
+      }
+      return realRead(...args);
+    }) as typeof fsDefault.readFileSync);
+    stub({ enabled: 'true', endpoint: ENDPOINT, level: 'detailed' });
+    const config = loadAnalyticsConfig();
+    expect(readSpy.mock.calls.some((c) => c[0] === file)).toBe(true);
+    expect(config.salt).toMatch(HEX64);
+    expect(config.salt).not.toBe('known-salt-value');
+    readSpy.mockRestore();
+    expect(fs.readFileSync(file, 'utf8')).toBe('known-salt-value');
+    expect(saltDirEntries()).toEqual(['analytics-salt']);
+    expect(infoMessages()).not.toContain(GENERATED);
+  });
+
+  it('a fresh write leaves only the salt file in the config directory', () => {
+    stub({ enabled: 'true', endpoint: ENDPOINT, level: 'detailed' });
+    const config = loadAnalyticsConfig();
+    expect(config.salt).toMatch(HEX64);
+    expect(saltDirEntries()).toEqual(['analytics-salt']);
+  });
+
+  it('removes the temp file and keeps an in-memory salt when the rename fails', () => {
+    const realRename = fsDefault.renameSync;
+    let thrown = false;
+    const renameSpy = vi.spyOn(fsDefault, 'renameSync').mockImplementation(((
+      ...args: Parameters<typeof fsDefault.renameSync>
+    ) => {
+      if (!thrown) {
+        thrown = true;
+        throw Object.assign(new Error('rename failed'), { code: 'EIO' });
+      }
+      return realRename(...args);
+    }) as typeof fsDefault.renameSync);
+    stub({ enabled: 'true', endpoint: ENDPOINT, level: 'detailed' });
+    const config = loadAnalyticsConfig();
+    expect(renameSpy).toHaveBeenCalledTimes(1);
+    expect(config.salt).toMatch(HEX64);
+    expect(saltDirEntries()).toEqual([]);
+    expect(infoMessages()).not.toContain(GENERATED);
+  });
+
+  it('an empty salt file no longer drops analytics events', async () => {
+    seedSaltFile('');
+    stub({ enabled: 'true', endpoint: ENDPOINT, level: 'detailed' });
+    const config = loadAnalyticsConfig();
+    const sendBatch = vi.fn().mockResolvedValue(undefined);
+    const collector = new AnalyticsCollector(config, { sendBatch });
+    await collector.trackToolCall('get_forecast', 'success');
+    expect(collector.getBufferSize()).toBe(1);
+    await collector.shutdown();
   });
 });
