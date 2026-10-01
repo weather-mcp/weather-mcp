@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.23] - 2026-10-01
+
 Installing the server pulled in a small geohash package whose latest release ships about 280 KB of unrelated AI-agent transcripts, and it declared its other small single-maintainer dependencies with version ranges. The lockfile that pins exact versions is not published, so those ranges are what your install resolves: a new release of any of them could reach you without anyone here having seen it. This release removes that package and pins the other two exactly. Weather tools and their output are unchanged.
 
 ### Changed
@@ -2091,7 +2093,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.23...HEAD
+[1.33.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...v1.33.23
 [1.33.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.21...v1.33.22
 [1.33.21]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.20...v1.33.21
 [1.33.20]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.19...v1.33.20
