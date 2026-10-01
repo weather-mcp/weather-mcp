@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+With analytics switched on at the most detailed level, an empty salt file in your home directory made the server drop every analytics event, on every start, without saying so. An interrupted first start could leave that file empty. Analytics is off by default and no analytics endpoint is live, so this reached only someone who had opted in. Weather tools and their output are unchanged.
+
 ### Fixed
-- **An empty analytics salt file no longer drops every analytics event.** With analytics enabled at the `detailed` level, an empty or whitespace-only `~/.weather-mcp/analytics-salt` was used as the salt. Every event was then dropped, on every start, with no visible error. The server now replaces an empty file with a new salt. A salt file that holds a value is still never overwritten. A salt file the server cannot read is now left untouched, and a new salt is kept in memory for that run; before, the server could try to overwrite it. The file is now written through a temporary file and renamed into place, so an interrupted first start can no longer leave it empty. Weather tools and their output are unchanged.
+- **An empty analytics salt file no longer drops every analytics event.** With analytics enabled at the `detailed` level, an empty or whitespace-only `~/.weather-mcp/analytics-salt` was used as the salt, and every event was dropped. The server now replaces an empty file with a new salt. A salt file that holds a value is still never overwritten. The file is now written to a temporary file and renamed into place, so an interrupted first start can no longer leave it empty.
+
+### Changed
+- **A salt file the server cannot read is now left untouched.** Before, the server could try to overwrite it with a new salt. Now it keeps a new salt in memory for that run and changes nothing on disk, so a passing read error can never replace a salt that was fine.
 
 ## [1.33.21] - 2026-09-30
 
