@@ -102,6 +102,10 @@ src/
 │   ├── defaultLocation.ts   # WEATHER_DEFAULT_LOCATION
 │   ├── api.ts               # Optional API keys (NCEI, FIRMS, Google)
 │   └── displayThresholds.ts # Display logic constants
+├── analytics/               # Opt-in usage analytics client (ANALYTICS_ENABLED=true; off by default, no default endpoint)
+│   ├── config.ts            # Env parsing, endpoint validation; salt generated only at the detailed level
+│   ├── transport.ts         # One bounded request with an absolute deadline, settle-once
+│   └── anonymizer.ts        # Event anonymisation; session hashing at the detailed level
 └── errors/
     └── ApiError.ts          # Custom error hierarchy; ApiServiceName is a closed union
 ```
