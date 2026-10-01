@@ -6625,6 +6625,36 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 ---
 
+## G129 — An Open-Meteo retry predicate that string-matches error messages never matches the errors the interceptor throws
+
+**Trigger:** adding or relying on a retry loop in `src/services/openmeteo.ts` (`makeRequest`, `makeRequestToForecast`, `makeNowcastRequest`, and their siblings), or writing a test that expects one of them to retry a 429, a 5xx or a timeout.
+
+**Rule:** do not assume the loop retries anything that came through `handleError`. Each loop retries only when `error.message` contains lowercase `rate limit`, `server error` or `timed out`. The response interceptor turns every axios failure into a typed error first, and those messages are `"Rate limit exceeded for OpenMeteo"` (capital R) and `"OpenMeteo API is currently unavailable"`. Neither matches. A test that wants to exercise the retry path has to reject with a raw `Error` whose message contains one of the substrings. A test that rejects with a typed error proves the "no retry" path. Say which one you are pinning.
+
+**Why:** the predicate and the error classes were written separately, and nothing exercised them together through the interceptor. Every unit test that "covers" the retry stubs a private seam with a hand-written message, so the suite stays green while production never retries a 429 or a 503 on any Open-Meteo call. Fixing the predicate changes the latency and request count of every Open-Meteo tool on failure, so it is a behaviour change for its own plan, not a drive-by.
+
+**Verify:** `node -e "import('./dist/errors/ApiError.js').then(m=>console.log(new m.RateLimitError('OpenMeteo').message, '|', new m.ServiceUnavailableError('OpenMeteo', new Error('x')).message))"` — while neither message contains a predicate substring, this entry holds.
+
+**Evidence:** 2026-10-01, minutely-nowcast T2 (`40d3345`). The plan's "same retry policy as hourly" test expected four calls for a `ServiceUnavailableError` and got one. `tests/unit/openmeteo-nowcast.test.ts` now pins both halves: a typed error is not retried, and a raw `server error` message is retried 1 + `maxRetries` times.
+
+**Status:** active. **The defect it describes is open**: candidate Hardening & fixes row. Retire this entry when the predicate matches the typed errors (by class or `isRetryableError`, not by message). Related: [G70] (wrong seam), [G115].
+
+## G130 — Open-Meteo's `timezone_abbreviation` is a GMT offset, not a zone name
+
+**Trigger:** rendering a zone label from an Open-Meteo response fetched with `timezone=auto` (forecast, nowcast, or any endpoint that echoes `timezone_abbreviation`).
+
+**Rule:** do not print `timezone_abbreviation`. Derive the label from the IANA `timezone` with luxon (`DateTime.fromMillis(now, { zone }).offsetNameShort`), and accept that ICU's en-US data has no short name for many non-US zones (`GMT+2` for Europe/Berlin is correct output, not a bug).
+
+**Why:** the field reads like a zone name, but Open-Meteo sends `"GMT-4"` for America/Detroit in daylight time, where a reader expects `EDT`. Fixtures copied from docs or older captures say `MDT` or `JST`, so a unit test built from them passes while the live render shows an offset.
+
+**Verify:** `curl -s "https://api.open-meteo.com/v1/forecast?latitude=43.82&longitude=-84.77&minutely_15=precipitation&forecast_minutely_15=1&timezone=auto" | jq -r .timezone_abbreviation` — `GMT-4` or `GMT-5` means the entry holds.
+
+**Evidence:** 2026-10-01, minutely-nowcast T2 live capture and T3 (`2fe2f9d`). The nowcast header uses `offsetNameShort` and renders `EDT`. The QA record shows `GMT+2` and `GMT+1` for Berlin and London.
+
+**Status:** active. Lint candidate: no `src/` file should read `timezone_abbreviation` for display.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
