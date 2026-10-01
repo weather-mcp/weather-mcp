@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.22] - 2026-10-01
+
 With analytics switched on at the most detailed level, an empty salt file in your home directory made the server drop every analytics event, on every start, without saying so. An interrupted first start could leave that file empty. Analytics is off by default and no analytics endpoint is live, so this reached only someone who had opted in. Weather tools and their output are unchanged.
 
 ### Fixed
@@ -2084,7 +2086,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.21...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...HEAD
+[1.33.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.21...v1.33.22
 [1.33.21]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.20...v1.33.21
 [1.33.20]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.19...v1.33.20
 [1.33.19]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.18...v1.33.19
