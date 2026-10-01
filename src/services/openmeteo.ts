@@ -8,7 +8,7 @@
  * - Marine: https://open-meteo.com/en/docs/marine-weather-api
  */
 
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 import type {
   OpenMeteoHistoricalResponse,
   OpenMeteoErrorResponse,
@@ -19,6 +19,7 @@ import type {
   OpenMeteoFloodResponse,
   OpenMeteoModelComparisonResponse,
   OpenMeteoEnsembleResponse,
+  OpenMeteoNowcastResponse,
   ClimateNormals
 } from '../types/openmeteo.js';
 import { Cache } from '../utils/cache.js';
@@ -32,6 +33,12 @@ import { UnitPreferences, IMPERIAL_PREFERENCES } from '../config/units.js';
 import { openMeteoUnitParams } from '../utils/unitFormat.js';
 import { COMPARISON_MODELS } from '../utils/modelComparison.js';
 import { ENSEMBLE_MODEL } from '../utils/ensembleSpread.js';
+import {
+  classifyNowcastResponse,
+  msUntilNextQuarter,
+  selectNowcastModel,
+  type NowcastModel
+} from '../utils/nowcast.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -47,6 +54,26 @@ import {
 function unitSignature(prefs: UnitPreferences): string {
   return `${prefs.temperature}-${prefs.windSpeed}-${prefs.precipitation}`;
 }
+
+/**
+ * The nowcast request resolves a 400 as a response instead of rejecting it.
+ *
+ * The forecast client's response interceptor sends every rejected request
+ * through `handleError`, which logs a 400 as a `securityEvent` and throws
+ * `InvalidLocationError` before any caller can look at it. A point outside
+ * the HRRR / ICON-D2 domain answers 400 with a fixed reason, and that is an
+ * expected outcome, not an attack. Resolving the 400 lets `getNowcast`
+ * classify it first; every 400 that is not the no-data answer is handed to
+ * `handleError` unchanged.
+ */
+export function nowcastValidateStatus(status: number): boolean {
+  return (status >= 200 && status < 300) || status === 400;
+}
+
+/** Outcome of `getNowcast`: the covered series, or a not-covered answer (never an error). */
+export type NowcastResult =
+  | { status: 'covered'; model: NowcastModel; response: OpenMeteoNowcastResponse }
+  | { status: 'not-covered'; model: NowcastModel | null };
 
 /**
  * Bounded 429 posture for the climate-normals archive pull (D3).
@@ -1011,6 +1038,144 @@ export class OpenMeteoService {
         'OpenMeteo',
         'No daily forecast data available for the specified location'
       );
+    }
+  }
+
+  /**
+   * Get the 15-minute precipitation nowcast for a point (`get_forecast`,
+   * `granularity: "minutely"`).
+   *
+   * Only HRRR and ICON-D2 publish native 15-minute data; a plain
+   * `minutely_15` request interpolates the hourly series everywhere else, so
+   * the model is always named. `selectNowcastModel` picks the model worth
+   * asking from a superset box (no request outside both); the response decides
+   * coverage (G53) — `classifyNowcastResponse` reads it.
+   *
+   * Fetched in millimetres with no unit params: the render shows bands, never
+   * an amount, so the answer is unit-invariant and the key carries no unit
+   * signature.
+   *
+   * Caching: a covered series expires at the next UTC quarter boundary,
+   * because its window starts at the request's current quarter. A not-covered
+   * answer is a null sentinel under its own key for
+   * `CacheConfig.ttl.nowcastCoverage` (G7: the two never share a key).
+   *
+   * @param nowMs - Clock injection for tests (default: `Date.now()`)
+   */
+  async getNowcast(
+    latitude: number,
+    longitude: number,
+    nowMs: number = Date.now()
+  ): Promise<NowcastResult> {
+    validateLatitude(latitude);
+    validateLongitude(longitude);
+
+    const model = selectNowcastModel(latitude, longitude);
+    if (model === null) {
+      return { status: 'not-covered', model: null };
+    }
+
+    const coverageKey = Cache.generateKey('openmeteo-nowcast-coverage', latitude, longitude, model);
+    const dataKey = Cache.generateKey('openmeteo-nowcast', latitude, longitude, model);
+
+    if (CacheConfig.enabled) {
+      // `!== undefined`, never truthy: the not-covered sentinel is a stored null.
+      const coverage = this.cache.get(coverageKey);
+      if (coverage !== undefined) {
+        return { status: 'not-covered', model };
+      }
+      const cached = this.cache.get(dataKey);
+      if (cached !== undefined) {
+        return { status: 'covered', model, response: cached as OpenMeteoNowcastResponse };
+      }
+    }
+
+    const params: Record<string, string | number> = {
+      latitude,
+      longitude,
+      minutely_15: 'precipitation,precipitation_probability',
+      forecast_minutely_15: 8,
+      models: model,
+      timezone: 'auto'
+    };
+
+    const response = await this.makeNowcastRequest(params);
+    const outcome = classifyNowcastResponse(response.status, response.data);
+
+    if (outcome === 'covered') {
+      const body = response.data as OpenMeteoNowcastResponse;
+      if (CacheConfig.enabled) {
+        this.cache.set(dataKey, body, msUntilNextQuarter(nowMs));
+      }
+      return { status: 'covered', model, response: body };
+    }
+
+    if (outcome === 'not-covered') {
+      if (CacheConfig.enabled) {
+        this.cache.set(coverageKey, null, CacheConfig.ttl.nowcastCoverage);
+      }
+      logger.debug('Nowcast model does not cover point', {
+        service: 'OpenMeteo',
+        model,
+        outcome: 'not-covered'
+      });
+      return { status: 'not-covered', model };
+    }
+
+    if (response.status === 400) {
+      // Any other 400 is today's error, exactly: same class, message and
+      // securityEvent warn. `handleError` reads `data.reason` unguarded, so a
+      // body that is not a plain object ('' or null — G111) reaches it as {}.
+      const data = response.data;
+      const safeData = typeof data === 'object' && data !== null && !Array.isArray(data) ? data : {};
+      const safeResponse: AxiosResponse = { ...response, data: safeData };
+      return this.handleError(
+        new AxiosError(
+          `Request failed with status code ${response.status}`,
+          AxiosError.ERR_BAD_REQUEST,
+          response.config,
+          response.request,
+          safeResponse
+        )
+      );
+    }
+
+    throw new DataNotFoundError(
+      'OpenMeteo',
+      'No 15-minute forecast data available for the specified location'
+    );
+  }
+
+  /**
+   * Nowcast request with the same retry policy as `makeRequestToForecast`
+   * for thrown errors (rate limit, server error, timeout). A 400 resolves
+   * (`nowcastValidateStatus`) and is never retried.
+   * @private
+   */
+  private async makeNowcastRequest(
+    params: Record<string, string | number>,
+    retries = 0
+  ): Promise<AxiosResponse<unknown>> {
+    try {
+      return await this.forecastClient.get<unknown>('/forecast', {
+        params,
+        validateStatus: nowcastValidateStatus
+      });
+    } catch (error) {
+      if (retries < this.maxRetries) {
+        const shouldRetry =
+          (error as Error).message.includes('rate limit') ||
+          (error as Error).message.includes('server error') ||
+          (error as Error).message.includes('timed out');
+
+        if (shouldRetry) {
+          const baseDelay = Math.pow(2, retries) * 1000;
+          const delay = baseDelay * (0.5 + Math.random() * 0.5);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return this.makeNowcastRequest(params, retries + 1);
+        }
+      }
+      throw error;
     }
   }
 
