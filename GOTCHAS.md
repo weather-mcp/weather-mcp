@@ -2236,6 +2236,21 @@ phrases: T4's `not.toContain('✅ Operational')` list in `tests/unit/status-hand
 the same plan adds a negative lock and a retired-phrase grep, exclude the lock file from the
 grep's pathspec, or the check fails on correct code.
 
+**Extended 2026-10-01** (`72f0433`, issue-73-micro-deps T3) — **`grep -rl … | grep -v
+<word>` filters file *names*, not matching lines.** The plan's "no runtime import of
+`ngeohash` left in `dist/`" check was `grep -rln "ngeohash" dist/ | grep -v vendor`.
+It printed `dist/utils/geohash.js`, which is correct code: that file's *line* is
+`import * as geohash from '../vendor/ngeohash.js'`, but its *name* does not contain
+`vendor`. The check could only pass if the import were deleted. The check that asks
+the real question greps for the bare specifier — `command grep -rnE
+"['\"]ngeohash['\"]" dist/` — which no relative import can match. The same run met
+the vacuous half once (T4): "antimeridian rows contain hashes from both sides of
+the seam" held on **neither** tree, because `calculateBoundingBox` never wraps
+longitude, so the check was unreachable rather than failing — compare a planned
+non-vacuity check against the base tree before treating its failure as a
+regression.
+
+
 **Status:** active, **extended twice on 2026-09-01, again 2026-09-03 and 2026-09-25; shape 3 recurred 2026-09-28 and again 2026-09-29** (service-status-empty-answer T4, `119aae0` — an impl plan called `check-doc-versions.sh` "a regression check, not a conditional requirement" on a branch whose T2/T3 added 26 tests; 8 test-count sites failed, every other sub-check passed. Again in geocoding-rate-budget T6, `a95beb6`: the plan said the check was "unaffected" and "a no-op confirmation" on a branch whose T1–T3 added 21 tests; the same 8 sites failed (4,167 → 4,188), every version, tool-count and link row passed, and the counts were left for `/release`. Two consecutive plans in two days: any plan whose tasks add tests must expect this check red on count sites until `/release`). Lint candidate on the vacuous half — a plan-authoring check
 could flag `git diff <ref>...<ref>` used as acceptance for a task whose file list
 contains a file marked **new**. Related: [G10] (prove the hash is not vacuous —
@@ -2560,6 +2575,20 @@ Both are this entry's 2026-08-29 rule — a mutation must diverge at the fixture
 in play — applied one stage earlier, to the mutation table as written.
 
 **Extended 2026-09-30** (`e4ec0e3`, spacer-wake-recheck T2): **the order in which a test releases its waiters decides which mutation it can reach.** The plan's recurrence row resolved a re-sleeping waiter C before a newer waiter D, in the same turn. In that order C releases on its own first re-check, and D's re-check catches the gap. The single-re-check mutation (M2) therefore stayed green. Resolving D first means C's *second* wake has to re-check again, and M2 goes red on it. Before you list a mutation as red in a plan, walk the row by hand under that mutant.
+
+**Extended 2026-10-01** (`b47bd04`, issue-73-micro-deps T2) — **a mutation can be
+*equivalent*: no input reaches a different output, so no contract can redden it.**
+The plan's mutation table for the vendored geohash codec listed "`ensure_valid_lat`
+returns `lat` unchanged (no clamp)" beside five others. Five went red; that one
+survived a differential sweep that already drove neighbours past both poles. The
+clamp sits in front of `encode`'s bisection, which saturates: a latitude above 90 is
+`> mid` at every step exactly as 90 is, so the clamp cannot change a single bit.
+Proven, not argued — 0 of 2,952,000 `encode` calls (lat 90–1000 and its negative, 50
+longitudes, precisions 1–12) differed from `encode(±90, …)`. Before recording a
+surviving mutation as a test gap, ask whether *any* input could observe it, and
+settle that with a sweep against the unmutated function; an equivalent mutant is
+recorded as such, not "fixed" with a test that cannot exist.
+
 
 **Status:** active, **extended 2026-08-29, twice on 2026-09-01, 2026-09-03, and 2026-09-24**. Related: [G13] (a fixture that cannot discriminate),
 [G32] (mutating to every *rejected implementation* — this entry is about the

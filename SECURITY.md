@@ -82,6 +82,12 @@ Please include the following information in your report:
 
 ### Dependency Security
 
+`tz-lookup` and `astronomy-engine` are pinned to exact versions, because
+`package-lock.json` is not published and a range would let your install pick up a
+release nobody here has reviewed. Geohash encoding for lightning subscriptions is
+vendored in `src/vendor/ngeohash.ts` (from `ngeohash` 0.6.4, MIT, notice kept in
+the file) rather than installed.
+
 These are the runtime dependencies `package.json` declares:
 
 - `@modelcontextprotocol/sdk` - Official MCP SDK from Anthropic
@@ -89,7 +95,6 @@ These are the runtime dependencies `package.json` declares:
 - `dotenv` - Environment variable loader
 - `luxon`, `tz-lookup` - Time zones and local-time formatting
 - `astronomy-engine` - Sunrise, sunset and moon phase
-- `ngeohash` - Geohash cells for lightning subscriptions
 - `pngjs` - Decoding and encoding composited radar images
 - `mqtt` (optional dependency) - The lightning feed. The server starts without
   it; only `get_lightning_activity` needs it

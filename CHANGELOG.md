@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.23] - 2026-10-01
+
+Installing the server pulled in a small geohash package whose latest release ships about 280 KB of unrelated AI-agent transcripts, and it declared its other small single-maintainer dependencies with version ranges. The lockfile that pins exact versions is not published, so those ranges are what your install resolves: a new release of any of them could reach you without anyone here having seen it. This release removes that package and pins the other two exactly. Weather tools and their output are unchanged.
+
+### Changed
+- **One fewer package is installed with the server, and the other two small dependencies are pinned exactly.** `ngeohash` is no longer a runtime dependency: the three functions the server calls (`encode`, `decode`, `neighbor`) are now vendored in `src/vendor/ngeohash.ts`, with the upstream MIT notice and provenance in its header, and a test compares them with the upstream package across a coordinate sweep that includes the antimeridian, the poles and uppercase or invalid characters. The reason is the package itself: `ngeohash` 0.6.4 ships about 280 KB of unrelated AI-agent review transcripts inside its published tarball, roughly 85% of its size, and that landed in every install of this server. `tz-lookup` and `astronomy-engine` stay dependencies but are now pinned to exact versions (`6.1.25`, `2.1.19`) instead of caret ranges, because `package-lock.json` is not published: a range is what your install resolves, so it could pick up a release nobody here has seen. Lightning subscriptions, local times and astronomy output are unchanged, checked byte for byte against the previous release. A future security fix in either pinned package now needs a deliberate bump rather than arriving on its own. Closes [#73](https://github.com/weather-mcp/weather-mcp/issues/73) part (b); part (a) shipped in 1.25.0. (`src/vendor/ngeohash.ts`, `src/utils/geohash.ts`, `tests/unit/vendor-ngeohash.test.ts`, `package.json`, `package-lock.json`, `SECURITY.md`, `CLAUDE.md`)
+
 ## [1.33.22] - 2026-10-01
 
 With analytics switched on at the most detailed level, an empty salt file in your home directory made the server drop every analytics event, on every start, without saying so. An interrupted first start could leave that file empty. Analytics is off by default and no analytics endpoint is live, so this reached only someone who had opted in. Weather tools and their output are unchanged.
@@ -2086,7 +2093,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.23...HEAD
+[1.33.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...v1.33.23
 [1.33.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.21...v1.33.22
 [1.33.21]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.20...v1.33.21
 [1.33.20]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.19...v1.33.20
