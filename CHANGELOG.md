@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.2] - 2026-10-02
+
 When Open-Meteo or the US National Weather Service answered with a brief rate limit or a server error, the request failed at once, even though the server was built to wait a moment and try again. That retry never ran, so a hiccup of a second or two reached you as an error. This release makes those retries happen. A request that times out is still not repeated, so a slow service fails at your configured timeout rather than several times later. Answers are unchanged whenever the services respond normally.
 
 ### Fixed
@@ -2112,7 +2114,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.1...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.2...HEAD
+[1.34.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.1...v1.34.2
 [1.34.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.0...v1.34.1
 [1.34.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.23...v1.34.0
 [1.33.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...v1.33.23
