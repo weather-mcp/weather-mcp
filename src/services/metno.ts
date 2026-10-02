@@ -16,7 +16,8 @@
  * claim for it to falsify. Two consequences ride on it:
  *
  * - **No retry layer on this path, anywhere.** By the time the fallback fires,
- *   the caller has already waited out Open-Meteo's own attempts, so the budget
+ *   the caller has already waited out Open-Meteo's own attempts (on a timeout
+ *   that is one attempt, so the fallback fires at the timeout), so the budget
  *   is one request. A 403 in particular is never retried: met.no's ToS warns
  *   that sites exceeding its limit are throttled, and retrying a throttle is
  *   how a throttle becomes a block.

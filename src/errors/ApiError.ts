@@ -107,6 +107,13 @@ export class RateLimitError extends ApiError {
  * Service unavailable error - API is down or timing out
  */
 export class ServiceUnavailableError extends ApiError {
+  /**
+   * The `code` of the underlying error when it was a string (for example axios's
+   * `ECONNABORTED`). The retry ladders read it to tell a timeout from other
+   * unavailability. It is never the error object.
+   */
+  public readonly causeCode?: string;
+
   constructor(service: ApiServiceName, messageOrError?: string | Error, originalError?: Error) {
     // Handle backwards compatibility: if second param is Error, treat it as originalError
     let message: string | undefined;
@@ -136,6 +143,9 @@ export class ServiceUnavailableError extends ApiError {
     );
 
     this.name = 'ServiceUnavailableError';
+
+    const code = (error as { code?: unknown } | undefined)?.code;
+    if (typeof code === 'string') this.causeCode = code;
 
     if (error && error.stack) {
       this.stack = `${this.stack}\nCaused by: ${error.stack}`;

@@ -9,6 +9,7 @@ import {
   isRetryableError,
   formatErrorForUser,
 } from '../../src/errors/ApiError.js';
+import { describeErrorForLogging } from '../../src/utils/logger.js';
 
 describe('Custom Error Classes', () => {
   describe('ApiError', () => {
@@ -152,6 +153,64 @@ describe('Custom Error Classes', () => {
 
       const meteoError = new ServiceUnavailableError('OpenMeteo');
       expect(meteoError.helpLinks[0]).toContain('open-meteo.com');
+    });
+
+    describe('causeCode', () => {
+      const withCode = (code: unknown): Error => Object.assign(new Error('boom'), { code });
+
+      it('should take the string code of an Error passed as the second argument', () => {
+        const error = new ServiceUnavailableError('OpenMeteo', withCode('ECONNABORTED'));
+        expect(error.causeCode).toBe('ECONNABORTED');
+      });
+
+      it('should take the code from the third argument when a message is given', () => {
+        const error = new ServiceUnavailableError('NCEI', 'msg', withCode('ECONNABORTED'));
+        expect(error.causeCode).toBe('ECONNABORTED');
+      });
+
+      it('should leave causeCode undefined when no string code is available', () => {
+        expect(new ServiceUnavailableError('NOAA', 'only a message').causeCode).toBeUndefined();
+        expect(new ServiceUnavailableError('NOAA', new Error('no code')).causeCode).toBeUndefined();
+        expect(new ServiceUnavailableError('NOAA', withCode(503)).causeCode).toBeUndefined();
+        expect(new ServiceUnavailableError('NOAA').causeCode).toBeUndefined();
+      });
+
+      it('should not store the error object', () => {
+        const error = new ServiceUnavailableError('OpenMeteo', withCode('ECONNABORTED'));
+        expect(typeof error.causeCode).toBe('string');
+        expect(Object.values(error).some((v) => v instanceof Error)).toBe(false);
+      });
+
+      it('should leave message, status, retryability and user message unchanged by a code', () => {
+        const cases: Array<[() => ServiceUnavailableError, () => ServiceUnavailableError]> = [
+          [
+            () => new ServiceUnavailableError('OpenMeteo', withCode('ECONNABORTED')),
+            () => new ServiceUnavailableError('OpenMeteo', withCode(undefined)),
+          ],
+          [
+            () => new ServiceUnavailableError('NCEI', 'msg', withCode('ECONNABORTED')),
+            () => new ServiceUnavailableError('NCEI', 'msg', withCode(undefined)),
+          ],
+          [
+            () => new ServiceUnavailableError('NOAA', withCode(503)),
+            () => new ServiceUnavailableError('NOAA', withCode(undefined)),
+          ],
+        ];
+        for (const [coded, plain] of cases) {
+          const a = coded();
+          const b = plain();
+          expect(a.message).toBe(b.message);
+          expect(a.statusCode).toBe(503);
+          expect(a.isRetryable).toBe(true);
+          expect(a.toUserMessage()).toBe(b.toUserMessage());
+        }
+      });
+
+      it('should not change describeErrorForLogging output', () => {
+        const coded = new ServiceUnavailableError('OpenMeteo', withCode('ECONNABORTED'));
+        const plain = new ServiceUnavailableError('OpenMeteo', withCode(undefined));
+        expect(describeErrorForLogging(coded)).toEqual(describeErrorForLogging(plain));
+      });
     });
   });
 

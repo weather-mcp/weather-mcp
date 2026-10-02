@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.2] - 2026-10-02
+
+When Open-Meteo or the US National Weather Service answered with a brief rate limit or a server error, the request failed at once, even though the server was built to wait a moment and try again. That retry never ran, so a hiccup of a second or two reached you as an error. This release makes those retries happen. A request that times out is still not repeated, so a slow service fails at your configured timeout rather than several times later. Answers are unchanged whenever the services respond normally.
+
+### Fixed
+- **Open-Meteo and NOAA now retry a rate limit, a server error or a failed connection.** Each upstream call was meant to retry these up to three times with backoff, but since the first release it never did. The retry loops looked for words such as "rate limit" in the error message, and the typed errors the services actually throw never contain them, so every 429, 5xx and connection failure failed at once. The loops now decide by error class. A 429, a 5xx or a refused connection is retried up to three times, with at most about 7 s of waiting in total. A timeout is not retried: it has already used the whole configured timeout, so a timed-out request fails at that timeout, and `get_forecast`'s MET Norway fallback outside the US answers at that point instead of after four timeouts. The climate-normals pull keeps its own single retry. The life-threatening alert banner, the fire-weather, severe-weather and winter-weather sections and the timezone-only station lookups are extras that never fail a response, so they still make one attempt and do not wait out an outage. No rendered output changes: the same 20 renders were byte-identical before and after. (`src/services/openmeteo.ts`, `src/services/noaa.ts`, `src/errors/ApiError.ts`, `tests/unit/retry-by-class.test.ts`)
+
 ## [1.34.1] - 2026-10-02
 
 A lightning check for a place near the 180° line of longitude, such as Fiji, Tonga or the far east of Russia, watched only one side of that line. Strikes a few kilometres across it were never received, and the report still said the area was fully monitored, so "no lightning nearby" could be wrong in exactly the places where the search circle crosses the line. This release watches both sides. Lightning checks everywhere else are unchanged.
@@ -2107,7 +2114,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.1...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.2...HEAD
+[1.34.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.1...v1.34.2
 [1.34.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.0...v1.34.1
 [1.34.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.23...v1.34.0
 [1.33.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...v1.33.23

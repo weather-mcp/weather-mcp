@@ -128,7 +128,7 @@ describe('resolveCriticalAlertBanner', () => {
       const getAlerts = vi.fn().mockResolvedValue(collection());
       await resolveCriticalAlertBanner(fakeNoaa(getAlerts), US_POINT, 'America/Detroit');
       expect(getAlerts).toHaveBeenCalledTimes(1);
-      expect(getAlerts).toHaveBeenCalledWith(42.9634, -85.6681, true);
+      expect(getAlerts).toHaveBeenCalledWith(42.9634, -85.6681, true, 0);
     });
   });
 
@@ -203,7 +203,7 @@ describe('resolveCriticalAlertBanner', () => {
       const banner = await resolveCriticalAlertBanner(fakeNoaa(getAlerts), point);
       expect(banner).toBe('');
       expect(getAlerts).toHaveBeenCalledTimes(1);
-      expect(getAlerts).toHaveBeenCalledWith(point.latitude, point.longitude, true);
+      expect(getAlerts).toHaveBeenCalledWith(point.latitude, point.longitude, true, 0);
     });
 
     // --- R2: the deliberate absences make no call at all ---
@@ -513,7 +513,7 @@ describe('resolveCriticalAlertBanner', () => {
 
       await resolveCriticalAlertBanner(fakeNoaa(getAlerts), US_POINT, 'America/Detroit');
 
-      expect(getAlerts).toHaveBeenCalledWith(42.9634, -85.6681, true);
+      expect(getAlerts).toHaveBeenCalledWith(42.9634, -85.6681, true, 0);
     });
   });
 });

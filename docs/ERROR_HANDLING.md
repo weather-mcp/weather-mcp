@@ -28,6 +28,13 @@ Reports whether each API answered and how (normally, rate limited, with an error
 
 ### NOAA API Errors
 
+Each NOAA call retries a rate limit (429), a server error (5xx) or a failed
+connection up to three times with backoff, waiting at most about 7 s in total,
+before you see one of the messages below. A timeout is not retried: it has
+already used the whole configured timeout (`API_TIMEOUT_MS`). The critical-alert
+banner, fire-weather, severe/winter-weather and timezone lookups make one attempt
+only, since they never fail a response.
+
 #### Service Outage (5xx errors)
 ```
 NOAA API server error: Service temporarily unavailable
@@ -78,10 +85,16 @@ Check:
 
 ### Open-Meteo API Errors
 
+Each Open-Meteo call retries a rate limit (429), a server error (5xx) or a failed
+connection up to three times with backoff, waiting at most about 7 s in total. A
+timeout is not retried. The climate-normals pull keeps its own single retry on a
+rate limit.
+
 **`get_forecast` outside the US does not show most of these.** A transient
 Open-Meteo failure — a 5xx, a rate limit, a timeout, or a network failure, after
 its own retries are spent — is answered by MET Norway instead, and you get a
-forecast rather than an error. The messages below are what you see when that
+forecast rather than an error. A timeout is not retried, so on a timeout the
+fallback fires at the timeout rather than after four of them. The messages below are what you see when that
 fallback does not apply or does not help:
 
 - **Another tool asked.** Only `get_forecast` (and the forecast section of
@@ -673,7 +686,7 @@ npx tsx tests/test_mcp_status_tool.ts
 
 Potential improvements:
 - Cache status check results for 1-2 minutes to reduce API calls
-- Add retry logic with exponential backoff to tool responses
+- Retry a whole tool response (each upstream call already retries a 429, 5xx or connection failure with exponential backoff)
 - Integration with external status monitoring services
 - Historical uptime tracking and statistics
 - Webhook notifications for status changes

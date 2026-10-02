@@ -855,7 +855,7 @@ async function formatNOAAForecast(
   // Add severe weather probabilities if requested
   if (include_severe_weather) {
     try {
-      gridpointData = await noaaService.getGridpointData(gridId, gridX, gridY);
+      gridpointData = await noaaService.getGridpointData(gridId, gridX, gridY, 0);
       const severeWeatherSection = formatSevereWeather(gridpointData.properties);
       if (severeWeatherSection) {
         output += `\n${severeWeatherSection}`;
@@ -870,7 +870,7 @@ async function formatNOAAForecast(
   try {
     // Fetch gridpoint data if we haven't already
     if (!gridpointData) {
-      gridpointData = await noaaService.getGridpointData(gridId, gridX, gridY);
+      gridpointData = await noaaService.getGridpointData(gridId, gridX, gridY, 0);
     }
 
     // Calculate time range for forecast period

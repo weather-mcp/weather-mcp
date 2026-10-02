@@ -6631,20 +6631,6 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 ---
 
-## G129 — An Open-Meteo retry predicate that string-matches error messages never matches the errors the interceptor throws
-
-**Trigger:** adding or relying on a retry loop in `src/services/openmeteo.ts` (`makeRequest`, `makeRequestToForecast`, `makeNowcastRequest`, and their siblings), or writing a test that expects one of them to retry a 429, a 5xx or a timeout.
-
-**Rule:** do not assume the loop retries anything that came through `handleError`. Each loop retries only when `error.message` contains lowercase `rate limit`, `server error` or `timed out`. The response interceptor turns every axios failure into a typed error first, and those messages are `"Rate limit exceeded for OpenMeteo"` (capital R) and `"OpenMeteo API is currently unavailable"`. Neither matches. A test that wants to exercise the retry path has to reject with a raw `Error` whose message contains one of the substrings. A test that rejects with a typed error proves the "no retry" path. Say which one you are pinning.
-
-**Why:** the predicate and the error classes were written separately, and nothing exercised them together through the interceptor. Every unit test that "covers" the retry stubs a private seam with a hand-written message, so the suite stays green while production never retries a 429 or a 503 on any Open-Meteo call. Fixing the predicate changes the latency and request count of every Open-Meteo tool on failure, so it is a behaviour change for its own plan, not a drive-by.
-
-**Verify:** `node -e "import('./dist/errors/ApiError.js').then(m=>console.log(new m.RateLimitError('OpenMeteo').message, '|', new m.ServiceUnavailableError('OpenMeteo', new Error('x')).message))"` — while neither message contains a predicate substring, this entry holds.
-
-**Evidence:** 2026-10-01, minutely-nowcast T2 (`40d3345`). The plan's "same retry policy as hourly" test expected four calls for a `ServiceUnavailableError` and got one. `tests/unit/openmeteo-nowcast.test.ts` now pins both halves: a typed error is not retried, and a raw `server error` message is retried 1 + `maxRetries` times.
-
-**Status:** active. **The defect it describes is open**: candidate Hardening & fixes row. Retire this entry when the predicate matches the typed errors (by class or `isRetryableError`, not by message). Related: [G70] (wrong seam), [G115].
-
 ## G130 — Open-Meteo's `timezone_abbreviation` is a GMT offset, not a zone name
 
 **Trigger:** rendering a zone label from an Open-Meteo response fetched with `timezone=auto` (forecast, nowcast, or any endpoint that echoes `timezone_abbreviation`).
@@ -6675,10 +6661,60 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 ---
 
+## G132 — Changing a shared request seam's failure latency reaches every garnish caller of every public method above it
+
+**Trigger:** a change that alters how long a shared service seam takes to fail (a retry ladder, a timeout, a backoff, a new fallback hop) in `makeRequest` or a sibling, where the plan classifies which callers are garnish and should opt out.
+
+**Rule:** enumerate the opt-outs **by call site, not by method**. List every public method that reaches the seam, then every handler call site of each, and classify each site on its own: is its `catch` a silent degrade (garnish), or does it feed the primary answer (contract, or a fallback that feeds it)? The same method can be both. `getStations` is contract at `currentConditionsHandler.ts:407` and garnish (a timezone refinement in `try { … } catch { /* fallback timezone */ }`) at `alertsHandler.ts:206` and `marineConditionsHandler.ts:73`. A blanket "every other caller is contract" line is the defect.
+
+**Why:** a plan finds the garnish sites it already knows about: the banner, the named optional sections. A garnish call that only refines a label sits in front of a contract call in the same handler, and nothing about it looks optional from the service side. Once the seam's ladder works, that call adds up to ~7 s to the contract tool on every outage before the tool even asks its real question.
+
+**Verify:** `grep -n "noaaService\.\(getStations\|getGridpointData\|getGridpointDataByCoordinates\|getAlerts\|getPointData\)(" src/handlers/*.ts`. Each hit inside a silent `catch` passes `maxRetries` `0`, or the plan names why it keeps the ladder.
+
+**Evidence:** 2026-10-02, retry-predicate-by-class. The impl plan's rev 1 listed the banner, fire-weather and severe/winter garnish sites, and called every other `makeRequest` caller contract. The cross-vendor prep review (copilot R1) found the two timezone-only `getStations` calls. They were folded in at rev 2, and T4 (`1fb7341`) passes `0` there. QA §5 observed `get_alerts` at 5 calls on a dead NOAA: 1 timezone attempt plus 4 for the contract ladder.
+
+**Status:** active. Related: [G19], [G126] (the composite reaches the same seam).
+
+---
+
+## G133 — Fake timers turned on before a service is constructed fake its cache-cleanup interval, and `vi.runAllTimersAsync()` then never finishes
+
+**Trigger:** a unit test that calls `vi.useFakeTimers()` in `beforeEach` **before** it constructs a service (`OpenMeteoService`, `NOAAService` or any service owning a `Cache`), and then drives a retry backoff or a sleep with `vi.runAllTimersAsync()`.
+
+**Rule:** use `vi.advanceTimersByTimeAsync(<the longest backoff, e.g. 30_000>)`, not `runAllTimersAsync()`. Or construct the service before turning fake timers on, as `openmeteo-nowcast.test.ts` does. Start the promise under test **before** advancing the clock, and await it **after**. If you await first, a mutation that adds a sleep fails by hanging until the test timeout, not on the count assertion, so the mutation table records a timeout where it should record a reason.
+
+**Why:** `Cache`'s constructor (`src/utils/cache.ts:42`) starts a repeating `setInterval` for cleanup. Under fake timers that interval is fake, so `runAllTimersAsync()` re-queues it forever and aborts with "Aborting after running 10000 timers". A test that built the service under real timers never sees this, so two files with the same shape can disagree.
+
+**Verify:** in `tests/unit/retry-by-class.test.ts`, swap one `advanceTimersByTimeAsync(BACKOFF_BUDGET_MS)` for `runAllTimersAsync()`. The test errors with the 10,000-timer abort.
+
+**Evidence:** 2026-10-02, retry-predicate-by-class T5 (`58a9679`). The subagent hit the abort and switched to `advanceTimersByTimeAsync(30_000)`. The orchestrator then reordered the banner test from await-then-advance to start-advance-await, and mutation M8 changed from a hang to `expected 1 call, got 4`.
+
+**Status:** active. Lint candidate: `runAllTimersAsync` in a file whose `beforeEach` calls `useFakeTimers` ahead of a `new *Service(`.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
 commit that removed it — never delete, never renumber.)*
+
+## G129 — An Open-Meteo retry predicate that string-matches error messages never matches the errors the interceptor throws
+
+**Retired:** 2026-10-02, by the retry-predicate-by-class plan (`9e4cd03` Open-Meteo, `204eca0` NOAA). Both services' retry ladders now decide by error class through `isTransientFailure` (`ServiceUnavailableError` unless `causeCode` is `ECONNABORTED`, else `isRetryableError`) and never read `error.message`; `tests/unit/retry-by-class.test.ts` (`58a9679`) pins it at the interceptor seam. The Verify line below stays true of the *messages* and is kept as the record of what they were.
+
+**Trigger:** adding or relying on a retry loop in `src/services/openmeteo.ts` (`makeRequest`, `makeRequestToForecast`, `makeNowcastRequest`, and their siblings), or writing a test that expects one of them to retry a 429, a 5xx or a timeout.
+
+**Rule:** do not assume the loop retries anything that came through `handleError`. Each loop retries only when `error.message` contains lowercase `rate limit`, `server error` or `timed out`. The response interceptor turns every axios failure into a typed error first, and those messages are `"Rate limit exceeded for OpenMeteo"` (capital R) and `"OpenMeteo API is currently unavailable"`. Neither matches. A test that wants to exercise the retry path has to reject with a raw `Error` whose message contains one of the substrings. A test that rejects with a typed error proves the "no retry" path. Say which one you are pinning.
+
+**Why:** the predicate and the error classes were written separately, and nothing exercised them together through the interceptor. Every unit test that "covers" the retry stubs a private seam with a hand-written message, so the suite stays green while production never retries a 429 or a 503 on any Open-Meteo call. Fixing the predicate changes the latency and request count of every Open-Meteo tool on failure, so it is a behaviour change for its own plan, not a drive-by.
+
+**Verify:** `node -e "import('./dist/errors/ApiError.js').then(m=>console.log(new m.RateLimitError('OpenMeteo').message, '|', new m.ServiceUnavailableError('OpenMeteo', new Error('x')).message))"` — while neither message contains a predicate substring, this entry holds.
+
+**Evidence:** 2026-10-01, minutely-nowcast T2 (`40d3345`). The plan's "same retry policy as hourly" test expected four calls for a `ServiceUnavailableError` and got one. `tests/unit/openmeteo-nowcast.test.ts` now pins both halves: a typed error is not retried, and a raw `server error` message is retried 1 + `maxRetries` times.
+
+**Status:** retired 2026-10-02 (see above). Related: [G70] (wrong seam), [G115].
+
+---
 
 ## G122 — Timer reservations coalesce into simultaneous starts when the event loop delivers overdue timers together
 

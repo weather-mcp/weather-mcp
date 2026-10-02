@@ -73,7 +73,7 @@ propagating it, and they answer **opposite** questions:
 | branch | fires when | answered by |
 |---|---|---|
 | NOAA -> Open-Meteo | NOAA says it does not cover this point (a 404 or other 4xx) — a permanent rejection, and the US routing box overruns the border, so Toronto and Vancouver land here | Open-Meteo, with a note saying so |
-| Open-Meteo -> MET Norway | Open-Meteo fails **transiently** — a rate limit, a 5xx, a timeout, or a network failure, after its own retries are spent | MET Norway Locationforecast, with a note saying so |
+| Open-Meteo -> MET Norway | Open-Meteo fails **transiently** — a rate limit, a 5xx, a timeout, or a network failure, after its own retries are spent (a timeout is not retried, so the fallback fires at the timeout) | MET Norway Locationforecast, with a note saying so |
 
 The second branch is new in v1.30.0 and has three properties worth stating
 plainly:

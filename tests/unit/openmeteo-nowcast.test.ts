@@ -292,33 +292,32 @@ describe('OpenMeteoService.getNowcast', () => {
       await expect(service.getNowcast(MICHIGAN.lat, MICHIGAN.lon, NOW)).rejects.toBeInstanceOf(DataNotFoundError);
     });
 
-    // Retry parity with makeRequestToForecast: the same message-substring
-    // predicate. It matches lowercase 'server error' / 'rate limit' /
-    // 'timed out', which the typed errors handleError throws do not contain
-    // ("OpenMeteo API is currently unavailable"), so a typed
-    // ServiceUnavailableError is not retried there either. These two cases pin
-    // the parity, not a policy this plan chose.
-    it('propagates a typed ServiceUnavailableError and caches nothing (parity: no retry)', async () => {
+    // Retry policy, keyed on the error class the interceptor throws: a typed
+    // ServiceUnavailableError (not a timeout) is retried 1 + maxRetries times
+    // and then propagates as the same instance. A raw Error is retried only if
+    // isRetryableError says so; its message no longer matters, so a raw
+    // 'server error' is not retried.
+    it('retries a typed ServiceUnavailableError 1 + maxRetries times, then propagates it and caches nothing', async () => {
       vi.useFakeTimers();
-      const getSpy = vi
-        .spyOn(client(service), 'get')
-        .mockRejectedValue(new ServiceUnavailableError('OpenMeteo', new Error('boom')));
+      const unavailable = new ServiceUnavailableError('OpenMeteo', new Error('boom'));
+      const getSpy = vi.spyOn(client(service), 'get').mockRejectedValue(unavailable);
       const pending = service.getNowcast(MICHIGAN.lat, MICHIGAN.lon, NOW).catch((e: unknown) => e);
       await vi.runAllTimersAsync();
       const error = await pending;
       expect(error).toBeInstanceOf(ServiceUnavailableError);
-      expect(getSpy).toHaveBeenCalledTimes(1);
+      expect(error).toBe(unavailable);
+      expect(getSpy).toHaveBeenCalledTimes(4);
       expect(service.getCacheStats().size).toBe(0);
     });
 
-    it('retries an error whose message matches the predicate, 1 + maxRetries times', async () => {
+    it('does not retry a raw Error whose message says "server error"', async () => {
       vi.useFakeTimers();
       const getSpy = vi.spyOn(client(service), 'get').mockRejectedValue(new Error('upstream server error'));
       const pending = service.getNowcast(MICHIGAN.lat, MICHIGAN.lon, NOW).catch((e: unknown) => e);
       await vi.runAllTimersAsync();
       const error = await pending;
       expect((error as Error).message).toBe('upstream server error');
-      expect(getSpy).toHaveBeenCalledTimes(4);
+      expect(getSpy).toHaveBeenCalledTimes(1);
       expect(service.getCacheStats().size).toBe(0);
     });
 
