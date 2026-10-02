@@ -342,6 +342,36 @@ export interface OpenMeteoForecastResponse {
 }
 
 /**
+ * Response from the Open-Meteo Forecast API for the 15-minute nowcast
+ * (`get_forecast`, `granularity: "minutely"`): one named model
+ * (`models=gfs_hrrr` or `models=icon_d2`), `minutely_15=precipitation,
+ * precipitation_probability`, `forecast_minutely_15=8`, `timezone=auto`.
+ *
+ * With a single model named the keys are unsuffixed, and no `hourly` or
+ * `daily` block is returned (verified live 2026-10-01). Every field is
+ * optional and every series element may be null: along the HRRR domain edge
+ * the API answers 200 with `precipitation` all null and
+ * `precipitation_probability` populated.
+ */
+export interface OpenMeteoNowcastResponse {
+  latitude?: number;
+  longitude?: number;
+  utc_offset_seconds?: number;
+  timezone?: string;
+  timezone_abbreviation?: string;
+  minutely_15_units?: {
+    time?: string;
+    precipitation?: string;
+    precipitation_probability?: string;
+  };
+  minutely_15?: {
+    time?: string[];
+    precipitation?: (number | null)[];
+    precipitation_probability?: (number | null)[];
+  };
+}
+
+/**
  * Current air quality data from Open-Meteo Air Quality API
  */
 export interface OpenMeteoAirQualityCurrentData {

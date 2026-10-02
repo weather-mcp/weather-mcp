@@ -93,6 +93,19 @@ fallback does not apply or does not help:
   ours to fix, not an outage, so it is never retried elsewhere.
 - **MET Norway also failed.** The **original Open-Meteo error** is what
   propagates — MET Norway's own message never surfaces.
+- **You asked for the 15-minute nowcast (`granularity: "minutely"`).** MET
+  Norway publishes no 15-minute product, so falling back would answer a
+  different question. The Open-Meteo error propagates.
+
+**The nowcast's "not covered" answer is not an error.** At a point no
+15-minute model covers, `granularity: "minutely"` returns a short
+disclosure: no 15-minute model covers the location, and this is not a forecast
+of dry weather. Use `granularity: "hourly"` there. It is a successful answer,
+not a failure, and it is never rendered as an empty or dry table.
+
+**`granularity "minutely" uses Open-Meteo 15-minute model data; use source "auto" or "openmeteo"`**
+is a validation error, thrown before any request when `source: "noaa"` is
+combined with `granularity: "minutely"`. NOAA has no 15-minute product.
 
 #### Service Outage (5xx errors)
 ```

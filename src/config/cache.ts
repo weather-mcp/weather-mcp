@@ -232,6 +232,14 @@ export const CacheConfig = {
     // means met.no itself says the parse is current — and bounds the LRU
     // against a series that runs to ~9-10 days per point (D3).
     metnoForecast: 12 * HOUR,
+
+    // 15-minute nowcast coverage (HRRR / ICON-D2) at a point — the
+    // not-covered null sentinel only. Model domains are a slow-changing fact,
+    // so a point found outside one is not re-probed for a day. The covered
+    // series itself is NOT cached at this TTL: it expires at the next quarter
+    // boundary (`msUntilNextQuarter`), because its window is anchored at the
+    // request's current quarter and goes stale within fifteen minutes.
+    nowcastCoverage: 24 * HOUR,
   },
 } as const;
 

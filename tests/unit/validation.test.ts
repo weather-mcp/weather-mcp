@@ -230,9 +230,13 @@ describe('Validation Utilities', () => {
       expect(validateGranularity('hourly')).toBe('hourly');
     });
 
+    it('should accept "minutely"', () => {
+      expect(validateGranularity('minutely')).toBe('minutely');
+    });
+
     it('should reject invalid granularity values', () => {
-      expect(() => validateGranularity('weekly')).toThrow('Must be either "daily" or "hourly"');
-      expect(() => validateGranularity('monthly')).toThrow('Must be either "daily" or "hourly"');
+      expect(() => validateGranularity('weekly')).toThrow('Must be one of "daily", "hourly" or "minutely"');
+      expect(() => validateGranularity('monthly')).toThrow('Must be one of "daily", "hourly" or "minutely"');
     });
 
     it('should reject non-string values', () => {

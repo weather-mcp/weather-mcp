@@ -8,7 +8,7 @@ Quick reference guide for the Weather MCP test suite.
 
 | Metric | Value |
 |--------|-------|
-| **Total Tests** | 4,254 |
+| **Total Tests** | 4,385 |
 | **Pass Rate** | 99.6% - 99.9% |
 | **Execution Time (Unit)** | ~2 seconds |
 | **Execution Time (Full)** | ~4-5 minutes |
@@ -237,7 +237,7 @@ describe('Feature Name', () => {
 ## Test Metrics & Goals
 
 ### Current Performance
-- ✅ 4,254 total tests
+- ✅ 4,385 total tests
 - ✅ 99.6% pass rate
 - ✅ <2s unit test execution
 - ⚠️ ~4-5min full suite execution

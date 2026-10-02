@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.33.23 (Production Ready)
+- **Version:** 1.34.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -72,6 +72,7 @@ src/
 │   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
 │   ├── criticalAlert.ts     # Life-threatening-alert gate, selection, banner copy (pure)
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
+│   ├── nowcast.ts           # minutely_15 nowcast: model superset boxes, 3-state response classification, quarter bands, hourly-probability pick (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
 │   ├── savedLocationShape.ts  # Saved-location record-shape contract — write-side validator and read-side describer (pure)
@@ -129,7 +130,7 @@ All location-based tools accept coordinates, a saved `location_name`, or a
 free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
 Full per-tool parameter reference: `docs/TOOLS.md`.
 
-1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); surfaces a life-threatening NWS alert banner above the response for NWS-served points (the US and its territories) (positive-assertion-only — absence is never an all-clear); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only
+1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); surfaces a life-threatening NWS alert banner above the response for NWS-served points (the US and its territories) (positive-assertion-only — absence is never an all-clear); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only; `granularity: "minutely"` gives 2 h of 15-minute precipitation bands from HRRR / ICON-D2 by name, with coverage decided by the response (a not-covered disclosure elsewhere, no met.no fallback)
 2. **get_current_conditions** - Current weather (NOAA stations in the US, Open-Meteo model data elsewhere, or worldwide METAR airport observations via `source="metar"`); surfaces the same life-threatening alert banner for NWS-served points (the US and its territories), gated on *location* not source (so a US `source="metar"` request gets it); `include_fire_weather` gives NOAA's published indices in the US and a server-computed Fosberg index on the Open-Meteo and METAR paths; automatically adds a frostbite-risk or heat-stress (WBGT) line in extreme conditions — no parameter, gated so moderate output is unchanged
 3. **get_alerts** - Weather alerts/warnings routed by country: NOAA (US), MSC GeoMet/ECCC (Canada), EUMETNET MeteoAlarm (38 European countries), and the national CAP feeds of India (NDMA SACHET), the Philippines (PAGASA) and Indonesia (BMKG) — matched by alert polygon where the feed publishes geometry inline (PH/ID), country-level with an explicit note otherwise (IN, whose geometry endpoint is not server-reachable) — and JMA (Japan), matched to the point by class10 warning area from a committed geometry artifact, with the Japanese name verbatim and an English gloss where known; elsewhere the optional keyed Google Weather fallback (`GOOGLE_WEATHER_API_KEY`) or a clean not-covered message; `detail` output control
 4. **get_historical_weather** - Historical data 1940-present (Open-Meteo archive, global; NOAA for recent US dates)
@@ -671,15 +672,15 @@ The publish path enforces a stricter, narrower gate: `npm audit --omit=dev --aud
 
 ## Project Status
 
-- **Version:** 1.33.23 — Production Ready ✅
-- **Test Coverage:** 4,254 tests, 100% pass rate
+- **Version:** 1.34.0 — Production Ready ✅
+- **Test Coverage:** 4,385 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.34.0:** get_forecast gains a 2-hour, 15-minute precipitation nowcast (granularity: "minutely") for North America and Central Europe
 - **New in v1.33.23:** ngeohash is vendored and no longer installed; tz-lookup and astronomy-engine are pinned exactly
 - **New in v1.33.22:** An empty analytics salt file is replaced instead of dropping every detailed-level event
-- **New in v1.33.21:** Releases stop on a high advisory in a shipped dependency, an unmapped module, or a committed home path
 
 ## Useful References
 
@@ -702,7 +703,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-10-01 (v1.33.23)
+**Last Updated:** 2026-10-01 (v1.34.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

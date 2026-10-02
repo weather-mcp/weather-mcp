@@ -71,6 +71,12 @@ import type {
 import { DataNotFoundError, InvalidLocationError, isRetryableError } from '../errors/ApiError.js';
 import { MetnoService } from '../services/metno.js';
 import { describeMetnoSymbol } from '../utils/metnoParse.js';
+import {
+  NOWCAST_MODELS,
+  bandForQuarter,
+  hourlyProbabilities,
+  liveQuarterIndices,
+} from '../utils/nowcast.js';
 
 /** Note shown when an auto-routed NOAA request falls back to Open-Meteo. */
 const NOAA_FALLBACK_NOTE =
@@ -106,7 +112,7 @@ interface ForecastArgs extends UnitArgs {
   location_name?: string;
   city_name?: string;
   days?: number;
-  granularity?: 'daily' | 'hourly';
+  granularity?: 'daily' | 'hourly' | 'minutely';
   include_precipitation_probability?: boolean;
   include_severe_weather?: boolean;
   include_normals?: boolean;
@@ -331,7 +337,7 @@ export async function handleGetForecast(
   }
 
   if (compare_models) {
-    if (granularity === 'hourly') {
+    if (granularity !== 'daily') {
       throw new Error('compare_models requires daily granularity');
     }
     if (requestedSource === 'noaa') {
@@ -343,12 +349,20 @@ export async function handleGetForecast(
   // forecast to someone who asked how certain the forecast is would be
   // dishonest, so these conflicts fail loudly instead of degrading (D1).
   if (ensemble_spread) {
-    if (granularity === 'hourly') {
+    if (granularity !== 'daily') {
       throw new Error('ensemble_spread requires daily granularity');
     }
     if (requestedSource === 'noaa') {
       throw new Error('ensemble_spread uses Open-Meteo ensemble data; use source "auto" or "openmeteo"');
     }
+  }
+
+  // The 15-minute nowcast exists only as Open-Meteo model data (HRRR /
+  // ICON-D2); NOAA publishes no quarter-hour product. Forcing NOAA is a
+  // request we cannot honour, so it fails loudly rather than silently
+  // answering a different question, the same posture as the guards above.
+  if (granularity === 'minutely' && requestedSource === 'noaa') {
+    throw new Error('granularity "minutely" uses Open-Meteo 15-minute model data; use source "auto" or "openmeteo"');
   }
 
   // BLOCKER-1 (diff review): a life-threatening warning must not be suppressed
@@ -378,7 +392,22 @@ export async function handleGetForecast(
   // Use NOAA for US locations or if explicitly requested
   let result: { content: Array<{ type: string; text: string }> };
   try {
-    if (ensemble_spread) {
+    if (granularity === 'minutely') {
+      // The nowcast short-circuits routing: it is Open-Meteo model data at
+      // every point, US included, so NOAA is never called. It sits outside the
+      // Open-Meteo arm's met.no fallback by construction — met.no has no
+      // quarter-hour product, and falling back would answer a different
+      // question. A failure still reaches the outer catch, which carries the
+      // banner onto it. First arm, so `granularity` narrows to daily | hourly
+      // for every renderer below.
+      result = await formatMinutelyNowcast(
+        openMeteoService,
+        latitude,
+        longitude,
+        include_precipitation_probability,
+        prefs
+      );
+    } else if (ensemble_spread) {
       // The spread short-circuits routing exactly as the comparison does (D2):
       // NOAA is never called, so none of the auto-fallback logic below applies.
       // US points still get a spread, with the NWS-not-the-model-shown
@@ -557,6 +586,83 @@ export async function handleGetForecast(
   const banner = bannerPromise ? await bannerPromise : '';
 
   return prependCriticalAlertBanner(result, banner);
+}
+
+/**
+ * The not-covered nowcast answer. Replaces the whole block (G68): no table, no
+ * probability, no legend, and it says plainly that it is not a dry forecast.
+ */
+const NOWCAST_NOT_COVERED_TEXT =
+  '# 15-Minute Precipitation Nowcast\n\n' +
+  'No 15-minute precipitation model covers this location. Native 15-minute data is available only in the contiguous US and nearby Canada and Mexico (HRRR) and in Central Europe (ICON-D2). This is not a forecast of dry weather. Use granularity "hourly" for an hour-by-hour forecast here.\n\n' +
+  '---\n' +
+  '*Data source: Open-Meteo*\n';
+
+/**
+ * Render the 15-minute precipitation nowcast (`granularity: "minutely"`).
+ *
+ * Contract, not garnish: a failed fetch propagates, and "not covered" renders
+ * apart from "covered and dry". Quarter rows carry a band only, never an
+ * amount; probability is Open-Meteo's hourly figure (interpolated between
+ * hours in the quarter series), so it renders once per hour. Bands are
+ * computed in mm and no number is shown, so the output is unit-invariant
+ * apart from the time format.
+ */
+async function formatMinutelyNowcast(
+  openMeteoService: OpenMeteoService,
+  latitude: number,
+  longitude: number,
+  include_precipitation_probability: boolean,
+  prefs: UnitPreferences
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  const nowMs = Date.now();
+  const nowcast = await openMeteoService.getNowcast(latitude, longitude, nowMs);
+
+  if (nowcast.status === 'not-covered') {
+    return { content: [{ type: 'text', text: NOWCAST_NOT_COVERED_TEXT }] };
+  }
+
+  const { model, response } = nowcast;
+  const times = response.minutely_15?.time ?? [];
+  const precipitation = response.minutely_15?.precipitation ?? [];
+  const probability = response.minutely_15?.precipitation_probability ?? [];
+  const offset = response.utc_offset_seconds;
+  const timezone = response.timezone;
+
+  const live = typeof offset === 'number' && timezone ? liveQuarterIndices(times, offset, nowMs) : [];
+  const bands = live.map(i => bandForQuarter(precipitation[i]));
+  if (!timezone || live.length === 0 || bands.every(band => band === null)) {
+    throw new DataNotFoundError('OpenMeteo', 'No 15-minute forecast data available for the specified location');
+  }
+
+  const { label, cadence } = NOWCAST_MODELS[model];
+  const shortName = label.split(' ')[0];
+  const zoneName = DateTime.fromMillis(nowMs, { zone: timezone }).offsetNameShort ?? timezone;
+  const timeLabel = (iso: string): string => formatLuxonTime(DateTime.fromISO(iso, { zone: timezone }), prefs);
+
+  let output = '# 15-Minute Precipitation Nowcast\n\n';
+  output += `**Model:** ${label} via Open-Meteo — ${cadence}\n`;
+  output += `*Next 2 hours in 15-minute steps, local time (${zoneName}). Amounts are shown as bands, not figures: consecutive model runs can disagree about individual showers, so read a single quarter as indicative.*\n\n`;
+  output += '| Time | Precipitation |\n';
+  output += '|------|---------------|\n';
+  live.forEach((index, row) => {
+    output += `| ${timeLabel(times[index])} | ${bands[row] ?? 'no data'} |\n`;
+  });
+  output += '\n';
+
+  if (include_precipitation_probability) {
+    const hourly = hourlyProbabilities(times, probability, live);
+    if (hourly.length > 0) {
+      const parts = hourly.map(({ index, percent }) => `${timeLabel(times[index])}: ${percent}%`);
+      output += `**Chance of precipitation (hourly figure, not per quarter):** ${parts.join(' · ')}\n\n`;
+    }
+  }
+
+  output += '*Bands are this server\'s heuristic for the 15-minute amount: none · trace · light · moderate · heavy (thresholds in docs/TOOLS.md).*\n\n';
+  output += '---\n';
+  output += `*Data source: Open-Meteo (${shortName} model)*\n`;
+
+  return { content: [{ type: 'text', text: output }] };
 }
 
 /**

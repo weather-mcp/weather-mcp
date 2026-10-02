@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-10-01
+
+Asking whether it will rain during a 30-minute walk used to get an hourly answer: one chance of rain for the whole hour, which cannot say whether the shower comes at a quarter past or at a quarter to. This release adds a two-hour forecast in 15-minute steps for the places where a weather model actually computes rain at that resolution, the contiguous US and nearby Canada and Mexico, and Central Europe. Everywhere else it says plainly that it has no 15-minute data, instead of showing numbers that only look precise. Daily and hourly forecasts are unchanged.
+
+### Added
+- **A 15-minute precipitation nowcast on `get_forecast`.** `granularity: "minutely"` shows the next two hours in 15-minute steps, which answers "will it rain in the next half hour?" — something an hourly forecast cannot. It uses the two models that publish native 15-minute precipitation: HRRR (the contiguous US and nearby Canada and Mexico, updated hourly) and ICON-D2 (Central Europe, updated every 3 hours), each asked by name through Open-Meteo. The model's own answer decides whether a point is covered. Elsewhere you get a plain disclosure that no 15-minute model covers the location and that this is not a forecast of dry weather. Each quarter shows a band (none, trace, light, moderate or heavy), never an amount, because consecutive model runs can disagree about individual showers. The chance of precipitation is shown once per hour and labelled as hourly, because the upstream 15-minute probability is the hourly figure interpolated. A failed fetch is an error: there is no MET Norway fallback, since MET Norway has no 15-minute product. `source: "noaa"`, `compare_models` and `ensemble_spread` cannot be combined with it. Daily and hourly forecasts are unchanged, checked byte for byte. (`src/utils/nowcast.ts`, `src/services/openmeteo.ts`, `src/handlers/forecastHandler.ts`, `src/server/weatherServer.ts`, `src/utils/validation.ts`, `src/config/cache.ts`, `src/types/openmeteo.ts`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`)
+
 ## [1.33.23] - 2026-10-01
 
 Installing the server pulled in a small geohash package whose latest release ships about 280 KB of unrelated AI-agent transcripts, and it declared its other small single-maintainer dependencies with version ranges. The lockfile that pins exact versions is not published, so those ranges are what your install resolves: a new release of any of them could reach you without anyone here having seen it. This release removes that package and pins the other two exactly. Weather tools and their output are unchanged.
@@ -2093,7 +2100,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.23...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.0...HEAD
+[1.34.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.23...v1.34.0
 [1.33.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...v1.33.23
 [1.33.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.21...v1.33.22
 [1.33.21]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.20...v1.33.21

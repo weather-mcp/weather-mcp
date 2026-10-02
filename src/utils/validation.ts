@@ -140,7 +140,7 @@ export function validateForecastDays(args: unknown): number {
  * @returns Validated granularity ('daily' or 'hourly')
  * @throws {Error} If value is invalid
  */
-export function validateGranularity(value: unknown): 'daily' | 'hourly' {
+export function validateGranularity(value: unknown): 'daily' | 'hourly' | 'minutely' {
   if (value === undefined) {
     return 'daily'; // default
   }
@@ -149,8 +149,8 @@ export function validateGranularity(value: unknown): 'daily' | 'hourly' {
     throw new Error(`Invalid granularity: must be a string, received ${typeof value}`);
   }
 
-  if (value !== 'daily' && value !== 'hourly') {
-    throw new Error(`Invalid granularity: "${value}". Must be either "daily" or "hourly".`);
+  if (value !== 'daily' && value !== 'hourly' && value !== 'minutely') {
+    throw new Error(`Invalid granularity: "${value}". Must be one of "daily", "hourly" or "minutely".`);
   }
 
   return value;

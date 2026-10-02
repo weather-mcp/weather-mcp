@@ -330,8 +330,8 @@ export const TOOL_DEFINITIONS = {
         },
         granularity: {
           type: 'string' as const,
-          description: 'Forecast granularity: "daily" for day/night periods or "hourly" for hour-by-hour detail (default: "daily")',
-          enum: ['daily', 'hourly'],
+          description: 'Forecast granularity: "daily" for day/night periods, "hourly" for hour-by-hour detail, or "minutely" for a 2-hour precipitation nowcast in 15-minute steps (contiguous US, Central Europe) (default: "daily")',
+          enum: ['daily', 'hourly', 'minutely'],
           default: 'daily'
         },
         include_precipitation_probability: {
