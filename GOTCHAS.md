@@ -3215,6 +3215,12 @@ the same review — what the short-circuited predicate was deciding), [G99] (the
 case where the *added* term is a conjunction inside a fast path, and dropping it
 reddens nothing unless the cross-product cell was written).
 
+**Verify line run clean, 2026-10-02** (`70e350b`, lightning-antimeridian-bbox T3). `lonInBox`
+adds two wrapped disjuncts in front of the plain interval test. Forcing the plain term to `false` turns
+36 red, including the pre-existing `geohash.test.ts` "should increase tile count with larger radius".
+Dropping the wrapped terms turns 10 red, all in `tests/unit/geohash-antimeridian.test.ts`. Both terms
+are pinned.
+
 ## G56 — A missing-data sentinel can have more than one encoding, so swapping a truthy guard for a real-value guard un-suppresses the second one
 
 **Trigger:** replacing `if (value)` with `if (isRealValue(value))` (or any
@@ -6652,6 +6658,20 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 **Evidence:** 2026-10-01, minutely-nowcast T2 live capture and T3 (`2fe2f9d`). The nowcast header uses `offsetNameShort` and renders `EDT`. The QA record shows `GMT+2` and `GMT+1` for Berlin and London.
 
 **Status:** active. Lint candidate: no `src/` file should read `timezone_abbreviation` for display.
+
+## G131 — A rewritten count that claims parity with the old code can diverge where the simulation never looked
+
+**Trigger:** replacing a size or count that a selector compares against a budget (`tiles.size <= maxTiles`, a page count, a cap) with a derived count that a plan says is "exactly what the old code returned", where the old count included an element unconditionally.
+
+**Rule:** before trusting the new definition, compare it with the **old implementation's own count** over the parameter range, the degenerate values included (`maxTiles = 0`, radius 0, precision 1), not only at the default the simulation used. Compile the old file from `main` to scratch (`git show main:<file>`, rewrite its relative imports to absolute `dist/` paths, `npx tsc --ignoreConfig --noCheck`) and diff the counts row by row. Where the two definitions disagree, the parity claim is the contract and the wording is the defect.
+
+**Why:** a plan describes the count in words ("every tile whose centre lies in the clamped interval") and separately promises an invariant ("the same precision as before on every input"). The words drop an element the old code always counted, here the start tile, which the BFS adds whether or not its centre passes. At the default budget the dropped element never changes the comparison, so a whole-globe simulation reports `precisionChanged 0` and every fixture matches. Only a lock pinned at a degenerate budget sees it.
+
+**Verify:** for `src/utils/geohash.ts`, `computeGeohashTilesBudgeted(...).budgeted` equals `main`'s `computeGeohashTiles(...).size` wherever either is `<= 9`. They differ only in rows the 10,000-tile cap truncates.
+
+**Evidence:** 2026-10-02, lightning-antimeridian-bbox T2 (`c017f79`). The plan's rule 3 counted the start tile only when its centre fell inside the clamped box. `tests/unit/geohash.test.ts:254` (`maxTiles = 0` → precision-4 fallback) went red: the budget read 0 at precision 1, so the selector returned the precision-1 start tile. The rev-2 simulation had passed all 19,040 sweep rows at `maxTiles = 9`. A parity run against `main`'s compiled tiler, 32,382 rows, found 0 disagreements at or below 9 after the fix. Mutation M6 in `70e350b` pins it.
+
+**Status:** active. Related: [G32], [G65] (settle what lies below the decision boundary), [G45].
 
 ---
 
