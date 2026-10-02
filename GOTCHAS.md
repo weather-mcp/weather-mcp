@@ -6661,6 +6661,38 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 ---
 
+## G132 — Changing a shared request seam's failure latency reaches every garnish caller of every public method above it
+
+**Trigger:** a change that alters how long a shared service seam takes to fail (a retry ladder, a timeout, a backoff, a new fallback hop) in `makeRequest` or a sibling, where the plan classifies which callers are garnish and should opt out.
+
+**Rule:** enumerate the opt-outs **by call site, not by method**. List every public method that reaches the seam, then every handler call site of each, and classify each site on its own: is its `catch` a silent degrade (garnish), or does it feed the primary answer (contract, or a fallback that feeds it)? The same method can be both. `getStations` is contract at `currentConditionsHandler.ts:407` and garnish (a timezone refinement in `try { … } catch { /* fallback timezone */ }`) at `alertsHandler.ts:206` and `marineConditionsHandler.ts:73`. A blanket "every other caller is contract" line is the defect.
+
+**Why:** a plan finds the garnish sites it already knows about: the banner, the named optional sections. A garnish call that only refines a label sits in front of a contract call in the same handler, and nothing about it looks optional from the service side. Once the seam's ladder works, that call adds up to ~7 s to the contract tool on every outage before the tool even asks its real question.
+
+**Verify:** `grep -n "noaaService\.\(getStations\|getGridpointData\|getGridpointDataByCoordinates\|getAlerts\|getPointData\)(" src/handlers/*.ts`. Each hit inside a silent `catch` passes `maxRetries` `0`, or the plan names why it keeps the ladder.
+
+**Evidence:** 2026-10-02, retry-predicate-by-class. The impl plan's rev 1 listed the banner, fire-weather and severe/winter garnish sites, and called every other `makeRequest` caller contract. The cross-vendor prep review (copilot R1) found the two timezone-only `getStations` calls. They were folded in at rev 2, and T4 (`1fb7341`) passes `0` there. QA §5 observed `get_alerts` at 5 calls on a dead NOAA: 1 timezone attempt plus 4 for the contract ladder.
+
+**Status:** active. Related: [G19], [G126] (the composite reaches the same seam).
+
+---
+
+## G133 — Fake timers turned on before a service is constructed fake its cache-cleanup interval, and `vi.runAllTimersAsync()` then never finishes
+
+**Trigger:** a unit test that calls `vi.useFakeTimers()` in `beforeEach` **before** it constructs a service (`OpenMeteoService`, `NOAAService` or any service owning a `Cache`), and then drives a retry backoff or a sleep with `vi.runAllTimersAsync()`.
+
+**Rule:** use `vi.advanceTimersByTimeAsync(<the longest backoff, e.g. 30_000>)`, not `runAllTimersAsync()`. Or construct the service before turning fake timers on, as `openmeteo-nowcast.test.ts` does. Start the promise under test **before** advancing the clock, and await it **after**. If you await first, a mutation that adds a sleep fails by hanging until the test timeout, not on the count assertion, so the mutation table records a timeout where it should record a reason.
+
+**Why:** `Cache`'s constructor (`src/utils/cache.ts:42`) starts a repeating `setInterval` for cleanup. Under fake timers that interval is fake, so `runAllTimersAsync()` re-queues it forever and aborts with "Aborting after running 10000 timers". A test that built the service under real timers never sees this, so two files with the same shape can disagree.
+
+**Verify:** in `tests/unit/retry-by-class.test.ts`, swap one `advanceTimersByTimeAsync(BACKOFF_BUDGET_MS)` for `runAllTimersAsync()`. The test errors with the 10,000-timer abort.
+
+**Evidence:** 2026-10-02, retry-predicate-by-class T5 (`58a9679`). The subagent hit the abort and switched to `advanceTimersByTimeAsync(30_000)`. The orchestrator then reordered the banner test from await-then-advance to start-advance-await, and mutation M8 changed from a hang to `expected 1 call, got 4`.
+
+**Status:** active. Lint candidate: `runAllTimersAsync` in a file whose `beforeEach` calls `useFakeTimers` ahead of a `new *Service(`.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
