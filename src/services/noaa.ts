@@ -26,7 +26,8 @@ import {
   ServiceUnavailableError,
   InvalidLocationError,
   DataNotFoundError,
-  ApiError
+  ApiError,
+  isRetryableError
 } from '../errors/ApiError.js';
 
 export interface NOAAServiceConfig {
@@ -36,6 +37,22 @@ export interface NOAAServiceConfig {
   usgsBaseURL?: string;
   timeout?: number;
   maxRetries?: number;
+}
+
+/**
+ * Whether a failure the response interceptor already typed is worth another
+ * attempt. `handleError` has classified every axios failure by the time the
+ * ladder sees it, so this reads the class, never `error.message` — the typed
+ * messages match no substring the old test looked for, so nothing was ever
+ * retried (G129). A timeout is not retried: it has already spent
+ * `API_TIMEOUT_MS`, so a second attempt ends past the MCP SDK's 60 s budget.
+ * Twin of `isTransientFailure` in `openmeteo.ts`, deliberately not shared.
+ */
+function isTransientFailure(error: unknown): boolean {
+  if (error instanceof ServiceUnavailableError) {
+    return error.causeCode !== 'ECONNABORTED';
+  }
+  return error instanceof Error && isRetryableError(error);
 }
 
 export class NOAAService {
@@ -171,33 +188,37 @@ export class NOAAService {
   }
 
   /**
-   * Make request with retry logic
+   * Run one request attempt, retrying a transient failure (`isTransientFailure`)
+   * up to `maxRetries` times with exponential backoff. The error that ends the
+   * ladder propagates as the same instance — never wrapped or re-typed.
+   */
+  private async withRetry<T>(
+    attempt: () => Promise<T>,
+    maxRetries: number = this.maxRetries
+  ): Promise<T> {
+    for (let retries = 0; ; retries++) {
+      try {
+        return await attempt();
+      } catch (error) {
+        if (retries >= maxRetries || !isTransientFailure(error)) {
+          throw error;
+        }
+        // Exponential backoff with jitter to prevent thundering herd
+        const baseDelay = Math.pow(2, retries) * 1000;
+        const delay = baseDelay * (0.5 + Math.random() * 0.5);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  /**
+   * Make request through `withRetry`
    */
   private async makeRequest<T>(
     url: string,
-    retries = 0
+    maxRetries?: number
   ): Promise<T> {
-    try {
-      const response = await this.client.get<T>(url);
-      return response.data;
-    } catch (error) {
-      // Retry on rate limit or server errors
-      if (retries < this.maxRetries) {
-        const shouldRetry =
-          (error as Error).message.includes('rate limit') ||
-          (error as Error).message.includes('server error') ||
-          (error as Error).message.includes('timed out');
-
-        if (shouldRetry) {
-          // Exponential backoff with jitter to prevent thundering herd
-          const baseDelay = Math.pow(2, retries) * 1000;
-          const delay = baseDelay * (0.5 + Math.random() * 0.5);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.makeRequest<T>(url, retries + 1);
-        }
-      }
-      throw error;
-    }
+    return this.withRetry(() => this.client.get<T>(url).then(r => r.data), maxRetries);
   }
 
   /**
