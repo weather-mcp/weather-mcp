@@ -105,10 +105,13 @@ const SHARED_OLD = { lat: -49.921875, lon: -130.078125, radius: 40 };
 /**
  * 60 points, each resolving to exactly ONE geohash at radius 100km, all mutually distinct
  * and disjoint from NINE_A/NINE_B/NINE_C's tiles. Used to fill the subscription cap to an
- * exact, known count one geohash at a time.
+ * exact, known count one geohash at a time. The first point was moved off the antimeridian
+ * (was lon -178): its 100km box crossed +/-180, so once subscriptions cross the seam it resolves to two
+ * tiles (`01 pc`), and `pc` would have collided with the (-80, 170) fixture. The one-tile property was
+ * an artefact of the old clamp.
  */
 const SINGLES: Array<{ lat: number; lon: number }> = [
-  { lat: -80, lon: -178 }, { lat: -80, lon: -168 }, { lat: -80, lon: -156 }, { lat: -80, lon: -146 },
+  { lat: -80, lon: -174 }, { lat: -80, lon: -168 }, { lat: -80, lon: -156 }, { lat: -80, lon: -146 },
   { lat: -80, lon: -134 }, { lat: -80, lon: -122 }, { lat: -80, lon: -112 }, { lat: -80, lon: -100 },
   { lat: -80, lon: -88 }, { lat: -80, lon: -78 }, { lat: -80, lon: -66 }, { lat: -80, lon: -56 },
   { lat: -80, lon: -44 }, { lat: -80, lon: -32 }, { lat: -80, lon: -22 }, { lat: -80, lon: -10 },

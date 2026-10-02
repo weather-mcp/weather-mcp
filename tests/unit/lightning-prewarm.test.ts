@@ -433,8 +433,10 @@ function topicsFor(latitude: number, longitude: number, radiusKm: number): strin
 }
 
 /** Two points empirically verified (tests/unit/lightning-prewarm-service.test.ts header) to
- *  each resolve to exactly one geohash at radius 100km, mutually disjoint. */
-const LOC_A = { latitude: -80, longitude: -178 };
+ *  each resolve to exactly one geohash at radius 100km, mutually disjoint. LOC_A was moved off
+ *  the antimeridian (was -178): its 100km box crossed +/-180, and once subscriptions cross the
+ *  seam it resolves to two tiles (`01 pc`). The one-tile property was an artefact of the old clamp. */
+const LOC_A = { latitude: -80, longitude: -174 };
 const LOC_B = { latitude: -80, longitude: -168 };
 
 /**

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.1] - 2026-10-02
+
+A lightning check for a place near the 180° line of longitude, such as Fiji, Tonga or the far east of Russia, watched only one side of that line. Strikes a few kilometres across it were never received, and the report still said the area was fully monitored, so "no lightning nearby" could be wrong in exactly the places where the search circle crosses the line. This release watches both sides. Lightning checks everywhere else are unchanged.
+
+### Fixed
+- **Lightning queries near the antimeridian now watch both sides of it.** A lightning query whose radius reached ±180° longitude (around Fiji, Chukotka or the eastern waters of Tonga) previously monitored only one side of the line, yet still reported complete coverage. The subscription area was cut off at the line, and the coverage check walked the same cut-off set, so strikes a few kilometres across the line were never received and the report did not say so. Subscriptions now cross the line: the search box is kept on the unwrapped longitude line, containment is tested modulo 360°, and a box that crosses also starts from the far side's edge cell. Such a query may now hold up to twice the usual number of subscriptions (at most 18, measured over a 19,040-row sweep of the globe). A saved location near the line uses the same larger share of the 50-subscription budget that saved locations are watched with at startup, so several of them can now reach that limit sooner; a location that does not fit is skipped with a warning, as before, and none is dropped to make room. The precision chosen is the same as before on every row, and the 17,280 rows whose search box does not cross the line subscribe exactly the same cells as before, so their strike counts and verdicts are unchanged. This is not a regression: subscriptions have stopped at the line since the tile search shipped. (`src/utils/geohash.ts`, `tests/unit/geohash-antimeridian.test.ts`)
+
 ## [1.34.0] - 2026-10-01
 
 Asking whether it will rain during a 30-minute walk used to get an hourly answer: one chance of rain for the whole hour, which cannot say whether the shower comes at a quarter past or at a quarter to. This release adds a two-hour forecast in 15-minute steps for the places where a weather model actually computes rain at that resolution, the contiguous US and nearby Canada and Mexico, and Central Europe. Everywhere else it says plainly that it has no 15-minute data, instead of showing numbers that only look precise. Daily and hourly forecasts are unchanged.
@@ -2100,7 +2107,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.1...HEAD
+[1.34.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.0...v1.34.1
 [1.34.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.23...v1.34.0
 [1.33.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...v1.33.23
 [1.33.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.21...v1.33.22
