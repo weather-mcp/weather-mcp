@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.1] - 2026-10-02
+
 A lightning check for a place near the 180° line of longitude, such as Fiji, Tonga or the far east of Russia, watched only one side of that line. Strikes a few kilometres across it were never received, and the report still said the area was fully monitored, so "no lightning nearby" could be wrong in exactly the places where the search circle crosses the line. This release watches both sides. Lightning checks everywhere else are unchanged.
 
 ### Fixed
@@ -2105,7 +2107,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.1...HEAD
+[1.34.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.0...v1.34.1
 [1.34.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.23...v1.34.0
 [1.33.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.22...v1.33.23
 [1.33.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.33.21...v1.33.22
