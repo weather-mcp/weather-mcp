@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Open-Meteo and NOAA now retry a rate limit, a server error or a failed connection.** Each upstream call was meant to retry these up to three times with backoff, but since the first release it never did. The retry loops looked for words such as "rate limit" in the error message, and the typed errors the services actually throw never contain them, so every 429, 5xx and connection failure failed at once. The loops now decide by error class. A 429, a 5xx or a refused connection is retried up to three times, with at most about 7 s of waiting in total. A timeout is not retried: it has already used the whole configured timeout, so a timed-out request fails at that timeout, and `get_forecast`'s MET Norway fallback outside the US answers at that point instead of after four timeouts. The climate-normals pull keeps its own single retry. The life-threatening alert banner, the fire-weather, severe-weather and winter-weather sections and the timezone-only station lookups are extras that never fail a response, so they still make one attempt and do not wait out an outage. No rendered output changes: the same 20 renders were byte-identical before and after. (`src/services/openmeteo.ts`, `src/services/noaa.ts`, `src/errors/ApiError.ts`, `tests/unit/retry-by-class.test.ts`)
+
 ## [1.34.1] - 2026-10-02
 
 A lightning check for a place near the 180° line of longitude, such as Fiji, Tonga or the far east of Russia, watched only one side of that line. Strikes a few kilometres across it were never received, and the report still said the area was fully monitored, so "no lightning nearby" could be wrong in exactly the places where the search circle crosses the line. This release watches both sides. Lightning checks everywhere else are unchanged.
