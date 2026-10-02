@@ -705,7 +705,7 @@ async function formatNOAACurrentConditions(
   // Fire Weather section (optional)
   if (includeFireWeather) {
     try {
-      const gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude);
+      const gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude, 0);
       const fireProps = gridpointData.properties;
 
       // Check if any fire weather data is available

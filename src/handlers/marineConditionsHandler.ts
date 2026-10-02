@@ -70,7 +70,7 @@ export async function handleGetMarineConditions(
   let timezone = guessTimezoneFromCoords(latitude, longitude); // fallback
   try {
     // Try to get timezone from station (preferred)
-    const stations = await noaaService.getStations(latitude, longitude);
+    const stations = await noaaService.getStations(latitude, longitude, 0);
     if (stations.features && stations.features.length > 0) {
       const stationTimezone = stations.features[0].properties.timeZone;
       if (stationTimezone) {

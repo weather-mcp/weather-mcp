@@ -291,7 +291,7 @@ export class NOAAService {
    * Convert lat/lon coordinates to NWS grid information
    * This is the first step for getting forecast or observation data
    */
-  async getPointData(latitude: number, longitude: number): Promise<PointsResponse> {
+  async getPointData(latitude: number, longitude: number, maxRetries?: number): Promise<PointsResponse> {
     // Validate coordinates (checks for NaN, Infinity, and range)
     validateLatitude(latitude);
     validateLongitude(longitude);
@@ -305,7 +305,7 @@ export class NOAAService {
       }
 
       const url = `/points/${latitude.toFixed(4)},${longitude.toFixed(4)}`;
-      const result = await this.makeRequest<PointsResponse>(url);
+      const result = await this.makeRequest<PointsResponse>(url, maxRetries);
 
       // Cache with infinite TTL (grid coordinates never change)
       this.cache.set(cacheKey, result, CacheConfig.ttl.gridCoordinates);
@@ -313,7 +313,7 @@ export class NOAAService {
     }
 
     const url = `/points/${latitude.toFixed(4)},${longitude.toFixed(4)}`;
-    return this.makeRequest<PointsResponse>(url);
+    return this.makeRequest<PointsResponse>(url, maxRetries);
   }
 
   /**
@@ -388,7 +388,7 @@ export class NOAAService {
    * Get gridpoint data for a location using grid coordinates
    * Contains detailed forecast data including fire weather indices
    */
-  async getGridpointData(office: string, gridX: number, gridY: number): Promise<import('../types/noaa.js').GridpointResponse> {
+  async getGridpointData(office: string, gridX: number, gridY: number, maxRetries?: number): Promise<import('../types/noaa.js').GridpointResponse> {
     // Check cache first (if enabled)
     if (CacheConfig.enabled) {
       const cacheKey = Cache.generateKey('gridpoint', office, gridX, gridY);
@@ -398,7 +398,7 @@ export class NOAAService {
       }
 
       const url = `/gridpoints/${office}/${gridX},${gridY}`;
-      const result = await this.makeRequest<import('../types/noaa.js').GridpointResponse>(url);
+      const result = await this.makeRequest<import('../types/noaa.js').GridpointResponse>(url, maxRetries);
 
       // Cache with forecast TTL (2 hours)
       this.cache.set(cacheKey, result, CacheConfig.ttl.forecast);
@@ -406,23 +406,23 @@ export class NOAAService {
     }
 
     const url = `/gridpoints/${office}/${gridX},${gridY}`;
-    return this.makeRequest<import('../types/noaa.js').GridpointResponse>(url);
+    return this.makeRequest<import('../types/noaa.js').GridpointResponse>(url, maxRetries);
   }
 
   /**
    * Get gridpoint data for a location using lat/lon (convenience method)
    * This combines getPointData and getGridpointData
    */
-  async getGridpointDataByCoordinates(latitude: number, longitude: number): Promise<import('../types/noaa.js').GridpointResponse> {
-    const pointData = await this.getPointData(latitude, longitude);
+  async getGridpointDataByCoordinates(latitude: number, longitude: number, maxRetries?: number): Promise<import('../types/noaa.js').GridpointResponse> {
+    const pointData = await this.getPointData(latitude, longitude, maxRetries);
     const { gridId, gridX, gridY } = pointData.properties;
-    return this.getGridpointData(gridId, gridX, gridY);
+    return this.getGridpointData(gridId, gridX, gridY, maxRetries);
   }
 
   /**
    * Get nearest observation stations for a location
    */
-  async getStations(latitude: number, longitude: number): Promise<StationCollectionResponse> {
+  async getStations(latitude: number, longitude: number, maxRetries?: number): Promise<StationCollectionResponse> {
     // Check cache first (if enabled)
     if (CacheConfig.enabled) {
       const cacheKey = Cache.generateKey('stations', latitude.toFixed(4), longitude.toFixed(4));
@@ -432,7 +432,7 @@ export class NOAAService {
       }
 
       const url = `/points/${latitude.toFixed(4)},${longitude.toFixed(4)}/stations`;
-      const result = await this.makeRequest<StationCollectionResponse>(url);
+      const result = await this.makeRequest<StationCollectionResponse>(url, maxRetries);
 
       // Cache with stations TTL (24 hours - stations rarely change)
       this.cache.set(cacheKey, result, CacheConfig.ttl.stations);
@@ -440,7 +440,7 @@ export class NOAAService {
     }
 
     const url = `/points/${latitude.toFixed(4)},${longitude.toFixed(4)}/stations`;
-    return this.makeRequest<StationCollectionResponse>(url);
+    return this.makeRequest<StationCollectionResponse>(url, maxRetries);
   }
 
   /**
@@ -595,12 +595,14 @@ export class NOAAService {
    * @param latitude Latitude coordinate
    * @param longitude Longitude coordinate
    * @param activeOnly Whether to filter to only active alerts (default: true)
+   * @param maxRetries Overrides the service's retry count; garnish callers pass 0
    * @returns Collection of weather alerts
    */
   async getAlerts(
     latitude: number,
     longitude: number,
-    activeOnly: boolean = true
+    activeOnly: boolean = true,
+    maxRetries?: number
   ): Promise<AlertCollectionResponse> {
     // Validate coordinates (checks for NaN, Infinity, and range)
     validateLatitude(latitude);
@@ -624,7 +626,7 @@ export class NOAAService {
         ? `/alerts/active?point=${latitude.toFixed(4)},${longitude.toFixed(4)}`
         : `/alerts?point=${latitude.toFixed(4)},${longitude.toFixed(4)}`;
 
-      const result = await this.makeRequest<AlertCollectionResponse>(url);
+      const result = await this.makeRequest<AlertCollectionResponse>(url, maxRetries);
 
       // Cache with alerts TTL (5 minutes - alerts can change rapidly)
       this.cache.set(cacheKey, result, CacheConfig.ttl.alerts);
@@ -636,7 +638,7 @@ export class NOAAService {
       ? `/alerts/active?point=${latitude.toFixed(4)},${longitude.toFixed(4)}`
       : `/alerts?point=${latitude.toFixed(4)},${longitude.toFixed(4)}`;
 
-    return this.makeRequest<AlertCollectionResponse>(url);
+    return this.makeRequest<AlertCollectionResponse>(url, maxRetries);
   }
 
   /**

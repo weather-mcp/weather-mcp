@@ -8,7 +8,8 @@
  * that renders a fabricated all-clear.
  *
  * The posture itself is D1 of the design plan: **silent omit**, one
- * `logger.warn`, and no retries. That is only safe because the banner is a
+ * `logger.warn`, and no retries — the fetch passes `maxRetries: 0`, so NOAA's
+ * 429/5xx ladder never runs here. That is only safe because the banner is a
  * positive assertion — its absence claims nothing. `get_alerts` still serves
  * the same data under full contract rules, where a failure propagates. Nothing
  * in a tool description, schema or doc may ever say these three tools "check
@@ -117,7 +118,8 @@ const NWS_CODE_PLUS_BOX: ReadonlySet<string> = new Set(['gu', 'mp', 'vi', 'as'])
  *    territory NWS serves only the southern half of. NOAA is the only upstream
  *    in v1 (D2), so a point outside NWS jurisdiction returns without making any
  *    request at all.
- * 2. **One fetch, no retries.** `getAlerts` caches on its own point-keyed
+ * 2. **One fetch, no retries.** The fetch passes `maxRetries: 0`, opting out
+ *    of NOAA's 429/5xx retry ladder. `getAlerts` caches on its own point-keyed
  *    alerts entry with the five-minute alerts TTL (`src/services/noaa.ts`), so a
  *    banner fetch and a real `get_alerts` call within five minutes share one
  *    request. This module deliberately builds no key and declares no TTL of its
@@ -183,7 +185,7 @@ export async function resolveCriticalAlertBanner(
   }
 
   try {
-    const alerts = await noaaService.getAlerts(latitude, longitude, true);
+    const alerts = await noaaService.getAlerts(latitude, longitude, true, 0);
 
     const features = Array.isArray(alerts?.features) ? alerts.features : [];
     if (features.length === 0) {
