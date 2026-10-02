@@ -44,7 +44,8 @@ import {
   ServiceUnavailableError,
   InvalidLocationError,
   DataNotFoundError,
-  ApiError
+  ApiError,
+  isRetryableError
 } from '../errors/ApiError.js';
 
 /**
@@ -82,10 +83,29 @@ export type NowcastResult =
  * pull is comparatively expensive; the limit was observed live once and did
  * not reproduce across three consecutive 30-year pulls. One retry is the
  * defensive sizing that matches that evidence — a second 429 propagates to
- * the call site's existing catch, which renders the unavailable note.
+ * the call site's existing catch, which renders the unavailable note. The
+ * pull opts out of the service ladder (`maxRetries: 0`), so this one retry
+ * stays the whole budget.
  */
 const NORMALS_RETRY_DELAY_MS = 2000;
 const NORMALS_RETRY_JITTER_MS = 500;
+
+/**
+ * Whether a failure the response interceptor already typed is worth another
+ * attempt. `handleError` has classified every axios failure by the time a
+ * ladder sees it, so this reads the class, never `error.message` — the typed
+ * messages ("Rate limit exceeded for OpenMeteo") match no substring the old
+ * test looked for, which is why nothing was ever retried (G129). A timeout is
+ * the one transient class that is not retried: it has already spent
+ * `API_TIMEOUT_MS`, so a second attempt ends past the MCP SDK's 60 s request
+ * budget. Twin of `isTransientFailure` in `noaa.ts`, deliberately not shared.
+ */
+function isTransientFailure(error: unknown): boolean {
+  if (error instanceof ServiceUnavailableError) {
+    return error.causeCode !== 'ECONNABORTED';
+  }
+  return error instanceof Error && isRetryableError(error);
+}
 
 export interface OpenMeteoServiceConfig {
   baseURL?: string;
@@ -327,34 +347,38 @@ export class OpenMeteoService {
   }
 
   /**
-   * Make request with retry logic
+   * Run one request attempt, retrying a transient failure (`isTransientFailure`)
+   * up to `maxRetries` times with exponential backoff. The error that ends the
+   * ladder propagates as the same instance — never wrapped or re-typed.
+   */
+  private async withRetry<T>(
+    attempt: () => Promise<T>,
+    maxRetries: number = this.maxRetries
+  ): Promise<T> {
+    for (let retries = 0; ; retries++) {
+      try {
+        return await attempt();
+      } catch (error) {
+        if (retries >= maxRetries || !isTransientFailure(error)) {
+          throw error;
+        }
+        // Exponential backoff with jitter to prevent thundering herd
+        const baseDelay = Math.pow(2, retries) * 1000;
+        const delay = baseDelay * (0.5 + Math.random() * 0.5);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  /**
+   * Make request through `withRetry`
    */
   private async makeRequest<T>(
     url: string,
     params: Record<string, string | number>,
-    retries = 0
+    maxRetries?: number
   ): Promise<T> {
-    try {
-      const response = await this.client.get<T>(url, { params });
-      return response.data;
-    } catch (error) {
-      // Retry on rate limit or server errors
-      if (retries < this.maxRetries) {
-        const shouldRetry =
-          (error as Error).message.includes('rate limit') ||
-          (error as Error).message.includes('server error') ||
-          (error as Error).message.includes('timed out');
-
-        if (shouldRetry) {
-          // Exponential backoff with jitter to prevent thundering herd
-          const baseDelay = Math.pow(2, retries) * 1000;
-          const delay = baseDelay * (0.5 + Math.random() * 0.5);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.makeRequest<T>(url, params, retries + 1);
-        }
-      }
-      throw error;
-    }
+    return this.withRetry(() => this.client.get<T>(url, { params }).then(r => r.data), maxRetries);
   }
 
   /**
@@ -988,34 +1012,14 @@ export class OpenMeteoService {
   }
 
   /**
-   * Make request to forecast API with retry logic
+   * Make request to forecast API through `withRetry`
    * @private
    */
   private async makeRequestToForecast<T>(
     url: string,
-    params: Record<string, string | number>,
-    retries = 0
+    params: Record<string, string | number>
   ): Promise<T> {
-    try {
-      const response = await this.forecastClient.get<T>(url, { params });
-      return response.data;
-    } catch (error) {
-      // Retry on rate limit or server errors
-      if (retries < this.maxRetries) {
-        const shouldRetry =
-          (error as Error).message.includes('rate limit') ||
-          (error as Error).message.includes('server error') ||
-          (error as Error).message.includes('timed out');
-
-        if (shouldRetry) {
-          const baseDelay = Math.pow(2, retries) * 1000;
-          const delay = baseDelay * (0.5 + Math.random() * 0.5);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.makeRequestToForecast<T>(url, params, retries + 1);
-        }
-      }
-      throw error;
-    }
+    return this.withRetry(() => this.forecastClient.get<T>(url, { params }).then(r => r.data));
   }
 
   /**
@@ -1147,36 +1151,20 @@ export class OpenMeteoService {
   }
 
   /**
-   * Nowcast request with the same retry policy as `makeRequestToForecast`
-   * for thrown errors (rate limit, server error, timeout). A 400 resolves
+   * Nowcast request through `withRetry`: a 429, a 5xx or a connection failure
+   * is retried; a timeout is not (`isTransientFailure`). A 400 resolves
    * (`nowcastValidateStatus`) and is never retried.
    * @private
    */
   private async makeNowcastRequest(
-    params: Record<string, string | number>,
-    retries = 0
+    params: Record<string, string | number>
   ): Promise<AxiosResponse<unknown>> {
-    try {
-      return await this.forecastClient.get<unknown>('/forecast', {
+    return this.withRetry(() =>
+      this.forecastClient.get<unknown>('/forecast', {
         params,
         validateStatus: nowcastValidateStatus
-      });
-    } catch (error) {
-      if (retries < this.maxRetries) {
-        const shouldRetry =
-          (error as Error).message.includes('rate limit') ||
-          (error as Error).message.includes('server error') ||
-          (error as Error).message.includes('timed out');
-
-        if (shouldRetry) {
-          const baseDelay = Math.pow(2, retries) * 1000;
-          const delay = baseDelay * (0.5 + Math.random() * 0.5);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.makeNowcastRequest(params, retries + 1);
-        }
-      }
-      throw error;
-    }
+      })
+    );
   }
 
   /**
@@ -1319,36 +1307,16 @@ export class OpenMeteoService {
   }
 
   /**
-   * Make request to the ensemble API with retry logic. Follows
+   * Make request to the ensemble API through `withRetry`. Follows
    * `makeRequestToFlood`'s shape exactly — retry/backoff/sanitization are
-   * shared via `handleError`, wired identically for every host client.
+   * shared via `withRetry` and `handleError`, wired identically for every host client.
    * @private
    */
   private async makeRequestToEnsemble<T>(
     url: string,
-    params: Record<string, string | number>,
-    retries = 0
+    params: Record<string, string | number>
   ): Promise<T> {
-    try {
-      const response = await this.ensembleClient.get<T>(url, { params });
-      return response.data;
-    } catch (error) {
-      // Retry on rate limit or server errors
-      if (retries < this.maxRetries) {
-        const shouldRetry =
-          (error as Error).message.includes('rate limit') ||
-          (error as Error).message.includes('server error') ||
-          (error as Error).message.includes('timed out');
-
-        if (shouldRetry) {
-          const baseDelay = Math.pow(2, retries) * 1000;
-          const delay = baseDelay * (0.5 + Math.random() * 0.5);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.makeRequestToEnsemble<T>(url, params, retries + 1);
-        }
-      }
-      throw error;
-    }
+    return this.withRetry(() => this.ensembleClient.get<T>(url, { params }).then(r => r.data));
   }
 
   /**
@@ -1614,34 +1582,14 @@ export class OpenMeteoService {
   }
 
   /**
-   * Make request to air quality API with retry logic
+   * Make request to air quality API through `withRetry`
    * @private
    */
   private async makeRequestToAirQuality<T>(
     url: string,
-    params: Record<string, string | number>,
-    retries = 0
+    params: Record<string, string | number>
   ): Promise<T> {
-    try {
-      const response = await this.airQualityClient.get<T>(url, { params });
-      return response.data;
-    } catch (error) {
-      // Retry on rate limit or server errors
-      if (retries < this.maxRetries) {
-        const shouldRetry =
-          (error as Error).message.includes('rate limit') ||
-          (error as Error).message.includes('server error') ||
-          (error as Error).message.includes('timed out');
-
-        if (shouldRetry) {
-          const baseDelay = Math.pow(2, retries) * 1000;
-          const delay = baseDelay * (0.5 + Math.random() * 0.5);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.makeRequestToAirQuality<T>(url, params, retries + 1);
-        }
-      }
-      throw error;
-    }
+    return this.withRetry(() => this.airQualityClient.get<T>(url, { params }).then(r => r.data));
   }
 
   /**
@@ -1777,34 +1725,14 @@ export class OpenMeteoService {
   }
 
   /**
-   * Make request to marine API with retry logic
+   * Make request to marine API through `withRetry`
    * @private
    */
   private async makeRequestToMarine<T>(
     url: string,
-    params: Record<string, string | number>,
-    retries = 0
+    params: Record<string, string | number>
   ): Promise<T> {
-    try {
-      const response = await this.marineClient.get<T>(url, { params });
-      return response.data;
-    } catch (error) {
-      // Retry on rate limit or server errors
-      if (retries < this.maxRetries) {
-        const shouldRetry =
-          (error as Error).message.includes('rate limit') ||
-          (error as Error).message.includes('server error') ||
-          (error as Error).message.includes('timed out');
-
-        if (shouldRetry) {
-          const baseDelay = Math.pow(2, retries) * 1000;
-          const delay = baseDelay * (0.5 + Math.random() * 0.5);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.makeRequestToMarine<T>(url, params, retries + 1);
-        }
-      }
-      throw error;
-    }
+    return this.withRetry(() => this.marineClient.get<T>(url, { params }).then(r => r.data));
   }
 
   /**
@@ -1940,34 +1868,14 @@ export class OpenMeteoService {
   }
 
   /**
-   * Make request to flood API with retry logic
+   * Make request to flood API through `withRetry`
    * @private
    */
   private async makeRequestToFlood<T>(
     url: string,
-    params: Record<string, string | number>,
-    retries = 0
+    params: Record<string, string | number>
   ): Promise<T> {
-    try {
-      const response = await this.floodClient.get<T>(url, { params });
-      return response.data;
-    } catch (error) {
-      // Retry on rate limit or server errors
-      if (retries < this.maxRetries) {
-        const shouldRetry =
-          (error as Error).message.includes('rate limit') ||
-          (error as Error).message.includes('server error') ||
-          (error as Error).message.includes('timed out');
-
-        if (shouldRetry) {
-          const baseDelay = Math.pow(2, retries) * 1000;
-          const delay = baseDelay * (0.5 + Math.random() * 0.5);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.makeRequestToFlood<T>(url, params, retries + 1);
-        }
-      }
-      throw error;
-    }
+    return this.withRetry(() => this.floodClient.get<T>(url, { params }).then(r => r.data));
   }
 
   /**
@@ -2091,7 +1999,7 @@ export class OpenMeteoService {
     try {
       let response: OpenMeteoHistoricalResponse;
       try {
-        response = await this.makeRequest<OpenMeteoHistoricalResponse>('/archive', params);
+        response = await this.makeRequest<OpenMeteoHistoricalResponse>('/archive', params, 0);
       } catch (error) {
         if (!(error instanceof RateLimitError)) {
           throw error;
@@ -2106,7 +2014,7 @@ export class OpenMeteoService {
         await new Promise(resolve => setTimeout(resolve, delay));
 
         // A second 429 propagates — one retry is the whole budget.
-        response = await this.makeRequest<OpenMeteoHistoricalResponse>('/archive', params);
+        response = await this.makeRequest<OpenMeteoHistoricalResponse>('/archive', params, 0);
       }
 
       const table = computeNormalsTable(response);
