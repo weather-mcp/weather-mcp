@@ -18,6 +18,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "lint": "eslint .",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build && npm audit --omit=dev --audit-level=high",
