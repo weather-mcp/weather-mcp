@@ -24,7 +24,7 @@ describe('Saved Locations - Activities Feature', () => {
     if (tempDir) {
       try {
         rmSync(tempDir, { recursive: true, force: true });
-      } catch (err) {
+      } catch {
         // Ignore cleanup errors
       }
     }

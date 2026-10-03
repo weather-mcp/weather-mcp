@@ -41,7 +41,6 @@ function buildSmryTable(overrides: Record<number, AcisSmryEntry> = {}): AcisSmry
 }
 
 const AUG_12_INDEX = 224;
-const FEB_29_INDEX = 59;
 
 /**
  * Configure the mocked client for a healthy StnMeta + StnData round trip.

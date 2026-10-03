@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.34.2 (Production Ready)
+- **Version:** 1.34.3 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -652,11 +652,31 @@ Note: MCP clients spawn `dist/index.js` at session start — a rebuild alone is 
 
 ```bash
 npm run build          # TypeScript compilation (0 errors)
+npm run lint           # ESLint (0 problems)
 npm test              # All tests passing (100%)
 npm audit             # Broad pre-commit check: all deps, moderate
 ```
 
 The publish path enforces a stricter, narrower gate: `npm audit --omit=dev --audit-level=high`, in `publish.yml` and in `prepublishOnly`, with no bypass. `./scripts/check-doc-versions.sh` also fails on a `src/` directory with no map row, on a module in an enumerated directory that the map does not name (`types/` and `analytics/` are excluded), and on a committed home path.
+
+### Linting
+
+`npm run lint` runs ESLint over `src/`, `tests/` and `scripts/` with the flat config in
+`eslint.config.js`, which lists its own ignores (flat config reads no `.gitignore`). Three
+rule families: `typescript-eslint`'s `recommended` preset, `no-console` in `src/` (off only in
+the logger, `src/index.ts`'s fatal record and the three config parsers that run before the
+logger exists — never a blanket `allow`), and `import-x/no-cycle`.
+`@typescript-eslint/no-explicit-any` is off in `tests/` because the gate does not typecheck
+them (GOTCHAS G103); turn it on when `tests/` gains a tsconfig the gate runs. A new
+`eslint-disable` needs a `-- reason`; unused ones fail the run.
+
+**The two TypeScript entries in `package.json` are deliberate.** `@typescript/native` is
+TypeScript 7, the `tsc` that `npm run build` runs. `typescript` is
+`npm:@typescript/typescript6` — the TS 6 API, which typescript-eslint needs to parse at all,
+because TS 7 ships no JS API. Dependabot ignores `typescript` majors so the shim never jumps
+to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
+(typescript-eslint#10940). Type-aware rules (`no-floating-promises`, `no-misused-promises`)
+are deferred to a follow-up plan.
 
 ### Code Review Checklist
 
@@ -666,21 +686,21 @@ The publish path enforces a stricter, narrower gate: `npm audit --omit=dev --aud
 - [ ] Security event logging where appropriate
 - [ ] Tests for new functionality (unit + integration); existing lock tests pass unedited
 - [ ] Documentation updated (inline comments + README + docs/TOOLS.md + CHANGELOG)
-- [ ] No console.log (use logger instead)
+- [ ] No console outside the logger and config parsers — enforced by `npm run lint`
 - [ ] No hardcoded values (use config/)
 - [ ] Rendered output read against live points, not just tests
 
 ## Project Status
 
-- **Version:** 1.34.2 — Production Ready ✅
+- **Version:** 1.34.3 — Production Ready ✅
 - **Test Coverage:** 4,462 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.34.3:** ESLint now runs in the pre-commit gate and in CI
 - **New in v1.34.2:** Open-Meteo and NOAA now retry a rate limit, a server error or a failed connection
 - **New in v1.34.1:** Lightning checks near the 180° line now watch both sides of it
-- **New in v1.34.0:** get_forecast gains a 2-hour, 15-minute precipitation nowcast (granularity: "minutely") for North America and Central Europe
 
 ## Useful References
 
@@ -703,7 +723,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-10-02 (v1.34.2)
+**Last Updated:** 2026-10-03 (v1.34.3)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

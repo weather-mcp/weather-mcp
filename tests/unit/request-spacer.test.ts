@@ -5,7 +5,7 @@ const I = 1000;
 
 /** A recording sleep that never resolves, so callers stay in flight. */
 function makeNeverSleep() {
-  return vi.fn((_ms: number): Promise<void> => new Promise<void>(() => {}));
+  return vi.fn((): Promise<void> => new Promise<void>(() => {}));
 }
 
 describe('RequestSpacer', () => {
@@ -22,7 +22,7 @@ describe('RequestSpacer', () => {
   });
 
   it('starts an idle first reservation with no sleep and an already-settled promise', async () => {
-    const sleep = vi.fn((_ms: number) => Promise.resolve());
+    const sleep = vi.fn(() => Promise.resolve());
     const spacer = new RequestSpacer(I, { now: () => 10_000, sleep });
 
     const winner = await Promise.race([
@@ -188,7 +188,7 @@ describe('RequestSpacer', () => {
     });
 
     it('rejects a sleep that resolves without moving the clock, instead of spinning', async () => {
-      const sleep = vi.fn((_ms: number) => Promise.resolve());
+      const sleep = vi.fn(() => Promise.resolve());
       const spacer = new RequestSpacer(I, { now: () => 10_000, sleep });
 
       await spacer.reserve();

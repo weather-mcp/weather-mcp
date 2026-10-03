@@ -155,7 +155,6 @@ describe('tools/list byte budget', () => {
   // standard is deliberately unbudgeted — measured and reported, not asserted.
   it('standard payload is measured and reported (no assertion — deliberately unbudgeted)', () => {
     const size = payloadBytes(PRESETS.standard);
-    // eslint-disable-next-line no-console
     console.log(`standard tools/list payload: ${size} bytes (unbudgeted)`);
     expect(size).toBeGreaterThan(0);
   });

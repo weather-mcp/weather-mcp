@@ -22,7 +22,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AxiosInstance } from 'axios';
 import { AxiosError } from 'axios';
-// eslint-disable-next-line import/no-unresolved -- axios's own unsafe subpath export, verified live in node_modules
+// axios's own unsafe subpath export, verified live in node_modules
 import settle from 'axios/unsafe/core/settle.js';
 import { NOAAService } from '../../src/services/noaa.js';
 import { OpenMeteoService } from '../../src/services/openmeteo.js';

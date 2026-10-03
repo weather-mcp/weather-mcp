@@ -48,6 +48,7 @@ const KCMO3 = loadGauge('KCMO3');
  * the fetch and the render together, over real bytes.
  */
 async function renderCapture(gauge: NWPSGauge): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- rest-sibling omit: builds the bbox fixture without the flood block
   const { flood: _flood, ...bboxGauge } = gauge;
   const noaaService = {
     getNWPSGaugesInBoundingBox: vi.fn().mockResolvedValue([bboxGauge]),

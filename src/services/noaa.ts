@@ -546,7 +546,7 @@ export class NOAAService {
       try {
         const stationId = station.properties.stationIdentifier;
         return await this.getLatestObservation(stationId);
-      } catch (error) {
+      } catch {
         // Try next station
         continue;
       }

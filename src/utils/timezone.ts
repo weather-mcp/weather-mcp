@@ -48,7 +48,7 @@ export function formatInTimezone(
       default:
         return zonedDt.toLocaleString({ ...DateTime.DATETIME_MED, ...hourOpt });
     }
-  } catch (error) {
+  } catch {
     // Fallback to standard Date formatting if anything goes wrong
     return new Date(isoString).toLocaleString('en-US', { timeZone: timezone });
   }
@@ -70,7 +70,7 @@ export function formatDateInTimezone(isoString: string, timezone: string): strin
     }
 
     return zonedDt.toLocaleString(DateTime.DATE_MED);
-  } catch (error) {
+  } catch {
     return new Date(isoString).toLocaleDateString('en-US', { timeZone: timezone });
   }
 }
@@ -94,7 +94,7 @@ export function formatTimeInTimezone(isoString: string, timezone: string): strin
     }
 
     return zonedDt.toLocaleString(DateTime.TIME_WITH_SHORT_OFFSET);
-  } catch (error) {
+  } catch {
     return new Date(isoString).toLocaleTimeString('en-US', {
       timeZone: timezone,
       timeZoneName: 'short'
@@ -115,7 +115,7 @@ export function getTimezoneAbbreviation(timezone: string, datetime?: Date): stri
       : DateTime.now().setZone(timezone);
 
     return dt.offsetNameShort || dt.toFormat('ZZZZ');
-  } catch (error) {
+  } catch {
     return timezone;
   }
 }
@@ -183,7 +183,7 @@ export function formatTimeRangeInTimezone(
 
     // Different days: "Nov 7, 2:00 PM - Nov 8, 5:00 PM EST"
     return `${start.toLocaleString(DateTime.DATETIME_MED)} - ${end.toLocaleString(DateTime.DATETIME_MED)}`;
-  } catch (error) {
+  } catch {
     return `${formatInTimezone(startTime, timezone, 'short')} - ${formatInTimezone(endTime, timezone, 'short')}`;
   }
 }

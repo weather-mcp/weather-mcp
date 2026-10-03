@@ -3,7 +3,7 @@
  * Tests for audit findings from CODE_QUALITY_REPORT_V1.6.md and SECURITY_AUDIT_V1.6.md
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { redactCoordinatesForLogging } from '../../src/utils/logger.js';
 import { guessTimezoneFromCoords } from '../../src/utils/timezone.js';
 

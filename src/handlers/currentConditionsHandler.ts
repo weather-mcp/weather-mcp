@@ -435,7 +435,7 @@ async function formatNOAACurrentConditions(
     let obs: ObservationResponse;
     try {
       obs = await noaaService.getLatestObservation(station.properties.stationIdentifier);
-    } catch (error) {
+    } catch {
       continue; // Today's behavior: a dead station is silently skipped.
     }
     fetched++;
@@ -796,7 +796,7 @@ async function formatNOAACurrentConditions(
         // No data at all available
         output += `No atmospheric monitoring data available for this location.\n`;
       }
-    } catch (error) {
+    } catch {
       // If fire weather data fetch fails, just skip it (don't error the whole request)
       output += `\n## Fire Weather\n\n`;
       output += `⚠️ Fire weather data not available for this location.\n`;
@@ -835,7 +835,7 @@ async function formatNOAACurrentConditions(
         if (recordsLine) {
           output += `\n${recordsLine}\n`;
         }
-      } catch (error) {
+      } catch {
         // getRecordsLine never throws, but stay defensive per D4 — records
         // must never fail the primary current-conditions response.
       }
@@ -1147,7 +1147,7 @@ async function formatOpenMeteoCurrentConditions(
         if (recordsLine) {
           output += `\n${recordsLine}\n`;
         }
-      } catch (error) {
+      } catch {
         // getRecordsLine never throws, but stay defensive per D4 — records
         // must never fail the primary current-conditions response.
       }
@@ -1508,7 +1508,7 @@ async function formatMetarCurrentConditions(
         if (recordsLine) {
           output += `\n${recordsLine}\n`;
         }
-      } catch (error) {
+      } catch {
         // getRecordsLine never throws, but records must never fail the
         // primary response.
       }

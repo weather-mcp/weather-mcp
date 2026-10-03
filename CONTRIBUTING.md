@@ -122,12 +122,17 @@ weather-mcp/
 npm run build
 ```
 
-2. Test with the NOAA API:
+2. Run the linter (ESLint, 0 problems expected):
+```bash
+npm run lint
+```
+
+3. Test with the NOAA API:
 ```bash
 npx tsx tests/test_noaa_api.ts
 ```
 
-3. Test manually with Claude Code (if possible)
+4. Test manually with Claude Code (if possible)
 
 ### Adding Tests
 

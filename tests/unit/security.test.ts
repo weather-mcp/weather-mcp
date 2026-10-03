@@ -3,7 +3,7 @@
  * Tests bounds checking, security event logging, and defense-in-depth measures
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { NOAAService } from '../../src/services/noaa.js';
 import { OpenMeteoService } from '../../src/services/openmeteo.js';
 import type { AxiosInstance } from 'axios';

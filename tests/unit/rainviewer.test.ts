@@ -3,7 +3,7 @@
  * Tests precipitation radar imagery retrieval and URL generation
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { RainViewerService } from '../../src/services/rainviewer.js';
 import { RainViewerFrame } from '../../src/types/imagery.js';
 

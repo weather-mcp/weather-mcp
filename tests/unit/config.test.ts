@@ -47,7 +47,6 @@ describe('Cache Configuration', () => {
     it('should convert time constants correctly', () => {
       const MINUTE = 60 * 1000;
       const HOUR = 60 * MINUTE;
-      const DAY = 24 * HOUR;
 
       // Alerts: 5 minutes
       expect(CacheConfig.ttl.alerts).toBe(5 * MINUTE);

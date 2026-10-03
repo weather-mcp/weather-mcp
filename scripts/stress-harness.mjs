@@ -26,7 +26,6 @@ const REPORT = resolve(ROOT, 'docs', 'testing', 'HARNESS_REPORT.md');
 
 // Reference locations
 const SEATTLE = { latitude: 47.6062, longitude: -122.3321 }; // US -> NOAA
-const BEND = { latitude: 44.0582, longitude: -121.3153 };     // US small -> NOAA
 const BERLIN = { latitude: 52.52, longitude: 13.405 };        // intl -> Open-Meteo
 const SYDNEY = { latitude: -33.8688, longitude: 151.2093 };   // S. hemisphere
 
@@ -81,7 +80,6 @@ function firstNum(text, re) {
   return m ? parseFloat(m[1]) : null;
 }
 
-const GROUPS = {};
 async function withServer(label, env, fn) {
   let conn;
   try {

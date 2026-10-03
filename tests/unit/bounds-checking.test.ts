@@ -109,8 +109,6 @@ describe('Bounds Checking - getMaxProbabilityFromSeries', () => {
   describe('Time Window Processing', () => {
     it('should process entries within time window', () => {
       const now = new Date();
-      const futureHours = 48;
-
       const series: GridpointDataSeries = {
         uom: 'wmoUnit:percent',
         values: Array.from({ length: 50 }, (_, i) => ({
@@ -393,20 +391,6 @@ describe('Bounds Checking - getMaxProbabilityFromSeries', () => {
     it('should handle mixed valid and invalid dates', () => {
       const validDate = new Date(Date.now() + 3600000).toISOString() + '/PT1H';
       const invalidDate = 'invalid-date';
-
-      const series: GridpointDataSeries = {
-        uom: 'wmoUnit:percent',
-        values: [
-          {
-            validTime: validDate,
-            value: 50
-          },
-          {
-            validTime: invalidDate,
-            value: 75
-          }
-        ]
-      };
 
       // Valid date should parse correctly
       const parsed1 = new Date(validDate.split('/')[0]);

@@ -334,7 +334,7 @@ export async function renderNormalsSection(
     );
 
     return formatNormals(normals, currentTemps, prefs);
-  } catch (error) {
+  } catch {
     // Normals failing must never fail the request that asked for them.
     return `\n${CLIMATE_SECTION_HEADING}\n\n⚠️ Climate normals data not available for this location.\n`;
   }

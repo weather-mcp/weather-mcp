@@ -5,7 +5,7 @@
 
 import type { AxiosInstance } from 'axios';
 import { AxiosError } from 'axios';
-// eslint-disable-next-line import/no-unresolved -- axios's own unsafe subpath export, verified live in node_modules
+// axios's own unsafe subpath export, verified live in node_modules
 import settle from 'axios/unsafe/core/settle.js';
 
 export type Answer = { status: number; data?: unknown } | { code: string };

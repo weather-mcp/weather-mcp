@@ -22,7 +22,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
     if (tempDir) {
       try {
         rmSync(tempDir, { recursive: true, force: true });
-      } catch (err) {
+      } catch {
         // Ignore cleanup errors
       }
     }

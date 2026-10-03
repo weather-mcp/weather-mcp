@@ -46,7 +46,7 @@ import { EnvironmentAgencyService } from '../services/environmentAgency.js';
 import { GeocodingService } from '../services/geocoding.js';
 import type { LocationStore } from '../services/locationStore.js';
 import { RequestSpacer } from '../utils/requestSpacer.js';
-import { toolConfig } from '../config/tools.js';
+import { toolConfig, type ToolName } from '../config/tools.js';
 import { getDefaultLocation } from '../config/defaultLocation.js';
 import { logger, describeErrorForLogging, isPiiLoggingEnabled } from '../utils/logger.js';
 import { formatErrorForUser } from '../errors/ApiError.js';
@@ -842,7 +842,7 @@ export function createWeatherServer(options: WeatherServerOptions): Server {
 
     try {
       // Check if tool is enabled
-      if (!toolConfig.isEnabled(name as any)) {
+      if (!toolConfig.isEnabled(name as ToolName)) {
         throw new Error(`Tool '${name}' is not enabled. Please check your ENABLED_TOOLS configuration.`);
       }
 

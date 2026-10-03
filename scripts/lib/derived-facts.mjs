@@ -253,10 +253,9 @@ export function renderCount(n, format) {
  * that changes spelling is a value the table can still read rather than a
  * parse failure that reads like a missing site.
  * @param {string} text
- * @param {'raw'|'en-us'|'badge'} _format
  * @returns {number|null} null when the text is not a plain integer
  */
-export function parseCount(text, _format) {
+export function parseCount(text) {
   const stripped = String(text ?? '').replace(/%2C/gi, '').replace(/,/g, '');
   if (!/^[0-9]+$/.test(stripped)) {
     return null;

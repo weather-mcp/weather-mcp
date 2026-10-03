@@ -805,7 +805,6 @@ describe('lightning feed-outage — render contracts (lightningHandler.ts)', () 
 
     // Absent-field control (G13): a fixture that predates this field entirely — no key at
     // all, not merely `undefined` — must render byte-identically to the cold-start path.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const absent = formatLightningActivityResponse(
       baseResponse({ safety: coldStartSafety, coverage: coldStartCoverage as any })
     );

@@ -5838,7 +5838,9 @@ entry. Type a spy held across hooks as `MockInstance<typeof obj.method>` (vitest
 any new test file; a subagent that was told to may report "not typechecked" in its
 Surprises rather than doing it.
 
-**Status:** active. **Lint candidate, and the better fix is in the config rather
+**Status:** active. **Still intact after ESLint landed (2026-10-03, eslint-toolchain):**
+`npm run lint` now reads `tests/`, but untyped — it parses, it does not typecheck — and
+`no-explicit-any` is deliberately off there because of this entry. **Lint candidate, and the better fix is in the config rather
 than in every reviewer** — a second `tsconfig.test.json` extending the base with
 `"include": ["src/**/*", "tests/**/*"]` and `"noEmit": true`, run as a gate step,
 would close this mechanically and cost one `tsc` pass. Until then the rule above
@@ -6690,6 +6692,40 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 **Evidence:** 2026-10-02, retry-predicate-by-class T5 (`58a9679`). The subagent hit the abort and switched to `advanceTimersByTimeAsync(30_000)`. The orchestrator then reordered the banner test from await-then-advance to start-advance-await, and mutation M8 changed from a hang to `expected 1 call, got 4`.
 
 **Status:** active. Lint candidate: `runAllTimersAsync` in a file whose `beforeEach` calls `useFakeTimers` ahead of a `new *Service(`.
+
+---
+
+## G134 — A tool that imports `typescript` cannot run on TypeScript 7, and a scratch install with its own TypeScript hides that
+
+**Trigger:** adding or upgrading anything that `require`s or imports the `typescript` package — typescript-eslint, ts-jest, ts-morph, a codegen script — or measuring such a tool in a scratch directory before adopting it. Also: a Dependabot PR that bumps the `typescript` entry.
+
+**Rule:** since 2026-10-03 `package.json` carries two TypeScript entries on purpose. `@typescript/native` is `npm:typescript@7` and owns `.bin/tsc`; `typescript` is `npm:@typescript/typescript6`, the TS 6 API that tools read. Any probe of a TypeScript-API tool runs **in a copy of this repo's `package.json` and lockfile** (`git archive HEAD`), never in a bare scratch install, and its first two lines check `node_modules/.bin/tsc --version` (7.x) and `node -p "require('typescript').version"` (6.x). Install the lint packages with explicit `^` ranges: bare names let `eslint-import-resolver-typescript`'s optional peer on the old `eslint-plugin-import` pull `eslint` back to 9 and fail `ERESOLVE`. Never bump the `typescript` entry to 7; Dependabot is told to ignore its majors.
+
+**Why:** TypeScript 7 is the native compiler and exports no JS API — its `"."` export is `lib/version.cjs`, and `require('typescript').createSourceFile` is `undefined`. typescript-eslint needs that API to **parse**, not only for type-aware rules: its peer range is `>=4.8.4 <6.1.0`, `npm i` fails `ERESOLVE`, an `overrides` entry cannot satisfy a peer, and under `--legacy-peer-deps` ESLint crashes with "typescript-eslint does not support TS 7.0". The ESLint design plan measured every finding in a scratch directory that installed its own TypeScript 5.9.3, so the parse failure was invisible until `/impl-plan` reran it against this repo's lockfile and halted.
+
+**Verify:** `node -p "require('typescript').version"` prints 6.x and `./node_modules/.bin/tsc --version` prints 7.x; `npm run lint` exits 0.
+
+**Evidence:** 2026-10-02/03, eslint-toolchain. The design's scratch probe (TS 5.9.3) versus the `/impl-plan` halt (`impl-halt.txt`, run `eslint-toolchain-20261002-231232`); T1 `246942a` installed the alias pair, verified by `npm ci` in a fresh worktree at T8.
+
+**Status:** active. Retire when typescript-eslint admits TS 7 (typescript-eslint#10940) and the pair collapses to one `typescript` entry.
+
+---
+
+## G135 — A lint rule that reports zero has not been shown to run until a mutation makes it fire
+
+**Trigger:** adopting or reconfiguring a lint rule whose clean result is the claim — `import-x/no-cycle`, any resolver-backed `import-x/*` rule, a `no-restricted-*` pattern, or any rule scoped by a `files` glob — and writing "0 violations" into a plan, a commit or a QA record.
+
+**Rule:** before you record a zero, plant one violation on a real path and confirm the rule reports it and the exit code is non-zero; then restore by `cp` ([G27]). For `import-x` under TypeScript, extend `importX.flatConfigs.typescript` (with `createTypeScriptImportResolver()` as `import-x/resolver-next`): it supplies the settings that map a `'./x.js'` specifier back to `x.ts`. Without them the resolver finds nothing, so no edge exists and the cycle check is silent.
+
+Know what the zero does not cover, too. Measured 2026-10-03 (diff review M1, reproduced): a cycle made only of `import type` statements, or only of bare side-effect imports (`import './x.js'`), passes. The first is erased at runtime and harmless. The second is a real runtime cycle, and `src/` has no side-effect imports today (`grep -rnE "^import '[.]" src` → empty). Plant a cycle whose imports **bind and use a value**.
+
+**Why:** the ESLint design plan reported `import/no-cycle: 0` for the whole tree from a config that registered the plugin and set the resolver but did not extend the preset. A two-file cycle under `src/utils/` then also produced no report, which is the only thing that showed the zero was vacuous. With the preset the same mutation fails `Dependency cycle detected`, and the real tree's zero became a measurement. This is [G41] for lint rules: a check that cannot fail looks exactly like a check that passed.
+
+**Verify:** create `src/utils/zzCycleA.ts` and `zzCycleB.ts` importing each other with `.js` specifiers; `npm run lint` exits 1 with `import-x/no-cycle`. Delete both files.
+
+**Evidence:** 2026-10-02, eslint-toolchain design rev 1 versus the rev 2 probe; mutation proofs at T2 (`5fdc37b`) and on the finished tree at T8 (`.devdocs/archive/completed/qa-eslint-toolchain.md` §2). Also observed: ESLint 10 dropped the `unix` formatter from core, so `eslint -f unix` errors — use `-f json`.
+
+**Status:** active.
 
 ---
 
