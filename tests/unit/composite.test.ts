@@ -338,7 +338,7 @@ describe('composite utilities', () => {
       const z = 6;
       const world = worldPixelSize(z);
       const { gx, gy } = latLonToGlobalPixel(-84.9, 0, z);
-      const { gx0, gy0 } = centeredWindowOrigin(gx, gy, 512, z);
+      const { gy0 } = centeredWindowOrigin(gx, gy, 512, z);
 
       expect(gy0).toBe(world - 512); // pinned to the bottom, not centered
       const py = Math.round(gy - gy0);

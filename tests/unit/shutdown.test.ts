@@ -20,11 +20,11 @@ type TimeoutHandle = ReturnType<typeof globalThis.setTimeout>;
 /** A fake scheduler that records its one deadline callback and lets a test fire it. */
 function createFakeScheduler() {
   let deadlineFn: (() => void) | undefined;
-  const setTimeout = vi.fn((fn: () => void, _ms: number) => {
+  const setTimeout = vi.fn((fn: () => void) => {
     deadlineFn = fn;
     return 42 as unknown as TimeoutHandle;
   });
-  const clearTimeout = vi.fn((_handle: TimeoutHandle) => {});
+  const clearTimeout = vi.fn(() => {});
   return {
     setTimeout,
     clearTimeout,

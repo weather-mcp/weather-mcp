@@ -97,8 +97,6 @@ describe('Geohash Neighbor API Usage', () => {
       const hash = 'dr5ru7n2qq';
       const neighbors = getGeohashNeighbors(hash);
 
-      const center = geohash.decode(hash);
-
       // NE (index 4) - just verify it's different
       expect(neighbors[4]).toBeDefined();
       expect(neighbors[4]).not.toBe(hash);

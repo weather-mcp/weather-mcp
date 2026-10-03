@@ -27,8 +27,6 @@ const DENVER = { latitude: 39.7392, longitude: -104.9903 };
 /** Milan — outside the US, so the NWS sentence must NOT appear. */
 const MILAN = { latitude: 45.4642, longitude: 9.19 };
 
-const COMPARISON_ONLY = ['gfs_seamless', 'ecmwf_ifs025', 'icon_seamless', 'gem_seamless', 'ukmo_seamless'];
-
 interface ModelDay {
   high: number | null;
   low?: number | null;

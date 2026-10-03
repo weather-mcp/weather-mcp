@@ -229,7 +229,6 @@ describe('v1.6.0 Security - Bounds Checking and Validation', () => {
       const radiusKm = 100;
 
       const latDelta = (radiusKm * 360) / 40000;
-      const lonDelta = latDelta / Math.cos((centerLat * Math.PI) / 180);
 
       const north = Math.min(90, centerLat + latDelta);
       const south = Math.max(-90, centerLat - latDelta);
@@ -464,6 +463,7 @@ describe('v1.6.0 Security - Bounds Checking and Validation', () => {
       const bounded = data.slice(0, maxEntries);
       let sum = 0;
       for (const item of bounded) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the accumulation is the timed work of this duration-bound test; removing it removes the work being timed
         sum += item.value;
       }
 

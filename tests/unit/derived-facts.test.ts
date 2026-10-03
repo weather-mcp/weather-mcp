@@ -320,7 +320,7 @@ describe('DOC_SITES', () => {
 
     it('contract 9: writeSites is two-phase — a failing read writes nothing, and a clean tree writes only the files whose value actually changed', () => {
       let writeCalls = 0;
-      const countingWrite = (_file: string, _text: string) => {
+      const countingWrite = () => {
         writeCalls += 1;
       };
       const rewordRow = DOC_SITES.find(

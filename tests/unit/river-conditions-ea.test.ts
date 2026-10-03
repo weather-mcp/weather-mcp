@@ -256,7 +256,7 @@ describe('handleGetRiverConditions — EA auto with no Nominatim wired', () => {
     // fakes.nominatim intentionally left undefined — the existing-harness shape.
     fakes.ea = buildEaFake();
 
-    const result = await callRiverConditions({ ...LONDON }, fakes);
+    await callRiverConditions({ ...LONDON }, fakes);
 
     expect(fakes.openMeteo.getRiverDischarge).toHaveBeenCalledTimes(1);
     expect(fakes.ea.getStationsNear).not.toHaveBeenCalled();

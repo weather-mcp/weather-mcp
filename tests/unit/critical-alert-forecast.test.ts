@@ -311,7 +311,6 @@ describe('handleGetForecast — criticalAlertBanner (T4)', () => {
     expect(headingIdx).toBeGreaterThan(locationIdx);
 
     // G11 — read the whole rendered string, not just the assertions above.
-    // eslint-disable-next-line no-console
     console.log('--- forecast with banner (read for G11) ---\n' + text);
   });
 

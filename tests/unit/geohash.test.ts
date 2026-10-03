@@ -9,8 +9,7 @@ import {
   getGeohashNeighbors,
   computeGeohashTiles,
   calculateGeohashSubscriptions,
-  isWithinRadius,
-  BoundingBox
+  isWithinRadius
 } from '../../src/utils/geohash.js';
 
 describe('Geohash Utilities', () => {
@@ -153,6 +152,7 @@ describe('Geohash Utilities', () => {
 
     it('should include center point geohash', () => {
       const tiles = computeGeohashTiles(40.7128, -74.006, 50, 3);
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- the differential lock on the vendored geohash probes the devDependency by name on purpose
       const centerHash = require('ngeohash').encode(40.7128, -74.006, 3);
 
       expect(tiles.has(centerHash)).toBe(true);

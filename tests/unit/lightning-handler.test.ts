@@ -464,7 +464,7 @@ describe('Lightning Activity Handler', () => {
     });
 
     it('should calculate density per square km', async () => {
-      const strikes: LightningStrike[] = Array.from({ length: 100 }, (_, i) => ({
+      const strikes: LightningStrike[] = Array.from({ length: 100 }, () => ({
         timestamp: new Date(),
         latitude: 40.8,
         longitude: -74.0,

@@ -216,7 +216,6 @@ describe('get_forecast granularity "minutely"', () => {
       expect(text).toContain(`| ${label(DETROIT_TIMES[4])} | moderate |\n`);
 
       // G11: read the rendered text, not only the assertions.
-      // eslint-disable-next-line no-console
       console.log('--- minutely covered (read for G11) ---\n' + text);
     });
 

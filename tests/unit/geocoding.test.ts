@@ -47,7 +47,7 @@ function nominatimRows(n: number): unknown[] {
  * Nominatim is the winning provider.
  */
 function routeProviders(nominatimCount: number): void {
-  getMock.mockImplementation(async (baseURL: string, _path: string) => {
+  getMock.mockImplementation(async (baseURL: string) => {
     if (baseURL.includes('census')) return { data: { result: { addressMatches: [] } } };
     if (baseURL.includes('nominatim')) return { data: nominatimRows(nominatimCount) };
     if (baseURL.includes('open-meteo')) return { data: { results: [] } };

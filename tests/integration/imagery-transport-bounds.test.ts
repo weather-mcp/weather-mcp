@@ -118,7 +118,6 @@ beforeEach(() => {
 describe('RainViewer metadata transport', () => {
   function serviceAt(route: string): RainViewerService {
     const svc = new RainViewerService();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (svc as any).client.defaults.baseURL = `${origin}/${route}`;
     return svc;
   }
@@ -138,10 +137,8 @@ describe('RainViewer metadata transport', () => {
       // A valid feed padded to cap+1: without the cap it would resolve, so a
       // rejection can only come from the transport.
       const svc = new RainViewerService();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (svc as any).client.defaults.baseURL = `${origin}/${route === 'big' ? 'pad' : 'pad-chunked'}`;
       // The query rides on the fixed suffix: /public/weather-maps.json?n=...
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (svc as any).client.defaults.params = { n: RAINVIEWER_MAX_METADATA_BYTES + 1 };
       // The service sanitizes the axios message, so the rejection type is the signal.
       await expect(svc.getRadarData()).rejects.toBeInstanceOf(ServiceUnavailableError);
@@ -150,9 +147,7 @@ describe('RainViewer metadata transport', () => {
     it(`/${route}: exactly the cap is not refused by the transport`, async () => {
       // A valid feed padded to exactly the cap resolves; only the size differs from cap+1.
       const svc = new RainViewerService();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (svc as any).client.defaults.baseURL = `${origin}/${route === 'big' ? 'pad' : 'pad-chunked'}`;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (svc as any).client.defaults.params = { n: RAINVIEWER_MAX_METADATA_BYTES };
       const data = await svc.getRadarData();
       expect(data.radar.past).toHaveLength(1);
@@ -193,7 +188,6 @@ describe('radar tile transport (RADAR_TILE_REQUEST_CONFIG)', () => {
 });
 
 describe('GIBS basemap transport (basemapService client)', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const get = (path: string) => (basemapService as any).client.get(`${origin}${path}`, { responseType: 'arraybuffer' });
 
   it('control: a valid 256px PNG resolves', async () => {
