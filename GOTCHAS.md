@@ -6717,6 +6717,8 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 **Rule:** before you record a zero, plant one violation on a real path and confirm the rule reports it and the exit code is non-zero; then restore by `cp` ([G27]). For `import-x` under TypeScript, extend `importX.flatConfigs.typescript` (with `createTypeScriptImportResolver()` as `import-x/resolver-next`): it supplies the settings that map a `'./x.js'` specifier back to `x.ts`. Without them the resolver finds nothing, so no edge exists and the cycle check is silent.
 
+Know what the zero does not cover, too. Measured 2026-10-03 (diff review M1, reproduced): a cycle made only of `import type` statements, or only of bare side-effect imports (`import './x.js'`), passes. The first is erased at runtime and harmless. The second is a real runtime cycle, and `src/` has no side-effect imports today (`grep -rnE "^import '[.]" src` → empty). Plant a cycle whose imports **bind and use a value**.
+
 **Why:** the ESLint design plan reported `import/no-cycle: 0` for the whole tree from a config that registered the plugin and set the resolver but did not extend the preset. A two-file cycle under `src/utils/` then also produced no report, which is the only thing that showed the zero was vacuous. With the preset the same mutation fails `Dependency cycle detected`, and the real tree's zero became a measurement. This is [G41] for lint rules: a check that cannot fail looks exactly like a check that passed.
 
 **Verify:** create `src/utils/zzCycleA.ts` and `zzCycleB.ts` importing each other with `.js` specifiers; `npm run lint` exits 1 with `import-x/no-cycle`. Delete both files.
