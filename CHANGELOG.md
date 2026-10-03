@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **ESLint now runs in the pre-commit gate and in CI.** `npm run lint` checks `src/`, `tests/` and `scripts/` with typescript-eslint's recommended rules, bans `console` in `src/` outside the logger and the config parsers that run before it exists (stdout is the MCP transport), and fails on any import cycle. The build stays on TypeScript 7. typescript-eslint cannot parse with TypeScript 7, which has no JS API yet, so `package.json` installs the TypeScript 6 API alongside it as `typescript` (the TypeScript team's `@typescript/typescript6` package), with the compiler as `@typescript/native`; the pair collapses back to one entry once typescript-eslint supports TypeScript 7. The existing findings were cleared with no behaviour change: twenty unused catch bindings, fourteen explicit `any` types in `src/` replaced with real ones (two geocoding callbacks keep theirs, with the reason stated beside them), unused test and script variables, and twelve stale `eslint-disable` comments written before the repo had a linter. Rendered output for a US and a non-US point in both unit systems is byte-identical to v1.34.2. (`eslint.config.js`, `package.json`, `.github/workflows/ci.yml`, `CLAUDE.md`, `CONTRIBUTING.md`)
+
 ## [1.34.2] - 2026-10-02
 
 When Open-Meteo or the US National Weather Service answered with a brief rate limit or a server error, the request failed at once, even though the server was built to wait a moment and try again. That retry never ran, so a hiccup of a second or two reached you as an error. This release makes those retries happen. A request that times out is still not repeated, so a slow service fails at your configured timeout rather than several times later. Answers are unchanged whenever the services respond normally.
