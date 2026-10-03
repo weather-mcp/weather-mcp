@@ -308,10 +308,15 @@ export class NCEIService {
    * Handle API errors
    * @private
    */
-  private async handleError(error: any): Promise<never> {
-    if (error.response) {
-      const status = error.response.status;
-      const message = error.response.data?.message || error.message;
+  private async handleError(error: unknown): Promise<never> {
+    const e = error as {
+      response?: { status: number; data?: { message?: string } };
+      message?: string;
+      code?: string;
+    };
+    if (e.response) {
+      const status = e.response.status;
+      const message = e.response.data?.message || e.message;
 
       if (status === 429) {
         throw new RateLimitError(
@@ -339,15 +344,15 @@ export class NCEIService {
       throw new ServiceUnavailableError('NCEI', message);
     }
 
-    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+    if (e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT') {
       throw new ServiceUnavailableError('NCEI', 'Request timed out');
     }
 
-    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+    if (e.code === 'ENOTFOUND' || e.code === 'ECONNREFUSED') {
       throw new ServiceUnavailableError('NCEI', 'Unable to connect to NCEI API');
     }
 
-    throw new ServiceUnavailableError('NCEI', error.message || 'Unknown error occurred');
+    throw new ServiceUnavailableError('NCEI', e.message || 'Unknown error occurred');
   }
 }
 

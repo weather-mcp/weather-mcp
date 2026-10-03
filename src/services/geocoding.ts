@@ -268,6 +268,7 @@ class NominatimProvider implements GeocodingProvider {
         return [];
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no Nominatim/Open-Meteo item type exists in src/types/, and the callback compares fields (item.importance > 0.6), so an all-optional type would change how undefined evaluates; revisit when a plan touches this callback
       const results: GeocodingResult[] = response.data.map((item: any) => {
         const address = item.address || {};
 
@@ -371,6 +372,7 @@ class OpenMeteoProvider implements GeocodingProvider {
         return [];
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no Nominatim/Open-Meteo item type exists in src/types/, and the callback compares fields (item.importance > 0.6), so an all-optional type would change how undefined evaluates; revisit when a plan touches this callback
       const results: GeocodingResult[] = found.map((item: any) => ({
         name: item.name,
         display_name: [item.name, item.admin1, item.admin2, item.country]
@@ -421,7 +423,7 @@ export class GeocodingService {
    * Detect if query is likely a US location
    * Helps optimize provider selection
    */
-  private isLikelyUSLocation(query: string): boolean {
+  private isLikelyUSLocation(query: string): boolean | null {
     const lowerQuery = query.toLowerCase();
 
     // State abbreviations
@@ -460,7 +462,7 @@ export class GeocodingService {
     }
 
     // Default: Assume might be US (we'll try Census.gov first, then fallback)
-    return null as any; // null means "uncertain"
+    return null; // null means "uncertain"
   }
 
   /**

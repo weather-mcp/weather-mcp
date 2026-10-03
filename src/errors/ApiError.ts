@@ -204,9 +204,9 @@ export class DataNotFoundError extends ApiError {
  */
 export class ValidationError extends Error {
   public readonly field?: string;
-  public readonly value?: any;
+  public readonly value?: unknown;
 
-  constructor(message: string, field?: string, value?: any) {
+  constructor(message: string, field?: string, value?: unknown) {
     super(message);
     this.name = 'ValidationError';
     this.field = field;

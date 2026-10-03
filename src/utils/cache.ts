@@ -22,7 +22,7 @@ export interface CacheStats {
   maxSize: number;
 }
 
-export class Cache<T = any> {
+export class Cache<T = unknown> {
   private cache: Map<string, CacheEntry<T>> = new Map();
   private stats: CacheStats;
   private maxSize: number;

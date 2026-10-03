@@ -32,7 +32,7 @@ interface LogEntry {
     stack?: string;
     code?: string;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export class Logger {
@@ -69,7 +69,7 @@ export class Logger {
   /**
    * Internal logging method
    */
-  private log(level: LogLevel, message: string, metadata?: Record<string, any>, error?: Error): void {
+  private log(level: LogLevel, message: string, metadata?: Record<string, unknown>, error?: Error): void {
     // Skip if below current log level
     if (level < this.level) return;
 
@@ -87,7 +87,7 @@ export class Logger {
       entry.error = {
         message: error.message,
         stack: error.stack,
-        code: (error as any).code,
+        code: (error as NodeJS.ErrnoException).code,
       };
     }
 
@@ -102,35 +102,35 @@ export class Logger {
   /**
    * Log debug message (detailed information for diagnosing problems)
    */
-  debug(message: string, metadata?: Record<string, any>): void {
+  debug(message: string, metadata?: Record<string, unknown>): void {
     this.log(LogLevel.DEBUG, message, metadata);
   }
 
   /**
    * Log info message (general informational messages)
    */
-  info(message: string, metadata?: Record<string, any>): void {
+  info(message: string, metadata?: Record<string, unknown>): void {
     this.log(LogLevel.INFO, message, metadata);
   }
 
   /**
    * Log warning message (warning messages for potentially harmful situations)
    */
-  warn(message: string, metadata?: Record<string, any>): void {
+  warn(message: string, metadata?: Record<string, unknown>): void {
     this.log(LogLevel.WARN, message, metadata);
   }
 
   /**
    * Log error message (error events that might still allow the application to continue)
    */
-  error(message: string, error?: Error, metadata?: Record<string, any>): void {
+  error(message: string, error?: Error, metadata?: Record<string, unknown>): void {
     this.log(LogLevel.ERROR, message, metadata, error);
   }
 
   /**
    * Log API request
    */
-  logApiRequest(service: string, endpoint: string, metadata?: Record<string, any>): void {
+  logApiRequest(service: string, endpoint: string, metadata?: Record<string, unknown>): void {
     this.debug(`API request to ${service}`, {
       service,
       endpoint,
