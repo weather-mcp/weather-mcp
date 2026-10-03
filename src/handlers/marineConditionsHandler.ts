@@ -77,7 +77,7 @@ export async function handleGetMarineConditions(
         timezone = stationTimezone;
       }
     }
-  } catch (error) {
+  } catch {
     // Use fallback timezone
   }
 

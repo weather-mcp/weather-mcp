@@ -73,7 +73,7 @@ export function getGeohashNeighbors(hash: string): string[] {
     neighbors.push(geohash.neighbor(hash, [-1, 1])); // NW
     neighbors.push(geohash.neighbor(hash, [1, -1])); // SE
     neighbors.push(geohash.neighbor(hash, [-1, -1])); // SW
-  } catch (error) {
+  } catch {
     // Defensive guard only: the vendored neighbor clamps latitude, wraps longitude
     // across the antimeridian and does not throw
   }

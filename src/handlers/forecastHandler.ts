@@ -860,7 +860,7 @@ async function formatNOAAForecast(
       if (severeWeatherSection) {
         output += `\n${severeWeatherSection}`;
       }
-    } catch (error) {
+    } catch {
       // If severe weather data is unavailable, just note it without failing the whole request
       output += `\n*Note: Severe weather probability data is not available for this location.*\n`;
     }
@@ -889,7 +889,7 @@ async function formatNOAAForecast(
     if (hasWinterWeather(winterData)) {
       output += formatSnowData(winterData);
     }
-  } catch (error) {
+  } catch {
     // Winter weather data is optional, silently skip if unavailable
   }
 
@@ -932,7 +932,7 @@ async function formatNOAAForecast(
           if (recordsLine) {
             output += `\n${recordsLine}\n`;
           }
-        } catch (error) {
+        } catch {
           // getRecordsLine never throws, but stay defensive per D4 — records
           // must never fail the primary forecast response.
         }
@@ -1298,7 +1298,7 @@ async function formatOpenMeteoForecast(
           if (recordsLine) {
             output += `\n${recordsLine}\n`;
           }
-        } catch (error) {
+        } catch {
           // getRecordsLine never throws, but stay defensive per D4 — records
           // must never fail the primary forecast response.
         }

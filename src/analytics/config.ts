@@ -29,7 +29,7 @@ export function validateAnalyticsEndpoint(endpoint: string): void {
   let url: URL;
   try {
     url = new URL(endpoint);
-  } catch (error) {
+  } catch {
     throw new Error('Invalid ANALYTICS_ENDPOINT: must be a valid URL');
   }
 

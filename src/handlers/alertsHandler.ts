@@ -210,7 +210,7 @@ async function handleNoaaAlerts(
         timezone = stationTimezone;
       }
     }
-  } catch (error) {
+  } catch {
     // Use fallback timezone
   }
 
