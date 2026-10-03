@@ -336,7 +336,7 @@ function splice(content, id, replacement, file) {
   return content.replace(re, `$1\n${replacement}\n$2`);
 }
 
-function spliceStamp(content, file) {
+function spliceStamp(content) {
   const re = /(<!-- capture-stamp -->)[\s\S]*?(<!-- \/capture-stamp -->)/;
   if (!re.test(content)) return content; // stamp is optional per file
   const stamp = `*Captured ${TODAY} — raw output is live data and will differ when regenerated (\`npm run examples\`).*`;
@@ -497,7 +497,7 @@ async function main() {
       if (scratch) rmSync(scratch, { recursive: true, force: true });
     }
 
-    content = spliceStamp(content, example.file);
+    content = spliceStamp(content);
     writeFileSync(path, content);
   }
 
