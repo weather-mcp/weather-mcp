@@ -25,6 +25,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Lint
+        run: npm run lint
+
       # Unit tests only: tests/integration/ hits live weather APIs, which is
       # too flaky (and too impolite to the free upstreams) for every PR push.
       # The doc-consistency check (scripts/check-doc-versions.sh) also stays
