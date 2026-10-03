@@ -19,6 +19,12 @@ updates:
           - "@types/*"
           - "@vitest/*"
           - "typescript"
+          - "@typescript/native"
+          - "eslint"
+          - "typescript-eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "globals"
           - "tsx"
           - "vitest"
         update-types:
@@ -32,6 +38,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # `typescript` is the TS 6 API shim for typescript-eslint and must never be bumped to 7
+    # (the build compiler is `@typescript/native`)
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     # Automatically rebase PRs when they become outdated
     rebase-strategy: "auto"
     # Add reviewers (customize with actual GitHub usernames if desired)
