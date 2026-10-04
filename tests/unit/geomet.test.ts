@@ -406,7 +406,9 @@ describe('GeoMetService', () => {
     });
 
     // 8. A failed connection is retried.
-    it.each(['ECONNREFUSED', 'ENOTFOUND'])(
+    // Every Node/axios transport code for a connection that failed before any
+    // answer — not just the two a local dead-port or bad-host probe produces.
+    it.each(['ECONNREFUSED', 'ENOTFOUND', 'ECONNRESET', 'EAI_AGAIN', 'EPIPE', 'ENETUNREACH', 'EHOSTUNREACH'])(
       'should retry a sustained %s maxRetries times',
       async (code) => {
         const err = await failWith({ code });
@@ -415,6 +417,13 @@ describe('GeoMetService', () => {
         expect(mockGet).toHaveBeenCalledTimes(4);
       }
     );
+
+    it('should not retry an unrecognised transport code', async () => {
+      const err = await failWith({ code: 'ERR_SOMETHING_NEW', message: 'boom' });
+
+      expect(err.message).toBe('GeoMet request failed');
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
 
     // 9. maxRetries: 0 means one attempt.
     it('should make a single attempt with maxRetries: 0 on a sustained 503', async () => {

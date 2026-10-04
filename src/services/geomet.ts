@@ -45,6 +45,22 @@ interface AxiosLikeError {
   code?: string;
 }
 
+/**
+ * Transport codes that mean the connection failed before any answer — retried.
+ * The first five match `jma.ts` and `metno.ts`; the unreachable-network pair
+ * is added because a dropped route is as transient as a dropped DNS answer.
+ * Timeout codes are deliberately absent (see `handleError`).
+ */
+const CONNECTION_FAILURE_CODES = new Set([
+  'ENOTFOUND',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EAI_AGAIN',
+  'EPIPE',
+  'ENETUNREACH',
+  'EHOSTUNREACH'
+]);
+
 function isAxiosLikeError(error: unknown): error is AxiosLikeError {
   return typeof error === 'object' && error !== null;
 }
@@ -247,7 +263,7 @@ export class GeoMetService {
         throw new GeoMetRequestError('GeoMet request timed out', false);
       }
 
-      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      if (error.code !== undefined && CONNECTION_FAILURE_CODES.has(error.code)) {
         throw new GeoMetRequestError('Unable to connect to GeoMet API', true);
       }
 
