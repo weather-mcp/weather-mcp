@@ -6736,7 +6736,7 @@ commit that removed it — never delete, never renumber.)*
 
 ## G129 — An Open-Meteo retry predicate that string-matches error messages never matches the errors the interceptor throws
 
-**Retired:** 2026-10-02, by the retry-predicate-by-class plan (`9e4cd03` Open-Meteo, `204eca0` NOAA). Both services' retry ladders now decide by error class through `isTransientFailure` (`ServiceUnavailableError` unless `causeCode` is `ECONNABORTED`, else `isRetryableError`) and never read `error.message`; `tests/unit/retry-by-class.test.ts` (`58a9679`) pins it at the interceptor seam. The Verify line below stays true of the *messages* and is kept as the record of what they were.
+**Retired:** 2026-10-02, by the retry-predicate-by-class plan (`9e4cd03` Open-Meteo, `204eca0` NOAA). Both services' retry ladders now decide by error class through `isTransientFailure` (`ServiceUnavailableError` unless `causeCode` is `ECONNABORTED`, else `isRetryableError`) and never read `error.message`; `tests/unit/retry-by-class.test.ts` (`58a9679`) pins it at the interceptor seam. The Verify line below stays true of the *messages* and is kept as the record of what they were. The last live instance of the shape — `src/services/geomet.ts`, whose `handleError` forwarded upstream `message` text past the same substring predicate — moved to a class-keyed `GeoMetRequestError.transient` decision in `335328e` (geomet-retry-predicate), with a timeout likewise not retried.
 
 **Trigger:** adding or relying on a retry loop in `src/services/openmeteo.ts` (`makeRequest`, `makeRequestToForecast`, `makeNowcastRequest`, and their siblings), or writing a test that expects one of them to retry a 429, a 5xx or a timeout.
 

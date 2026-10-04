@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.4] - 2026-10-04
+
+When something in front of Environment and Climate Change Canada's alert service answered with a brief error — a busy gateway, a rate limit, a dropped connection — a Canadian weather-alert request failed at once and showed you that gateway's own text, even though the server was meant to wait a moment and try again. Alerts are safety information, so a hiccup of a second or two should not cost you the answer. This release makes those retries happen, keeps a request that times out from being repeated, and makes every error you see from this service plain text written by this server. Answers are unchanged whenever the service responds normally.
+
+### Fixed
+- **Canadian weather alerts are now retried when GeoMet answers through a gateway error.** `get_alerts` for a Canadian point, and the alerts section of `get_weather_summary` there, read Environment and Climate Change Canada's MSC GeoMet. Its retry loop was meant to retry a rate limit or a server error up to three times, but it decided by looking for words such as "server error" in the error message, and that message was taken from the response body when the body had a `message` field. GeoMet's own error bodies never carry one, but a gateway or firewall in front of it answering a 503 or a 429 with JSON does — so during an outage, the one time the retry matters, the request failed at once with the gateway's text. The loop now decides by the HTTP status: a 429, a 5xx or a failed connection is retried up to three times with backoff, waiting at most about 7 s in total. A failed connection — refused, unresolvable, reset or unreachable, including a momentary DNS failure — was not retried before and now is. A timeout is not retried: it has already used the whole configured timeout, so a Canadian alert request against a GeoMet that never answers now fails at that timeout (30 s by default) instead of after four of them (about 2 minutes). Every GeoMet error message is now fixed text written by this server; text from the response body or from the HTTP client is never shown. Answers are unchanged whenever GeoMet responds normally: the same 8 renders (Toronto and Vancouver, both tools, both unit systems) were byte-identical before and after. (`src/services/geomet.ts`, `tests/unit/geomet.test.ts`, `docs/ERROR_HANDLING.md`)
+
 ## [1.34.3] - 2026-10-03
 
 This release changes nothing you will see when you use the server: every tool answers exactly as it did in 1.34.2, checked byte for byte. It is for people who work on the code. The project's own rules — no stray console output, which would corrupt the connection to your AI client; no untyped values in the server code; no circular imports — were written down but enforced only by review. A linter now checks them on every change and in CI, so a slip is caught before it can ship.
@@ -2121,7 +2128,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.3...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.4...HEAD
+[1.34.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.3...v1.34.4
 [1.34.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.2...v1.34.3
 [1.34.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.1...v1.34.2
 [1.34.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.0...v1.34.1
