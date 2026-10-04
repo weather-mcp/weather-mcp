@@ -169,6 +169,29 @@ Check:
 - Service status: https://open-meteo.com/en/docs/model-updates
 ```
 
+### MSC GeoMet (Canada) Errors
+
+`get_alerts` for a Canadian point, and the alerts section of `get_weather_summary` there, read
+Environment and Climate Change Canada's MSC GeoMet. Each GeoMet call retries a rate limit (429), a
+server error (5xx) or a failed connection up to three times with backoff, waiting at most about
+7 s in total, before you see one of the messages below. A timeout is not retried: it has already
+used the whole configured timeout (`API_TIMEOUT_MS`). Every message is fixed text written by this
+server. Text from GeoMet's response body, or from a gateway in front of it, is never shown.
+
+```
+GeoMet API returned status 429 (rate limit)
+GeoMet API returned status 503 (server error)
+GeoMet API returned status 404
+GeoMet request timed out
+Unable to connect to GeoMet API
+GeoMet request failed
+Unknown error occurred while contacting GeoMet API
+```
+
+`get_alerts` fails with the message. `get_weather_summary` keeps its other sections and renders
+this one as `## alerts (unavailable)` with the same message. Alerts are safety data, so a failed
+fetch is always an error and never an empty "no alerts" answer.
+
 ### Optional Dependency Errors
 
 Unlike everything above, this is a **configuration** state, not an upstream outage. No weather
