@@ -35,15 +35,32 @@ const BBOX_HALF_EXTENT = 0.25;
 /** Values of `status_en` (case-insensitive) that mean the alert record itself is over and must be filtered out. */
 const ENDED_STATUS_VALUES = new Set(['ended', 'expired']);
 
-/** Minimal structural shape of an axios-style error, checked without `any`. */
+/**
+ * Minimal structural shape of an axios-style error, checked without `any`.
+ * Deliberately carries no `message` fields: `handleError` never forwards
+ * upstream body text or the HTTP client's own text.
+ */
 interface AxiosLikeError {
-  response?: { status: number; data?: { message?: string } };
+  response?: { status: number };
   code?: string;
-  message?: string;
 }
 
 function isAxiosLikeError(error: unknown): error is AxiosLikeError {
   return typeof error === 'object' && error !== null;
+}
+
+/**
+ * A GeoMet failure already classified by `handleError`. `transient` is the
+ * retry decision — read by `makeRequest`, decided in exactly one place.
+ * A plain `Error` subclass on purpose: GeoMet is outside `ApiServiceName`
+ * (CLAUDE.md, Error Handling), so `formatErrorForUser` takes its generic
+ * branch and renders `Error: <message>` unchanged.
+ */
+class GeoMetRequestError extends Error {
+  constructor(message: string, public readonly transient: boolean) {
+    super(message);
+    this.name = 'GeoMetRequestError';
+  }
 }
 
 /** Build a GeoMet `bbox` string ("minLon,minLat,maxLon,maxLat") around a coordinate. */
@@ -176,10 +193,11 @@ export class GeoMetService {
   }
 
   /**
-   * Request with retry/backoff, mirroring `NOAAService.makeRequest`
-   * (`src/services/noaa.ts:175-199`): exponential backoff with jitter,
-   * retrying only on messages that indicate a transient failure (rate
-   * limit, server error, timeout).
+   * Request with retry/backoff: a 429, a 5xx or a failed connection is
+   * retried up to `maxRetries` times with exponential backoff and jitter; a
+   * timeout and any other status are not. The decision is
+   * `GeoMetRequestError.transient`, set once in `handleError` — the thrown
+   * message is never read.
    * @private
    */
   private async makeRequest(bbox: string, retries = 0): Promise<GeoMetFeatureCollection> {
@@ -189,18 +207,11 @@ export class GeoMetService {
       });
       return response.data;
     } catch (error) {
-      if (retries < this.maxRetries) {
-        const shouldRetry =
-          (error as Error).message.includes('rate limit') ||
-          (error as Error).message.includes('server error') ||
-          (error as Error).message.includes('timed out');
-
-        if (shouldRetry) {
-          const baseDelay = Math.pow(2, retries) * 1000;
-          const delay = baseDelay * (0.5 + Math.random() * 0.5);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.makeRequest(bbox, retries + 1);
-        }
+      if (retries < this.maxRetries && error instanceof GeoMetRequestError && error.transient) {
+        const baseDelay = Math.pow(2, retries) * 1000;
+        const delay = baseDelay * (0.5 + Math.random() * 0.5);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.makeRequest(bbox, retries + 1);
       }
       throw error;
     }
@@ -209,42 +220,48 @@ export class GeoMetService {
   /**
    * Handle API errors. GeoMet has no service literal in `ApiError` (it is
    * not one of the project's original data sources), so errors are
-   * surfaced as plain, sanitized `Error`s — following `AcisService`'s
-   * precedent (`src/services/acis.ts`).
+   * surfaced as plain, sanitized `Error`s with fixed, pre-written messages —
+   * upstream body text and axios text are never forwarded. Follows
+   * `AcisService`'s precedent (`src/services/acis.ts`).
    * @private
    */
   private async handleError(error: unknown): Promise<never> {
     if (isAxiosLikeError(error)) {
       if (error.response) {
         const status = error.response.status;
-        const message = error.response.data?.message;
 
         if (status === 429) {
-          throw new Error(message || `GeoMet API returned status ${status} (rate limit)`);
+          throw new GeoMetRequestError(`GeoMet API returned status ${status} (rate limit)`, true);
         }
         if (status >= 500) {
-          throw new Error(message || `GeoMet API returned status ${status} (server error)`);
+          throw new GeoMetRequestError(`GeoMet API returned status ${status} (server error)`, true);
         }
-        throw new Error(message || `GeoMet API returned status ${status}`);
+        throw new GeoMetRequestError(`GeoMet API returned status ${status}`, false);
       }
 
+      // Not retried: a timeout has already spent API_TIMEOUT_MS (30 s by
+      // default) and the MCP SDK's request budget is 60 s, so a retry would
+      // answer after the client has given up — the v1.34.2 rule for NOAA and
+      // Open-Meteo (`isTransientFailure`).
       if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-        throw new Error('GeoMet request timed out');
+        throw new GeoMetRequestError('GeoMet request timed out', false);
       }
 
       if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-        throw new Error('Unable to connect to GeoMet API');
+        throw new GeoMetRequestError('Unable to connect to GeoMet API', true);
       }
 
-      if (error.message) {
-        throw new Error(error.message);
+      if ((error as { message?: unknown }).message) {
+        throw new GeoMetRequestError('GeoMet request failed', false);
       }
     }
 
+    // `isAxiosLikeError` accepts any object, so this rethrow is reached only
+    // by an `Error` whose message is empty — there is no text to forward.
     if (error instanceof Error) {
       throw error;
     }
 
-    throw new Error('Unknown error occurred while contacting GeoMet API');
+    throw new GeoMetRequestError('Unknown error occurred while contacting GeoMet API', false);
   }
 }
