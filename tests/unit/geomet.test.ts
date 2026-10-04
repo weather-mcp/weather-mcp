@@ -35,6 +35,7 @@ vi.mock('axios', () => ({
   }
 }));
 
+import { afterEach } from 'vitest';
 import { GeoMetService, filterActiveGeoMetAlerts } from '../../src/services/geomet.js';
 import type { GeoMetAlertFeature, GeoMetFeatureCollection } from '../../src/types/geomet.js';
 
@@ -289,5 +290,138 @@ describe('GeoMetService', () => {
       expect(alerts).toHaveLength(1);
       expect(mockGet).toHaveBeenCalledTimes(2);
     }, 10000);
+  });
+
+  describe('retry by class', () => {
+    // Fake timers go on AFTER construction (the Cache owns a setInterval) and
+    // are driven by advanceTimersByTimeAsync alone (G133).
+    const BACKOFF_BUDGET_MS = 30_000;
+    const LAT = 43.6532;
+    const LON = -79.3832;
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Drive a call to its rejection value (or a sentinel Error on resolution) with fake timers running the backoff. */
+    async function settleRejection(start: () => Promise<unknown>): Promise<unknown> {
+      vi.useFakeTimers();
+      const pending = start().then(
+        () => new Error('expected a rejection, got a resolution'),
+        (e: unknown) => e
+      );
+      await vi.advanceTimersByTimeAsync(BACKOFF_BUDGET_MS);
+      return pending;
+    }
+
+    /** Sustained failure: every call rejects with the same axios-shaped object. */
+    async function failWith(rejection: unknown, config?: { maxRetries?: number }): Promise<Error> {
+      mockGet.mockImplementation(() => Promise.reject(rejection));
+      const service = new GeoMetService(config);
+      const err = await settleRejection(() => service.getAlerts(LAT, LON));
+      expect(err).toBeInstanceOf(Error);
+      return err as Error;
+    }
+
+    // 1. A 503/429 once, then success: retried by status class.
+    it.each([
+      [503, 'Service Unavailable'],
+      [429, 'Too Many Requests']
+    ])('should retry a %i once and then resolve with the alert', async (status, message) => {
+      let call = 0;
+      mockGet.mockImplementation(() => {
+        call++;
+        if (call === 1) {
+          return Promise.reject({ response: { status, data: { message } } });
+        }
+        return jsonResponse(collection([buildFeature()]));
+      });
+
+      const service = new GeoMetService();
+      vi.useFakeTimers();
+      const pending = service.getAlerts(LAT, LON);
+      await vi.advanceTimersByTimeAsync(BACKOFF_BUDGET_MS);
+      const alerts = await pending;
+
+      expect(alerts).toHaveLength(1);
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+
+    // 2. Upstream body text is never forwarded.
+    it.each([429, 503, 404])(
+      'should throw a fixed message for a %i and never forward upstream body text',
+      async (status) => {
+        const err = await failWith(
+          { response: { status, data: { message: 'UPSTREAM-SENTINEL-TEXT' } } },
+          { maxRetries: 0 }
+        );
+
+        const fixed: Record<number, string> = {
+          429: 'GeoMet API returned status 429 (rate limit)',
+          503: 'GeoMet API returned status 503 (server error)',
+          404: 'GeoMet API returned status 404'
+        };
+        expect(err.message).toBe(fixed[status]);
+        expect(err.message).not.toContain('UPSTREAM-SENTINEL-TEXT');
+        expect(err).toMatchObject({ name: 'GeoMetRequestError' });
+      }
+    );
+
+    // 3. Sustained 5xx exhausts the retry budget.
+    it('should retry a sustained 503 maxRetries times and then throw the fixed message', async () => {
+      const err = await failWith({ response: { status: 503, data: {} } });
+
+      expect(err.message).toBe('GeoMet API returned status 503 (server error)');
+      expect(mockGet).toHaveBeenCalledTimes(4);
+    });
+
+    // 4. A timeout is never retried.
+    it.each(['ECONNABORTED', 'ETIMEDOUT'])(
+      'should not retry a %s timeout',
+      async (code) => {
+        const err = await failWith({ code });
+
+        expect(err.message).toBe('GeoMet request timed out');
+        expect(mockGet).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    // 5. A bare client-side message is neither retried nor forwarded.
+    it('should not retry an object that carries only a message, and must not forward it', async () => {
+      const err = await failWith({ message: 'socket hang up at https://api.weather.gc.ca/secret?x=1' });
+
+      expect(err.message).toBe('GeoMet request failed');
+      expect(err.message).not.toContain('api.weather.gc.ca');
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    // 6. A non-retryable status is not retried.
+    it('should not retry a 404', async () => {
+      const err = await failWith({
+        response: { status: 404, data: { code: 'NotFound', description: 'Collection not found' } }
+      });
+
+      expect(err.message).toBe('GeoMet API returned status 404');
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    // 8. A failed connection is retried.
+    it.each(['ECONNREFUSED', 'ENOTFOUND'])(
+      'should retry a sustained %s maxRetries times',
+      async (code) => {
+        const err = await failWith({ code });
+
+        expect(err.message).toBe('Unable to connect to GeoMet API');
+        expect(mockGet).toHaveBeenCalledTimes(4);
+      }
+    );
+
+    // 9. maxRetries: 0 means one attempt.
+    it('should make a single attempt with maxRetries: 0 on a sustained 503', async () => {
+      const err = await failWith({ response: { status: 503, data: {} } }, { maxRetries: 0 });
+
+      expect(err.message).toBe('GeoMet API returned status 503 (server error)');
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
   });
 });
