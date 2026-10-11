@@ -850,6 +850,8 @@ inside `ensureConnected`), shipped green, caught by reading live output during
 T4, fixed in `30ad5cf` by resolving in `subscribeToLocation` and passing the
 module in.
 
+**Second instance (2026-10-11, `7f67a51`):** the same split in its write-side form — read a map, `await` a broker round trip, then delete what was read. `BlitzortungService`'s idle prune and LRU eviction deleted tracking only after the UNSUBACK, so a query in the gap re-stamped a topic the broker was dropping and reported coverage without it. Both now delete before calling `unsubscribe`, in one synchronous run; `tests/unit/blitzortung-prune.test.ts` contracts 2–4 pin it (moving either delete back below the `await` turns them red), and the live reproduction is [G136].
+
 **Status:** active. Related: [G17] (the same file's other concurrency trap),
 [G11] — this is the sharpest instance yet of the exit code not being the
 acceptance — and [G100], the same mechanism one layer up: there the `await` sits
@@ -6691,6 +6693,8 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 **Evidence:** 2026-10-02, retry-predicate-by-class T5 (`58a9679`). The subagent hit the abort and switched to `advanceTimersByTimeAsync(30_000)`. The orchestrator then reordered the banner test from await-then-advance to start-advance-await, and mutation M8 changed from a hang to `expected 1 call, got 4`.
 
+**Also under fake timers (2026-10-11, `cba5964`):** `setImmediate` is faked too, so a "let the loop turn" hop written with it never fires. Take a real hop from `node:timers/promises` (`await setImmediate()` imported from there), which `vi.useFakeTimers()` does not patch. A service whose constructor arms a periodic pass on the fake clock fires its first tick one full interval after import, so for `BlitzortungService` a query at fake t=0 is first stale at `SUBSCRIPTION_IDLE_THRESHOLD_MS + SUBSCRIPTION_PRUNE_INTERVAL_MS` (the tick exactly at the threshold is not strictly greater).
+
 **Status:** active. Lint candidate: `runAllTimersAsync` in a file whose `beforeEach` calls `useFakeTimers` ahead of a `new *Service(`.
 
 ---
@@ -6725,7 +6729,25 @@ Know what the zero does not cover, too. Measured 2026-10-03 (diff review M1, rep
 
 **Evidence:** 2026-10-02, eslint-toolchain design rev 1 versus the rev 2 probe; mutation proofs at T2 (`5fdc37b`) and on the finished tree at T8 (`.devdocs/archive/completed/qa-eslint-toolchain.md` §2). Also observed: ESLint 10 dropped the `unix` formatter from core, so `eslint -f unix` errors — use `-f json`.
 
+**Typed rules in a throwaway config (2026-10-11, `7f67a51`; plan-review gemini R1):** a scratch flat config that names `@typescript-eslint/no-misused-promises` must `extends: [tseslint.configs.base]` — that registers the plugin and the parser. `parserOptions.projectService` alone leaves Espree as the parser and ESLint exits 2 on config, which is loud but easy to misread as "the rule failed". Run it with `--no-config-lookup -c <file>`. Expect two "unused eslint-disable" reports in `src/services/geocoding.ts` from such a run: their directives name rules the scratch config does not enable, so they are config artefacts, not findings. The positive control for row 60's rules is the base's one hit at the old `blitzortung.ts:643` — gone since `7f67a51`, so a future measurement needs a planted `setInterval(async () => …)`.
+
 **Status:** active.
+
+---
+
+## G136 — An await-split race reproduces live by starting the competing call from the log line just before the `await`
+
+**Trigger:** a plan's live pass needs a base-tree positive control ([G108]) for a [G20]-shaped race — a read or delete split from its write by a network round trip — on a path driven by a long timer (the 15-minute lightning prune) or with no public seam to start the competing call at the right moment.
+
+**Rule:** don't edit source and don't guess at sleeps. Copy the built `dist/` to a scratch directory, `sed` the interval constant down (e.g. `SUBSCRIPTION_PRUNE_INTERVAL_MS` → `5000`), and in the driver wrap the shared `logger` instance (`dist/utils/logger.js`, the same module object the service imports) so that when the log line emitted **immediately before** the `await` arrives, the wrapper starts the competing call synchronously. Use the same technique on base and branch so the only variable is the code. The scratch `dist` must sit under a directory whose `node_modules` resolves (inside the repo or the worktree).
+
+**Why:** the window is one broker round trip — about 250 ms on the Blitzortung broker — and a timer-driven pass gives a driver no handle on when it starts. Starting from the log line puts the competing call inside the window every time, so the control reproduces on the first attempt rather than being recorded as *unobserved on base*.
+
+**Verify:** `.devdocs/archive/completed/qa-blitzortung-prune-rejection.md` §2: on `1f145ab` the hook produced `All required geohashes already subscribed` then `remainingSubscriptions: 0` and a `null` coverage start; on the branch the same hook produced a re-SUBSCRIBE and a coverage start equal to the query's own stamp.
+
+**Evidence:** 2026-10-11, blitzortung-prune-rejection T3 (`cba5964`). The plan expected the base control might not reproduce in two attempts; the log-line hook reproduced it in one.
+
+**Status:** active. Related: [G20], [G108], [G37] (every driver ends in `process.exit(0)`, one at a time).
 
 ---
 
