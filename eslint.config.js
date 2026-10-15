@@ -41,6 +41,25 @@ export default tseslint.config(
     rules: { 'import-x/no-cycle': 'error' },
   },
 
+  // Type-aware rules. They read types through tsconfig.eslint.json, a lint-only program over
+  // src/ and the four test directories; the build never reads it. A file ESLint lints that the
+  // program omits is a parse error, never a silent skip, so a new test directory fails lint
+  // until it is added there. Types come from the TS 6 API; the build is TS 7 (CLAUDE.md,
+  // "Linting"). In tests/, anything typed `any` is invisible to both rules (GOTCHAS G103).
+  {
+    files: ['src/**/*.ts', 'tests/**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        project: './tsconfig.eslint.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+    },
+  },
+
   // stdout is the MCP transport. Everything in src/ logs through src/utils/logger.ts.
   {
     files: ['src/**/*.ts'],
@@ -61,7 +80,8 @@ export default tseslint.config(
   },
 
   // Fakes cast to upstream shapes are the house pattern in tests/, and the gate does not
-  // typecheck tests/ at all (GOTCHAS G103). Revisit when tests/ gains a tsconfig the gate runs.
+  // typecheck tests/ at all (GOTCHAS G103). tsconfig.eslint.json only type-reads them for the
+  // promise rules above; it is not a typecheck. Revisit when a gate step typechecks tests/.
   {
     files: ['tests/**'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
