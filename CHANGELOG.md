@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.6] - 2026-10-15
+
+When the aviation weather service stopped answering, a METAR request for current conditions could keep trying for about two minutes before it failed, long after your AI client had already given up on it. The server was retrying a request that had already used its whole timeout. It now fails once, at the timeout, and still retries the short failures that are worth another try. Successful answers and error messages are unchanged.
+
+### Fixed
+- **METAR observations no longer retry a request that has already timed out.** `get_current_conditions` with `source="metar"` reads NOAA's Aviation Weather Center. A request that timed out was retried up to three more times, each one using the whole configured timeout, so against an upstream that never answered the tool spent up to about two minutes before failing, while your client gives up after one minute. A timeout is now not retried: the request fails at the configured timeout (30 s by default). A gateway error (502, 503 or 504) or a failed connection is still retried up to three times with backoff, waiting at most about 7 s in total. Against a local server that accepts and never answers, with a 2 s timeout, the request now makes one attempt and fails in 2 s, where it made four and failed in about 13 s. The error message is unchanged, and so is every successful answer: the same 4 renders (Seattle and London, both unit systems) were byte-identical before and after. (`src/services/aviationWeather.ts`, `tests/unit/metar-service.test.ts`, `docs/ERROR_HANDLING.md`)
+
 ## [1.34.5] - 2026-10-15
 
 A lightning answer could report its coverage as starting later than it really did. The lightning service tidies up its subscriptions in the background, and a query that arrived for an area at the moment that area was being dropped lost the start of its coverage window. The same housekeeping could, in principle, stop the whole server if it ever failed, because nothing caught the failure. This release fixes both. Lightning answers are otherwise unchanged.
@@ -2138,7 +2145,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.5...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.6...HEAD
+[1.34.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.5...v1.34.6
 [1.34.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.4...v1.34.5
 [1.34.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.3...v1.34.4
 [1.34.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.2...v1.34.3

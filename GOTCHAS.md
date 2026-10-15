@@ -6695,6 +6695,8 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 **Also under fake timers (2026-10-11, `cba5964`):** `setImmediate` is faked too, so a "let the loop turn" hop written with it never fires. Take a real hop from `node:timers/promises` (`await setImmediate()` imported from there), which `vi.useFakeTimers()` does not patch. A service whose constructor arms a periodic pass on the fake clock fires its first tick one full interval after import, so for `BlitzortungService` a query at fake t=0 is first stale at `SUBSCRIPTION_IDLE_THRESHOLD_MS + SUBSCRIPTION_PRUNE_INTERVAL_MS` (the tick exactly at the threshold is not strictly greater).
 
+**One mutation cannot fail on the count (2026-10-15, `b35988a`):** removing a retry ladder's bound (`retries < this.maxRetries`) makes the loop retry forever, so the promise never settles inside the advance and the test fails by vitest's 5 s timeout. Record that row as "red by timeout" and move on — it is the one mutation start-advance-await cannot turn into a count.
+
 **Status:** active. Lint candidate: `runAllTimersAsync` in a file whose `beforeEach` calls `useFakeTimers` ahead of a `new *Service(`.
 
 ---
@@ -6748,6 +6750,22 @@ Know what the zero does not cover, too. Measured 2026-10-03 (diff review M1, rep
 **Evidence:** 2026-10-11, blitzortung-prune-rejection T3 (`cba5964`). The plan expected the base control might not reproduce in two attempts; the log-line hook reproduced it in one.
 
 **Status:** active. Related: [G20], [G108], [G37] (every driver ends in `process.exit(0)`, one at a time).
+
+---
+
+## G137 — A retry predicate that reads `causeCode` is inert unless the throw site passed the cause
+
+**Trigger:** a retry ladder (or any branch) that tests `error.causeCode` on a `ServiceUnavailableError`, in a service whose `handleError` builds that error from a string message — `new ServiceUnavailableError(service, 'fixed text')`.
+
+**Rule:** at every throw site the predicate must recognise, pass the underlying error as the **third** argument and keep the message: `new ServiceUnavailableError(service, 'fixed text', error instanceof Error ? error : undefined)`. Never pass the cause in place of the message: the two-argument cause-only form swaps the fixed text for the generic "temporarily unavailable" sentence. Test it by rejecting a **real `Error` carrying `code`** through the interceptor ([G70]); a plain `{ code }` object is not an `Error` and sets nothing.
+
+**Why:** `causeCode` is set in the constructor only from an `Error` argument with a string `code` (`src/errors/ApiError.ts`, `ServiceUnavailableError`). Built from a string alone, it is `undefined`, so `causeCode !== 'ECONNABORTED'` is true for a timeout and the predicate retries exactly what it was written to skip. Nothing errors and the existing tests stay green; a test whose fixture bypasses the interceptor passes against the unchanged loop.
+
+**Verify:** in `src/services/aviationWeather.ts`, drop the `cause` argument from the timeout branch of `handleError`. `tests/unit/metar-service.test.ts` `retry by cause code` goes red: `expected 1 call, got 4`.
+
+**Evidence:** 2026-10-15, aviation-timeout-no-retry. The roadmap row called the fix "the one-line `causeCode !== 'ECONNABORTED'`"; the design found the timeout branch passed no cause, so that line alone would change nothing. Fixed in `00afa35` (cause passed at three branches, then read); mutation M1 in `b35988a` (predicate kept, causes dropped) went red on the count. NOAA and Open-Meteo already pass the cause; GeoMet decides by its own class.
+
+**Status:** active. Lint candidate: a `new ServiceUnavailableError(` with a string second argument and no third, in a file whose retry predicate reads `causeCode`. Related: [G70], [G133].
 
 ---
 

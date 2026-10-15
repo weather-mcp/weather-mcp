@@ -192,6 +192,27 @@ Unknown error occurred while contacting GeoMet API
 this one as `## alerts (unavailable)` with the same message. Alerts are safety data, so a failed
 fetch is always an error and never an empty "no alerts" answer.
 
+### AviationWeather (METAR) Errors
+
+Only `get_current_conditions` with `source="metar"` reads NOAA's Aviation Weather Center;
+`get_weather_summary` does not accept that source. Each call retries a gateway error (502, 503 or
+504) or a failed connection (refused or unresolvable) up to three times with backoff, waiting at
+most about 7 s in total, before you see one of the messages below. A timeout is not retried: it has
+already used the whole configured timeout (`API_TIMEOUT_MS`), so the tool fails at that timeout
+(30 s by default). Any other status fails at once.
+
+```
+AviationWeather API request timed out
+Unable to connect to AviationWeather API
+AviationWeather API returned status 503
+Unknown error occurred while contacting AviationWeather API
+```
+
+For a status error, a short plain-text body or a JSON `message` field of 200 characters or fewer
+from the upstream is shown in place of `AviationWeather API returned status <N>`. An HTML page or a
+longer body is never shown. Another network failure, such as a reset connection, is retried like a
+failed connection and shows the HTTP client's own error text.
+
 ### Optional Dependency Errors
 
 Unlike everything above, this is a **configuration** state, not an upstream outage. No weather
