@@ -221,11 +221,15 @@ export class AviationWeatherService {
 
   /**
    * Request with retry/backoff, mirroring `NOAAService.makeRequest`.
-   * Retries only on the transient classes observed live — 502/503/504 and
-   * network errors, both mapped to `ServiceUnavailableError` by
-   * `handleError`. A 204 resolves normally (axios treats it as success) and
-   * never reaches this catch block; other 4xx/5xx statuses are mapped to a
-   * non-retryable `ApiError` and are not retried.
+   * A 502/503/504 or a failed connection is retried up to `maxRetries`
+   * times with jittered backoff. A timeout is **not** retried: it has
+   * already spent `API_TIMEOUT_MS` (30 s by default) and the MCP SDK's
+   * request budget is 60 s, so a retry would answer after the client gave
+   * up (the v1.34.2 rule, `isTransientFailure` in `noaa.ts` and
+   * `openmeteo.ts`). The loop reads `causeCode`, never the message. A 204
+   * resolves normally (axios treats it as success) and never reaches this
+   * catch block; other 4xx/5xx statuses are mapped to a non-retryable
+   * `ApiError` and are not retried.
    * @private
    */
   private async makeRequest(bbox: BoundingBox, retries = 0): Promise<unknown> {
@@ -238,7 +242,11 @@ export class AviationWeatherService {
       });
       return response.data;
     } catch (error) {
-      if (retries < this.maxRetries && error instanceof ServiceUnavailableError) {
+      const transient =
+        error instanceof ServiceUnavailableError &&
+        error.causeCode !== 'ECONNABORTED' &&
+        error.causeCode !== 'ETIMEDOUT';
+      if (retries < this.maxRetries && transient) {
         const baseDelay = Math.pow(2, retries) * 1000;
         const delay = baseDelay * (0.5 + Math.random() * 0.5);
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -252,9 +260,10 @@ export class AviationWeatherService {
    * Map API errors to sanitized, typed errors. Non-2xx bodies that look
    * like HTML (the observed Azure gateway failure page) or otherwise
    * aren't JSON are never included in a thrown message. Only 502/503/504
-   * and network-level failures are mapped to `ServiceUnavailableError`
-   * (the class `makeRequest` retries on); everything else maps to a
-   * non-retryable `ApiError`.
+   * and network-level failures are mapped to `ServiceUnavailableError`;
+   * everything else maps to a non-retryable `ApiError`. Network failures
+   * carry the axios error as the cause, so `causeCode` is set and
+   * `makeRequest` can tell a timeout from a failed connection.
    * @private
    */
   private async handleError(error: unknown): Promise<never> {
@@ -288,16 +297,18 @@ export class AviationWeatherService {
         );
       }
 
+      const cause = error instanceof Error ? error : undefined;
+
       if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-        throw new ServiceUnavailableError('AviationWeather', 'AviationWeather API request timed out');
+        throw new ServiceUnavailableError('AviationWeather', 'AviationWeather API request timed out', cause);
       }
 
       if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-        throw new ServiceUnavailableError('AviationWeather', 'Unable to connect to AviationWeather API');
+        throw new ServiceUnavailableError('AviationWeather', 'Unable to connect to AviationWeather API', cause);
       }
 
       if (error.message) {
-        throw new ServiceUnavailableError('AviationWeather', error.message);
+        throw new ServiceUnavailableError('AviationWeather', error.message, cause);
       }
     }
 
