@@ -129,7 +129,7 @@ function stubRainViewerFeed(): void {
  * `Promise.all` in `getBaseWindow` rejects and the whole composite degrades.
  */
 function stubBasemapTiles(failUrlSubstring?: string): void {
-  vi.spyOn((basemapService as any).client, 'get').mockImplementation(async (...args: unknown[]) => {
+  vi.spyOn((basemapService as unknown as { client: Client }).client, 'get').mockImplementation(async (...args: unknown[]) => {
     const url = args[0] as string;
 
     if (failUrlSubstring && url.includes(failUrlSubstring)) {
@@ -171,6 +171,9 @@ const SEATTLE_LON = -122.3321;
 // Miami success test.
 const DENVER_LAT = 39.7392;
 const DENVER_LON = -104.9903;
+
+/** Private axios client, typed only as far as the spy needs (same shape as tests/unit/imagery-fetch-bounds.test.ts). */
+type Client = { get: (...a: unknown[]) => Promise<unknown> };
 
 describe('Composited weather imagery — mocked end-to-end (deterministic)', () => {
   afterEach(() => {
@@ -256,7 +259,7 @@ describe('Composited weather imagery — mocked end-to-end (deterministic)', () 
     stubRadarTileFetch();
 
     const basemapCalls: string[] = [];
-    vi.spyOn((basemapService as any).client, 'get').mockImplementation(async (...args: unknown[]) => {
+    vi.spyOn((basemapService as unknown as { client: Client }).client, 'get').mockImplementation(async (...args: unknown[]) => {
       const url = args[0] as string;
       basemapCalls.push(url);
       if (url.includes('OSM_Land_Water_Map')) return { data: BASE_TILE, status: 200 };

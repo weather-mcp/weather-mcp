@@ -142,12 +142,15 @@ function buildNoaaFake() {
   };
 }
 
+/** Private axios client, typed only as far as the spy needs (same shape as tests/unit/imagery-fetch-bounds.test.ts). */
+type Client = { post: (url: string, ...rest: unknown[]) => Promise<unknown> };
+
 describe('Almanac integration — ACIS records through the real handler (mocked, deterministic)', () => {
   it('surfaces a one-sided **Records for** line and ACIS attribution for a US include_normals call', async () => {
     // Real AcisService; only its private axios client's `post` is stubbed
     // (see file header for why this isn't a module-level `vi.mock('axios')`).
     const acisService = new AcisService();
-    const postSpy = vi.spyOn((acisService as any).client, 'post');
+    const postSpy = vi.spyOn((acisService as unknown as { client: Client }).client, 'post');
     postSpy.mockImplementation(async (url: string) => {
       if (url === '/StnMeta') {
         return { data: { meta: [ACIS_STATION] } };
