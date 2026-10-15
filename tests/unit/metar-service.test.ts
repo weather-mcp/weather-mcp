@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { afterEach } from 'vitest';
 
 // Mock the axios instance used by AviationWeatherService so no real network calls are made.
 //
@@ -316,6 +317,100 @@ describe('AviationWeatherService', () => {
       expect(
         new AviationWeatherService({ baseURL: 'https://custom.example.com', timeout: 5000, maxRetries: 1 })
       ).toBeInstanceOf(AviationWeatherService);
+    });
+  });
+
+  describe('retry by cause code', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const networkError = (message: string, code: string) => Object.assign(new Error(message), { code });
+
+    /** Start the call, give it a handle immediately, drive the clock past every backoff, then settle it. */
+    async function runToSettled<T>(start: () => Promise<T>): Promise<{ value?: T; error?: unknown }> {
+      const settled = start().then(
+        value => ({ value }),
+        (error: unknown) => ({ error })
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      return settled;
+    }
+
+    it('should not retry an ECONNABORTED timeout and should keep the axios text out of the error', async () => {
+      mockGet.mockImplementation(() =>
+        Promise.reject(networkError('timeout of 30000ms exceeded', 'ECONNABORTED'))
+      );
+      const service = new AviationWeatherService();
+      vi.useFakeTimers();
+
+      const { error } = await runToSettled(() => service.getMetarsInBoundingBox(US_BBOX));
+
+      expect(mockGet).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(ServiceUnavailableError);
+      const failure = error as ServiceUnavailableError;
+      expect(failure.causeCode).toBe('ECONNABORTED');
+      expect(failure.userMessage).toBe('AviationWeather API request timed out');
+      expect(failure.message).not.toContain('timeout of 30000ms');
+      expect(failure.userMessage).not.toContain('timeout of 30000ms');
+    });
+
+    it('should not retry an ETIMEDOUT timeout', async () => {
+      mockGet.mockImplementation(() => Promise.reject(networkError('connect ETIMEDOUT', 'ETIMEDOUT')));
+      const service = new AviationWeatherService();
+      vi.useFakeTimers();
+
+      const { error } = await runToSettled(() => service.getMetarsInBoundingBox(US_BBOX));
+
+      expect(mockGet).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(ServiceUnavailableError);
+      expect((error as ServiceUnavailableError).causeCode).toBe('ETIMEDOUT');
+    });
+
+    it('should still retry a refused connection and succeed on the next attempt', async () => {
+      let call = 0;
+      mockGet.mockImplementation(() => {
+        call += 1;
+        if (call === 1) {
+          return Promise.reject(networkError('connect ECONNREFUSED', 'ECONNREFUSED'));
+        }
+        return jsonResponse(CAPTURED_STATIONS);
+      });
+      const service = new AviationWeatherService();
+      vi.useFakeTimers();
+
+      const { value, error } = await runToSettled(() => service.getMetarsInBoundingBox(US_BBOX));
+
+      expect(error).toBeUndefined();
+      expect(value).toHaveLength(2);
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+
+    it('should exhaust retries on a sustained ENOTFOUND (4 calls) with the connection message', async () => {
+      mockGet.mockImplementation(() => Promise.reject(networkError('getaddrinfo ENOTFOUND', 'ENOTFOUND')));
+      const service = new AviationWeatherService();
+      vi.useFakeTimers();
+
+      const { error } = await runToSettled(() => service.getMetarsInBoundingBox(US_BBOX));
+
+      expect(mockGet).toHaveBeenCalledTimes(4);
+      expect(error).toBeInstanceOf(ServiceUnavailableError);
+      const failure = error as ServiceUnavailableError;
+      expect(failure.causeCode).toBe('ENOTFOUND');
+      expect(failure.userMessage).toBe('Unable to connect to AviationWeather API');
+    });
+
+    it('should make exactly one attempt with maxRetries 0 on a sustained ECONNREFUSED', async () => {
+      mockGet.mockImplementation(() =>
+        Promise.reject(networkError('connect ECONNREFUSED', 'ECONNREFUSED'))
+      );
+      const service = new AviationWeatherService({ maxRetries: 0 });
+      vi.useFakeTimers();
+
+      const { error } = await runToSettled(() => service.getMetarsInBoundingBox(US_BBOX));
+
+      expect(mockGet).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(ServiceUnavailableError);
     });
   });
 });
