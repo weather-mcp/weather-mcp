@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The lint gate now catches a promise nobody waits for.** `npm run lint` also runs typescript-eslint's `no-floating-promises` and `no-misused-promises` over `src/` and `tests/`: the first flags a promise that is never awaited or handled, the second a promise handed to a callback that discards it — the `setInterval(async …)` shape that needed the v1.34.5 fix. The rules read types through a lint-only `tsconfig.eslint.json` with the TypeScript 6 API, while the build stays on TypeScript 7 and never reads that file. `src/` had no findings. Five integration-test mocks that spied through an untyped cast were given typed spies, with no test behaviour changed. Lint takes about 18 seconds instead of about 9.5. No server behaviour or output changes. (`eslint.config.js`, `tsconfig.eslint.json`, `tests/integration/almanac.test.ts`, `tests/integration/global-wildfire.test.ts`, `tests/integration/imagery-composite.test.ts`, `CLAUDE.md`)
+
 ## [1.34.6] - 2026-10-15
 
 When the aviation weather service stopped answering, a METAR request for current conditions could keep trying for about two minutes before it failed, long after your AI client had already given up on it. The server was retrying a request that had already used its whole timeout. It now fails once, at the timeout, and still retries the short failures that are worth another try. Successful answers and error messages are unchanged.

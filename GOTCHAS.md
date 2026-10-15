@@ -5842,7 +5842,11 @@ Surprises rather than doing it.
 
 **Status:** active. **Still intact after ESLint landed (2026-10-03, eslint-toolchain):**
 `npm run lint` now reads `tests/`, but untyped — it parses, it does not typecheck — and
-`no-explicit-any` is deliberately off there because of this entry. **Lint candidate, and the better fix is in the config rather
+`no-explicit-any` is deliberately off there because of this entry. **Since 2026-10-15
+(eslint-typed-rules, `92cf6d8`)** `npm run lint` type-*reads* `tests/` through
+`tsconfig.eslint.json` for `no-floating-promises` and `no-misused-promises`, and still does not
+typecheck them: an expression whose type degrades to `any` — a type error, or the house `as any`
+fake — is invisible to both rules, so a zero in `tests/` is weaker than a zero in `src/`. **Lint candidate, and the better fix is in the config rather
 than in every reviewer** — a second `tsconfig.test.json` extending the base with
 `"include": ["src/**/*", "tests/**/*"]` and `"noEmit": true`, run as a gate step,
 would close this mechanically and cost one `tsc` pass. Until then the rule above
@@ -6731,7 +6735,7 @@ Know what the zero does not cover, too. Measured 2026-10-03 (diff review M1, rep
 
 **Evidence:** 2026-10-02, eslint-toolchain design rev 1 versus the rev 2 probe; mutation proofs at T2 (`5fdc37b`) and on the finished tree at T8 (`.devdocs/archive/completed/qa-eslint-toolchain.md` §2). Also observed: ESLint 10 dropped the `unix` formatter from core, so `eslint -f unix` errors — use `-f json`.
 
-**Typed rules in a throwaway config (2026-10-11, `7f67a51`; plan-review gemini R1):** a scratch flat config that names `@typescript-eslint/no-misused-promises` must `extends: [tseslint.configs.base]` — that registers the plugin and the parser. `parserOptions.projectService` alone leaves Espree as the parser and ESLint exits 2 on config, which is loud but easy to misread as "the rule failed". Run it with `--no-config-lookup -c <file>`. Expect two "unused eslint-disable" reports in `src/services/geocoding.ts` from such a run: their directives name rules the scratch config does not enable, so they are config artefacts, not findings. The positive control for row 60's rules is the base's one hit at the old `blitzortung.ts:643` — gone since `7f67a51`, so a future measurement needs a planted `setInterval(async () => …)`.
+**Typed rules in a throwaway config (2026-10-11, `7f67a51`; plan-review gemini R1):** a scratch flat config that names `@typescript-eslint/no-misused-promises` must `extends: [tseslint.configs.base]` — that registers the plugin and the parser. `parserOptions.projectService` alone leaves Espree as the parser and ESLint exits 2 on config, which is loud but easy to misread as "the rule failed". Run it with `--no-config-lookup -c <file>`. Expect two "unused eslint-disable" reports in `src/services/geocoding.ts` from such a run: their directives name rules the scratch config does not enable, so they are config artefacts, not findings. The committed config's positive control (2026-10-15, eslint-typed-rules `92cf6d8`): a bare promise call and a `setInterval(async () => …)` appended to `src/utils/finiteSample.ts` fire `no-floating-promises` and `no-misused-promises`; an un-awaited `expect(…).rejects` in `tests/unit/cache.test.ts` fires `no-floating-promises`; a `.ts` file in a new `tests/<dir>/` is a parse error ("not found in any of the provided project(s)"), the control that `tsconfig.eslint.json`'s include list cannot drift silently. Restore by `cp` ([G27]). Record: `.devdocs/archive/completed/qa-eslint-typed-rules.md` §2.
 
 **Status:** active.
 
