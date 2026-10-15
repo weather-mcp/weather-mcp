@@ -611,12 +611,24 @@ export class BlitzortungService {
       securityEvent: true
     });
 
+    // Remove from tracking BEFORE unsubscribing, in the same synchronous run as the call below -
+    // see `pruneStaleSubscriptions` for why. A concurrent query must see an evicted geohash as
+    // absent and re-subscribe it, never re-stamp a topic the broker is about to drop.
+    for (const [geohash] of toEvict) {
+      this.subscribedGeohashes.delete(geohash);
+      this.geohashFirstSubscribed.delete(geohash);
+    }
+
     // Unsubscribe from topics
     await new Promise<void>((resolve) => {
       this.client!.unsubscribe(topics, (error) => {
         if (error) {
+          // Name and code only, as on the subscribe path: mqtt's errors carry the broker host
+          // and port in message and stack.
+          const failure = error as NodeJS.ErrnoException;
           logger.warn('Failed to unsubscribe from topics', {
-            error: error.message,
+            name: failure.name,
+            code: failure.code,
             topics: topics.slice(0, 3) // Log first 3 for debugging
           });
         }
@@ -624,15 +636,73 @@ export class BlitzortungService {
       });
     });
 
-    // Remove from tracking map
-    for (const [geohash] of toEvict) {
-      this.subscribedGeohashes.delete(geohash);
-      this.geohashFirstSubscribed.delete(geohash);
-    }
-
     logger.debug('Eviction complete', {
       remainingSubscriptions: this.subscribedGeohashes.size
     });
+  }
+
+  /**
+   * One prune pass: drop subscriptions not accessed in the last hour
+   */
+  private async pruneStaleSubscriptions(): Promise<void> {
+    if (!this.client || this.subscribedGeohashes.size === 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const staleThreshold = SUBSCRIPTION_IDLE_THRESHOLD_MS;
+    const staleGeohashes: string[] = [];
+
+    for (const [geohash, lastAccess] of this.subscribedGeohashes.entries()) {
+      if (now - lastAccess > staleThreshold) {
+        staleGeohashes.push(geohash);
+      }
+    }
+
+    if (staleGeohashes.length > 0) {
+      logger.info('Pruning stale geohash subscriptions', {
+        count: staleGeohashes.length,
+        totalBefore: this.subscribedGeohashes.size
+      });
+
+      const topics = staleGeohashes.map(geohash => {
+        const geohashPath = geohash.split('').join('/');
+        return `${this.topicPrefix}/${geohashPath}/#`;
+      });
+
+      // Remove from tracking BEFORE unsubscribing, and keep this loop in the same synchronous run
+      // as the `unsubscribe` call below - no `await` between them (G20). A query that runs during
+      // the UNSUBACK round trip must see these geohashes as absent: it then stages and subscribes
+      // them, mqtt sends that SUBSCRIBE after this UNSUBSCRIBE, and its coverage starts from its
+      // own stamp. With the delete below the `await`, the query re-stamps a geohash the broker is
+      // dropping, and its coverage start vanishes when the delete lands. It also means a second
+      // pass, while this one's UNSUBACK is still outstanding, never unsubscribes them again. A
+      // failed unsubscribe leaves the broker over-subscribed, never under-subscribed.
+      for (const geohash of staleGeohashes) {
+        this.subscribedGeohashes.delete(geohash);
+        this.geohashFirstSubscribed.delete(geohash);
+      }
+
+      // Unsubscribe from stale topics
+      await new Promise<void>((resolve) => {
+        this.client!.unsubscribe(topics, (error) => {
+          if (error) {
+            // Name and code only, as on the subscribe path: mqtt's errors carry the broker host
+            // and port in message and stack.
+            const failure = error as NodeJS.ErrnoException;
+            logger.warn('Failed to unsubscribe from stale topics', {
+              name: failure.name,
+              code: failure.code
+            });
+          }
+          resolve();
+        });
+      });
+
+      logger.debug('Pruning complete', {
+        remainingSubscriptions: this.subscribedGeohashes.size
+      });
+    }
   }
 
   /**
@@ -640,54 +710,20 @@ export class BlitzortungService {
    */
   private startSubscriptionPruning(): void {
     // Housekeeping only — must not keep the process alive once nothing else is live.
-    setInterval(async () => {
-      if (!this.client || this.subscribedGeohashes.size === 0) {
-        return;
-      }
-
-      const now = Date.now();
-      const staleThreshold = SUBSCRIPTION_IDLE_THRESHOLD_MS;
-      const staleGeohashes: string[] = [];
-
-      for (const [geohash, lastAccess] of this.subscribedGeohashes.entries()) {
-        if (now - lastAccess > staleThreshold) {
-          staleGeohashes.push(geohash);
-        }
-      }
-
-      if (staleGeohashes.length > 0) {
-        logger.info('Pruning stale geohash subscriptions', {
-          count: staleGeohashes.length,
-          totalBefore: this.subscribedGeohashes.size
+    // The callback is synchronous and owns its failure: `setInterval` discards a returned
+    // promise, and this server has no `unhandledRejection` handler, so a rejected pass would
+    // end the process. Garnish posture: one warn, no retry, the next tick tries again.
+    // Name and code only — mqtt's errors carry the broker host and port in message and stack,
+    // which is also why this is not `describeErrorForLogging` (it adds both under LOG_PII).
+    setInterval(() => {
+      this.pruneStaleSubscriptions().catch((error: unknown) => {
+        const failure = error as NodeJS.ErrnoException | undefined;
+        logger.warn('Subscription prune pass failed', {
+          name: failure?.name,
+          code: failure?.code,
+          securityEvent: true
         });
-
-        const topics = staleGeohashes.map(geohash => {
-          const geohashPath = geohash.split('').join('/');
-          return `${this.topicPrefix}/${geohashPath}/#`;
-        });
-
-        // Unsubscribe from stale topics
-        await new Promise<void>((resolve) => {
-          this.client!.unsubscribe(topics, (error) => {
-            if (error) {
-              logger.warn('Failed to unsubscribe from stale topics', {
-                error: error.message
-              });
-            }
-            resolve();
-          });
-        });
-
-        // Remove from tracking
-        for (const geohash of staleGeohashes) {
-          this.subscribedGeohashes.delete(geohash);
-          this.geohashFirstSubscribed.delete(geohash);
-        }
-
-        logger.debug('Pruning complete', {
-          remainingSubscriptions: this.subscribedGeohashes.size
-        });
-      }
+      });
     }, SUBSCRIPTION_PRUNE_INTERVAL_MS).unref();
   }
 

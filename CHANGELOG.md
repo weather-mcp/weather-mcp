@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.5] - 2026-10-15
+
+A lightning answer could report its coverage as starting later than it really did. The lightning service tidies up its subscriptions in the background, and a query that arrived for an area at the moment that area was being dropped lost the start of its coverage window. The same housekeeping could, in principle, stop the whole server if it ever failed, because nothing caught the failure. This release fixes both. Lightning answers are otherwise unchanged.
+
+### Fixed
+- **A lightning query that arrives while an idle area is being unsubscribed now keeps that area.** The lightning service runs a housekeeping pass every 15 minutes that unsubscribes areas nobody has asked about for an hour, and it evicts the oldest area when a query needs room past the 50-subscription cap. Both marked the area as gone only after the broker confirmed the unsubscribe. A `get_lightning_activity` query (or the lightning section of `get_weather_summary`) that arrived in that gap treated the area as still subscribed, collected for its 10 seconds while the broker dropped it, and then reported its coverage window with that area's start missing. This was reproduced against the live broker. Both paths now mark the area as gone before they unsubscribe, so the query re-subscribes it and its coverage starts from its own request. The housekeeping pass could also, in principle, end the whole server if it ever failed: the failure was an unhandled promise rejection, and Node's default for that is to exit. No such failure has been observed. A failed pass now logs one warning and the next pass tries again. The two "failed to unsubscribe" warnings, and the new one, log the error's name and code rather than the MQTT client's error text, which can name the broker host — as the subscribe path already does. Lightning results are otherwise unchanged. (`src/services/blitzortung.ts`, `tests/unit/blitzortung-prune.test.ts`)
+
+### Changed
+- **Dependencies** — `@modelcontextprotocol/sdk` 1.30.1 → 1.32.1, `dotenv` 18.0.4 → 18.0.6 and `fast-xml-parser` 5.11.1 → 5.11.2 (Dependabot #114, #113); `proxy-addr` 2.0.7 → 2.0.8, reached only through the SDK's HTTP layer, which this stdio server never starts (#117); a development-only `source-map-js` bump (#116). No behaviour change. (`package.json`, `package-lock.json`)
+
 ## [1.34.4] - 2026-10-04
 
 When something in front of Environment and Climate Change Canada's alert service answered with a brief error — a busy gateway, a rate limit, a dropped connection — a Canadian weather-alert request failed at once and showed you that gateway's own text, even though the server was meant to wait a moment and try again. Alerts are safety information, so a hiccup of a second or two should not cost you the answer. This release makes those retries happen, keeps a request that times out from being repeated, and makes every error you see from this service plain text written by this server. Answers are unchanged whenever the service responds normally.
@@ -2128,7 +2138,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.4...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.5...HEAD
+[1.34.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.4...v1.34.5
 [1.34.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.3...v1.34.4
 [1.34.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.2...v1.34.3
 [1.34.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.1...v1.34.2
