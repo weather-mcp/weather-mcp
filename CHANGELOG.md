@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.5] - 2026-10-15
+
 A lightning answer could report its coverage as starting later than it really did. The lightning service tidies up its subscriptions in the background, and a query that arrived for an area at the moment that area was being dropped lost the start of its coverage window. The same housekeeping could, in principle, stop the whole server if it ever failed, because nothing caught the failure. This release fixes both. Lightning answers are otherwise unchanged.
 
 ### Fixed
@@ -2136,7 +2138,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.4...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.5...HEAD
+[1.34.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.4...v1.34.5
 [1.34.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.3...v1.34.4
 [1.34.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.2...v1.34.3
 [1.34.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.1...v1.34.2
