@@ -25,6 +25,7 @@ import type {
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { computeNormalsTable, getNormalsTableCacheKey, type NormalsTable } from '../utils/normals.js';
 import { getUserAgent } from '../utils/version.js';
@@ -328,7 +329,9 @@ export class OpenMeteoService {
       throw new ServiceUnavailableError('OpenMeteo', error);
     }
 
-    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+    // The shared set names "connection failed before any answer"; retry stays this service's own decision
+    // (isTransientFailure), and every code in the set is retried because none is ECONNABORTED.
+    if (isConnectionFailureCode(error.code)) {
       throw new ServiceUnavailableError('OpenMeteo', error);
     }
 
