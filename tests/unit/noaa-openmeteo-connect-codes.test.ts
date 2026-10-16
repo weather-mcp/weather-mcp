@@ -5,6 +5,12 @@ import { NOAAService } from '../../src/services/noaa.js';
 import { CacheConfig } from '../../src/config/cache.js';
 import { logger } from '../../src/utils/logger.js';
 import { ApiError, ServiceUnavailableError, formatErrorForUser } from '../../src/errors/ApiError.js';
+import { handleGetForecast } from '../../src/handlers/forecastHandler.js';
+import type { LocationStore } from '../../src/services/locationStore.js';
+import type { GeocodingService } from '../../src/services/geocoding.js';
+import type { NCEIService } from '../../src/services/ncei.js';
+import type { MetnoService } from '../../src/services/metno.js';
+import type { MetnoDailyAggregate, MetnoDailyForecast } from '../../src/utils/metnoParse.js';
 
 /**
  * NOAA and Open-Meteo map every connection-failure code to the outage error.
@@ -169,5 +175,92 @@ describe('NOAA and Open-Meteo connection-failure codes', () => {
     const result = await settleRejection(() => service.getAlerts(DENVER.lat, DENVER.lon, true, 0));
     expect(result).toBeInstanceOf(ServiceUnavailableError);
     expect(adapter.calls()).toBe(1);
+  });
+});
+
+describe('get_forecast auto falls back to met.no on an Open-Meteo connection failure', () => {
+  const originalEnabled = CacheConfig.enabled;
+  const TOKYO = { latitude: 35.6762, longitude: 139.6503, days: 5 };
+
+  beforeEach(() => {
+    (CacheConfig as { enabled: boolean }).enabled = false;
+    vi.useFakeTimers();
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'debug').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    (CacheConfig as { enabled: boolean }).enabled = originalEnabled;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function metnoAggregate(): MetnoDailyAggregate {
+    const days: MetnoDailyForecast[] = Array.from({ length: 6 }, (_, i) => {
+      const date = `2026-09-${String(11 + i).padStart(2, '0')}`;
+      return {
+        date,
+        startsAt: `${date}T00:00:00.000+09:00`,
+        hoursCovered: 24,
+        complete: true,
+        temperatureMaxC: 17,
+        temperatureMinC: 10,
+        temperatureBasis: 'window',
+        precipitationMm: 0,
+        precipitationProbabilityMaxPct: 10,
+        windSpeedMaxMps: 4,
+        windFromDirectionDeg: 180,
+        symbolCode: 'partlycloudy_day'
+      };
+    });
+    return {
+      timezone: 'Asia/Tokyo',
+      elevationM: 20,
+      days,
+      completeDayCount: days.length,
+      entriesSeen: days.length * 4,
+      entriesAggregated: days.length * 4,
+      entriesTrimmed: false
+    };
+  }
+
+  function setup() {
+    const openMeteo = new OpenMeteoService();
+    const adapter = scriptAdapter(omClient(openMeteo, 'forecastClient'), [{ code: 'ECONNRESET' }]);
+    const metno = { getForecast: vi.fn().mockResolvedValue(metnoAggregate()) };
+    const call = (extra: Record<string, unknown> = {}) =>
+      handleGetForecast(
+        { ...TOKYO, ...extra },
+        {} as unknown as NOAAService,
+        openMeteo,
+        { get: () => undefined, getAll: () => ({}) } as unknown as LocationStore,
+        {} as unknown as GeocodingService,
+        { isAvailable: () => false } as unknown as NCEIService,
+        undefined,
+        undefined,
+        metno as unknown as MetnoService
+      );
+    return { adapter, metno, call };
+  }
+
+  it('auto: runs the Open-Meteo ladder, then serves met.no with both attributions', async () => {
+    const { adapter, metno, call } = setup();
+    const pending = call();
+    await vi.advanceTimersByTimeAsync(BACKOFF_BUDGET_MS);
+    const result = await pending;
+    const text = result.content.map((b) => b.text).join('\n');
+    expect(adapter.calls()).toBe(ATTEMPTS);
+    expect(metno.getForecast).toHaveBeenCalledTimes(1);
+    expect(text).toContain('*Open-Meteo is not responding; showing MET Norway model data instead.*');
+    expect(text).toContain('*Forecast data by MET Norway (CC BY 4.0)*');
+  });
+
+  it("source 'openmeteo': keeps the error contract and never asks met.no", async () => {
+    const { metno, call } = setup();
+    const result = await settleRejection(() => call({ source: 'openmeteo' }));
+    expect(result).toBeInstanceOf(ServiceUnavailableError);
+    expect(metno.getForecast).not.toHaveBeenCalled();
   });
 });
