@@ -1348,7 +1348,7 @@ describe('NationalCapService', () => {
       const service = makeService();
       const promise = service.getWarnings('ph').catch(e => e as Error);
       await vi.advanceTimersByTimeAsync(10000);
-      const err = await promise;
+      const err = (await promise) as Error;
       expect(err.message).toBe('Unable to connect to the PAGASA-DOST alert feed');
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
@@ -1361,7 +1361,7 @@ describe('NationalCapService', () => {
       const service = makeService();
       const promise = service.getWarnings(feed).catch(e => e as Error);
       await vi.advanceTimersByTimeAsync(10000);
-      const err = await promise;
+      const err = (await promise) as Error;
       expect(err.message).toBe(`Unable to connect to the ${publisher} alert feed`);
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
@@ -1371,7 +1371,7 @@ describe('NationalCapService', () => {
       const service = makeService();
       const promise = service.getWarnings('ph').catch(e => e as Error);
       await vi.advanceTimersByTimeAsync(10000);
-      const err = await promise;
+      const err = (await promise) as Error;
       expect(err.message).toBe('Unknown error occurred while contacting the PAGASA-DOST alert feed');
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
