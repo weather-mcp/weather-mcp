@@ -69,6 +69,7 @@ import {
   parseCapIndex,
   parsePolygonDocument
 } from '../utils/capParse.js';
+import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { logger } from '../utils/logger.js';
@@ -287,7 +288,8 @@ export class NationalCapService {
         return new Error(`${feed.publisher} alert feed request timed out`);
       }
 
-      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      // Not in isRetryable on purpose: every connection code fails fast, like ENOTFOUND.
+      if (isConnectionFailureCode(error.code)) {
         return new Error(`Unable to connect to the ${feed.publisher} alert feed`);
       }
     }
