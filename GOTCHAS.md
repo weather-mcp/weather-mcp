@@ -6745,7 +6745,7 @@ Know what the zero does not cover, too. Measured 2026-10-03 (diff review M1, rep
 
 **Trigger:** a plan's live pass needs a base-tree positive control ([G108]) for a [G20]-shaped race — a read or delete split from its write by a network round trip — on a path driven by a long timer (the 15-minute lightning prune) or with no public seam to start the competing call at the right moment.
 
-**Rule:** don't edit source and don't guess at sleeps. Copy the built `dist/` to a scratch directory, `sed` the interval constant down (e.g. `SUBSCRIPTION_PRUNE_INTERVAL_MS` → `5000`), and in the driver wrap the shared `logger` instance (`dist/utils/logger.js`, the same module object the service imports) so that when the log line emitted **immediately before** the `await` arrives, the wrapper starts the competing call synchronously. Use the same technique on base and branch so the only variable is the code. The scratch `dist` must sit under a directory whose `node_modules` resolves (inside the repo or the worktree).
+**Rule:** don't edit source and don't guess at sleeps. Copy the built `dist/` to a scratch directory, `sed` the interval constant down (e.g. `SUBSCRIPTION_PRUNE_INTERVAL_MS` → `5000`), and in the driver wrap the shared `logger` instance (`dist/utils/logger.js`, the same module object the service imports) so that when the log line emitted **immediately before** the `await` arrives, the wrapper starts the competing call synchronously. Use the same technique on base and branch so the only variable is the code. The scratch `dist` must sit under a directory whose `node_modules` resolves (inside the repo or the worktree), **and** must have a `package.json` beside it: `dist/utils/version.js` reads `../package.json` relative to the dist directory, which does not walk up the way module resolution does — copy the repo's `package.json` next to the scratch `dist` (noaa-openmeteo-connect-codes T3, 2026-10-16).
 
 **Why:** the window is one broker round trip — about 250 ms on the Blitzortung broker — and a timer-driven pass gives a driver no handle on when it starts. Starting from the log line puts the competing call inside the window every time, so the control reproduces on the first attempt rather than being recorded as *unobserved on base*.
 
@@ -6791,16 +6791,19 @@ test that follows G9 rethrows it. On 2026-10-15 a PAGASA outage did exactly that
 tag.
 
 **Verify:** `grep -rn "'ECONNREFUSED'" src/services/` lists only the services the plan
-deliberately left on their own lists (noaa, openmeteo, nominatim, ncei, meteoalarm,
-environmentAgency, aviationWeather, acis, metno). A new hit is a new copy.
+deliberately left on their own lists (nominatim, ncei, meteoalarm, environmentAgency,
+aviationWeather, acis, metno). A new hit is a new copy.
 
 **Evidence:** 2026-10-15, plan `alert-feed-connect-codes`: `d5f5f67` (shared util; GeoMet moved
 unchanged), `9091854` (JMA), `7d3b868` (nationalCap). Node reported `EHOSTUNREACH -113` for
-PAGASA while `api.weather.gov` answered 200.
+PAGASA while `api.weather.gov` answered 200. 2026-10-16, plan `noaa-openmeteo-connect-codes`:
+`371e914` moved NOAA and Open-Meteo onto the shared set. Their catch-all was already retryable, so
+the five unlisted codes had been retried all along and only the message was wrong — measure a
+service's catch-all before assuming its retry follows its list.
 
-**Status:** active. Nine services still carry their own lists, deferred because their error
+**Status:** active. Seven services still carry their own lists, deferred because their error
 classes and retry rules differ. Lint candidate: a `no-restricted-syntax` rule on an
-`'ECONNREFUSED'` literal under `src/services/`, once those nine migrate.
+`'ECONNREFUSED'` literal under `src/services/`, once those seven migrate.
 
 ---
 
