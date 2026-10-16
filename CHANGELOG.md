@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **An alert feed that cannot be reached now says so, instead of reporting an unknown error.** On 2026-10-15 the Philippine feed (PAGASA) could not be reached from this network at all, and `get_alerts` for a Philippine point failed with "Unknown error occurred while contacting the PAGASA-DOST alert feed", which reads like a fault in the server rather than an outage at the publisher. The national alert feeds for India, the Philippines and Indonesia, and Japan's JMA feed, now report "Unable to connect to the … alert feed" for every kind of failed connection: a host or network that cannot be reached, a dropped connection, or a temporary DNS failure. Before, only an unresolvable host or a refused connection got that message. `get_weather_summary` shows the same message in its `## alerts (unavailable)` section. A failed connection is still not retried, exactly as an unresolvable host already was, so a feed that is down fails after one attempt rather than backing off. Every message string is unchanged; only which failures reach the connect message changed. Canada's alerts already worked this way and are unchanged. (`src/utils/connectionFailure.ts`, `src/services/nationalCap.ts`, `src/services/jma.ts`, `src/services/geomet.ts`, `tests/unit/connection-failure.test.ts`, `tests/unit/national-cap-service.test.ts`, `tests/unit/jma-service.test.ts`)
+
 ## [1.34.6] - 2026-10-15
 
 When the aviation weather service stopped answering, a METAR request for current conditions could keep trying for about two minutes before it failed, long after your AI client had already given up on it. The server was retrying a request that had already used its whole timeout. It now fails once, at the timeout, and still retries the short failures that are worth another try. Successful answers and error messages are unchanged.
