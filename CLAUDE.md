@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.34.6 (Production Ready)
+- **Version:** 1.34.7 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -693,15 +693,15 @@ are deferred to a follow-up plan.
 
 ## Project Status
 
-- **Version:** 1.34.6 — Production Ready ✅
-- **Test Coverage:** 4,496 tests, 100% pass rate
+- **Version:** 1.34.7 — Production Ready ✅
+- **Test Coverage:** 4,526 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.34.7:** An unreachable national or Japanese alert feed now reports a connection failure instead of an unknown error
 - **New in v1.34.6:** METAR observations no longer retry a request that has already timed out
 - **New in v1.34.5:** A lightning query no longer loses an area that is being unsubscribed
-- **New in v1.34.4:** Canadian weather alerts now retry a gateway error, a rate limit or a dropped connection
 
 ## Useful References
 
@@ -724,7 +724,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-10-15 (v1.34.6)
+**Last Updated:** 2026-10-16 (v1.34.7)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

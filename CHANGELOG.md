@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.7] - 2026-10-16
+
+When a national alert feed could not be reached at all, `get_alerts` told you an "unknown error" had occurred, which looks like a fault in the server rather than an outage at the publisher. The feeds for India, the Philippines, Indonesia and Japan now report a failed connection as exactly that, the way Canada's alerts already did. Nothing else about alerts changed: the messages, the answers and the retry behaviour are the same as before.
+
 ### Fixed
 - **An alert feed that cannot be reached now says so, instead of reporting an unknown error.** On 2026-10-15 the Philippine feed (PAGASA) could not be reached from this network at all, and `get_alerts` for a Philippine point failed with "Unknown error occurred while contacting the PAGASA-DOST alert feed", which reads like a fault in the server rather than an outage at the publisher. The national alert feeds for India, the Philippines and Indonesia, and Japan's JMA feed, now report "Unable to connect to the … alert feed" for every kind of failed connection: a host or network that cannot be reached, a dropped connection, or a temporary DNS failure. Before, only an unresolvable host or a refused connection got that message. `get_weather_summary` shows the same message in its `## alerts (unavailable)` section. A failed connection is still not retried, exactly as an unresolvable host already was, so a feed that is down fails after one attempt rather than backing off. Every message string is unchanged; only which failures reach the connect message changed. Canada's alerts already worked this way and are unchanged. (`src/utils/connectionFailure.ts`, `src/services/nationalCap.ts`, `src/services/jma.ts`, `src/services/geomet.ts`, `tests/unit/connection-failure.test.ts`, `tests/unit/national-cap-service.test.ts`, `tests/unit/jma-service.test.ts`)
 
@@ -2148,7 +2152,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.6...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.7...HEAD
+[1.34.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.6...v1.34.7
 [1.34.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.5...v1.34.6
 [1.34.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.4...v1.34.5
 [1.34.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.3...v1.34.4
