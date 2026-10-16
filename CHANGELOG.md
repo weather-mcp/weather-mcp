@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A dropped connection to NOAA or Open-Meteo now reads as an outage, not as a raw client error.** When NOAA or Open-Meteo could not be reached, every tool already retried the request up to three times, but only an unresolvable host or a refused connection then got the "temporarily unavailable" message. A dropped connection, a temporary DNS failure or an unreachable network showed the HTTP client's own error text instead, for example `NOAA API Error: Request failed: read ECONNRESET`, which looks like a fault in the server rather than an outage upstream. Every failure to connect now shows `The NOAA weather service is temporarily unavailable. Please try again in a few minutes.` (or the Open-Meteo equivalent), with the service's own help link. In `get_weather_summary`, a failed section likewise reads `NOAA API is currently unavailable` or `OpenMeteo API is currently unavailable` instead of the raw text. Retry behaviour does not change: each call still retries a failed connection three times, and `get_forecast` outside the US still answers from MET Norway when Open-Meteo cannot be reached. The connection-failure examples in `docs/ERROR_HANDLING.md` now show the message that is actually rendered. (`src/services/noaa.ts`, `src/services/openmeteo.ts`, `tests/unit/noaa-openmeteo-connect-codes.test.ts`, `docs/ERROR_HANDLING.md`)
+
 ## [1.34.8] - 2026-10-16
 
 This release changes nothing you will see when you use the server: every tool answers exactly as it did in 1.34.7. It is for people who work on the code. A promise that nobody waits for can fail with no one noticing, and in one case (fixed in 1.34.5) such a failure could have stopped the server. The linter now catches that pattern on every change and in CI, so it is found before it can ship.

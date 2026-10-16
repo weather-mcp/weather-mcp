@@ -71,17 +71,18 @@ If this persists, check:
 
 #### Connection Issues
 ```
-Unable to connect to NOAA API.
+NOAA API Error: The NOAA weather service is temporarily unavailable. Please try again in a few minutes.
 
-Possible causes:
-- Internet connection issues
-- NOAA API service outage
-- DNS resolution problems
-
-Check:
-- Your internet connection
-- Service status: https://weather-gov.github.io/api/planned-outages
+For more information:
+- https://www.weather.gov/
 ```
+
+You see this message for every failure to connect: an unreachable host or
+network, a refused or dropped connection, or a temporary DNS failure. It comes
+after the retries described at the top of this section. A timeout shows the
+same message without a retry. Possible causes are a problem with your own
+internet connection or DNS, or an outage at NOAA. Check your connection, then
+the planned-outages page: https://weather-gov.github.io/api/planned-outages
 
 ### Open-Meteo API Errors
 
@@ -157,17 +158,20 @@ API documentation: https://open-meteo.com/en/docs/historical-weather-api
 
 #### Connection Issues
 ```
-Unable to connect to Open-Meteo API.
+OpenMeteo API Error: The OpenMeteo weather service is temporarily unavailable. Please try again in a few minutes.
 
-Possible causes:
-- Internet connection issues
-- Open-Meteo API service outage
-- DNS resolution problems
-
-Check:
-- Your internet connection
-- Service status: https://open-meteo.com/en/docs/model-updates
+For more information:
+- https://open-meteo.com/
 ```
+
+You see this message for every failure to connect: an unreachable host or
+network, a refused or dropped connection, or a temporary DNS failure. It comes
+after the retries described at the top of this section. A timeout shows the
+same message without a retry. For `get_forecast` outside the US, MET Norway
+usually answers instead, as described above. Possible causes are a problem with
+your own internet connection or DNS, or an Open-Meteo outage. Check your
+connection, then the model-updates page:
+https://open-meteo.com/en/docs/model-updates
 
 ### MSC GeoMet (Canada) Errors
 
