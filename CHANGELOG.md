@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The lint gate now catches a promise nobody waits for.** `npm run lint` also runs typescript-eslint's `no-floating-promises` and `no-misused-promises` over `src/` and `tests/`: the first flags a promise that is never awaited or handled, the second a promise handed to a callback that discards it — the `setInterval(async …)` shape that needed the v1.34.5 fix. The rules read types through a lint-only `tsconfig.eslint.json` with the TypeScript 6 API, while the build stays on TypeScript 7 and never reads that file. `src/` had no findings. Five integration-test mocks that spied through an untyped cast were given typed spies, with no test behaviour changed. Lint takes about 18 seconds instead of about 9.5. No server behaviour or output changes. (`eslint.config.js`, `tsconfig.eslint.json`, `tests/integration/almanac.test.ts`, `tests/integration/global-wildfire.test.ts`, `tests/integration/imagery-composite.test.ts`, `CLAUDE.md`)
 
+## [1.34.7] - 2026-10-16
+
+When a national alert feed could not be reached at all, `get_alerts` told you an "unknown error" had occurred, which looks like a fault in the server rather than an outage at the publisher. The feeds for India, the Philippines, Indonesia and Japan now report a failed connection as exactly that, the way Canada's alerts already did. Nothing else about alerts changed: the messages, the answers and the retry behaviour are the same as before.
+
+### Fixed
+- **An alert feed that cannot be reached now says so, instead of reporting an unknown error.** On 2026-10-15 the Philippine feed (PAGASA) could not be reached from this network at all, and `get_alerts` for a Philippine point failed with "Unknown error occurred while contacting the PAGASA-DOST alert feed", which reads like a fault in the server rather than an outage at the publisher. The national alert feeds for India, the Philippines and Indonesia, and Japan's JMA feed, now report "Unable to connect to the … alert feed" for every kind of failed connection: a host or network that cannot be reached, a dropped connection, or a temporary DNS failure. Before, only an unresolvable host or a refused connection got that message. `get_weather_summary` shows the same message in its `## alerts (unavailable)` section. A failed connection is still not retried, exactly as an unresolvable host already was, so a feed that is down fails after one attempt rather than backing off. Every message string is unchanged; only which failures reach the connect message changed. Canada's alerts already worked this way and are unchanged. (`src/utils/connectionFailure.ts`, `src/services/nationalCap.ts`, `src/services/jma.ts`, `src/services/geomet.ts`, `tests/unit/connection-failure.test.ts`, `tests/unit/national-cap-service.test.ts`, `tests/unit/jma-service.test.ts`)
+
 ## [1.34.6] - 2026-10-15
 
 When the aviation weather service stopped answering, a METAR request for current conditions could keep trying for about two minutes before it failed, long after your AI client had already given up on it. The server was retrying a request that had already used its whole timeout. It now fails once, at the timeout, and still retries the short failures that are worth another try. Successful answers and error messages are unchanged.
@@ -2149,7 +2156,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.6...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.7...HEAD
+[1.34.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.6...v1.34.7
 [1.34.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.5...v1.34.6
 [1.34.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.4...v1.34.5
 [1.34.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.3...v1.34.4

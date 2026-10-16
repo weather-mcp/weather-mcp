@@ -6773,6 +6773,37 @@ Know what the zero does not cover, too. Measured 2026-10-03 (diff review M1, rep
 
 ---
 
+## G138 — A per-service connection-code list drifts; an unlisted socket code becomes "Unknown error"
+
+**Trigger:** writing or editing an error mapper in `src/services/` (a `toXError`, `toFeedError` or
+`handleError`) that turns axios `error.code` values into fixed messages.
+
+**Rule:** for "the connection failed before any answer", call `isConnectionFailureCode`
+(`src/utils/connectionFailure.ts`), never an inline `error.code === '…' ||` chain. Map timeouts
+first and separately; the set deliberately excludes them. Decide retry in the service, not in the
+util. A unit test per newly mapped code asserts both the message and the request count.
+
+**Why:** three alert services kept three copies of the list (GeoMet 7 codes, JMA 5, nationalCap 2),
+and each fix landed in one file. An `EHOSTUNREACH` that a short list misses falls to the "Unknown
+error occurred while contacting …" line. That reads as a server defect to the user, and a live smoke
+test that follows G9 rethrows it. On 2026-10-15 a PAGASA outage did exactly that and stopped
+`/release 1.34.7` at its gate. Under G64 the same failure in `publish.yml` would have come after the
+tag.
+
+**Verify:** `grep -rn "'ECONNREFUSED'" src/services/` lists only the services the plan
+deliberately left on their own lists (noaa, openmeteo, nominatim, ncei, meteoalarm,
+environmentAgency, aviationWeather, acis, metno). A new hit is a new copy.
+
+**Evidence:** 2026-10-15, plan `alert-feed-connect-codes`: `d5f5f67` (shared util; GeoMet moved
+unchanged), `9091854` (JMA), `7d3b868` (nationalCap). Node reported `EHOSTUNREACH -113` for
+PAGASA while `api.weather.gov` answered 200.
+
+**Status:** active. Nine services still carry their own lists, deferred because their error
+classes and retry rules differ. Lint candidate: a `no-restricted-syntax` rule on an
+`'ECONNREFUSED'` literal under `src/services/`, once those nine migrate.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
