@@ -66,6 +66,7 @@ import { CacheConfig } from '../config/cache.js';
 import { getUserAgent } from '../utils/version.js';
 import { logger } from '../utils/logger.js';
 import { isAllowedFeedUrl } from '../utils/capParse.js';
+import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import {
   JMA_MAX_DOCUMENT_BYTES,
   JMA_MAX_INDEX_BYTES,
@@ -238,18 +239,12 @@ export class JmaService {
       ) {
         return new Error(`JMA ${what} request timed out`);
       }
-      // ECONNRESET / EPIPE (peer dropped the socket) and EAI_AGAIN (transient
-      // DNS failure) are connection failures like the two above. Left
-      // unmapped they fell to the "Unknown error" line, which reads as a
-      // defect rather than a network event — and CI's live smoke rethrows
-      // anything it cannot classify as transport (G64).
-      if (
-        error.code === 'ENOTFOUND' ||
-        error.code === 'ECONNREFUSED' ||
-        error.code === 'ECONNRESET' ||
-        error.code === 'EAI_AGAIN' ||
-        error.code === 'EPIPE'
-      ) {
+      // Connection failures: the shared code set lives in
+      // src/utils/connectionFailure.ts. Left unmapped, a transport code fell
+      // to the "Unknown error" line, which reads as a defect rather than a
+      // network event — and CI's live smoke rethrows anything it cannot
+      // classify as transport (G64).
+      if (isConnectionFailureCode(error.code)) {
         return new Error(`Unable to connect to the JMA ${what}`);
       }
     }
