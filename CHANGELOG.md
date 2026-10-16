@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.8] - 2026-10-16
+
 This release changes nothing you will see when you use the server: every tool answers exactly as it did in 1.34.7. It is for people who work on the code. A promise that nobody waits for can fail with no one noticing, and in one case (fixed in 1.34.5) such a failure could have stopped the server. The linter now catches that pattern on every change and in CI, so it is found before it can ship.
 
 ### Changed
@@ -2158,7 +2160,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.7...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.8...HEAD
+[1.34.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.7...v1.34.8
 [1.34.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.6...v1.34.7
 [1.34.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.5...v1.34.6
 [1.34.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.4...v1.34.5
