@@ -74,6 +74,7 @@ src/
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── nowcast.ts           # minutely_15 nowcast: model superset boxes, 3-state response classification, quarter bands, hourly-probability pick (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
+│   ├── connectionFailure.ts # Transport codes meaning "connection failed before any answer"; shared by the alert-feed services (pure)
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
 │   ├── savedLocationShape.ts  # Saved-location record-shape contract — write-side validator and read-side describer (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
