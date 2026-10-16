@@ -1330,4 +1330,67 @@ describe('NationalCapService', () => {
       expect(serialized).not.toMatch(/-?\d+(\.\d+)?,-?\d+(\.\d+)?/); // a coordinate pair
     });
   });
+
+  // ------------------------------------------------------------------
+  // Connection-failure codes: mapped to the connect message, never retried
+  // ------------------------------------------------------------------
+  describe('connection-failure codes', () => {
+    it.each([
+      'ENOTFOUND',
+      'ECONNREFUSED',
+      'ECONNRESET',
+      'EAI_AGAIN',
+      'ENETUNREACH',
+      'EHOSTUNREACH',
+      'EPIPE'
+    ])('%s maps to the connect message and is fetched once', async (code) => {
+      mockGet.mockImplementation(() => Promise.reject({ code }));
+      const service = makeService();
+      const promise = service.getWarnings('ph').catch(e => e as Error);
+      await vi.advanceTimersByTimeAsync(10000);
+      const err = (await promise) as Error;
+      expect(err.message).toBe('Unable to connect to the PAGASA-DOST alert feed');
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['in', 'EHOSTUNREACH', 'NDMA SACHET'],
+      ['id', 'ECONNRESET', 'BMKG']
+    ] as const)('%s + %s names %s', async (feed, code, publisher) => {
+      mockGet.mockImplementation(() => Promise.reject({ code }));
+      const service = makeService();
+      const promise = service.getWarnings(feed).catch(e => e as Error);
+      await vi.advanceTimersByTimeAsync(10000);
+      const err = (await promise) as Error;
+      expect(err.message).toBe(`Unable to connect to the ${publisher} alert feed`);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('an unlisted code stays the unknown-error message, fetched once', async () => {
+      mockGet.mockImplementation(() => Promise.reject({ code: 'ERR_SOMETHING' }));
+      const service = makeService();
+      const promise = service.getWarnings('ph').catch(e => e as Error);
+      await vi.advanceTimersByTimeAsync(10000);
+      const err = (await promise) as Error;
+      expect(err.message).toBe('Unknown error occurred while contacting the PAGASA-DOST alert feed');
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('a document that fails with EHOSTUNREACH counts unavailable and is fetched once', async () => {
+      const badUrl = 'https://sachet.ndma.gov.in/cap_public_website/unreach';
+      const indexXml = rssIndex([{ guid: 'bad', link: badUrl }]);
+      mockGet.mockImplementation((url: string) => {
+        if (url === TEST_FEEDS.in.indexUrl) return xmlResponse(indexXml);
+        if (url === badUrl) return Promise.reject({ code: 'EHOSTUNREACH' });
+        return Promise.reject(new Error(`unexpected url: ${url}`));
+      });
+      const service = makeService();
+      const promise = service.getWarnings('in');
+      await vi.advanceTimersByTimeAsync(10000);
+      const result = await promise;
+      expect(result.warnings).toEqual([]);
+      expect(result.unavailableCount).toBe(1);
+      expect(mockGet.mock.calls.filter(c => c[0] === badUrl)).toHaveLength(1);
+    });
+  });
 });

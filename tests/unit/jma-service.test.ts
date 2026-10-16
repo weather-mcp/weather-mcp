@@ -446,6 +446,40 @@ describe('JmaService', () => {
     }
   );
 
+  it.each(['ENETUNREACH', 'EHOSTUNREACH'])('maps %s to the fixed connect-failure message', async code => {
+    mockGet.mockImplementation(() => Promise.reject({ code }));
+
+    await expect(
+      makeService(() => Date.parse('2026-09-03T00:00:00Z')).getWarnings('180000')
+    ).rejects.toThrow('Unable to connect to the JMA alert index');
+    expect(callsTo(JMA_INDEX_URL)).toHaveLength(1);
+  });
+
+  it('maps EHOSTUNREACH on the warning document fetch to the document connect-failure message', async () => {
+    const href = docUrl('180000');
+    const indexXml = atomFeed([atomEntry({ href, updated: '2026-09-03T00:00:00Z' })]);
+
+    mockGet.mockImplementation((url: string) => {
+      if (url === JMA_INDEX_URL) return xmlResponse(indexXml);
+      if (url === href) return Promise.reject({ code: 'EHOSTUNREACH' });
+      return Promise.reject(new Error(`unexpected fetch in test: ${url}`));
+    });
+
+    await expect(
+      makeService(() => Date.parse('2026-09-03T00:00:00Z')).getWarnings('180000')
+    ).rejects.toThrow('Unable to connect to the JMA warning document');
+    expect(callsTo(href)).toHaveLength(1);
+  });
+
+  it('leaves an unlisted code on the unknown-error line', async () => {
+    mockGet.mockImplementation(() => Promise.reject({ code: 'ERR_SOMETHING' }));
+
+    await expect(
+      makeService(() => Date.parse('2026-09-03T00:00:00Z')).getWarnings('180000')
+    ).rejects.toThrow('Unknown error occurred while contacting the JMA alert index');
+    expect(callsTo(JMA_INDEX_URL)).toHaveLength(1);
+  });
+
   // ------------------------------------------------------------------
   // 22: failure propagation, no leaked URL, no raw error object logged
   // ------------------------------------------------------------------
