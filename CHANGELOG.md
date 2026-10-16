@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.8] - 2026-10-16
+
+This release changes nothing you will see when you use the server: every tool answers exactly as it did in 1.34.7. It is for people who work on the code. A promise that nobody waits for can fail with no one noticing, and in one case (fixed in 1.34.5) such a failure could have stopped the server. The linter now catches that pattern on every change and in CI, so it is found before it can ship.
+
+### Changed
+
+- **The lint gate now catches a promise nobody waits for.** `npm run lint` also runs typescript-eslint's `no-floating-promises` and `no-misused-promises` over `src/` and `tests/`: the first flags a promise that is never awaited or handled, the second a promise handed to a callback that discards it — the `setInterval(async …)` shape that needed the v1.34.5 fix. The rules read types through a lint-only `tsconfig.eslint.json` with the TypeScript 6 API, while the build stays on TypeScript 7 and never reads that file. `src/` had no findings. Five integration-test mocks that spied through an untyped cast were given typed spies, with no test behaviour changed. Lint takes about 18 seconds instead of about 9.5. No server behaviour or output changes. (`eslint.config.js`, `tsconfig.eslint.json`, `tests/integration/almanac.test.ts`, `tests/integration/global-wildfire.test.ts`, `tests/integration/imagery-composite.test.ts`, `CLAUDE.md`)
+
 ## [1.34.7] - 2026-10-16
 
 When a national alert feed could not be reached at all, `get_alerts` told you an "unknown error" had occurred, which looks like a fault in the server rather than an outage at the publisher. The feeds for India, the Philippines, Indonesia and Japan now report a failed connection as exactly that, the way Canada's alerts already did. Nothing else about alerts changed: the messages, the answers and the retry behaviour are the same as before.
@@ -2152,7 +2160,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.7...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.8...HEAD
+[1.34.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.7...v1.34.8
 [1.34.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.6...v1.34.7
 [1.34.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.5...v1.34.6
 [1.34.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.4...v1.34.5

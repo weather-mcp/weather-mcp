@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.34.7 (Production Ready)
+- **Version:** 1.34.8 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -663,21 +663,26 @@ The publish path enforces a stricter, narrower gate: `npm audit --omit=dev --aud
 ### Linting
 
 `npm run lint` runs ESLint over `src/`, `tests/` and `scripts/` with the flat config in
-`eslint.config.js`, which lists its own ignores (flat config reads no `.gitignore`). Three
+`eslint.config.js`, which lists its own ignores (flat config reads no `.gitignore`). Four
 rule families: `typescript-eslint`'s `recommended` preset, `no-console` in `src/` (off only in
 the logger, `src/index.ts`'s fatal record and the three config parsers that run before the
-logger exists — never a blanket `allow`), and `import-x/no-cycle`.
+logger exists — never a blanket `allow`), `import-x/no-cycle`, and the two type-aware promise
+rules `@typescript-eslint/no-floating-promises` and `@typescript-eslint/no-misused-promises`
+over `src/` and `tests/`. The typed rules read types through `tsconfig.eslint.json`, a
+lint-only program the build never reads: a linted file it omits is a parse error, so a new
+test directory must be added to its `include`. They roughly double the lint's wall time
+(about 18 s against about 9.5 s).
 `@typescript-eslint/no-explicit-any` is off in `tests/` because the gate does not typecheck
-them (GOTCHAS G103); turn it on when `tests/` gains a tsconfig the gate runs. A new
-`eslint-disable` needs a `-- reason`; unused ones fail the run.
+them (GOTCHAS G103); turn it on when a gate step **typechecks** `tests/` —
+`tsconfig.eslint.json` only type-reads them. A new `eslint-disable` needs a `-- reason`;
+unused ones fail the run.
 
 **The two TypeScript entries in `package.json` are deliberate.** `@typescript/native` is
 TypeScript 7, the `tsc` that `npm run build` runs. `typescript` is
 `npm:@typescript/typescript6` — the TS 6 API, which typescript-eslint needs to parse at all,
 because TS 7 ships no JS API. Dependabot ignores `typescript` majors so the shim never jumps
 to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
-(typescript-eslint#10940). Type-aware rules (`no-floating-promises`, `no-misused-promises`)
-are deferred to a follow-up plan.
+(typescript-eslint#10940).
 
 ### Code Review Checklist
 
@@ -693,15 +698,15 @@ are deferred to a follow-up plan.
 
 ## Project Status
 
-- **Version:** 1.34.7 — Production Ready ✅
+- **Version:** 1.34.8 — Production Ready ✅
 - **Test Coverage:** 4,526 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.34.8:** The lint gate now catches a promise nobody waits for
 - **New in v1.34.7:** An unreachable national or Japanese alert feed now reports a connection failure instead of an unknown error
 - **New in v1.34.6:** METAR observations no longer retry a request that has already timed out
-- **New in v1.34.5:** A lightning query no longer loses an area that is being unsubscribed
 
 ## Useful References
 
@@ -724,7 +729,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-10-16 (v1.34.7)
+**Last Updated:** 2026-10-16 (v1.34.8)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

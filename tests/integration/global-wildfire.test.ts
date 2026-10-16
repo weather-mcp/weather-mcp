@@ -114,10 +114,13 @@ const FLAT_FILE_CSV = [
 const FLAT_FILE_QUERY_LAT = 48.2;
 const FLAT_FILE_QUERY_LON = 16.4;
 
+/** Private axios client, typed only as far as the spy needs (same shape as tests/unit/imagery-fetch-bounds.test.ts). */
+type Client = { get: (...a: unknown[]) => Promise<unknown> };
+
 describe('Global wildfire integration — mocked CSV shapes end-to-end (deterministic)', () => {
   it('renders a keyed Area-API (14-column) response through the real service and handler', async () => {
     const firmsService = new FIRMSService({ mapKey: 'FAKE_TEST_MAP_KEY' });
-    vi.spyOn((firmsService as any).client, 'get').mockImplementation(() => textResponse(AREA_API_CSV));
+    vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(() => textResponse(AREA_API_CSV));
 
     const nominatimService = makeNominatimFake('pt'); // Portugal — non-US, routes to FIRMS
 
@@ -157,7 +160,7 @@ describe('Global wildfire integration — mocked CSV shapes end-to-end (determin
 
   it('renders a keyless flat-file (13-column) response through the real service and handler, with the day_range upgrade note', async () => {
     const firmsService = new FIRMSService({ mapKey: undefined }); // no key configured -> keyless path
-    vi.spyOn((firmsService as any).client, 'get').mockImplementation(() => textResponse(FLAT_FILE_CSV));
+    vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(() => textResponse(FLAT_FILE_CSV));
 
     const nominatimService = makeNominatimFake('at'); // Austria — non-US, routes to FIRMS
 
