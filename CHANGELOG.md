@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.9] - 2026-10-17
+
 When NOAA or Open-Meteo could not be reached because a connection dropped, DNS failed for a moment, or the network was unreachable, the tools showed the HTTP client's own error text, such as `Request failed: read ECONNRESET`. That looks like a bug in the server, not an outage upstream, and in one case it printed a network address. These failures now show the same plain "temporarily unavailable" message an unreachable host already got. Successful answers are unchanged, and so is how often a request is retried.
 
 ### Changed
@@ -2168,7 +2170,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.8...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.9...HEAD
+[1.34.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.8...v1.34.9
 [1.34.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.7...v1.34.8
 [1.34.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.6...v1.34.7
 [1.34.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.5...v1.34.6
