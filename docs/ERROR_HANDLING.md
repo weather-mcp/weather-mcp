@@ -33,7 +33,8 @@ connection up to three times with backoff, waiting at most about 7 s in total,
 before you see one of the messages below. A timeout is not retried: it has
 already used the whole configured timeout (`API_TIMEOUT_MS`). The critical-alert
 banner, fire-weather, severe/winter-weather and timezone lookups make one attempt
-only, since they never fail a response.
+only, since they never fail a response. The river-gauge lookups for
+`get_river_conditions` (NOAA NWPS and USGS) also make one attempt.
 
 #### Service Outage (5xx errors)
 ```
@@ -89,7 +90,8 @@ the planned-outages page: https://weather-gov.github.io/api/planned-outages
 Each Open-Meteo call retries a rate limit (429), a server error (5xx) or a failed
 connection up to three times with backoff, waiting at most about 7 s in total. A
 timeout is not retried. The climate-normals pull keeps its own single retry on a
-rate limit.
+rate limit. Place-name lookups that reach Open-Meteo's geocoder are not retried;
+see [Location Lookup Errors](#location-lookup-errors).
 
 **`get_forecast` outside the US does not show most of these.** A transient
 Open-Meteo failure — a 5xx, a rate limit, a timeout, or a network failure, after
