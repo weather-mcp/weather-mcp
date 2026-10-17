@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.9] - 2026-10-17
+
+When NOAA or Open-Meteo could not be reached because a connection dropped, DNS failed for a moment, or the network was unreachable, the tools showed the HTTP client's own error text, such as `Request failed: read ECONNRESET`. That looks like a bug in the server, not an outage upstream, and in one case it printed a network address. These failures now show the same plain "temporarily unavailable" message an unreachable host already got. Successful answers are unchanged, and so is how often a request is retried.
+
+### Changed
+- **Open-Meteo is spelled with its hyphen in error messages.** Every Open-Meteo error read `OpenMeteo API Error: …`, and the outage text read `The OpenMeteo weather service …`, which used the code's identifier rather than the service's name. They now read `Open-Meteo API Error: …` and `The Open-Meteo weather service …`, and a rate limit reads `Rate limit exceeded for Open-Meteo`. Only the spelling changes. The identifier itself is unchanged, so logs and analytics still say `OpenMeteo`. (`src/errors/ApiError.ts`, `tests/unit/errors.test.ts`)
+
+### Fixed
+- **A dropped connection to NOAA or Open-Meteo now reads as an outage, not as a raw client error.** When NOAA or Open-Meteo could not be reached, only an unresolvable host or a refused connection got the "temporarily unavailable" message. A dropped connection, a temporary DNS failure or an unreachable network showed the HTTP client's own error text instead, for example `NOAA API Error: Request failed: read ECONNRESET`, which looks like a fault in the server rather than an outage upstream. Every failure to connect now shows `The NOAA weather service is temporarily unavailable. Please try again in a few minutes.` (or the Open-Meteo equivalent), with the service's own help link. In `get_weather_summary`, a failed section likewise reads `NOAA API is currently unavailable` or `Open-Meteo API is currently unavailable` instead of the raw text. Retry behaviour does not change, and `get_forecast` outside the US still answers from MET Norway when Open-Meteo cannot be reached. The connection-failure examples in `docs/ERROR_HANDLING.md` now show the message that is actually rendered. (`src/services/noaa.ts`, `src/services/openmeteo.ts`, `tests/unit/noaa-openmeteo-connect-codes.test.ts`, `docs/ERROR_HANDLING.md`)
+
 ## [1.34.8] - 2026-10-16
 
 This release changes nothing you will see when you use the server: every tool answers exactly as it did in 1.34.7. It is for people who work on the code. A promise that nobody waits for can fail with no one noticing, and in one case (fixed in 1.34.5) such a failure could have stopped the server. The linter now catches that pattern on every change and in CI, so it is found before it can ship.
@@ -2160,7 +2170,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.8...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.9...HEAD
+[1.34.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.8...v1.34.9
 [1.34.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.7...v1.34.8
 [1.34.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.6...v1.34.7
 [1.34.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.5...v1.34.6

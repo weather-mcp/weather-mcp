@@ -19,6 +19,7 @@ import type {
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import { logger } from '../utils/logger.js';
 import { classifyProbeAnswer, type ServiceProbeResult } from '../utils/serviceStatusProbe.js';
 import {
@@ -172,7 +173,9 @@ export class NOAAService {
       throw new ServiceUnavailableError('NOAA', error);
     }
 
-    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+    // The shared set names "connection failed before any answer"; retry stays this service's own decision
+    // (isTransientFailure), and every code in the set is retried because none is ECONNABORTED.
+    if (isConnectionFailureCode(error.code)) {
       throw new ServiceUnavailableError('NOAA', error);
     }
 

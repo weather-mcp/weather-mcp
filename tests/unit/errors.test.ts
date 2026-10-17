@@ -8,6 +8,7 @@ import {
   ValidationError,
   isRetryableError,
   formatErrorForUser,
+  serviceDisplayName,
 } from '../../src/errors/ApiError.js';
 import { describeErrorForLogging } from '../../src/utils/logger.js';
 
@@ -74,7 +75,7 @@ describe('Custom Error Classes', () => {
 
       const formatted = error.toUserMessage();
 
-      expect(formatted).toBe('OpenMeteo API Error: Bad request');
+      expect(formatted).toBe('Open-Meteo API Error: Bad request');
       expect(formatted).not.toContain('For more information');
     });
 
@@ -211,6 +212,25 @@ describe('Custom Error Classes', () => {
         const plain = new ServiceUnavailableError('OpenMeteo', withCode(undefined));
         expect(describeErrorForLogging(coded)).toEqual(describeErrorForLogging(plain));
       });
+    });
+  });
+
+  describe('service display names', () => {
+    it('names Open-Meteo with its hyphen in every user-facing string, and keeps the identifier', () => {
+      const down = new ServiceUnavailableError('OpenMeteo', new Error('read ECONNRESET'));
+      expect(down.service).toBe('OpenMeteo');
+      expect(down.message).toBe('Open-Meteo API is currently unavailable');
+      expect(down.toUserMessage()).toContain(
+        'Open-Meteo API Error: The Open-Meteo weather service is temporarily unavailable.'
+      );
+      expect(new RateLimitError('OpenMeteo').message).toBe('Rate limit exceeded for Open-Meteo');
+      expect(formatErrorForUser(down)).not.toContain('OpenMeteo');
+    });
+
+    it('leaves the other services as they were', () => {
+      expect(serviceDisplayName('NOAA')).toBe('NOAA');
+      expect(new ServiceUnavailableError('NOAA').message).toBe('NOAA API is currently unavailable');
+      expect(serviceDisplayName('AviationWeather')).toBe('AviationWeather');
     });
   });
 

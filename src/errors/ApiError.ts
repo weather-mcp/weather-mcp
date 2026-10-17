@@ -14,6 +14,24 @@ export type ApiServiceName =
   | 'AviationWeather';
 
 /**
+ * How each service is named in text a user reads. `ApiServiceName` is an
+ * identifier and stays one (logs, `error.service`); this is the brand.
+ * A `Record` so a new service cannot be added without choosing its name.
+ */
+const SERVICE_DISPLAY_NAMES: Record<ApiServiceName, string> = {
+  NOAA: 'NOAA',
+  OpenMeteo: 'Open-Meteo',
+  NCEI: 'NCEI',
+  RainViewer: 'RainViewer',
+  Nominatim: 'Nominatim',
+  AviationWeather: 'AviationWeather',
+};
+
+export function serviceDisplayName(service: ApiServiceName): string {
+  return SERVICE_DISPLAY_NAMES[service];
+}
+
+/**
  * Base error class for API-related errors
  */
 export class ApiError extends Error {
@@ -49,7 +67,7 @@ export class ApiError extends Error {
    * Format error for display to user
    */
   toUserMessage(): string {
-    let message = `${this.service} API Error: ${this.userMessage}`;
+    let message = `${serviceDisplayName(this.service)} API Error: ${this.userMessage}`;
 
     if (this.helpLinks.length > 0) {
       message += '\n\nFor more information:\n';
@@ -86,7 +104,7 @@ export class RateLimitError extends ApiError {
       : 'Rate limit exceeded. Please retry in a few seconds.');
 
     super(
-      `Rate limit exceeded for ${service}`,
+      `Rate limit exceeded for ${serviceDisplayName(service)}`,
       429,
       service,
       userMessage,
@@ -127,14 +145,14 @@ export class ServiceUnavailableError extends ApiError {
       error = messageOrError;
     }
 
-    const userMessage = message || `The ${service} weather service is temporarily unavailable. Please try again in a few minutes.`;
+    const userMessage = message || `The ${serviceDisplayName(service)} weather service is temporarily unavailable. Please try again in a few minutes.`;
     const helpLink = service === 'NOAA' ? 'https://www.weather.gov/'
       : service === 'NCEI' ? 'https://www.ncei.noaa.gov/'
       : service === 'RainViewer' ? 'https://www.rainviewer.com/'
       : 'https://open-meteo.com/';
 
     super(
-      `${service} API is currently unavailable`,
+      `${serviceDisplayName(service)} API is currently unavailable`,
       503,
       service,
       userMessage,

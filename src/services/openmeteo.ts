@@ -25,6 +25,7 @@ import type {
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
+import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { computeNormalsTable, getNormalsTableCacheKey, type NormalsTable } from '../utils/normals.js';
 import { getUserAgent } from '../utils/version.js';
@@ -94,7 +95,7 @@ const NORMALS_RETRY_JITTER_MS = 500;
  * Whether a failure the response interceptor already typed is worth another
  * attempt. `handleError` has classified every axios failure by the time a
  * ladder sees it, so this reads the class, never `error.message` — the typed
- * messages ("Rate limit exceeded for OpenMeteo") match no substring the old
+ * messages ("Rate limit exceeded for Open-Meteo") match no substring the old
  * test looked for, which is why nothing was ever retried (G129). A timeout is
  * the one transient class that is not retried: it has already spent
  * `API_TIMEOUT_MS`, so a second attempt ends past the MCP SDK's 60 s request
@@ -328,7 +329,9 @@ export class OpenMeteoService {
       throw new ServiceUnavailableError('OpenMeteo', error);
     }
 
-    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+    // The shared set names "connection failed before any answer"; retry stays this service's own decision
+    // (isTransientFailure), and every code in the set is retried because none is ECONNABORTED.
+    if (isConnectionFailureCode(error.code)) {
       throw new ServiceUnavailableError('OpenMeteo', error);
     }
 

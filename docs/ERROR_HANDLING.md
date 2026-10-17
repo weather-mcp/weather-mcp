@@ -33,7 +33,8 @@ connection up to three times with backoff, waiting at most about 7 s in total,
 before you see one of the messages below. A timeout is not retried: it has
 already used the whole configured timeout (`API_TIMEOUT_MS`). The critical-alert
 banner, fire-weather, severe/winter-weather and timezone lookups make one attempt
-only, since they never fail a response.
+only, since they never fail a response. The river-gauge lookups for
+`get_river_conditions` (NOAA NWPS and USGS) also make one attempt.
 
 #### Service Outage (5xx errors)
 ```
@@ -71,24 +72,26 @@ If this persists, check:
 
 #### Connection Issues
 ```
-Unable to connect to NOAA API.
+NOAA API Error: The NOAA weather service is temporarily unavailable. Please try again in a few minutes.
 
-Possible causes:
-- Internet connection issues
-- NOAA API service outage
-- DNS resolution problems
-
-Check:
-- Your internet connection
-- Service status: https://weather-gov.github.io/api/planned-outages
+For more information:
+- https://www.weather.gov/
 ```
+
+You see this message for every failure to connect: an unreachable host or
+network, a refused or dropped connection, or a temporary DNS failure. It comes
+after the retries described at the top of this section. A timeout shows the
+same message without a retry. Possible causes are a problem with your own
+internet connection or DNS, or an outage at NOAA. Check your connection, then
+the planned-outages page: https://weather-gov.github.io/api/planned-outages
 
 ### Open-Meteo API Errors
 
 Each Open-Meteo call retries a rate limit (429), a server error (5xx) or a failed
 connection up to three times with backoff, waiting at most about 7 s in total. A
 timeout is not retried. The climate-normals pull keeps its own single retry on a
-rate limit.
+rate limit. Place-name lookups that reach Open-Meteo's geocoder are not retried;
+see [Location Lookup Errors](#location-lookup-errors).
 
 **`get_forecast` outside the US does not show most of these.** A transient
 Open-Meteo failure — a 5xx, a rate limit, a timeout, or a network failure, after
@@ -157,17 +160,20 @@ API documentation: https://open-meteo.com/en/docs/historical-weather-api
 
 #### Connection Issues
 ```
-Unable to connect to Open-Meteo API.
+Open-Meteo API Error: The Open-Meteo weather service is temporarily unavailable. Please try again in a few minutes.
 
-Possible causes:
-- Internet connection issues
-- Open-Meteo API service outage
-- DNS resolution problems
-
-Check:
-- Your internet connection
-- Service status: https://open-meteo.com/en/docs/model-updates
+For more information:
+- https://open-meteo.com/
 ```
+
+You see this message for every failure to connect: an unreachable host or
+network, a refused or dropped connection, or a temporary DNS failure. It comes
+after the retries described at the top of this section. A timeout shows the
+same message without a retry. For `get_forecast` outside the US, MET Norway
+usually answers instead, as described above. Possible causes are a problem with
+your own internet connection or DNS, or an Open-Meteo outage. Check your
+connection, then the model-updates page:
+https://open-meteo.com/en/docs/model-updates
 
 ### MSC GeoMet (Canada) Errors
 
