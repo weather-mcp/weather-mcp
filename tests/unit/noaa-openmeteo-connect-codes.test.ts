@@ -96,7 +96,7 @@ const TARGETS: Target[] = [
     name: 'Open-Meteo',
     api: 'OpenMeteo',
     prefix:
-      'OpenMeteo API Error: The OpenMeteo weather service is temporarily unavailable. Please try again in a few minutes.',
+      'Open-Meteo API Error: The Open-Meteo weather service is temporarily unavailable. Please try again in a few minutes.',
     make: (opts) => {
       const service = new OpenMeteoService(opts);
       return {

@@ -164,7 +164,7 @@ describe('handleGetWeatherSummary — met.no fallback threading (G19)', () => {
 
     expect(fakes.metno.getForecast).not.toHaveBeenCalled();
     expect(text).toContain('## forecast (unavailable)');
-    expect(text).toContain('OpenMeteo API is currently unavailable');
+    expect(text).toContain('Open-Meteo API is currently unavailable');
     expect(text).not.toContain('MET Norway');
   });
 });

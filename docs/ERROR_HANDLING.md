@@ -160,7 +160,7 @@ API documentation: https://open-meteo.com/en/docs/historical-weather-api
 
 #### Connection Issues
 ```
-OpenMeteo API Error: The OpenMeteo weather service is temporarily unavailable. Please try again in a few minutes.
+Open-Meteo API Error: The Open-Meteo weather service is temporarily unavailable. Please try again in a few minutes.
 
 For more information:
 - https://open-meteo.com/
