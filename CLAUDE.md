@@ -19,6 +19,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 ```
 src/
 ├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown triggers (stdin EOF, transport close, signals)
+├── http.ts                  # Streamable HTTP entry (weather-mcp-http): dotenv, WebCrypto floor, config + issuer discovery (refuse to start), JWKS, LocationStore, listen, pre-warm, SIGTERM/SIGINT-only shutdown
 ├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
 ├── server/lightningPrewarm.ts  # Saved-location lightning pre-warm: gate, guarded store read, refresh timer (never evicts)
 ├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one ref'd deadline that bounds teardown, stderr only
@@ -463,7 +464,7 @@ via `src/utils/unitFormat.ts`.
 - **Algorithm:** LRU (Least Recently Used) eviction
 - **Size limits:** Configurable max size (default 1000 entries)
 - **Automatic cleanup:** Every 5 minutes
-- **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process; the analytics flush runs under its own deadline inside that budget and never sets the exit code
+- **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process; the analytics flush runs under its own deadline inside that budget and never sets the exit code. The HTTP entry (`src/http.ts`) uses the same coordinator with **SIGTERM and SIGINT only** — never stdin, which is at EOF from the first tick in a container started without `-i` — and its first step stops accepting connections (`server.close()`, forced after 400 ms)
 
 ## Commit Conventions
 

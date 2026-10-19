@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "weather-mcp": "dist/index.js"
+    "weather-mcp": "dist/index.js",
+    "weather-mcp-http": "dist/http.js"
   },
   "files": [
     "dist",
@@ -20,7 +21,9 @@
     "build": "tsc",
     "lint": "eslint .",
     "dev": "tsx src/index.ts",
+    "dev:http": "tsx src/http.ts",
     "start": "node dist/index.js",
+    "start:http": "node dist/http.js",
     "prepublishOnly": "npm run build && npm audit --omit=dev --audit-level=high",
     "test": "vitest run",
     "test:watch": "vitest",
