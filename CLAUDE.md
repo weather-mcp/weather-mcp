@@ -7,10 +7,11 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.34.9 (Production Ready)
+- **Version:** 1.35.0 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
+- **Entries:** `weather-mcp` (stdio, `src/index.ts`) and `weather-mcp-http` (Streamable HTTP behind OAuth, `src/http.ts`, for self-hosters; `docs/REMOTE_HOSTING.md`). The HTTP entry adds no tool and changes no output; it is a second way to reach the same factory
 
 ## Architecture
 
@@ -19,9 +20,13 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 ```
 src/
 ├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown triggers (stdin EOF, transport close, signals)
+├── http.ts                  # Streamable HTTP entry (weather-mcp-http): dotenv, WebCrypto floor, config + issuer discovery (refuse to start), JWKS, LocationStore, listen, pre-warm, SIGTERM/SIGINT-only shutdown
 ├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
 ├── server/lightningPrewarm.ts  # Saved-location lightning pre-warm: gate, guarded store read, refresh timer (never evicts)
 ├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one ref'd deadline that bounds teardown, stderr only
+├── server/tokenVerifier.ts  # OAuth resource server: jose JWT verification (issuer, audience = public URL, exp, asymmetric algs) → AuthInfo; fixed SDK errors
+├── server/oauthDiscovery.ts  # Issuer metadata (RFC 8414 / OIDC) via the SDK; exact-issuer and jwks_uri checks; never throws
+├── server/httpApp.ts       # createHttpApp(): healthz → host validation → RFC 9728 metadata → bearer auth → body limit → stateless transport; side-effect-free
 ├── handlers/                # One handler per MCP tool (saved locations share one file)
 │   ├── forecastHandler.ts           # get_forecast (+ compare_models, ensemble_spread, normals, astronomy)
 │   ├── currentConditionsHandler.ts  # get_current_conditions (NOAA / Open-Meteo / METAR; fire weather, thermal stress)
@@ -102,6 +107,7 @@ src/
 │   ├── tools.ts             # ENABLED_TOOLS presets (basic/standard/full), tool names, and
 │   │                        #   TOOLS_LIST_BYTE_BUDGET — the tools/list size ceiling per preset
 │   ├── defaultLocation.ts   # WEATHER_DEFAULT_LOCATION
+│   ├── http.ts              # WEATHER_HTTP_* / WEATHER_OAUTH_* parsing for the HTTP entry (pure; returns a result, never warns)
 │   ├── api.ts               # Optional API keys (NCEI, FIRMS, Google)
 │   └── displayThresholds.ts # Display logic constants
 ├── analytics/               # Opt-in usage analytics client (ANALYTICS_ENABLED=true; off by default, no default endpoint)
@@ -124,11 +130,14 @@ src/
 6. **Three-layer split for computed features:** service fetches → pure zero-I/O util computes → handler renders. The pure module owns constants; the service imports them from the util, never the reverse (e.g. `COMPARISON_MODELS`, `ENSEMBLE_MODEL`)
 7. **Route by country, not by bounding box, for jurisdictional data** (alerts, wildfire): `NominatimService.reverseCountry` resolves the country once; saved/geocoded locations carry `country_code` through `ResolvedLocation` and skip the lookup (alerts also route to the national CAP feeds ahead of Google)
 8. **A rendered coverage claim needs both signals — country *and* geography.** OSM resolves every US territory to `us` at country zoom, so a country set alone cannot tell Puerto Rico (gauged) from Guam (not), and `isInUS` alone cannot tell the US from Toronto. `get_river_conditions` requires both. Promoting a routing heuristic to a claim the user reads also inherits every edge it was previously allowed to get wrong, so widen the boxes to the jurisdiction's real extent when you do it (`src/utils/geography.ts`, GOTCHAS G53)
+9. **The HTTP entry's stage stack is ordered, and the order is the security model.** `src/server/httpApp.ts` builds, in this order: `GET /healthz` (constant body, ahead of host validation so a proxy probe answers) → the SDK's host-header validation → `mcpAuthMetadataRouter` (RFC 9728, unauthenticated) → on the MCP route, every method: access log → missing-token classifier → `requireBearerAuth` → `POST` only: `express.json` with a 256 KB limit → a fresh `Server` and stateless transport per request → any other method 405 → a final error handler, so express never reaches its default handler (which prints `err.stack`). A new middleware goes into that order, or its plan says why
 
 ## Key Features (17 MCP Tools)
 
 All location-based tools accept coordinates, a saved `location_name`, or a
 free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
+Every tool is reachable through both entries, stdio and `weather-mcp-http`, with the same
+`ENABLED_TOOLS` set and the same output.
 Full per-tool parameter reference: `docs/TOOLS.md`.
 
 1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); surfaces a life-threatening NWS alert banner above the response for NWS-served points (the US and its territories) (positive-assertion-only — absence is never an all-clear); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only; `granularity: "minutely"` gives 2 h of 15-minute precipitation bands from HRRR / ICON-D2 by name, with coverage decided by the response (a not-covered disclosure elsewhere, no met.no fallback)
@@ -421,6 +430,17 @@ WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
                                # Philippines/Indonesia/Japan.
                                # docs/GOOGLE_WEATHER_KEY_SETUP.md
 
+# Remote hosting — weather-mcp-http only (src/config/http.ts; the stdio entry ignores them)
+# WEATHER_HTTP_HOST=127.0.0.1           # Bind address (default 127.0.0.1)
+# WEATHER_HTTP_PORT=3939                # Bind port, 1-65535 (default 3939)
+# WEATHER_HTTP_PUBLIC_URL=https://weather.example.net/mcp
+#                                       # Required. The MCP endpoint, the token audience and the
+#                                       # Host every request must name; its path is the route
+# WEATHER_OAUTH_ISSUER=https://auth.example.net/realms/home
+#                                       # Required. Its RFC 8414 / OIDC metadata must name this
+#                                       # exact issuer and publish a jwks_uri, or startup refuses
+# WEATHER_OAUTH_REQUIRED_SCOPES=        # Comma-separated scopes every token must carry
+
 # Logging
 LOG_LEVEL=1                    # 0/DEBUG, 1/INFO, 2/WARN, 3/ERROR — number or name,
                                # names case-insensitive (default: 1). An unrecognized
@@ -458,7 +478,7 @@ via `src/utils/unitFormat.ts`.
 - **Algorithm:** LRU (Least Recently Used) eviction
 - **Size limits:** Configurable max size (default 1000 entries)
 - **Automatic cleanup:** Every 5 minutes
-- **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process; the analytics flush runs under its own deadline inside that budget and never sets the exit code
+- **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process; the analytics flush runs under its own deadline inside that budget and never sets the exit code. The HTTP entry (`src/http.ts`) uses the same coordinator with **SIGTERM and SIGINT only** — never stdin, which is at EOF from the first tick in a container started without `-i` — and its first step stops accepting connections (`server.close()`, forced after 400 ms)
 
 ## Commit Conventions
 
@@ -698,15 +718,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.34.9 — Production Ready ✅
-- **Test Coverage:** 4,551 tests, 100% pass rate
+- **Version:** 1.35.0 — Production Ready ✅
+- **Test Coverage:** 4,656 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.0:** Run the server remotely over Streamable HTTP, behind OAuth
 - **New in v1.34.9:** A dropped connection to NOAA or Open-Meteo now reads as an outage
 - **New in v1.34.8:** The lint gate now catches a promise nobody waits for
-- **New in v1.34.7:** An unreachable national or Japanese alert feed now reports a connection failure instead of an unknown error
 
 ## Useful References
 
@@ -729,7 +749,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-10-17 (v1.34.9)
+**Last Updated:** 2026-10-19 (v1.35.0)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

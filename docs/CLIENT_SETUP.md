@@ -6,7 +6,7 @@ This guide covers how to set up the Weather MCP Server with various AI assistant
 
 ## Prerequisites
 
-Before setting up with any client, you need **Node.js 18 or higher** installed.
+Before setting up with any client, you need **Node.js 20 or higher** installed. This applies to the stdio server and to the remote HTTP server (`weather-mcp-http`).
 
 ## Installation Options
 
@@ -369,6 +369,42 @@ Postman can integrate with existing MCP config files from Claude, VS Code, and o
 
 ---
 
+## Remote server (Streamable HTTP)
+
+Every section above starts the server as a local process. If you run `weather-mcp-http` on another
+machine instead, behind a reverse proxy and an OAuth authorization server, a client connects to its
+URL. Setting up that server is covered in **[REMOTE_HOSTING.md](./REMOTE_HOSTING.md)**. The examples
+below use `https://weather.example.net/mcp` as the public URL.
+
+Each client logs in through your authorization server the first time it connects: the server
+answers `401`, the client reads the protected-resource document it points to, and opens the
+authorization server's login page. Whether the client registers itself or needs a client you
+create by hand depends on the client and on your authorization server.
+
+### Claude Code
+
+```bash
+claude mcp add --transport http weather https://weather.example.net/mcp
+```
+
+Then run `/mcp` in a Claude Code session and choose the server to authenticate. A browser window
+opens for the login.
+
+### claude.ai (custom connector)
+
+In claude.ai, add a custom connector and give it the public URL
+(`https://weather.example.net/mcp`). claude.ai starts the OAuth login when you connect. The server
+must be reachable from the internet, because claude.ai connects from Anthropic's servers, not from
+your machine.
+
+### Other clients
+
+Any MCP client that supports the Streamable HTTP transport and OAuth can connect the same way: give
+it the public URL. A client that supports only stdio cannot connect to `weather-mcp-http`; use the
+local setup above instead.
+
+---
+
 ## Testing Your Setup
 
 After configuring any client, test the connection with these simple queries:
@@ -389,7 +425,7 @@ After configuring any client, test the connection with these simple queries:
 ### Server Not Connecting
 
 1. **Verify the path:** Make sure the path to `dist/index.js` is absolute and correct
-2. **Check Node.js:** Ensure Node.js 18+ is installed: `node --version`
+2. **Check Node.js:** Ensure Node.js 20+ is installed: `node --version`
 3. **Rebuild the project:** Run `npm run build` in the weather-mcp directory
 4. **Restart the client:** Most clients need a restart after configuration changes
 5. **Check logs:** Look for MCP-related errors in your client's console/logs

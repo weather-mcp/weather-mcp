@@ -1659,6 +1659,11 @@ file appears to say), [G11] (the dist is where a rendering or stream claim is
 actually checkable). Not lintable: only the test's author knows whether a
 given assertion is about a stream or about a call.
 
+**Timing (2026-10-18, remote-http-transport T6, `4915e3a`):** a `vi.spyOn(console, …)` made at
+describe-collection time — in the `describe` body rather than a hook — records nothing, because
+Vitest rebinds `console` after collection. Install the spies in `beforeAll`/`beforeEach`, still
+ahead of the construction the test is about ([G123]).
+
 ---
 
 ## G35 — Release prose is a JavaScript replacement string, so a `$` in a changelog bullet rewrites the file
@@ -3950,6 +3955,13 @@ only prose hits is the evidence.
 same breath. If the gap explains it, the disposition is "accepted until
 <date>" in the release notes plus a follow-up `chore:` — not a resolution
 override, and not silence.
+
+**Superseded evidence (2026-10-19, remote-http-transport `6a20f73`):** the reachability
+argument above is now **per entry**. `weather-mcp-http` (`src/http.ts`) runs express, the SDK's
+Streamable HTTP transport and jose on every request, so the `grep -rn 'StreamableHTTP\|express'
+src/` check is no longer "prose hits only". For an advisory in that subtree, say it is
+unreachable from `weather-mcp` (stdio: `src/index.ts`'s import graph) and **reachable** from
+`weather-mcp-http` — `SECURITY.md` *Which advisories are reachable* is the standing text.
 
 ---
 
@@ -6745,7 +6757,7 @@ Know what the zero does not cover, too. Measured 2026-10-03 (diff review M1, rep
 
 **Trigger:** a plan's live pass needs a base-tree positive control ([G108]) for a [G20]-shaped race — a read or delete split from its write by a network round trip — on a path driven by a long timer (the 15-minute lightning prune) or with no public seam to start the competing call at the right moment.
 
-**Rule:** don't edit source and don't guess at sleeps. Copy the built `dist/` to a scratch directory, `sed` the interval constant down (e.g. `SUBSCRIPTION_PRUNE_INTERVAL_MS` → `5000`), and in the driver wrap the shared `logger` instance (`dist/utils/logger.js`, the same module object the service imports) so that when the log line emitted **immediately before** the `await` arrives, the wrapper starts the competing call synchronously. Use the same technique on base and branch so the only variable is the code. The scratch `dist` must sit under a directory whose `node_modules` resolves (inside the repo or the worktree), **and** must have a `package.json` beside it: `dist/utils/version.js` reads `../package.json` relative to the dist directory, which does not walk up the way module resolution does — copy the repo's `package.json` next to the scratch `dist` (noaa-openmeteo-connect-codes T3, 2026-10-16).
+**Rule:** don't edit source and don't guess at sleeps. Copy the built `dist/` to a scratch directory, `sed` the interval constant down (e.g. `SUBSCRIPTION_PRUNE_INTERVAL_MS` → `5000`), and in the driver wrap the shared `logger` instance (`dist/utils/logger.js`, the same module object the service imports) so that when the log line emitted **immediately before** the `await` arrives, the wrapper starts the competing call synchronously. Use the same technique on base and branch so the only variable is the code. The scratch `dist` must sit under a directory whose `node_modules` resolves (inside the repo or the worktree), **and** must have a `package.json` beside it: `dist/utils/version.js` reads `../package.json` relative to the dist directory, which does not walk up the way module resolution does — copy the repo's `package.json` next to the scratch `dist` (noaa-openmeteo-connect-codes T3, 2026-10-16). The same holds for a [G10] byte-identity **baseline copy**: `dist/analytics/config.js` reads it too, and the base spawn throws `ENOENT` before `tools/list` without it — smoke-start the copy the moment it is taken (remote-http-transport T9, 2026-10-18).
 
 **Why:** the window is one broker round trip — about 250 ms on the Blitzortung broker — and a timer-driven pass gives a driver no handle on when it starts. Starting from the log line puts the competing call inside the window every time, so the control reproduces on the first attempt rather than being recorded as *unobserved on base*.
 
@@ -6804,6 +6816,158 @@ service's catch-all before assuming its retry follows its list.
 **Status:** active. Seven services still carry their own lists, deferred because their error
 classes and retry rules differ. Lint candidate: a `no-restricted-syntax` rule on an
 `'ECONNREFUSED'` literal under `src/services/`, once those seven migrate.
+
+---
+
+## G139 — Node's `fetch` silently drops a caller-supplied `Host` header
+
+**Trigger:** a test that must send a specific `Host` to a local server — host-header / DNS-rebinding
+validation, virtual-host routing, a reverse-proxy rule.
+
+**Rule:** send that request with `node:http`'s `request()` and `headers: { host: '…' }`, never
+`fetch`. For ordinary requests, configure the server under test so the `Host` that `fetch` derives
+from the URL is the accepted one (for example a public URL whose hostname is `127.0.0.1`). Pair
+every foreign-`Host` refusal with a positive control through the **same** client path carrying the
+accepted `Host`, so the refusal is known to be the header and not the client.
+
+**Why:** undici treats `Host` as a forbidden header and replaces it with the URL's authority, with
+no error. A `fetch` test of "foreign Host is refused" therefore sends the loopback host and fails
+(or passes) for the wrong reason, and a `fetch` with a custom `Host` to an app that validates it
+403s every authenticated row.
+
+**Verify:** `fetch('http://127.0.0.1:<port>/', { headers: { host: 'evil.example' } })` against an
+echo server reports `127.0.0.1:<port>`; the same through `http.request` reports `evil.example`.
+
+**Evidence:** 2026-10-18, remote-http-transport plan review `C-R1` (verified on Node 22.23.2);
+the T6 contract file `tests/integration/http-app.test.ts` rows 7 and 9 (`4915e3a`).
+
+**Status:** active.
+
+---
+
+## G140 — A "no request bytes on stderr" lock is vacuous under Vitest, and for most malformed bodies
+
+**Trigger:** a test asserting that an express app (or anything using `finalhandler`) never writes a
+request body, header or stack to stderr — the final-error-handler class of lock.
+
+**Rule:** two conditions, both needed. **(1)** Run the code with `NODE_ENV` unset or `production`:
+in a subprocess, `delete env.NODE_ENV` (Vitest sets `test`); in-process, assert on the **response
+body**, which can go red, and record that the console assertion cannot. **(2)** Pick a malformed
+body whose parse error quotes it: `[zqbody7731]` gives V8's `Unexpected token 'z', "[zqbody7731]"
+is not valid JSON`; a truncated object such as `{"zqbody7731": ` gives `Unexpected end of JSON
+input`, which quotes nothing, so the lock passes even with the leak path open.
+
+**Why:** express's default error handler logs `err.stack` through `console.error` only when env is
+not `test` (`express/lib/application.js`), so under Vitest the leak is silent. And the leak only
+carries the sentinel when the parser's message does.
+
+**Verify:** delete the final error handler in `src/server/httpApp.ts`.
+`tests/integration/http-entry.test.ts` row 5 goes red on `zqbody7731`; with the body changed to
+`{"zqbody7731": ` it stays green.
+
+**Evidence:** 2026-10-18, remote-http-transport review `C-R5` (the `NODE_ENV` half) and T8
+mutation (d) (the body half), `83a37ac`.
+
+**Status:** active. Related: [G13] (the fixture must carry the secret), [G123].
+
+---
+
+## G141 — `npm install --save pkg@^x.y.z` moves an already-locked version; declaring a transitive dependency needs a hand edit
+
+**Trigger:** promoting a package the tree already resolves transitively to a direct dependency
+"at the range the parent already resolves", where the claim is that no resolved version moves.
+
+**Rule:** do not use `npm install --save <pkg>@<range>`. Write the range into `package.json` by
+hand and run plain `npm install`, which keeps every locked version that satisfies it. Then check
+`git diff package-lock.json | grep '^-'` prints no removed version line, and `npm ls <pkg>` shows one
+deduped copy.
+
+**Why:** `--save` with a spec re-resolves the named packages to the newest version the range and
+npm's `min-release-age` allow, upgrades the transitive copy to match, and writes the new version
+back as the range. Nothing fails, the gate stays green, and a feature branch quietly carries a
+dependency upgrade that belongs to Dependabot ([G66] for the cooldown half).
+
+**Verify:** at `7b03773`, `npm install --save express@^5.2.1 jose@^6.1.3` wrote `^5.3.0` and
+`^6.2.12` and moved express 5.2.1 → 5.3.0, jose 6.1.3 → 6.2.12, and a nested `content-type`
+1.0.1 → 2.0.1. The hand edit plus `npm install` gave a lockfile diff of +91/−0.
+
+**Evidence:** 2026-10-18, remote-http-transport T1 (`7ca0f3a`).
+
+**Status:** active.
+
+---
+
+## G142 — The architecture-map check for a subdirectory module is satisfied by any same-named file in the map
+
+**Trigger:** adding a module under an enumerated `src/<dir>/` whose basename already appears
+elsewhere in `CLAUDE.md`'s map, or adding a top-level `src/<name>.ts` whose name matches an
+existing `src/<dir>/<name>.ts` (`src/http.ts` and `src/config/http.ts`).
+
+**Rule:** do not take the map check's silence as proof the subdirectory line exists. Plant the
+control on **each** same-named line separately ([G41]) and read the line by eye.
+
+**Why:** `scripts/check-doc-versions.sh` anchors the top-level arm (`^[├└]── <name>`), but the
+subdirectory arm matches `(^|[^A-Za-z0-9_])<basename>` anywhere in the map block. Once the
+top-level `├── http.ts` row existed, deleting the `config/` `http.ts` line no longer fired.
+
+**Verify:** on `c185704`, delete `│   ├── http.ts …` under `config/` and run
+`env -u FORCE_COLOR ./scripts/check-doc-versions.sh`: no `src/config/http.ts` line is printed.
+
+**Evidence:** 2026-10-18, remote-http-transport T7; raised as plan-review copilot `P-R1` and
+rejected there, confirmed here. Not fixed: the checker is risk floor F9.
+
+**Status:** active. **Lint candidate:** match the subdirectory arm against its own `<dir>/` block,
+or against `<dir>/<basename>` in the line's path form.
+
+---
+
+## G143 — "Refuses without binding" cannot be proved by checking the port after the process exits
+
+**Trigger:** a fail-closed startup contract — "a refusal never binds the port" — tested on a
+subprocess that refuses and exits.
+
+**Rule:** probe the port **while the pre-bind step is still running**: hold the step open (an
+issuer server that delays its metadata answer, a hook that blocks), connect to the configured
+port, and expect `ECONNREFUSED`; then let the step fail and expect the refusal. Keep the post-exit
+"port is free" check for leaks, not for ordering.
+
+**Why:** a process that bound the port too early and then refused still exits, and exit frees the
+port, so the post-exit check passes on the exact mutation it was written to catch (listen moved
+ahead of discovery).
+
+**Verify:** in `src/http.ts`, move `listen` ahead of `discoverIssuer`.
+`tests/integration/http-entry.test.ts`'s bind-probe row goes red (`connected` vs
+`ECONNREFUSED`); the seven post-exit port-free rows stay green.
+
+**Evidence:** 2026-10-18, remote-http-transport T8 mutation (c), `83a37ac`.
+
+**Status:** active. Related: [G41].
+
+---
+
+## G144 — A validator in front of a library check must be no wider than the check
+
+**Trigger:** writing a config parser or input validator whose accepted values are later handed to
+a library that validates them again — the MCP SDK's `checkIssuerUrl`, a router's path parser, a
+URL allowlist.
+
+**Rule:** read the library's own check and make the parser's accepted domain a **subset** of it,
+then test one construction per accepted form plus one control the library refuses. A value the
+parser accepts and the library throws on fails later, inside a constructor, past the point where a
+fixed message can name the variable.
+
+**Why:** the design allowed `http` issuers on any loopback literal and did not forbid a query or
+fragment; `mcpAuthMetadataRouter` allows `http` only on `localhost` and `127.0.0.1` and throws on
+either. `http://[::1]/issuer` would have passed the parser and crashed startup with the SDK's
+message, which quotes the URL. Express 5's path parser is the same shape: `/mcp:v2` is a parameter.
+
+**Verify:** `tests/integration/http-app.test.ts` row 5a constructs the app for every issuer form
+`src/config/http.ts` accepts, and its control shows the router throwing for `http://[::1]/issuer`.
+
+**Evidence:** 2026-10-18, remote-http-transport plan review codex `X-R1` / claude `C-R6`, `C-R7`;
+`d7edbac`, `4915e3a`.
+
+**Status:** active.
 
 ---
 

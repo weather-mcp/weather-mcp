@@ -15,6 +15,7 @@ Weather MCP Server.
 - **[../README.md](../README.md)** - Main project README with installation and usage instructions
 - **[../examples/](../examples/README.md)** - Realistic sessions: prompt → assistant answer → verbatim server output (regenerable via `npm run examples`)
 - **[CLIENT_SETUP.md](./CLIENT_SETUP.md)** - Setup guides for 8 different MCP clients
+- **[REMOTE_HOSTING.md](./REMOTE_HOSTING.md)** - Running `weather-mcp-http` (Streamable HTTP behind OAuth) for remote clients
 
 ### 📁 Tool Reference
 - **[TOOLS.md](./TOOLS.md)** - Complete MCP tool reference: every tool, its parameters, and its output
@@ -74,8 +75,8 @@ extend coverage beyond their keyless path:
 
 ## Version Information
 
-- **Current Version:** 1.34.9
-- **Test Coverage:** 4,551 tests, 100% pass rate
+- **Current Version:** 1.35.0
+- **Test Coverage:** 4,656 tests, 100% pass rate
 
 ---
 

@@ -6,6 +6,7 @@ We release patches for security vulnerabilities for the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 1.35.x   | :white_check_mark: |
 | 1.34.x   | :white_check_mark: |
 | 1.33.x   | :white_check_mark: |
 | 1.32.x   | :white_check_mark: |
@@ -105,6 +106,23 @@ These are the runtime dependencies `package.json` declares:
   entity-expansion class; these feeds never use one), and well-formedness is
   checked with `XMLValidator` rather than trusting the parser, which is
   lenient by design and would otherwise accept malformed input silently.
+- `express` - The HTTP server of the remote entry (`weather-mcp-http`) only.
+  The MCP SDK already depended on it; it is declared so the entry does not
+  rely on a transitive copy. The stdio entry never loads it
+- `jose` - JWT access-token verification and the authorization server's JWKS,
+  for `weather-mcp-http` only. The stdio entry never loads it
+
+**Which advisories are reachable.** The package has two entry points, and they
+load different code:
+
+- `weather-mcp` (stdio, the default) constructs only the SDK's stdio transport.
+  It never imports `express`, `jose`, or the SDK's HTTP transport, so an
+  advisory in the `express` / `hono` subtree under the SDK is **not reachable**
+  from it.
+- `weather-mcp-http` (remote hosting) runs `express`, the SDK's Streamable HTTP
+  transport (which uses `hono`'s Node adapter) and `jose` on every request. An
+  advisory in that subtree **is reachable** for anyone running the HTTP entry,
+  and is triaged as such.
 
 **Automated Scanning:**
 
@@ -176,6 +194,11 @@ Every tool works with no API key, token or account. Four optional keys (NCEI, NA
 
 ### Network Security
 
+- **Inbound:** the stdio server opens no port. The remote entry
+  (`weather-mcp-http`) listens on `127.0.0.1:3939` by default and answers only
+  requests that carry a valid OAuth access token, apart from a constant
+  `/healthz` and the two discovery documents. See
+  [Remote hosting](#remote-hosting-weather-mcp-http) below
 - Every weather, geocoding and imagery request uses HTTPS. The one exception is the lightning feed's default MQTT connection, described above
 - Certificate validation is enabled by default (via axios)
 - **URLs taken from a feed body are allowlisted before they are fetched.** The
@@ -204,6 +227,43 @@ Every tool works with no API key, token or account. Four optional keys (NCEI, NA
   so a small body cannot declare an image large enough to exhaust memory. A
   refused frame or tile URL is logged as a security event with a count or a
   reason code, never the path or the URL.
+
+### Remote hosting (weather-mcp-http)
+
+The `weather-mcp-http` entry serves the tools over Streamable HTTP for
+self-hosters. Setup: [docs/REMOTE_HOSTING.md](docs/REMOTE_HOSTING.md). These
+statements apply to that entry, not to the stdio server.
+
+- **Resource server only.** It verifies OAuth 2.1 access tokens issued by an
+  authorization server you run. It issues, refreshes and revokes nothing, and
+  holds no client secrets. Tokens must be JWTs signed with an asymmetric
+  algorithm; `HS*` tokens are refused, so a public key can never be used as an
+  HMAC secret.
+- **Audience binding.** A token's `aud` must equal `WEATHER_HTTP_PUBLIC_URL`
+  exactly, its `iss` must equal `WEATHER_OAUTH_ISSUER`, and it must carry `exp`.
+  A token issued for another application on the same authorization server is
+  refused.
+- **Fail closed.** The entry refuses to start, before binding any port, when
+  the issuer or public URL is missing or not `https` (loopback excepted), or
+  when the issuer's metadata cannot be read or names a different issuer. There
+  is no anonymous mode. A JWKS that cannot be fetched at request time gives a
+  `500`, never a pass.
+- **Host validation.** Every route except `/healthz` refuses a request whose
+  `Host` header does not name the public URL's host, before the token is
+  checked. This blocks DNS rebinding from a browser on the operator's network.
+- **Bounded input.** Request bodies are limited to 256 KB. Errors are answered
+  with fixed JSON-RPC messages, never a stack trace or the request body.
+- **Logging.** No log line carries the `Authorization` header, a token, any
+  token claim, or the token's subject, at any `LOG_LEVEL`, including with
+  `LOG_PII=true`. A refused request is logged once as a security event with a
+  fixed reason class. Access lines carry method, status and duration only; the
+  public URL's path is never logged.
+- **Revocation.** A JWT stays valid until `exp`. Keep access-token lifetimes
+  short.
+- **Shared store.** Every authenticated caller shares one saved-location
+  file. Give access only to people who should share it.
+- **No rate limiting.** The entry is for authenticated self-hosters. The
+  per-process Nominatim spacing still applies to every caller together.
 
 ## Security Testing
 

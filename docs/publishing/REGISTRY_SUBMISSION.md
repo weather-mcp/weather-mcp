@@ -27,7 +27,7 @@ There are three main MCP registries:
 
 ### ⏭️ Smithery.ai - SKIPPED
 - **Status:** Not submitted (intentionally skipped)
-- **Reason:** Smithery is designed for managed/hosted MCP servers with HTTP transport. This server uses **stdio transport** and is distributed as an npm package for local execution. Smithery's build system expects to containerize and host servers remotely, which is incompatible with stdio-based servers that run on users' local machines.
+- **Reason:** Smithery is designed for managed/hosted MCP servers with HTTP transport. This server is distributed as an npm package that users run themselves: the default entry uses **stdio transport**, and the HTTP entry (`weather-mcp-http`, added later) is for self-hosters behind their own OAuth authorization server. There is no hosted instance for a registry to list or for Smithery to run, so the decision stands.
 - **Alternative:** Users can install directly from npm: `npm install -g @dangahagan/weather-mcp`
 
 ### 🔄 Glama.ai - PENDING AUTO-INDEX
@@ -100,7 +100,7 @@ Full guide: https://github.com/modelcontextprotocol/registry/blob/main/docs/guid
 
 **This server was NOT submitted to Smithery.ai** for the following reasons:
 
-- **Transport Incompatibility:** This server uses **stdio transport** (local execution via npm), while Smithery is designed for **remote HTTP/SSE servers** that they can host and manage
+- **Transport Incompatibility:** The default entry uses **stdio transport** (local execution via npm), while Smithery is designed for **remote HTTP/SSE servers** that they can host and manage. The HTTP entry (`weather-mcp-http`) speaks Streamable HTTP, but it requires the operator's own OAuth authorization server, so it is not something a managed host can run on a user's behalf
 - **Build System Mismatch:** Smithery's build system expects to containerize and deploy servers as remote services, which doesn't align with stdio-based local execution
 - **Distribution Model:** Users install this server directly from npm (`npm install -g @dangahagan/weather-mcp`) rather than connecting to a hosted endpoint
 
@@ -110,7 +110,7 @@ Smithery is ideal for:
 - ✅ MCP servers with **HTTP or SSE transport**
 - ✅ Servers that need **managed hosting** and deployment
 - ✅ Remote services that clients connect to over the network
-- ❌ NOT for stdio-based local npm packages like this one
+- ❌ NOT for stdio-based local npm packages, or for a self-hosted HTTP entry that depends on the operator's own authorization server, like this one
 
 ### Original Submission Process (For Reference)
 

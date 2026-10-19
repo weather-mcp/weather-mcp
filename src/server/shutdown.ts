@@ -1,8 +1,8 @@
 /**
- * Shutdown coordinator: one bounded, run-once teardown for every way the stdio session can end.
+ * Shutdown coordinator: one bounded, run-once teardown for every way a server process can end.
  *
  * `src/index.ts` wires stdin `end`/`close`, `server.onclose`, `SIGTERM` and `SIGINT` to the one
- * trigger this module returns. The contracts:
+ * trigger this module returns; `src/http.ts` wires `SIGTERM` and `SIGINT` only. The contracts:
  *
  * - **Run once.** The first trigger starts the run; every later trigger — including one fired from
  *   inside a step, as `server.close()` fires `server.onclose` — returns the same promise.
