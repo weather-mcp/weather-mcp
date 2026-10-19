@@ -35,3 +35,8 @@ jobs:
       # The unit project runs under tests/setup/no-network.ts, so the step needs no network.
       - name: Test
         run: npx vitest run --project unit
+
+      # Both files touch only loopback (127.0.0.1), which is why they can run on every
+      # push while the rest of tests/integration/ (live upstream calls) cannot.
+      - name: HTTP entry contracts (loopback only)
+        run: npx vitest run tests/integration/http-app.test.ts tests/integration/http-entry.test.ts
