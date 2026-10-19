@@ -15,6 +15,7 @@ Weather MCP Server.
 - **[../README.md](../README.md)** - Main project README with installation and usage instructions
 - **[../examples/](../examples/README.md)** - Realistic sessions: prompt → assistant answer → verbatim server output (regenerable via `npm run examples`)
 - **[CLIENT_SETUP.md](./CLIENT_SETUP.md)** - Setup guides for 8 different MCP clients
+- **[REMOTE_HOSTING.md](./REMOTE_HOSTING.md)** - Running `weather-mcp-http` (Streamable HTTP behind OAuth) for remote clients
 
 ### 📁 Tool Reference
 - **[TOOLS.md](./TOOLS.md)** - Complete MCP tool reference: every tool, its parameters, and its output

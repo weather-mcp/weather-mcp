@@ -110,6 +110,7 @@ All 17 tools, documented in detail in **[docs/TOOLS.md](./docs/TOOLS.md)**:
 - **Imperial or metric** — pick your units server-wide (`WEATHER_UNITS`) or per request (`units: "metric"`), with fine-grained overrides (wind in knots, pressure in hPa, 24-hour clock). Defaults to imperial. See [Units & Localization](#units--localization).
 - **Built-in caching** — an LRU cache with per-data-type TTLs (5 minutes for alerts, 2 hours for forecasts, forever for finalized historical data) makes repeat queries return in <10ms and cuts upstream API calls by 50–80%.
 - **Actionable errors** — failures explain what happened and link to the upstream status page instead of dumping a stack trace.
+- **Remote hosting** — besides the local stdio server, the package ships `weather-mcp-http`, which serves the same tools over Streamable HTTP so a claude.ai connector or a client on another machine can reach your own instance. It requires an OAuth authorization server you run (Keycloak, Authentik and similar) and checks every request's token, including its audience. For self-hosters; there is no public instance. See [docs/REMOTE_HOSTING.md](./docs/REMOTE_HOSTING.md).
 
 ## Data sources
 
@@ -180,7 +181,7 @@ npm run build
 
 Then point your MCP client at `node /absolute/path/to/weather-mcp/dist/index.js`.
 
-Requires Node.js 18+. No API keys, tokens, or accounts needed — see [Optional API keys](#optional-api-keys) for the four that add optional extras, and [Optional dependency](#optional-dependency) if you want a smaller install.
+Requires Node.js 18+ (the stdio server; the remote HTTP server needs 20+). No API keys, tokens, or accounts needed — see [Optional API keys](#optional-api-keys) for the four that add optional extras, and [Optional dependency](#optional-dependency) if you want a smaller install.
 
 ### Works with
 
@@ -279,6 +280,7 @@ Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weath
 | `NCEI_API_TOKEN` | — | Optional [free NCEI token](https://www.ncdc.noaa.gov/cdo-web/token) for official NOAA climate normals (US); falls back to Open-Meteo automatically. See [Optional API keys](#optional-api-keys) |
 | `FIRMS_MAP_KEY` | — | Optional [free FIRMS key](https://firms.modaps.eosdis.nasa.gov/api/map_key/) for targeted wildfire queries and up to 5 days of detection history. See [Optional API keys](#optional-api-keys) |
 | `GOOGLE_POLLEN_API_KEY` | — | Optional key for pollen outside Europe (incl. the US). **Requires a Google Cloud billing account** — free tier is 5,000 lookups/month. See [Optional API keys](#optional-api-keys) and [the setup guide](./docs/GOOGLE_POLLEN_KEY_SETUP.md) |
+| `WEATHER_HTTP_PUBLIC_URL`, `WEATHER_OAUTH_ISSUER`, … | — | Remote HTTP server (`weather-mcp-http`) only: five variables for its address, public URL and OAuth issuer. See [docs/REMOTE_HOSTING.md](./docs/REMOTE_HOSTING.md#configuration) |
 | `GOOGLE_WEATHER_API_KEY` | — | Optional key for official weather alerts beyond the US, Canada, Europe, India, the Philippines, Indonesia, and Japan (~45+ more territories). **Requires a Google Cloud billing account.** See [Optional API keys](#optional-api-keys) and [the setup guide](./docs/GOOGLE_WEATHER_KEY_SETUP.md) |
 
 For caching architecture details, see [.github/CACHING.md](./.github/CACHING.md).
@@ -418,6 +420,7 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 - **[Examples](./examples/)** — realistic sessions in cities around the world: prompt → assistant answer → verbatim server output
 - **[Tool Reference](./docs/TOOLS.md)** — all 17 tools: parameters, examples, sample output
 - **[Client Setup](./docs/CLIENT_SETUP.md)** — step-by-step for 8 MCP clients
+- **[Remote Hosting](./docs/REMOTE_HOSTING.md)** — run `weather-mcp-http` behind your own OAuth authorization server
 - **[Error Handling](./docs/ERROR_HANDLING.md)** — how failures are reported
 - **[Testing Guide](./docs/testing/TESTING_GUIDE.md)** — manual testing procedures
 - **[Changelog](./CHANGELOG.md)** — version history

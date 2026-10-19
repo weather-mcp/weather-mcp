@@ -11,6 +11,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
+- **Entries:** `weather-mcp` (stdio, `src/index.ts`) and `weather-mcp-http` (Streamable HTTP behind OAuth, `src/http.ts`, for self-hosters; `docs/REMOTE_HOSTING.md`). The HTTP entry adds no tool and changes no output; it is a second way to reach the same factory
 
 ## Architecture
 
@@ -135,6 +136,8 @@ src/
 
 All location-based tools accept coordinates, a saved `location_name`, or a
 free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
+Every tool is reachable through both entries, stdio and `weather-mcp-http`, with the same
+`ENABLED_TOOLS` set and the same output.
 Full per-tool parameter reference: `docs/TOOLS.md`.
 
 1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); surfaces a life-threatening NWS alert banner above the response for NWS-served points (the US and its territories) (positive-assertion-only — absence is never an all-clear); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only; `granularity: "minutely"` gives 2 h of 15-minute precipitation bands from HRRR / ICON-D2 by name, with coverage decided by the response (a not-covered disclosure elsewhere, no met.no fallback)
@@ -426,6 +429,17 @@ WEATHER_UNITS=imperial         # imperial | metric (default: imperial)
                                # Adds official alerts beyond US/Canada/Europe/India/
                                # Philippines/Indonesia/Japan.
                                # docs/GOOGLE_WEATHER_KEY_SETUP.md
+
+# Remote hosting — weather-mcp-http only (src/config/http.ts; the stdio entry ignores them)
+# WEATHER_HTTP_HOST=127.0.0.1           # Bind address (default 127.0.0.1)
+# WEATHER_HTTP_PORT=3939                # Bind port, 1-65535 (default 3939)
+# WEATHER_HTTP_PUBLIC_URL=https://weather.example.net/mcp
+#                                       # Required. The MCP endpoint, the token audience and the
+#                                       # Host every request must name; its path is the route
+# WEATHER_OAUTH_ISSUER=https://auth.example.net/realms/home
+#                                       # Required. Its RFC 8414 / OIDC metadata must name this
+#                                       # exact issuer and publish a jwks_uri, or startup refuses
+# WEATHER_OAUTH_REQUIRED_SCOPES=        # Comma-separated scopes every token must carry
 
 # Logging
 LOG_LEVEL=1                    # 0/DEBUG, 1/INFO, 2/WARN, 3/ERROR — number or name,

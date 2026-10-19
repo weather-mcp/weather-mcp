@@ -93,6 +93,7 @@ npx tsx tests/test_noaa_api.ts
 weather-mcp/
 ├── src/
 │   ├── index.ts           # Stdio entry point
+│   ├── http.ts            # Streamable HTTP entry point (weather-mcp-http, behind OAuth)
 │   ├── server/weatherServer.ts  # Tool registration, dispatch, services
 │   ├── services/
 │   │   ├── noaa.ts        # NOAA API service

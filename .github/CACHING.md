@@ -224,7 +224,7 @@ With 1000 max entries:
 
 ### Thread Safety
 
-The cache is not explicitly thread-safe, but Node.js's single-threaded event loop makes race conditions unlikely for the MCP server's usage pattern (sequential request processing via stdio).
+The cache is not explicitly thread-safe, but Node.js's single-threaded event loop makes race conditions unlikely. Requests arrive sequentially over stdio, and concurrently over the HTTP entry (`weather-mcp-http`), which shares one cache across every request; the caches already tolerate concurrent readers and writers on one event loop.
 
 ## Monitoring and Debugging
 
