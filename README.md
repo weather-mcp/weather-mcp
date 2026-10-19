@@ -181,7 +181,7 @@ npm run build
 
 Then point your MCP client at `node /absolute/path/to/weather-mcp/dist/index.js`.
 
-Requires Node.js 18+ (the stdio server; the remote HTTP server needs 20+). No API keys, tokens, or accounts needed — see [Optional API keys](#optional-api-keys) for the four that add optional extras, and [Optional dependency](#optional-dependency) if you want a smaller install.
+Requires Node.js 20+. No API keys, tokens, or accounts needed — see [Optional API keys](#optional-api-keys) for the four that add optional extras, and [Optional dependency](#optional-dependency) if you want a smaller install.
 
 ### Works with
 

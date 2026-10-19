@@ -6,7 +6,7 @@ This guide covers how to set up the Weather MCP Server with various AI assistant
 
 ## Prerequisites
 
-Before setting up with any client, you need **Node.js 18 or higher** installed for the stdio server. The remote HTTP server (`weather-mcp-http`) needs Node.js 20 or higher.
+Before setting up with any client, you need **Node.js 20 or higher** installed. This applies to the stdio server and to the remote HTTP server (`weather-mcp-http`).
 
 ## Installation Options
 
@@ -425,7 +425,7 @@ After configuring any client, test the connection with these simple queries:
 ### Server Not Connecting
 
 1. **Verify the path:** Make sure the path to `dist/index.js` is absolute and correct
-2. **Check Node.js:** Ensure Node.js 18+ is installed for the stdio server (20+ for `weather-mcp-http`): `node --version`
+2. **Check Node.js:** Ensure Node.js 20+ is installed: `node --version`
 3. **Rebuild the project:** Run `npm run build` in the weather-mcp directory
 4. **Restart the client:** Most clients need a restart after configuration changes
 5. **Check logs:** Look for MCP-related errors in your client's console/logs

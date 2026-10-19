@@ -82,8 +82,7 @@ Rules for the two URLs:
   and at least `/` as the path. Write `https://weather.example.net/`, not
   `https://weather.example.net`.
 
-Node.js **20 or newer** is required for `weather-mcp-http` (it needs the WebCrypto API). The stdio
-server still runs on Node.js 18.
+Node.js **20 or newer** is required, for `weather-mcp-http` and for the stdio server alike.
 
 ## Running it
 
