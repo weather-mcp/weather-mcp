@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import {
   SignJWT,
   createLocalJWKSet,
@@ -71,7 +71,7 @@ async function signHs256(claims: JWTPayload): Promise<string> {
 }
 
 describe('createTokenVerifier', () => {
-  let warn: ReturnType<typeof vi.fn>;
+  let warn: Mock<(message: string, metadata?: Record<string, unknown>) => void>;
 
   beforeEach(() => {
     warn = vi.fn();
@@ -276,7 +276,7 @@ describe('token verifier log sentinel (G123, G112)', () => {
     }
     await throwing.verifyAccessToken(marker).catch(() => undefined);
 
-    const recorded = spies.flatMap(spy => spy.mock.calls.map(call => JSON.stringify(call)));
+    const recorded = spies.flatMap(spy => spy.mock.calls.map((call: unknown[]) => JSON.stringify(call)));
     // The rejections did log, so the empty-hit assertions below are not vacuous.
     expect(recorded.filter(line => line.includes('Access token rejected'))).toHaveLength(5);
     const forbidden = [SUB, CLIENT, CLAIM, JOSE_MSG, ...markers.flatMap(m => [m.slice(0, 16), m.slice(-16)])];
