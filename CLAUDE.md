@@ -102,6 +102,7 @@ src/
 │   ├── tools.ts             # ENABLED_TOOLS presets (basic/standard/full), tool names, and
 │   │                        #   TOOLS_LIST_BYTE_BUDGET — the tools/list size ceiling per preset
 │   ├── defaultLocation.ts   # WEATHER_DEFAULT_LOCATION
+│   ├── http.ts              # WEATHER_HTTP_* / WEATHER_OAUTH_* parsing for the HTTP entry (pure; returns a result, never warns)
 │   ├── api.ts               # Optional API keys (NCEI, FIRMS, Google)
 │   └── displayThresholds.ts # Display logic constants
 ├── analytics/               # Opt-in usage analytics client (ANALYTICS_ENABLED=true; off by default, no default endpoint)
