@@ -89,6 +89,9 @@ export function createHttpApp(deps: HttpAppDeps): express.Express {
 
   const app = express();
   app.disable('x-powered-by');
+  // The route is the public URL's exact path: /MCP and /mcp/ are not /mcp.
+  app.set('case sensitive routing', true);
+  app.set('strict routing', true);
 
   // 1. Liveness. Answers before host validation; the body is a constant, so a
   //    rebinding read learns nothing.
@@ -113,15 +116,18 @@ export function createHttpApp(deps: HttpAppDeps): express.Express {
     route,
     (req: Request, res: Response, next: NextFunction) => {
       const started = performance.now();
-      res.once('finish', () => {
+      // 'close' fires for a completed response and for a client that hung up
+      // first, so every request gets exactly one line.
+      res.once('close', () => {
+        const finished = res.writableFinished;
         logger.info('HTTP request', {
           method: req.method,
-          status: res.statusCode,
+          status: finished ? res.statusCode : 'aborted',
           durationMs: Math.round(performance.now() - started)
         });
         // The verifier never sees a scope failure: the SDK decides it after verification.
         const challenge = res.getHeader('WWW-Authenticate');
-        if (res.statusCode === 403 && typeof challenge === 'string' && challenge.includes('insufficient_scope')) {
+        if (finished && res.statusCode === 403 && typeof challenge === 'string' && challenge.includes('insufficient_scope')) {
           logTokenRejection('scope');
         }
       });
@@ -158,6 +164,7 @@ export function createHttpApp(deps: HttpAppDeps): express.Express {
     } catch (error) {
       logger.error('HTTP request failed', undefined, { error: describeErrorForLogging(error) });
       if (!res.headersSent) res.status(500).json(jsonRpcError(-32603, 'Internal server error'));
+      else res.end();
     }
   });
 

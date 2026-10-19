@@ -168,8 +168,8 @@ give access to people who should share that list.
 
 All logs go to stderr as JSON lines. The HTTP server adds:
 
-- One line per request: method, status and duration. **No** path, header, query, body or IP
-  address.
+- One line per request: method, status and duration. The status is `aborted` when the client
+  hung up before the response was sent. **No** path, header, query, body or IP address.
 - One `Access token rejected` security warning per refused request, with a fixed reason:
   `missing`, `invalid`, `expired`, `audience`, `scope` or `jwks_unavailable`.
 - The startup line: version, host, port, the issuer's origin (scheme, host, port) and the number of

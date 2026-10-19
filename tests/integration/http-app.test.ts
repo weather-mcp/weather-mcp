@@ -412,6 +412,52 @@ describe('http app: routes', () => {
   });
 });
 
+describe('http app: exact route and access log', () => {
+  it('14. the route is case-sensitive and strict: /MCP and /mcp/ answer 404 with a valid bearer', async () => {
+    const marker = await issuer.sign({ claims: goodClaims() });
+    const control = await mcpPost(main.base, INITIALIZE, marker);
+    expect(control.status).toBe(200);
+    await control.text();
+    for (const path of ['/MCP', '/mcp/']) {
+      const res = await fetch(`${main.base}${path}`, {
+        method: 'POST',
+        headers: { ...MCP_HEADERS, Authorization: `Bearer ${marker}` },
+        body: JSON.stringify(INITIALIZE)
+      });
+      expect(res.status).toBe(404);
+      await res.text();
+    }
+  });
+
+  it('15. a client that hangs up before the response still gets one access line, status aborted', async () => {
+    const marker = await issuer.sign({ claims: goodClaims() });
+    const info = vi.spyOn(logger, 'info');
+    try {
+      // Promise a body it never finishes, so express.json is still reading when the socket dies.
+      await new Promise<void>(resolve => {
+        const req = http.request({
+          host: '127.0.0.1',
+          port: main.port,
+          method: 'POST',
+          path: '/mcp',
+          agent: false,
+          headers: { ...MCP_HEADERS, Authorization: `Bearer ${marker}`, 'Content-Length': '1000' }
+        });
+        req.on('error', () => resolve());
+        req.on('close', () => resolve());
+        req.write('{"jsonrpc":');
+        setTimeout(() => req.destroy(), 150);
+      });
+      const accessLines = () => info.mock.calls.filter(call => call[0] === 'HTTP request');
+      await waitFor(() => accessLines().length > 0);
+      expect(accessLines()).toHaveLength(1);
+      expect(accessLines()[0][1]).toMatchObject({ method: 'POST', status: 'aborted' });
+    } finally {
+      info.mockRestore();
+    }
+  });
+});
+
 describe('13. whole-path log sentinel (G123)', () => {
   let spies: Array<ReturnType<typeof vi.spyOn>> = [];
   const PATH_MARKER = 'zqpath7731';
