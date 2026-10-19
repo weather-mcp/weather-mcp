@@ -12,6 +12,12 @@
  * byte-for-byte compare with no trailing-slash normalisation), it publishes a
  * `jwks_uri`, and that URI is https (http only for a loopback host).
  *
+ * The whole discovery runs under one deadline (`DISCOVERY_TIMEOUT_MS`). The SDK
+ * sets none, so an issuer that accepts the connection and never answers would
+ * otherwise hold startup, unbound and silent, for undici's 300 s. The deadline
+ * races each fetch rather than only signalling it, so a fetch that ignores its
+ * signal cannot hold startup either. A timeout is `ERR_DISCOVERY_UNREADABLE`.
+ *
  * `discoverIssuer` never throws. The SDK throws on a 5xx and on a schema
  * failure, and those errors embed the endpoint URL, so no thrown text is passed
  * on. Each failure maps to one fixed message that quotes neither the URL, the
@@ -34,6 +40,24 @@ export const ERR_DISCOVERY_JWKS_URI_HTTPS = "the authorization server's jwks_uri
 // URL.hostname keeps IPv6 literals bracketed (GOTCHAS G109).
 const JWKS_LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 
+/** Upper bound on the whole discovery, every well-known URL included. */
+export const DISCOVERY_TIMEOUT_MS = 10_000;
+
+/** `base`, with every call aborted and rejected once `deadline` fires. */
+function underDeadline(base: FetchLike, deadline: AbortSignal): FetchLike {
+  return (url, init) => {
+    const signal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
+    if (signal.aborted) return Promise.reject(signal.reason);
+    return new Promise<Response>((resolve, reject) => {
+      const onAbort = (): void => reject(signal.reason);
+      signal.addEventListener('abort', onAbort, { once: true });
+      base(url, { ...init, signal }).then(resolve, reject).finally(() => {
+        signal.removeEventListener('abort', onAbort);
+      });
+    });
+  };
+}
+
 export type DiscoveryResult =
   | { ok: true; metadata: OAuthMetadata; jwksUri: URL }
   | { ok: false; error: string };
@@ -45,12 +69,14 @@ function refuse(error: string): { ok: false; error: string } {
 export async function discoverIssuer(
   issuerUrl: URL,
   issuer: string,
-  fetchFn?: FetchLike
+  fetchFn?: FetchLike,
+  timeoutMs: number = DISCOVERY_TIMEOUT_MS
 ): Promise<DiscoveryResult> {
   try {
     let found;
     try {
-      found = await discoverAuthorizationServerMetadata(issuerUrl, fetchFn ? { fetchFn } : {});
+      const deadlined = underDeadline(fetchFn ?? fetch, AbortSignal.timeout(timeoutMs));
+      found = await discoverAuthorizationServerMetadata(issuerUrl, { fetchFn: deadlined });
     } catch {
       return refuse(ERR_DISCOVERY_UNREADABLE);
     }

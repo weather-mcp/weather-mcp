@@ -200,7 +200,7 @@ code 1. Nothing is bound when this happens.
 | `WEATHER_OAUTH_ISSUER must not carry a username or password` | |
 | `WEATHER_HTTP_PUBLIC_URL path may contain only letters, digits, and . _ ~ - /` | Choose a simpler path |
 | `WEATHER_HTTP_PUBLIC_URL must be in canonical form (lowercase host, no default port, a path of at least "/")` | Lowercase the host, drop `:443` or `:80`, and end a bare host with `/`. Configure the same string as the token audience |
-| `could not read the authorization server's metadata from WEATHER_OAUTH_ISSUER` | The issuer is unreachable, answered an error, or published a document that does not parse. Check the URL and that the server can reach it |
+| `could not read the authorization server's metadata from WEATHER_OAUTH_ISSUER` | The issuer is unreachable, did not answer within 10 seconds, answered an error, or published a document that does not parse. Check the URL and that the server can reach it |
 | `the authorization server's metadata names a different issuer than WEATHER_OAUTH_ISSUER` | Copy the `issuer` value from the metadata document exactly, including any trailing slash |
 | `the authorization server publishes no jwks_uri; JWT access tokens cannot be verified` | The authorization server must publish signing keys |
 | `the authorization server's jwks_uri must be an https URL` | |

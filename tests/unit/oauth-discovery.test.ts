@@ -176,6 +176,31 @@ describe('discoverIssuer', () => {
     expectRefusal(result, ERR_DISCOVERY_UNREADABLE);
   });
 
+  it('refuses, within the deadline, an issuer that never answers', async () => {
+    let calls = 0;
+    // Never settles and ignores its signal: only the deadline's race can end it.
+    const fetchFn = (): Promise<Response> => {
+      calls++;
+      return new Promise<Response>(() => undefined);
+    };
+    const started = Date.now();
+    const result = await discoverIssuer(new URL(LEAK_ISSUER), LEAK_ISSUER, fetchFn, 50);
+    expectRefusal(result, ERR_DISCOVERY_UNREADABLE);
+    expect(calls).toBeGreaterThan(0);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it('passes an abort signal to the fetch', async () => {
+    let seen: AbortSignal | undefined;
+    const fetchFn = (_u: string | URL, init?: RequestInit): Promise<Response> => {
+      seen = init?.signal ?? undefined;
+      return Promise.resolve(json(doc(HOST)));
+    };
+    const result = await discoverIssuer(new URL(HOST), HOST, fetchFn);
+    expect(result.ok).toBe(true);
+    expect(seen).toBeInstanceOf(AbortSignal);
+  });
+
   it('refuses a 500', async () => {
     const { result } = await run(LEAK_ISSUER, {
       [`${LEAK_ISSUER}/.well-known/oauth-authorization-server`]: () => new Response('boom', { status: 500 }),
