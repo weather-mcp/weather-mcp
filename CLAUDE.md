@@ -24,6 +24,7 @@ src/
 ├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one ref'd deadline that bounds teardown, stderr only
 ├── server/tokenVerifier.ts  # OAuth resource server: jose JWT verification (issuer, audience = public URL, exp, asymmetric algs) → AuthInfo; fixed SDK errors
 ├── server/oauthDiscovery.ts  # Issuer metadata (RFC 8414 / OIDC) via the SDK; exact-issuer and jwks_uri checks; never throws
+├── server/httpApp.ts       # createHttpApp(): healthz → host validation → RFC 9728 metadata → bearer auth → body limit → stateless transport; side-effect-free
 ├── handlers/                # One handler per MCP tool (saved locations share one file)
 │   ├── forecastHandler.ts           # get_forecast (+ compare_models, ensemble_spread, normals, astronomy)
 │   ├── currentConditionsHandler.ts  # get_current_conditions (NOAA / Open-Meteo / METAR; fire weather, thermal stress)
@@ -127,6 +128,7 @@ src/
 6. **Three-layer split for computed features:** service fetches → pure zero-I/O util computes → handler renders. The pure module owns constants; the service imports them from the util, never the reverse (e.g. `COMPARISON_MODELS`, `ENSEMBLE_MODEL`)
 7. **Route by country, not by bounding box, for jurisdictional data** (alerts, wildfire): `NominatimService.reverseCountry` resolves the country once; saved/geocoded locations carry `country_code` through `ResolvedLocation` and skip the lookup (alerts also route to the national CAP feeds ahead of Google)
 8. **A rendered coverage claim needs both signals — country *and* geography.** OSM resolves every US territory to `us` at country zoom, so a country set alone cannot tell Puerto Rico (gauged) from Guam (not), and `isInUS` alone cannot tell the US from Toronto. `get_river_conditions` requires both. Promoting a routing heuristic to a claim the user reads also inherits every edge it was previously allowed to get wrong, so widen the boxes to the jurisdiction's real extent when you do it (`src/utils/geography.ts`, GOTCHAS G53)
+9. **The HTTP entry's stage stack is ordered, and the order is the security model.** `src/server/httpApp.ts` builds, in this order: `GET /healthz` (constant body, ahead of host validation so a proxy probe answers) → the SDK's host-header validation → `mcpAuthMetadataRouter` (RFC 9728, unauthenticated) → on the MCP route, every method: access log → missing-token classifier → `requireBearerAuth` → `POST` only: `express.json` with a 256 KB limit → a fresh `Server` and stateless transport per request → any other method 405 → a final error handler, so express never reaches its default handler (which prints `err.stack`). A new middleware goes into that order, or its plan says why
 
 ## Key Features (17 MCP Tools)
 

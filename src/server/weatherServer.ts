@@ -18,8 +18,9 @@
  *
  * The services are module-scope singletons on purpose: two createWeatherServer()
  * calls in one process share one set of upstream caches, which is what a
- * per-session transport wants. src/index.ts — the stdio entry — is the only
- * consumer today; the factory is not a published API.
+ * per-session transport wants. src/index.ts (stdio) and src/server/httpApp.ts
+ * (HTTP, one Server per request) are the consumers; the factory is not a
+ * published API.
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
