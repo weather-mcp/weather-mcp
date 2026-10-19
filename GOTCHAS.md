@@ -6971,6 +6971,124 @@ message, which quotes the URL. Express 5's path parser is the same shape: `/mcp:
 
 ---
 
+## G145 — A configured URL compared as an exact-match credential must be canonical before it is documented as "exact"
+
+**Trigger:** a config URL that becomes an exact string compare downstream — a JWT `aud`, an RFC
+9728 `resource`, an allowlist entry — after it passes through `new URL()`.
+
+**Rule:** refuse a value whose `new URL(raw).href !== raw` with a fixed message, or document and
+advertise the normalised form. Never write "exactly as you configured it" over a `.href`.
+
+**Why:** `URL.href` appends `/` to a path-less URL, lowercases the host and drops a default port.
+The parser accepted `https://h.example.com`; the verifier demanded `aud=https://h.example.com/`;
+three documents told the operator to mint the first form. Every request then got 401 `audience`.
+The SDK's own `sameResource` tolerates one trailing slash, which hides the mismatch from any test
+that goes through it.
+
+**Verify:** `tests/unit/http-config.test.ts`, "refuses a public URL the URL parser would rewrite";
+live, `https://localhost:18443` (no path) is refused at startup in 0.6 s.
+
+**Evidence:** 2026-10-19, remote-http-transport diff review claude DR-C1 / codex DR-C1 (G145 in
+both); fixed in `405b0f8`, shipped v1.35.0.
+
+**Status:** active.
+
+---
+
+## G146 — A "stays up on stdin EOF" lock is only proved by a mutation that also reads stdin
+
+**Trigger:** a contract that a long-lived entry must not stop when stdin is at EOF, tested by
+spawning it with `stdio: 'ignore'` or a closed pipe.
+
+**Rule:** the mutation that should redden the row is the stdio entry's wiring **plus** something
+that reads stdin (`process.stdin.resume()` or a `data` listener). A listener-only
+`process.stdin.on('end', …)` stays green, and that proves nothing either way.
+
+**Why:** `'end'` fires only on a flowing stream. In a process that reads nothing the listener is
+inert code, so it cannot stop the server. The real hazard in a container is a reader — a transport,
+a library — that pulls the stream to EOF. Spawning with `stdin: 'pipe'` and closing it does not
+change this: the inert listener still never fires.
+
+**Verify:** remote-http-transport diff review, mutation M10 (listener only) green 12/12; M10b
+(listener + `resume()`) red on `tests/integration/http-entry.test.ts` row 2.
+
+**Evidence:** 2026-10-19, diff review claude (G146); copilot F1 proposed the inert form and was
+rejected in triage row 8.
+
+**Status:** active.
+
+---
+
+## G147 — A caught HTTP failure after headers are sent must still end the response
+
+**Trigger:** an async Express handler that catches a rejection and answers with
+`if (!res.headersSent) res.status(500)…`.
+
+**Rule:** add the `else`: end the response (`res.end()`) or hand it to a final handler that does.
+A replacement error body is illegal once headers are out, but leaving the response open is worse.
+
+**Why:** with only the `headersSent` guard, a failure after the first byte leaves the client waiting
+and keeps the per-request `Server` and transport alive until the client gives up. The final error
+handler in `src/server/httpApp.ts` already ended the response; the route's own catch did not.
+
+**Verify:** read `src/server/httpApp.ts`, the POST handler's catch. No test row: reaching the state
+needs the SDK's transport replaced mid-body (triage row 5 judged a seam for it disproportionate).
+
+**Evidence:** 2026-10-19, diff review codex DR-C4 (its G146); fixed in `5b7c5b1`.
+
+**Status:** active.
+
+---
+
+## G148 — A pre-bind startup fetch over global `fetch` has no deadline of its own
+
+**Trigger:** a fail-closed startup step that awaits a network answer before binding — issuer
+discovery, a config fetch — through `fetch` or a library that calls it without a `signal`.
+
+**Rule:** run the step under one deadline that **races** the fetch, not only signals it, and map
+the timeout to the step's fixed refusal. Test it with a `fetchFn` that never settles and ignores
+its signal.
+
+**Why:** a peer that accepts the TCP connection and never answers is not a connection failure.
+undici waits its 300 s headers timeout, and the MCP SDK's discovery sets no signal. The process
+stays alive, unbound and silent, which a supervisor reads as "starting".
+
+**Verify:** `tests/unit/oauth-discovery.test.ts`, "refuses, within the deadline, an issuer that
+never answers"; live, a silent loopback issuer is refused at 10.6 s.
+
+**Evidence:** 2026-10-19, diff review claude DR-C2 (its G147); fixed in `1969364`.
+
+**Status:** active.
+
+---
+
+## G149 — `engines` is a claim nothing tests: the floor it names may not start at all
+
+**Trigger:** writing "runs on Node N" in a doc, raising or keeping `engines.node`, or adding a
+dependency that ships ESM.
+
+**Rule:** start both built entries on the `engines` floor before you state it — a throwaway
+container is enough:
+`podman run --rm --network none -v "$PWD":/app:ro,z -w /app node:18-alpine node dist/index.js`.
+A claim about a Node version that nothing ran is a guess.
+
+**Why:** `astronomy-engine` (added v1.18.0) ships an ESM build without `"type": "module"`. Node 20
+and later load it through module syntax detection; Node 18 parses it as CommonJS and stops with
+`SyntaxError: Unexpected token 'export'`. CI runs one Node version, so neither entry has started on
+18 since v1.18.0, while `engines` said `>=18.0.0` and five doc lines said 18 was supported. The
+HTTP entry's WebCrypto refusal for Node < 20 never prints either: Node 18.20 has
+`globalThis.crypto.subtle`, and the import fails first.
+
+**Verify:** the command above against `main` @ `7b03773` and @ `064f8bf` — the same `SyntaxError`;
+with `node:20-alpine` (20.20.2) both entries start.
+
+**Evidence:** 2026-10-19, v1.35.0 test drive Observation 1; docs corrected in `aba5046`; the
+`engines` decision is RF-18's.
+
+**Status:** active.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
