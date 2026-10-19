@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-10-19
+
 You can now run the server on one machine and reach it from another. The package ships a second command, `weather-mcp-http`, which serves the same tools over Streamable HTTP, so a claude.ai custom connector, Claude Code on a laptop, or an agent on another host can use your own instance. It is for self-hosters, and it requires an OAuth authorization server you already run: every request must carry a valid access token issued for this server. The stdio server you start today is unchanged and does not load any of the new code.
 
 ### Added
@@ -20,7 +22,7 @@ You can now run the server on one machine and reach it from another. The package
 
 ### Security
 - **Advisories in the `express` / `hono` subtree are now reachable for HTTP deployments.** Until this release the server only ever constructed the SDK's stdio transport, so advisories in the SDK's HTTP dependencies were unreachable. That still holds for `weather-mcp`, which loads none of that code. It does not hold for `weather-mcp-http`, which runs `express`, the SDK's Streamable HTTP transport and `jose` on every request: an advisory there is triaged as reachable for anyone running the HTTP entry. `express` and `jose` are now declared dependencies rather than transitive ones, at the versions the SDK already used. (`SECURITY.md`, `package.json`)
-- **The HTTP entry refuses to start without OAuth configuration.** There is no anonymous mode. It exits before binding any port when the public URL or issuer is missing or not `https` (loopback excepted), or when the issuer's metadata cannot be read or names a different issuer. No log line carries the `Authorization` header, a token, a token claim or the subject, at any log level and with `LOG_PII=true`. (`src/http.ts`, `SECURITY.md`)
+- **The HTTP entry refuses to start without OAuth configuration.** There is no anonymous mode. It exits before binding any port when the public URL or issuer is missing or not `https` (loopback excepted), when the public URL is not written in canonical form (it is compared to the token audience character for character, so write `https://host/`, not `https://host`), or when the issuer's metadata cannot be read within 10 seconds or names a different issuer. No log line carries the `Authorization` header, a token, a token claim or the subject, at any log level and with `LOG_PII=true`. (`src/http.ts`, `SECURITY.md`)
 
 ## [1.34.9] - 2026-10-17
 
@@ -2185,7 +2187,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.9...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.0...HEAD
+[1.35.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.9...v1.35.0
 [1.34.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.8...v1.34.9
 [1.34.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.7...v1.34.8
 [1.34.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.6...v1.34.7
