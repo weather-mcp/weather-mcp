@@ -22,6 +22,7 @@ src/
 ├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
 ├── server/lightningPrewarm.ts  # Saved-location lightning pre-warm: gate, guarded store read, refresh timer (never evicts)
 ├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one ref'd deadline that bounds teardown, stderr only
+├── server/tokenVerifier.ts  # OAuth resource server: jose JWT verification (issuer, audience = public URL, exp, asymmetric algs) → AuthInfo; fixed SDK errors
 ├── handlers/                # One handler per MCP tool (saved locations share one file)
 │   ├── forecastHandler.ts           # get_forecast (+ compare_models, ensemble_spread, normals, astronomy)
 │   ├── currentConditionsHandler.ts  # get_current_conditions (NOAA / Open-Meteo / METAR; fire weather, thermal stress)
