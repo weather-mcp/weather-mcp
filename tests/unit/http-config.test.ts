@@ -13,6 +13,7 @@ import {
   ERR_PUBLIC_URL_PATH,
   ERR_PUBLIC_URL_USERINFO,
   ERR_ISSUER_USERINFO,
+  ERR_PUBLIC_URL_CANONICAL,
 } from '../../src/config/http.js';
 
 const S = 'zqhttpcfg7731';
@@ -120,10 +121,20 @@ describe('parseHttpConfig', () => {
 
   it('accepts a safe path and refuses path-to-regexp syntax', () => {
     expect(run({ WEATHER_HTTP_PUBLIC_URL: 'https://h.example.com/mcp/7f3a-9b2c' }).ok).toBe(true);
-    expect(run({ WEATHER_HTTP_PUBLIC_URL: 'https://h.example.com' }).ok).toBe(true);
+    expect(run({ WEATHER_HTTP_PUBLIC_URL: 'https://h.example.com/' }).ok).toBe(true);
     for (const p of [`/mcp:v2${S}`, `/mcp(1)${S}`, `/m*${S}`, `/a%20b${S}`, `/a b${S}`]) {
       refused({ WEATHER_HTTP_PUBLIC_URL: `https://h.example.com${p}` }, ERR_PUBLIC_URL_PATH);
     }
+  });
+
+  it('refuses a public URL the URL parser would rewrite, so the audience is exact', () => {
+    refused({ WEATHER_HTTP_PUBLIC_URL: 'https://H.example.com/mcp' }, ERR_PUBLIC_URL_CANONICAL);
+    refused({ WEATHER_HTTP_PUBLIC_URL: 'https://h.example.com' }, ERR_PUBLIC_URL_CANONICAL);
+    refused({ WEATHER_HTTP_PUBLIC_URL: 'https://h.example.com:443/mcp' }, ERR_PUBLIC_URL_CANONICAL);
+    refused({ WEATHER_HTTP_PUBLIC_URL: 'http://localhost:80/mcp' }, ERR_PUBLIC_URL_CANONICAL);
+    const ok = run({ WEATHER_HTTP_PUBLIC_URL: 'https://h.example.com:8443/mcp' });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.config.publicUrl.href).toBe('https://h.example.com:8443/mcp');
   });
 
   it('refuses userinfo on the public URL', () => {

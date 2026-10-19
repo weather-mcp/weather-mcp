@@ -75,6 +75,12 @@ Rules for the two URLs:
 - No query string, no fragment, no username or password.
 - The public URL's path may contain only letters, digits, and `. _ ~ - /`. The server answers on
   that exact path, so `https://weather.example.net/mcp` serves `/mcp`. Pick any path you like.
+  The match is case-sensitive, and a trailing slash is significant: `/mcp/` and `/MCP` are not
+  `/mcp`.
+- The public URL must be written in canonical form, because it is compared to the token's `aud`
+  character for character: a lowercase host, no default port (`:443` for https, `:80` for http),
+  and at least `/` as the path. Write `https://weather.example.net/`, not
+  `https://weather.example.net`.
 
 Node.js **20 or newer** is required for `weather-mcp-http` (it needs the WebCrypto API). The stdio
 server still runs on Node.js 18.
@@ -141,7 +147,7 @@ push (the `GET` event stream) is not offered. No tool sends server-initiated mes
 
 | Status | When |
 |---|---|
-| `401` | No token, a malformed `Authorization` header, or a token that fails any check above. The `WWW-Authenticate` header carries `resource_metadata="…"`, which MCP clients follow to log in |
+| `401` | No token, an `Authorization` header that does not start `Bearer <token>`, or a token that fails any check above. The `WWW-Authenticate` header carries `resource_metadata="…"`, which MCP clients follow to log in |
 | `403` | The token lacks a scope in `WEATHER_OAUTH_REQUIRED_SCOPES` (the header carries `scope="…"`). Also any request whose `Host` is not the public URL's host |
 | `500` | The authorization server's JWKS could not be read (it timed out, refused the connection, or answered with an error). This is deliberately not a `401`, so clients do not loop through logins during an outage |
 | `413` | The request body is larger than 256 KB |
@@ -193,6 +199,7 @@ code 1. Nothing is bound when this happens.
 | `WEATHER_HTTP_PUBLIC_URL must not carry a username or password` | |
 | `WEATHER_OAUTH_ISSUER must not carry a username or password` | |
 | `WEATHER_HTTP_PUBLIC_URL path may contain only letters, digits, and . _ ~ - /` | Choose a simpler path |
+| `WEATHER_HTTP_PUBLIC_URL must be in canonical form (lowercase host, no default port, a path of at least "/")` | Lowercase the host, drop `:443` or `:80`, and end a bare host with `/`. Configure the same string as the token audience |
 | `could not read the authorization server's metadata from WEATHER_OAUTH_ISSUER` | The issuer is unreachable, answered an error, or published a document that does not parse. Check the URL and that the server can reach it |
 | `the authorization server's metadata names a different issuer than WEATHER_OAUTH_ISSUER` | Copy the `issuer` value from the metadata document exactly, including any trailing slash |
 | `the authorization server publishes no jwks_uri; JWT access tokens cannot be verified` | The authorization server must publish signing keys |

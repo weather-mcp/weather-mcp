@@ -53,6 +53,8 @@ export const ERR_PUBLIC_URL_PATH =
   'WEATHER_HTTP_PUBLIC_URL path may contain only letters, digits, and . _ ~ - /';
 export const ERR_PUBLIC_URL_USERINFO = 'WEATHER_HTTP_PUBLIC_URL must not carry a username or password';
 export const ERR_ISSUER_USERINFO = 'WEATHER_OAUTH_ISSUER must not carry a username or password';
+export const ERR_PUBLIC_URL_CANONICAL =
+  'WEATHER_HTTP_PUBLIC_URL must be in canonical form (lowercase host, no default port, a path of at least "/")';
 
 // URL.hostname keeps IPv6 literals bracketed (GOTCHAS G109).
 const PUBLIC_URL_LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -120,6 +122,12 @@ export function parseHttpConfig(env: NodeJS.ProcessEnv): HttpConfigResult {
   }
   // Express 5 reads anything else as path-to-regexp syntax (e.g. "/mcp:v2").
   if (!PATH_PATTERN.test(pub.url.pathname)) return { ok: false, error: ERR_PUBLIC_URL_PATH };
+  // The token audience is compared as an exact string against publicUrl.href. A
+  // configured value that the URL parser rewrites (mixed-case host, explicit :443,
+  // no path) would make every token fail the audience check, so refuse it here and
+  // keep "exactly as configured" true. PATH_PATTERN keeps the path free of
+  // percent-encoding, so href equality is a clean test.
+  if (pub.url.href !== publicRaw) return { ok: false, error: ERR_PUBLIC_URL_CANONICAL };
 
   const issuerRaw = read(env, 'WEATHER_OAUTH_ISSUER');
   const iss = parseUrl(issuerRaw, ISSUER_LOOPBACK, {
