@@ -19,6 +19,7 @@ import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
 import { validateLatitude, validateLongitude, validateDetail, DetailLevel } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import { ValidationError } from '../errors/ApiError.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
@@ -99,16 +100,17 @@ const RADAR_TILE_PIXELS = 512;
 const RADAR_TILE_HOST = 'tilecache.rainviewer.com';
 
 /**
- * Request config for every radar tile fetch: no redirects, and a capped body.
- * Exported so the transport test can prove this exact object against a real
- * server.
+ * Request config for every radar tile fetch: no redirects, a capped body, and
+ * one wall-clock deadline over the whole request. Exported so the transport
+ * test can prove this exact object against a real server.
  */
 export const RADAR_TILE_REQUEST_CONFIG: AxiosRequestConfig = {
   responseType: 'arraybuffer',
   timeout: CacheConfig.apiTimeoutMs,
   headers: { 'User-Agent': COMPOSITE_USER_AGENT },
   maxRedirects: 0,
-  maxContentLength: RADAR_TILE_MAX_BYTES
+  maxContentLength: RADAR_TILE_MAX_BYTES,
+  adapter: withRequestDeadline()
 };
 
 /**
