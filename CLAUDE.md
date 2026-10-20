@@ -81,6 +81,7 @@ src/
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
 │   ├── connectionFailure.ts # Transport codes meaning "connection failed before any answer"; shared by the alert-feed services, NOAA and Open-Meteo (pure)
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
+│   ├── httpDeadline.ts      # withRequestDeadline — one wall-clock deadline per axios request (proxy included), emitted as axios's own ECONNABORTED; every axios.create passes it
 │   ├── savedLocationShape.ts  # Saved-location record-shape contract — write-side validator and read-side describer (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
 │   ├── serviceStatusProbe.ts     # check_service_status probe outcome type + 200/429/other classification; both probes import it (pure)
@@ -269,6 +270,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 - Cache the *table*, not the per-date slice, for anything derived from a bulk pull (normals).
 - Dedupe concurrent same-key pulls with a `Map<string, Promise<T>>` deleted in `finally`, so a rejected pull is never cached nor left behind.
 - A per-upstream rate budget is one `RequestSpacer` (`src/utils/requestSpacer.ts`) per upstream, built in the composition root and passed to every client of that upstream. It reserves each start slot synchronously before any `await` (G20) and spaces **starts**, not completions, so a slow or failed request never stalls the next. On every wake it re-checks the last *actual* start against a monotonic clock (`performance.now`) and sleeps the remainder, so overdue timers delivered together after an event-loop stall still dispatch one interval apart; the read, compare and record after each wake are one synchronous run (G20). Nominatim's is shared by `NominatimService` and `GeocodingService`'s provider, and it is per process.
+- Every `axios.create` passes `adapter: withRequestDeadline()` (`src/utils/httpDeadline.ts`); `tests/unit/http-deadline-wiring.test.ts` fails on a create literal without it. axios's own `timeout` is an inactivity timer, and on the follow-redirects transport it never starts behind a proxy that does not answer the `CONNECT`. The wrapper races one wall-clock deadline at the merged config's `timeout` and rejects with axios's own `ECONNABORTED` / `timeout of <N>ms exceeded`, so no error mapper changes. Its timer is ref'd (G114). It cannot release a CONNECT socket that axios's bundled `https-proxy-agent` is still waiting on; `tests/integration/http-deadline-proxy.test.ts` pins that limitation.
 - Bound every upstream array (`securityEvent` warn + caveat when the cap trims): 5,000 FIRMS rows, 64 ensemble members, gridpoint series lengths.
 
 ### Process
