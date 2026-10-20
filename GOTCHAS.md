@@ -6042,6 +6042,14 @@ branch rendered byte-identical to `limit: 7`. The upstream 400s were confirmed
 with direct requests. The CHANGELOG and a test header were narrowed in
 `aec455f`; the handler fix did not change.
 
+**Again 2026-10-19** (http-request-deadline T3): the design's measurement table said a resetting
+CONNECT proxy left axios `NEVER SETTLED`, and the plan built a positive control on it. On the base,
+with a proxy that calls `resetAndDestroy()` once the CONNECT line arrives, the unwrapped client
+settled in about 17 ms with `ECONNRESET`, and the server retried it as a failed connection. The
+control was run first, it failed, and the run halted before any row built on it. Only the silent
+case was the real hang. Through the server, the reset path already matched
+`docs/ERROR_HANDLING.md`, so the doc edit the plan had planned was dropped.
+
 **Status:** active. Related: [G10] (the base column as the defect's own proof),
 [G46] (every published behavioural sentence names its proof), [G19] (read what a
 layer passes on; do not infer it).
@@ -6265,6 +6273,13 @@ contract and a mutation row, and both plan review and `/run-plan` accepted it.
 The codex diff review (DR-M1) reproduced the exit-0 drain in a subprocess.
 Fixed in `6d04e5a`. The mutation above reddened exactly those two tests.
 
+**Second Verify, negative** (2026-10-19, http-request-deadline T3, `0e76f7a`): the axios deadline
+timer in `src/utils/httpDeadline.ts` is ref'd by this rule, but no proxy path made it the only
+handle. Behind a silent CONNECT proxy, the leaked proxy socket holds the loop ([G150]). Behind a
+resetting proxy, the request settles by itself. So `.unref()` there is not provable in a
+subprocess, and the planned G114 row was dropped rather than weakened. Keep the timer ref'd anyway:
+the rule does not depend on the proof being available.
+
 **Status:** active. Related: [G37] (event-loop liveness — the other direction),
 [G45] (a mutation-checked lock can pin the wrong property), [G34] (a claim about
 the process has to be made in a process).
@@ -6431,6 +6446,13 @@ red. Add `NO_PROXY=127.0.0.1`: all green.
 **Evidence:** 2026-09-29, imagery-fetch-bounds T7 (`f3bf6b5`),
 `tests/integration/imagery-transport-bounds.test.ts`. With only `HTTPS_PROXY`/`HTTP_PROXY` set,
 15 of 18 rows failed. With `NO_PROXY=127.0.0.1` added, 18 of 18 passed in 521 ms.
+
+**Child-env variant** (2026-10-19, http-request-deadline T3, `0e76f7a`): to drive a proxy through
+the *environment*, set `HTTPS_PROXY`/`https_proxy` only in a spawned child's `env`, and delete
+`NO_PROXY`, `no_proxy`, `HTTP_PROXY`, `http_proxy` and `NODE_USE_ENV_PROXY` there. The test
+process's own `process.env` is never mutated. The parent dead-proxy probe then stays green,
+because each child overwrites its own proxy variables
+(`tests/integration/http-deadline-proxy.test.ts`).
 
 **Status:** active. Related: [G70] (the unit-level inert-mock probe this extends), [G64]/[G71]
 (why a `tests/integration/` file must never reach the internet).
@@ -7057,6 +7079,10 @@ stays alive, unbound and silent, which a supervisor reads as "starting".
 never answers"; live, a silent loopback issuer is refused at 10.6 s.
 
 **Evidence:** 2026-10-19, diff review claude DR-C2 (its G147); fixed in `1969364`.
+**The axios twin** (2026-10-19, http-request-deadline, `4f91b02`): the same rule applies to an axios
+adapter. `src/utils/httpDeadline.ts` settles its own promise at the deadline and then aborts the
+inner adapter; `tests/unit/http-deadline.test.ts` (a) runs it against an inner adapter that ignores
+its signal, and dropping the race turns that row red.
 
 **Status:** active.
 
@@ -7086,6 +7112,40 @@ with `node:20-alpine` (20.20.2) both entries start.
 `engines` decision is RF-18's.
 
 **Status:** active.
+
+---
+
+## G150 — Aborting an axios request behind a silent CONNECT proxy settles it but leaks the proxy socket
+
+**Trigger:** adding a deadline, `signal` or abort to an axios request that can go through
+`HTTPS_PROXY`, or an explicit `proxy` config, to an `https` target. Or a test that expects a
+process to exit after such a request times out.
+
+**Rule:** treat the request and the proxy socket as two things. A deadline can settle the
+request: `withRequestDeadline` rejects with `ECONNABORTED` on time. It cannot release the CONNECT
+socket that axios's tunnelling agent is still waiting on, and that socket keeps the process alive
+until the proxy closes it. Do not claim that "the abort releases the socket", and do not assert
+that a short-lived process exits on that path. Pin the limitation instead.
+
+**Why:** axios 1.20 tunnels HTTPS through its own bundled `https-proxy-agent` 5.0.1
+(`node_modules/axios/lib/adapters/http.js:84-180`), for the environment and the explicit-`proxy`
+path alike: both send `CONNECT host:443`. `HttpsProxyAgent.callback()`
+(`node_modules/https-proxy-agent/dist/agent.js:84-110`) opens the proxy socket and awaits the
+CONNECT reply with no cancellation. agent-base 6.0.2 has no hook that `req.destroy()` reaches
+before a socket is handed over. A long-lived server leaks one file descriptor per hung request until
+the proxy times it out.
+
+**Verify:** `tests/integration/http-deadline-proxy.test.ts` "KNOWN LIMITATION: the child outlives
+the settled request". The child is still alive 1 s after printing `ECONNABORTED`. When that row
+goes red, upstream releases the socket: flip it to assert exit 0, and retire this entry.
+
+**Evidence:** 2026-10-19, http-request-deadline T3 (`0e76f7a`). The T3 subagent stopped at the
+positive control, and the orchestrator reproduced it: wrapped, the request settled at 506 ms, and
+`getActiveResourcesInfo()` 1 s later still listed a `TCPSocketWrap`. The module header claim was
+corrected in the same commit.
+
+**Status:** active. Related: [G148] (race, not only signal), [G114] (why the ref'd timer cannot be
+proven on this path), [G108]. Roadmap row filed for a cancellable tunnelling agent.
 
 ---
 
