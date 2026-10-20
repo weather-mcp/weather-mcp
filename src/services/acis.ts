@@ -34,6 +34,7 @@ import type {
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
 import { Cache } from '../utils/cache.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import { CacheConfig } from '../config/cache.js';
 
 export interface AcisServiceConfig {
@@ -107,7 +108,8 @@ export class AcisService {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     this.client.interceptors.response.use(

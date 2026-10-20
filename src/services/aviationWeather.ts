@@ -28,6 +28,7 @@ import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { VERSION } from '../utils/version.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import { ApiError, ServiceUnavailableError } from '../errors/ApiError.js';
 
 export interface AviationWeatherServiceConfig {
@@ -175,7 +176,8 @@ export class AviationWeatherService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': METAR_USER_AGENT
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     this.client.interceptors.response.use(

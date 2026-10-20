@@ -31,6 +31,7 @@ import { CacheConfig } from '../config/cache.js';
 import { logger, redactCoordinatesForLogging, isPiiLoggingEnabled } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
 import { RequestSpacer } from '../utils/requestSpacer.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -72,7 +73,8 @@ export class NominatimService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // Add response interceptor for error handling

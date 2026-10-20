@@ -32,6 +32,7 @@ import { getUserAgent } from '../utils/version.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { calculateDistance } from '../utils/distance.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 
 export interface NCEIServiceConfig {
   baseURL?: string;
@@ -87,7 +88,8 @@ export class NCEIService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // Add token to requests if available

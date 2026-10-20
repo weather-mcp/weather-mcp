@@ -8,6 +8,7 @@ import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 
 export interface NIFCServiceConfig {
   baseURL?: string;
@@ -32,7 +33,8 @@ export class NIFCService {
       timeout,
       headers: {
         'Accept': 'application/json'
-      }
+      },
+      adapter: withRequestDeadline(),
     });
   }
 

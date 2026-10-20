@@ -74,6 +74,7 @@ import {
   parseJmaIndex,
   parseJmaWarningDocument
 } from '../utils/jmaParse.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import type { JmaIndexEntry, JmaIndexResult, JmaWarningDocument } from '../types/jma.js';
 
 /** The long-term index: roughly seven days of bulletins. */
@@ -209,7 +210,8 @@ export class JmaService {
       maxBodyLength: JMA_MAX_INDEX_BYTES,
       // A 304 must reach us as a value, not as an exception — it is the
       // success case for a revalidation.
-      validateStatus: status => (status >= 200 && status < 300) || status === 304
+      validateStatus: status => (status >= 200 && status < 300) || status === 304,
+      adapter: withRequestDeadline(),
     });
   }
 

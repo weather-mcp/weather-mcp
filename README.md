@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-4%2C656%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-4%2C682%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Four optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 4,656 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 4,682 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, and no telemetry unless you opt in.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -273,7 +273,7 @@ Supported on `get_forecast`, `get_current_conditions`, and `get_historical_weath
 | `WEATHER_TEMPERATURE_UNIT` … | — | Per-unit overrides: `_TEMPERATURE_`(F/C), `_WIND_SPEED_`(mph/kmh/ms/kn), `_PRECIPITATION_`(inch/mm), `_PRESSURE_`(inHg/hPa), `_DISTANCE_`(mi/km), `_TIME_FORMAT`(12h/24h) |
 | `CACHE_ENABLED` | `true` | Enable/disable response caching |
 | `CACHE_MAX_SIZE` | `1000` | Max cache entries (100–10000) |
-| `API_TIMEOUT_MS` | `30000` | Upstream API timeout (5000–120000) |
+| `API_TIMEOUT_MS` | `30000` | Upstream request timeout, end to end on a wall clock — connect, proxy and response body (5000–120000). A few clients keep a timeout of their own, such as geocoding at 10 s |
 | `WEATHER_LIGHTNING_PREWARM` | `true` | Subscribe saved locations' geohashes at startup so lightning has coverage before the first query, and keep them subscribed for as long as they stay saved. The saved list is re-read every 30 minutes: a location saved from another client is picked up, and a removed one stops being watched within about an hour, with no restart. Follows the lightning tool (`get_lightning_activity`), not `get_weather_summary`: no effect when the lightning tool is disabled, as it is in the default `basic` preset — use `ENABLED_TOOLS=basic,+lightning` to opt in. A saved location that does not fit the 50-subscription limit is skipped rather than displacing an area you queried. Set `false` to skip pre-warm and the persistent MQTT connection it opens. |
 | `LOG_LEVEL` | `1` | `0`/`DEBUG`, `1`/`INFO`, `2`/`WARN`, `3`/`ERROR` — number or name, names case-insensitive. An unrecognized value warns on stderr and falls back to `INFO`. Logs go to stderr. `0`/`DEBUG` adds detail, never location text |
 | `LOG_PII` | — | Set `true` to log full-precision coordinates, geocoding queries, saved-location aliases, and the error text of failed tool calls. By default these are left out and coordinates are rounded to about 1 km. The saved place name and any MQTT broker credentials are never logged. For local debugging only — not for shared or centrally collected logs |
@@ -393,7 +393,7 @@ Being honest about what free public data can and can't do:
 ```bash
 npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
-npm test               # Run all 4,656 tests
+npm test               # Run all 4,682 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

@@ -53,6 +53,7 @@ import {
   aggregateMetnoDaily,
 } from '../utils/metnoParse.js';
 import type { MetnoDailyAggregate } from '../utils/metnoParse.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 
 /** The one endpoint this service reads. */
 const METNO_FORECAST_URL = 'https://api.met.no/weatherapi/locationforecast/2.0/complete';
@@ -154,6 +155,7 @@ export class MetnoService {
       // success case for a revalidation. Without this line the whole
       // conditional-request design is dead code.
       validateStatus: status => (status >= 200 && status < 300) || status === 304,
+      adapter: withRequestDeadline(),
     });
   }
 

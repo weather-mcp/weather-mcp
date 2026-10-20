@@ -22,6 +22,7 @@ import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import { logger } from '../utils/logger.js';
 import { classifyProbeAnswer, type ServiceProbeResult } from '../utils/serviceStatusProbe.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -83,7 +84,8 @@ export class NOAAService {
       headers: {
         'User-Agent': userAgent,
         'Accept': 'application/geo+json'
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // NWPS (National Water Prediction Service) client for river gauges
@@ -93,7 +95,8 @@ export class NOAAService {
       headers: {
         'User-Agent': userAgent,
         'Accept': 'application/json'
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // USGS Water Services client for streamflow data
@@ -102,7 +105,8 @@ export class NOAAService {
       timeout,
       headers: {
         'User-Agent': userAgent
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // Add response interceptor for error handling

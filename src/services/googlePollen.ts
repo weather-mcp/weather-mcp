@@ -26,6 +26,7 @@ import { GOOGLE_POLLEN_API_KEY } from '../config/api.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import type { GooglePollenDailyInfo, GooglePollenResponse } from '../types/googlePollen.js';
 
 /**
@@ -98,7 +99,8 @@ export class GooglePollenService {
       timeout,
       headers: {
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
   }
 

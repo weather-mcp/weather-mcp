@@ -32,6 +32,7 @@ import { FIRMS_MAP_KEY } from '../config/api.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { parseFIRMSCsv } from '../utils/firmsHotspots.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import type { FIRMSDetection, FIRMSRegionFile } from '../types/firms.js';
 
 /**
@@ -80,7 +81,8 @@ export class FIRMSService {
       timeout,
       headers: {
         'Accept': 'text/csv'
-      }
+      },
+      adapter: withRequestDeadline(),
     });
   }
 

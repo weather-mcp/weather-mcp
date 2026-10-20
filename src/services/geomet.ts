@@ -22,6 +22,7 @@ import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
 import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import { Cache } from '../utils/cache.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import { CacheConfig } from '../config/cache.js';
 
 export interface GeoMetServiceConfig {
@@ -144,7 +145,8 @@ export class GeoMetService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     this.client.interceptors.response.use(

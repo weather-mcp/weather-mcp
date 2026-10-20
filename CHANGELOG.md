@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.1] - 2026-10-20
+
+Behind a corporate proxy (`HTTPS_PROXY`) that accepted the connection and then never answered, every tool hung with no error until the MCP client gave up, and `API_TIMEOUT_MS` had no effect. Each request to a weather service now stops at its timeout and the tool shows that service's own timed-out message. Normal answers are unchanged.
+
+### Changed
+- **`API_TIMEOUT_MS` now bounds the whole request on a wall clock: connect, the proxy and the response body.** Before, it was an inactivity timer, so a response that kept trickling bytes for longer than the limit still succeeded. It now fails at the limit. Raise `API_TIMEOUT_MS` on a very slow link.
+
+### Fixed
+- **A request through a proxy that never answers now fails at its timeout instead of hanging.** When `HTTPS_PROXY` named a proxy that accepted the connection and then never answered the `CONNECT`, every upstream request waited with no error until the MCP client gave up, and `API_TIMEOUT_MS` was ignored. Each request now fails at its timeout with that service's existing timed-out message — `AviationWeather API request timed out` for METAR, NOAA's "temporarily unavailable" message for NOAA — and a timeout is still not retried. Clients that set their own timeout keep it: geocoding and the RainViewer radar index (10 seconds), NCEI climate normals (30 seconds), and the `check_service_status` probes (10 seconds). Everything else uses `API_TIMEOUT_MS`. A proxy that resets the `CONNECT` already failed fast with the connection-reset message, and still does. Known limitation: behind a silent proxy, the connection to the proxy itself stays open until the proxy closes it, because the HTTP client's proxy tunnel cannot be cancelled once it has been opened. The limit applies to each request, not to each tool: a tool that makes several requests in a row, such as `get_weather_summary` or `get_alerts` in the US, spends one timeout per request, so at the default 30 seconds it can still take longer than your client waits. Lower `API_TIMEOUT_MS` (5 seconds at the least) if you work behind a proxy that fails this way. (`src/utils/httpDeadline.ts`, every service in `src/services/` that creates an HTTP client)
+
 ## [1.35.0] - 2026-10-19
 
 You can now run the server on one machine and reach it from another. The package ships a second command, `weather-mcp-http`, which serves the same tools over Streamable HTTP, so a claude.ai custom connector, Claude Code on a laptop, or an agent on another host can use your own instance. It is for self-hosters, and it requires an OAuth authorization server you already run: every request must carry a valid access token issued for this server. The stdio server you start today is unchanged and does not load any of the new code.
@@ -2187,7 +2197,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.1...HEAD
+[1.35.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.0...v1.35.1
 [1.35.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.9...v1.35.0
 [1.34.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.8...v1.34.9
 [1.34.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.7...v1.34.8

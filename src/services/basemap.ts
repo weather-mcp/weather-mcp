@@ -53,6 +53,7 @@ import {
   assertTileHeader,
   BASEMAP_TILE_MAX_BYTES
 } from '../utils/composite.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 
 /** WMTS REST base for EPSG:3857 "best" imagery — same endpoint family as `gibs.ts`. */
 const GIBS_BASE = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best';
@@ -126,6 +127,7 @@ export class BasemapService {
       headers: {
         'User-Agent': BASEMAP_USER_AGENT,
       },
+      adapter: withRequestDeadline(),
     });
   }
 
