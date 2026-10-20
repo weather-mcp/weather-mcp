@@ -50,13 +50,13 @@ Check service status:
 
 #### Rate Limiting (429 error)
 ```
-NOAA API rate limit exceeded. Please retry in a few seconds.
+NOAA API Error: Rate limit exceeded. Please retry in a few seconds.
 
-Details: Too many requests
-
-For more information about rate limits, visit:
-https://weather-gov.github.io/api/
+For more information:
+- https://www.weather.gov/
 ```
+
+The link is the home page of the service that was rate-limited.
 
 #### Geographic Coverage (404 error)
 ```
@@ -218,6 +218,16 @@ For a status error, a short plain-text body or a JSON `message` field of 200 cha
 from the upstream is shown in place of `AviationWeather API returned status <N>`. An HTML page or a
 longer body is never shown. Another network failure, such as a reset connection, is retried like a
 failed connection and shows the HTTP client's own error text.
+
+```
+AviationWeather API Error: AviationWeather API request timed out
+
+For more information:
+- https://aviationweather.gov/
+```
+
+A timeout, a failed connection, another network failure, a gateway error (502, 503 or 504) and an
+unknown error all end with this link. An error for any other status shows no link.
 
 ### Optional Dependency Errors
 

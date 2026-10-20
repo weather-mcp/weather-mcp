@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **An error's "For more information" link now names the service that failed.** Under an AviationWeather (METAR) or Nominatim outage the link pointed to open-meteo.com; it now points to aviationweather.gov or nominatim.org. Under a rate limit every service listed the same three links (the NOAA, Open-Meteo and NCEI documentation pages); it now lists one, the home page of the service that was rate-limited. Outage links for NOAA, Open-Meteo, NCEI and RainViewer are unchanged. This applies where an error shows a "For more information" block; a failed section of `get_weather_summary` and a US river-gauge (NOAA) error show no link, before and after. (`src/errors/ApiError.ts`)
+
 ## [1.35.1] - 2026-10-20
 
 Behind a corporate proxy (`HTTPS_PROXY`) that accepted the connection and then never answered, every tool hung with no error until the MCP client gave up, and `API_TIMEOUT_MS` had no effect. Each request to a weather service now stops at its timeout and the tool shows that service's own timed-out message. Normal answers are unchanged.
