@@ -40,6 +40,7 @@ import {
   selectNowcastModel,
   type NowcastModel
 } from '../utils/nowcast.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import {
   RateLimitError,
   ServiceUnavailableError,
@@ -172,7 +173,8 @@ export class OpenMeteoService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // Geocoding client
@@ -182,7 +184,8 @@ export class OpenMeteoService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // Forecast client
@@ -192,7 +195,8 @@ export class OpenMeteoService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // Air quality client
@@ -202,7 +206,8 @@ export class OpenMeteoService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // Marine client
@@ -212,7 +217,8 @@ export class OpenMeteoService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // Flood client (river discharge / GloFAS)
@@ -222,7 +228,8 @@ export class OpenMeteoService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // Ensemble client (single-model member spread)
@@ -232,7 +239,8 @@ export class OpenMeteoService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     // Add response interceptor for error handling

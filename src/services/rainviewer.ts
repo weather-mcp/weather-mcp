@@ -6,6 +6,7 @@
 
 import axios, { AxiosInstance } from 'axios';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import { RainViewerResponse, RainViewerFrame, ImageryFrame } from '../types/imagery.js';
 import { ServiceUnavailableError } from '../errors/ApiError.js';
 
@@ -95,7 +96,8 @@ export class RainViewerService {
       maxContentLength: RAINVIEWER_MAX_METADATA_BYTES,
       headers: {
         'User-Agent': 'weather-mcp-server/1.4.0'
-      }
+      },
+      adapter: withRequestDeadline(),
     });
   }
 

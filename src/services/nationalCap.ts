@@ -74,6 +74,7 @@ import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { logger } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 
 /**
  * The three national CAP feeds, as data rather than code. The only
@@ -239,7 +240,8 @@ export class NationalCapService {
       // the second line of defence. `maxBodyLength` is request-side and set
       // only for symmetry.
       maxContentLength: MAX_DOCUMENT_BYTES,
-      maxBodyLength: MAX_DOCUMENT_BYTES
+      maxBodyLength: MAX_DOCUMENT_BYTES,
+      adapter: withRequestDeadline(),
     });
   }
 

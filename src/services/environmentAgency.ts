@@ -65,6 +65,7 @@ import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { logger } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 
 /** Base URL for every flood-monitoring endpoint this service reads. */
 const EA_BASE_URL = 'https://environment.data.gov.uk/flood-monitoring';
@@ -184,7 +185,8 @@ export class EnvironmentAgencyService {
       // A 3xx is an error, never followed.
       maxRedirects: 0,
       maxContentLength: MAX_RESPONSE_BYTES,
-      maxBodyLength: MAX_RESPONSE_BYTES
+      maxBodyLength: MAX_RESPONSE_BYTES,
+      adapter: withRequestDeadline(),
     });
   }
 

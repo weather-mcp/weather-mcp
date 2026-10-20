@@ -39,6 +39,7 @@ import type {
 import { logger } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
 import { Cache } from '../utils/cache.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import { CacheConfig } from '../config/cache.js';
 
 export interface MeteoAlarmServiceConfig {
@@ -223,7 +224,8 @@ export class MeteoAlarmService {
       headers: {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
 
     this.client.interceptors.response.use(

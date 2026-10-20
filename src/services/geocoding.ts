@@ -7,6 +7,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { logger, isPiiLoggingEnabled, describeErrorForLogging } from '../utils/logger.js';
 import { RequestSpacer } from '../utils/requestSpacer.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import { NOMINATIM_MIN_INTERVAL_MS } from './nominatim.js';
 
 /**
@@ -145,7 +146,8 @@ class CensusGovProvider implements GeocodingProvider {
       headers: {
         'Accept': 'application/json'
       },
-      paramsSerializer: { serialize: rfc3986ParamsSerializer }
+      paramsSerializer: { serialize: rfc3986ParamsSerializer },
+      adapter: withRequestDeadline(),
     });
 
     // Rate limit to 5 requests/second to be respectful
@@ -237,7 +239,8 @@ class NominatimProvider implements GeocodingProvider {
         'User-Agent': '(weather-mcp, github.com/weather-mcp/weather-mcp)',
         'Accept': 'application/json'
       },
-      paramsSerializer: { serialize: rfc3986ParamsSerializer }
+      paramsSerializer: { serialize: rfc3986ParamsSerializer },
+      adapter: withRequestDeadline(),
     });
 
     // Strict 1 request/second rate limit as per Nominatim usage policy
@@ -342,7 +345,8 @@ class OpenMeteoProvider implements GeocodingProvider {
       headers: {
         'Accept': 'application/json'
       },
-      paramsSerializer: { serialize: rfc3986ParamsSerializer }
+      paramsSerializer: { serialize: rfc3986ParamsSerializer },
+      adapter: withRequestDeadline(),
     });
   }
 

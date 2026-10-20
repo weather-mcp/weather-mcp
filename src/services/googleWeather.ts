@@ -29,6 +29,7 @@ import { GOOGLE_WEATHER_API_KEY } from '../config/api.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
+import { withRequestDeadline } from '../utils/httpDeadline.js';
 import type { GoogleWeatherAlert, GoogleWeatherAlertsResponse } from '../types/googleWeather.js';
 
 /**
@@ -127,7 +128,8 @@ export class GoogleWeatherService {
       timeout,
       headers: {
         'User-Agent': getUserAgent()
-      }
+      },
+      adapter: withRequestDeadline(),
     });
   }
 
