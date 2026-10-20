@@ -14,10 +14,12 @@
  *   `transitional.clarifyTimeoutError`, so neither is honoured.
  * - It races the inner adapter rather than only signalling it (G148): the promise settles at the
  *   deadline whether or not the inner adapter honours the abort, and the abort then releases the
- *   inner request's socket. Whatever the inner adapter does afterwards is ignored (settle-once).
+ *   inner request. A tunnelling agent's pending CONNECT socket (axios's bundled https-proxy-agent)
+ *   has no cancel hook and stays open until the proxy closes it. Whatever the inner adapter
+ *   does afterwards is ignored (settle-once).
  * - A caller's own `signal` is chained in, and a caller's cancel stays axios's `ERR_CANCELED`.
  * - The deadline timer is ref'd (G114) and cleared on every settle path, with the caller-signal
- *   listener, so it holds a process for at most `timeout`.
+ *   listener, so the timer itself holds a process for at most `timeout`.
  *
  * This module reads no runtime axios export at module scope or in `withRequestDeadline()` itself:
  * thirteen unit-test mocks of `axios` expose only `create`, and they construct services that call
