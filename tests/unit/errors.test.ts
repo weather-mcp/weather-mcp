@@ -9,7 +9,10 @@ import {
   isRetryableError,
   formatErrorForUser,
   serviceDisplayName,
+  serviceHelpLink,
+  API_SERVICE_NAMES,
 } from '../../src/errors/ApiError.js';
+import type { ApiServiceName } from '../../src/errors/ApiError.js';
 import { describeErrorForLogging } from '../../src/utils/logger.js';
 
 describe('Custom Error Classes', () => {
@@ -467,5 +470,58 @@ describe('Custom Error Classes', () => {
       expect(error.statusCode).toBe(400);
       expect(error.isRetryable).toBe(false);
     });
+  });
+});
+
+describe('help links name the failing service', () => {
+  const EXPECTED_HELP_LINK: Record<ApiServiceName, string> = {
+    NOAA: 'https://www.weather.gov/',
+    OpenMeteo: 'https://open-meteo.com/',
+    NCEI: 'https://www.ncei.noaa.gov/',
+    RainViewer: 'https://www.rainviewer.com/',
+    Nominatim: 'https://nominatim.org/',
+    AviationWeather: 'https://aviationweather.gov/',
+  };
+
+  // Tests are not typechecked, so the Record above cannot prove it covers the
+  // union. This runtime check fails until a new member gets a link here too.
+  it('expects a link for exactly the members of the closed union', () => {
+    expect(Object.keys(EXPECTED_HELP_LINK).sort()).toEqual([...API_SERVICE_NAMES].sort());
+  });
+
+  it.each(API_SERVICE_NAMES)('serviceHelpLink(%s) is that service\'s home page', (service) => {
+    expect(serviceHelpLink(service)).toBe(EXPECTED_HELP_LINK[service]);
+  });
+
+  it.each(API_SERVICE_NAMES)('ServiceUnavailableError(%s) links only its own service', (service) => {
+    const error = new ServiceUnavailableError(service);
+
+    expect(error.helpLinks).toEqual([EXPECTED_HELP_LINK[service]]);
+    expect(error.helpLinks.some(link => link.includes('open-meteo.com'))).toBe(service === 'OpenMeteo');
+  });
+
+  it.each(API_SERVICE_NAMES)('RateLimitError(%s) links only its own service', (service) => {
+    const error = new RateLimitError(service);
+
+    expect(error.helpLinks).toEqual([EXPECTED_HELP_LINK[service]]);
+    expect(error.helpLinks.some(link => link.includes('open-meteo.com'))).toBe(service === 'OpenMeteo');
+  });
+
+  it('renders an AviationWeather timeout with the aviationweather.gov link', () => {
+    const text = formatErrorForUser(
+      new ServiceUnavailableError('AviationWeather', 'AviationWeather API request timed out')
+    );
+    const [head, tail] = text.split('For more information:\n');
+
+    expect(head.startsWith('AviationWeather API Error: AviationWeather API request timed out')).toBe(true);
+    expect(tail).toBe('- https://aviationweather.gov/\n');
+  });
+
+  it('renders a Nominatim rate limit with one nominatim.org link', () => {
+    const text = formatErrorForUser(new RateLimitError('Nominatim'));
+    const [head, tail] = text.split('For more information:\n');
+
+    expect(head.startsWith('Nominatim API Error: Rate limit exceeded.')).toBe(true);
+    expect(tail).toBe('- https://nominatim.org/\n');
   });
 });
