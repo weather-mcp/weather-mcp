@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+Behind an HTTPS proxy, two things went wrong. A request that timed out because the proxy never answered left its connection to the proxy open, so a long-running server collected one open connection per hung request. And proxy credentials written percent-encoded in `HTTPS_PROXY` were sent still encoded, so the proxy rejected them. Both are fixed. Without a proxy, nothing changes.
 
-- A request that times out behind a proxy that never answers the `CONNECT` now closes its connection to the proxy. Before, each such request left that connection open until the proxy dropped it, so a long-running server (`weather-mcp-http`, or a stdio session behind a corporate proxy) gained one open connection per hung request: five timed-out forecasts held ten. The timeout and its message are unchanged. Proven by `tests/integration/http-deadline-proxy.test.ts` (the child exits and the proxy sees its socket close) and by a live stdio session whose descriptor count stayed flat across five timed-out calls.
-- Proxy credentials written percent-encoded in `HTTPS_PROXY` (for example `p%40ss` for a password containing `@`) are now decoded before they are sent, as curl and Node's own proxy support do. Before, they were sent still encoded, so the proxy rejected them. A literal `%` in a proxy password must now be written `%25`. Proven by the credentials row in `tests/integration/http-deadline-proxy.test.ts`.
+### Changed
+- **Proxy credentials in `HTTPS_PROXY` are now percent-decoded before they are sent.** A password containing `@` is written `p%40ss` in the URL. It is now sent as `p@ss`, as curl and Node's own proxy support do. Before, it was sent as `p%40ss` and the proxy refused it. **If your proxy password contains a literal `%`, write it as `%25`.** A malformed escape such as `%ZZ` is sent unchanged rather than failing.
+
+### Fixed
+- **A request that times out behind a silent proxy now closes its connection to the proxy.** Before, the request failed on time but left the proxy connection open until the proxy dropped it. A long-running server (`weather-mcp-http`, or a stdio session behind a corporate proxy) gained one open connection per hung request: five timed-out forecasts held ten. The timeout and its message are unchanged.
+- **A failed connection to the proxy no longer names the proxy's address.** When the proxy could not be reached, some error text and log lines carried its host and port, for example `connect ECONNREFUSED proxy.example.com:3128`. They now say `proxy connection failed` and keep only the error code. Credentials were never included.
 
 ## [1.35.3] - 2026-10-21
 
