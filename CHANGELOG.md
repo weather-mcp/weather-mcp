@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.4] - 2026-10-21
+
+Behind an HTTPS proxy, two things went wrong. A request that timed out because the proxy never answered left its connection to the proxy open, so a long-running server collected one open connection per hung request. And proxy credentials written percent-encoded in `HTTPS_PROXY` were sent still encoded, so the proxy rejected them. Both are fixed. Without a proxy, nothing changes.
+
+### Changed
+- **Proxy credentials in `HTTPS_PROXY` are now percent-decoded before they are sent.** A password containing `@` is written `p%40ss` in the URL. It is now sent as `p@ss`, as curl and Node's own proxy support do. Before, it was sent as `p%40ss` and the proxy refused it. **If your proxy password contains a literal `%`, write it as `%25`.** A malformed escape such as `%ZZ` is sent unchanged rather than failing.
+
+### Fixed
+- **A request that times out behind a silent proxy now closes its connection to the proxy.** Before, the request failed on time but left the proxy connection open until the proxy dropped it. A long-running server (`weather-mcp-http`, or a stdio session behind a corporate proxy) gained one open connection per hung request: five timed-out forecasts held ten. The timeout and its message are unchanged.
+- **A failed connection to the proxy no longer names the proxy's address.** When the proxy could not be reached, some error text and log lines carried its host and port, for example `connect ECONNREFUSED proxy.example.com:3128`. They now say `proxy connection failed` and keep only the error code. Credentials were never included.
+
 ## [1.35.3] - 2026-10-21
 
 Two failure paths said more than they should. A saved-locations file that could not be parsed wrote a fragment of its contents, possibly a saved address, to the log at the default level. A wildfire (NIFC) or radar (RainViewer) failure showed raw network-library text to the user. Both now say only what went wrong, in fixed words. Normal answers are unchanged.
@@ -2214,7 +2225,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.3...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.4...HEAD
+[1.35.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.3...v1.35.4
 [1.35.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.2...v1.35.3
 [1.35.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.1...v1.35.2
 [1.35.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.0...v1.35.1

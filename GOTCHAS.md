@@ -6101,6 +6101,14 @@ trailing dot (`replace(/\.+$/, '')`) before comparing names. Stripping only one 
 `localhost.` reachable, and the mutation pass showed it. IPv4 is not affected, because the
 parser normalises `127.0.0.1.` to `127.0.0.1`.
 
+**Same trap, third spelling — a socket dial (2026-10-21, proxy-socket-release, plan-review
+codex-R1, `413f39c`): `URL.hostname` is URL-ready, not dial-ready.** `net.connect` /
+`tls.connect` / `dns.lookup` with `host: '[::1]'` fail `ENOTFOUND`; `'::1'` resolves. Strip
+exactly one enclosing bracket pair before a dial (`replace(/^\[|\]$/g, '')`, as axios does at
+`lib/adapters/http.js:366`), and bracket only when rendering an authority (`CONNECT [::1]:443`).
+Test the dial host and the rendered authority separately — `tests/unit/proxy-tunnel.test.ts`
+(g) spies the dial, (b) checks the CONNECT line.
+
 **Status:** active. Partly lintable: a grep for an unbracketed IPv6 literal on the right of
 `hostname ===` is mechanical. Related: [G65] (the lock on the rejection messages), [G108]
 (the base-artifact repro).
@@ -6283,7 +6291,8 @@ timer in `src/utils/httpDeadline.ts` is ref'd by this rule, but no proxy path ma
 handle. Behind a silent CONNECT proxy, the leaked proxy socket holds the loop ([G150]). Behind a
 resetting proxy, the request settles by itself. So `.unref()` there is not provable in a
 subprocess, and the planned G114 row was dropped rather than weakened. Keep the timer ref'd anyway:
-the rule does not depend on the proof being available.
+the rule does not depend on the proof being available. Since 2026-10-21 (proxy-socket-release, [G150] retired) the silent path no longer holds a leaked
+socket, so the ref'd-timer proof is now available there; the row is left to a later curation.
 
 **Status:** active. Related: [G37] (event-loop liveness — the other direction),
 [G45] (a mutation-checked lock can pin the wrong property), [G34] (a claim about
@@ -7133,7 +7142,89 @@ with `node:20-alpine` (20.20.2) both entries start.
 
 ---
 
+## G151 — A synthetic stack frame under `/home/<name>/` in a test fails `check-doc-versions.sh`
+
+**Trigger:** a test fixture that fakes an `Error.stack`, a file path or a log line with an absolute
+path, typically to prove the stack is kept out of a log.
+
+**Rule:** use a non-home path (`/opt/app/x.js`). The script allows only the placeholders `/home/you/`
+and `/home/user/`. Any other `/home/<name>/`, `/Users/<name>/` or `C:\Users\` path fails it.
+
+**Why:** `./scripts/check-doc-versions.sh` fails on any committed home path, test files included, and
+`/release` runs it. The gate (`build`/`lint`/`test`/`audit`) does not run it, so the fixture is green
+on every task. It is caught only in the final docs task, or at release.
+
+**Verify:** add a frame `at /home/<name>/x.js:1:1` (any real-looking name) to a file under `tests/` and run
+`env -u FORCE_COLOR ./scripts/check-doc-versions.sh`. It prints `Home path in a committed file`.
+
+**Evidence:** 2026-10-21, error-object-log-channel. The impl plan's T1 step 4 prescribed
+a synthetic frame under `/home/<name>/`. It was written as told and caught by T4's doc check, then fixed in `bc0c53b`.
+
+**Status:** active. Lint candidate: a `no-restricted-syntax` literal pattern over `tests/` would catch
+it at the gate. Related: [G41].
+
+---
+
+## G152 — The release leak scan matches credential-shaped code and test fixtures, not only leaked secrets
+
+**Trigger:** writing code or tests near proxy URLs, auth headers or keys — an empty-string
+comparison on a field named for a credential, or a fixture URL whose userinfo password is one of
+the scan's keywords.
+
+**Rule:** run the bindings' leak-scan command (`orchestration-bindings.md`, *Release*) over
+`git diff main` before the last commit, not at `/release`. Spell credential fixtures with a word
+outside the scan's keyword list (`s3kr1t`, `p%40ss`), and test userinfo by truthiness
+(`proxy.username || proxy.password`) rather than comparing it with the empty string.
+
+**Why:** the scan matches one of four keywords followed, on the same line, by any run of non-letters
+and then `=` or `:`, and the bindings make **any** hit a stop. An inequality against `''` puts `!=`
+after the keyword; a loopback fixture URL puts `@127.0.0.1` and then the port colon after it. The
+gate never runs the scan, so both pass every task and stop the release. Prose that quotes such a
+line hits too — describe the shape, as this entry does, rather than pasting it.
+
+**Verify:** add a line comparing a `.password` field with `''` to any file on a branch and run the
+bindings' scan; it prints that line.
+
+**Evidence:** 2026-10-21, proxy-socket-release T4: the scan hit `src/utils/proxyTunnel.ts`'s
+userinfo check (reworded in `935e69f`), T2's fixtures used `s3kr1t` because the plan's keyword
+would have hit, and the first draft of this entry hit three times.
+
+**Status:** active. Lint candidate: the same regex as a gate step (or a `check-doc-versions.sh`
+row) would move the stop from `/release` to the task that wrote it.
+
+---
+
+## G153 — A fix that turns its own pinned-limitation row red must flip that row in the same commit
+
+**Trigger:** a plan that fixes a behaviour an existing test pins as a KNOWN LIMITATION (a row
+asserting the bug), with the flip scheduled in a later task than the fix.
+
+**Rule:** the flip of the limitation row belongs to the commit that makes it red — the fix's task.
+A plan that puts the fix in Tn and the flip in Tn+1 cannot commit Tn green. Move the flip (and the
+file header that describes the limitation) into the fix's commit; leave new rows and mutations to
+the later task.
+
+**Why:** a limitation row is an F12 lock written to go red when the bug goes away. The task graph
+sees "mechanism" and "proof" as separate phases and splits them, but the gate does not.
+
+**Verify:** in the plan, find the task that flips any `KNOWN LIMITATION` row; it must be the task
+whose change makes the old assertion false.
+
+**Evidence:** 2026-10-21, proxy-socket-release: T3 (`130f1a7`) made the silent-proxy child exit, and
+the T4-scheduled flip had to land in T3's commit.
+
+**Status:** active. A `/impl-plan` check candidate rather than a lint.
+
+---
+
+## Graveyard
+
+*(When an entry's trap is refactored away, move it here with the reason and the
+commit that removed it — never delete, never renumber.)*
+
 ## G150 — Aborting an axios request behind a silent CONNECT proxy settles it but leaks the proxy socket
+
+**Retired:** 2026-10-21, by the proxy-socket-release plan (`130f1a7`, `19a8f6a`). The deadline's signal now reaches a per-request tunnel agent (`src/utils/proxyTunnel.ts`) that destroys the pending CONNECT socket; the KNOWN LIMITATION row is now the release's lock ("the child exits 0 after the deadline, and the proxy sees its socket close"). **Successor rule:** the cancel hook for a pre-socket request is the deadline's signal, not the request — Node emits no event on a request destroyed before it has a socket, so an agent hooked on the request leaks the same way (measured, design row E). Live: base held two more descriptors per timed-out `get_forecast` (21 → 31 over five calls); the branch stayed at 21.
 
 **Trigger:** adding a deadline, `signal` or abort to an axios request that can go through
 `HTTPS_PROXY`, or an explicit `proxy` config, to an `https` target. Or a test that expects a
@@ -7162,38 +7253,9 @@ positive control, and the orchestrator reproduced it: wrapped, the request settl
 `getActiveResourcesInfo()` 1 s later still listed a `TCPSocketWrap`. The module header claim was
 corrected in the same commit.
 
-**Status:** active. Related: [G148] (race, not only signal), [G114] (why the ref'd timer cannot be
-proven on this path), [G108]. Roadmap row filed for a cancellable tunnelling agent.
+**Status:** retired 2026-10-21 (see above). Related: [G148], [G114].
 
 ---
-
-## G151 — A synthetic stack frame under `/home/<name>/` in a test fails `check-doc-versions.sh`
-
-**Trigger:** a test fixture that fakes an `Error.stack`, a file path or a log line with an absolute
-path, typically to prove the stack is kept out of a log.
-
-**Rule:** use a non-home path (`/opt/app/x.js`). The script allows only the placeholders `/home/you/`
-and `/home/user/`. Any other `/home/<name>/`, `/Users/<name>/` or `C:\Users\` path fails it.
-
-**Why:** `./scripts/check-doc-versions.sh` fails on any committed home path, test files included, and
-`/release` runs it. The gate (`build`/`lint`/`test`/`audit`) does not run it, so the fixture is green
-on every task. It is caught only in the final docs task, or at release.
-
-**Verify:** add a frame `at /home/<name>/x.js:1:1` (any real-looking name) to a file under `tests/` and run
-`env -u FORCE_COLOR ./scripts/check-doc-versions.sh`. It prints `Home path in a committed file`.
-
-**Evidence:** 2026-10-21, error-object-log-channel. The impl plan's T1 step 4 prescribed
-a synthetic frame under `/home/<name>/`. It was written as told and caught by T4's doc check, then fixed in `bc0c53b`.
-
-**Status:** active. Lint candidate: a `no-restricted-syntax` literal pattern over `tests/` would catch
-it at the gate. Related: [G41].
-
----
-
-## Graveyard
-
-*(When an entry's trap is refactored away, move it here with the reason and the
-commit that removed it — never delete, never renumber.)*
 
 ## G129 — An Open-Meteo retry predicate that string-matches error messages never matches the errors the interceptor throws
 

@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.3 (Production Ready)
+- **Version:** 1.35.4 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -81,7 +81,8 @@ src/
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
 │   ├── connectionFailure.ts # Transport codes meaning "connection failed before any answer"; shared by the alert-feed services, NOAA and Open-Meteo (pure)
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
-│   ├── httpDeadline.ts      # withRequestDeadline — one wall-clock deadline per axios request (proxy included), emitted as axios's own ECONNABORTED; every axios.create passes it
+│   ├── httpDeadline.ts      # withRequestDeadline — one wall-clock deadline per axios request (proxy included), emitted as axios's own ECONNABORTED; every axios.create passes it; hands a tunnelled https request proxy: false and a per-request TunnelAgent on its own signal
+│   ├── proxyTunnel.ts       # Per-request CONNECT tunnel agent hooked on the deadline's signal; tunnelProxyFor mirrors axios's proxy-from-env selection (no logging)
 │   ├── savedLocationShape.ts  # Saved-location record-shape contract — write-side validator and read-side describer (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
 │   ├── serviceStatusProbe.ts     # check_service_status probe outcome type + 200/429/other classification; both probes import it (pure)
@@ -274,7 +275,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 - Cache the *table*, not the per-date slice, for anything derived from a bulk pull (normals).
 - Dedupe concurrent same-key pulls with a `Map<string, Promise<T>>` deleted in `finally`, so a rejected pull is never cached nor left behind.
 - A per-upstream rate budget is one `RequestSpacer` (`src/utils/requestSpacer.ts`) per upstream, built in the composition root and passed to every client of that upstream. It reserves each start slot synchronously before any `await` (G20) and spaces **starts**, not completions, so a slow or failed request never stalls the next. On every wake it re-checks the last *actual* start against a monotonic clock (`performance.now`) and sleeps the remainder, so overdue timers delivered together after an event-loop stall still dispatch one interval apart; the read, compare and record after each wake are one synchronous run (G20). Nominatim's is shared by `NominatimService` and `GeocodingService`'s provider, and it is per process.
-- Every `axios.create` passes `adapter: withRequestDeadline()` (`src/utils/httpDeadline.ts`), and so does the config constant of every direct `axios.get`-style call (the radar tile fetch, `RADAR_TILE_REQUEST_CONFIG`); `tests/unit/http-deadline-wiring.test.ts` fails on either without it. axios's own `timeout` is an inactivity timer, and on the follow-redirects transport it never starts behind a proxy that does not answer the `CONNECT`. The wrapper races one wall-clock deadline at the merged config's `timeout` and rejects with axios's own `ECONNABORTED` / `timeout of <N>ms exceeded`, so no error mapper changes. Its timer is ref'd (G114). It cannot release a CONNECT socket that axios's bundled `https-proxy-agent` is still waiting on; `tests/integration/http-deadline-proxy.test.ts` pins that limitation.
+- Every `axios.create` passes `adapter: withRequestDeadline()` (`src/utils/httpDeadline.ts`), and so does the config constant of every direct `axios.get`-style call (the radar tile fetch, `RADAR_TILE_REQUEST_CONFIG`); `tests/unit/http-deadline-wiring.test.ts` fails on either without it. axios's own `timeout` is an inactivity timer, and on the follow-redirects transport it never starts behind a proxy that does not answer the `CONNECT`. The wrapper races one wall-clock deadline at the merged config's `timeout` and rejects with axios's own `ECONNABORTED` / `timeout of <N>ms exceeded`, so no error mapper changes. Its timer is ref'd (G114). The deadline also releases the proxy socket: on an `https:` request that `proxy-from-env` routes through a proxy, the wrapper passes `proxy: false` and a per-request tunnel agent (`src/utils/proxyTunnel.ts`) hooked on **its own** signal, because Node emits nothing on a request destroyed before it has a socket. `tests/integration/http-deadline-proxy.test.ts` asserts the child exits and the proxy sees the socket close.
 - Bound every upstream array (`securityEvent` warn + caveat when the cap trims): 5,000 FIRMS rows, 64 ensemble members, gridpoint series lengths.
 
 ### Process
@@ -724,15 +725,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.3 — Production Ready ✅
-- **Test Coverage:** 4,752 tests, 100% pass rate
+- **Version:** 1.35.4 — Production Ready ✅
+- **Test Coverage:** 4,800 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.4:** A request that times out behind a silent proxy now closes its proxy connection, and proxy credentials are percent-decoded
 - **New in v1.35.3:** Wildfire and radar failures show a fixed message, and a damaged saved-locations file no longer logs place text
 - **New in v1.35.2:** An error's help link now names the service that failed
-- **New in v1.35.1:** A request through a dead proxy now fails at its timeout instead of hanging
 
 ## Useful References
 
@@ -755,7 +756,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-10-21 (v1.35.3)
+**Last Updated:** 2026-10-21 (v1.35.4)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
