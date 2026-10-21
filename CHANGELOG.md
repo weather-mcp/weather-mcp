@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **A damaged saved-locations file no longer writes your saved places to the log.** When `~/.weather-mcp/locations.json` was not valid JSON, the log line quoted the part of the file where the parser stopped, which could include a saved location's address. That happened at the default log level. The line now names only the error type and the file path, at every log level. (`src/services/locationStore.ts`)
+
+### Fixed
+- **Wildfire and radar failures now show a fixed message instead of raw network text.** A NIFC failure outside its three known cases showed text such as `getaddrinfo ENOTFOUND …`. A RainViewer failure showed the network library's own wording or text from RainViewer's response. Each now says whether the request timed out, could not connect, or got an HTTP error status. Their log lines no longer carry the error's stack. (`src/services/nifc.ts`, `src/services/rainviewer.ts`)
+
 ## [1.35.2] - 2026-10-20
 
 When a service failed, the error's "For more information" link could point at a different service. A METAR or geocoding outage sent you to open-meteo.com, and a rate limit always listed the same three NOAA, Open-Meteo and NCEI pages, whichever service had limited you. The link now names the service that failed. The error text and every normal answer are unchanged.

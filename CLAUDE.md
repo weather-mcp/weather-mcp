@@ -222,7 +222,11 @@ message and stack only under `LOG_PII`), never by passing the `Error` to `logger
 message is the user-facing text and embeds what they typed. The dispatch catch in
 `src/server/weatherServer.ts` logs `argKeys`, never `args`. The saved `name` is the geocoder's full
 address and is not logged even under `LOG_PII`. `tests/unit/log-privacy.test.ts` holds the sentinel
-contract.
+contract. The `Error` argument of `logger.error` is an allowlisted channel, locked by
+`tests/unit/logger-error-channel.test.ts`: a new `logger.error(…, error)` site needs an allowlist entry
+with its reason there, and an entry that matches no call fails the test. `Failed to parse saved
+locations` logs the error class and path only, even under `LOG_PII`, because a `JSON.parse` message
+quotes the file.
 
 ## Project Conventions (hard-won rules)
 
