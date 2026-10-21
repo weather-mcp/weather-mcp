@@ -11,10 +11,10 @@ import { join } from 'node:path';
  * accepts the TCP connection and then never answers the CONNECT ("silent") or resets it
  * ("reset"). Every row runs in a child process so that exit behaviour is observable.
  *
- * Behind the silent proxy the wrapper rejects on time, but the child does not exit: axios tunnels
- * through its bundled https-proxy-agent, whose pending CONNECT socket has no cancel hook (see the
- * limitation row). G114 is not reproducible on these paths, because the leaked socket holds the
- * loop on the silent path and the request settles itself on the reset path.
+ * Behind the silent proxy the wrapper rejects on time and the child exits: the wrapped client
+ * tunnels through a per-request agent (src/utils/proxyTunnel.ts) hooked on the deadline's signal,
+ * which destroys the pending CONNECT socket. The unwrapped client still tunnels through axios's
+ * bundled https-proxy-agent, which has no cancel hook (the positive control).
  *
  * Makes no external call: the target host is `.invalid` and neither proxy ever tunnels. The
  * proxy variables are set only in each child's environment (G119); the cwd is a fresh temp
@@ -195,19 +195,18 @@ describe('silent proxy', () => {
   );
 
   it(
-    'KNOWN LIMITATION: the child outlives the settled request',
+    'the child exits 0 after the deadline, and the proxy sees its socket close',
     async () => {
-      // Pins the leaked CONNECT socket: axios's bundled https-proxy-agent (v5) awaits the proxy's
-      // CONNECT reply with no cancel hook, so aborting the request cannot release it and the
-      // socket keeps the process alive until the proxy closes it. A RED row means upstream now
-      // releases the socket. That is the revisit trigger: flip this row to assert exit code 0.
+      // G150's successor Verify: the deadline's signal reaches a per-request tunnel agent
+      // (src/utils/proxyTunnel.ts) that destroys the pending CONNECT socket, so nothing holds the
+      // process once the request has settled. A RED row means the deadline no longer reaches the
+      // agent — the socket leaks again, one per timed-out request in a long-lived server.
       const running = await run(silent, buildScript(true, ''));
       await waitForLine(running, 5_000);
       expect(running.stdout()).toContain('ECONNABORTED');
-      await sleep(1_000);
-      expect(running.child.exitCode).toBeNull();
-      running.child.kill('SIGKILL');
-      await running.exited;
+      const code = await running.exited;
+      expect(code).toBe(0);
+      expect(silent.sockets.size).toBe(0);
     },
     CASE_TIMEOUT_MS
   );

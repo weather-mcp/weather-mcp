@@ -14,14 +14,21 @@
  *   `transitional.clarifyTimeoutError`, so neither is honoured.
  * - It races the inner adapter rather than only signalling it (G148): the promise settles at the
  *   deadline whether or not the inner adapter honours the abort, and the abort then releases the
- *   inner request. A tunnelling agent's pending CONNECT socket (axios's bundled https-proxy-agent)
- *   has no cancel hook and stays open until the proxy closes it. Whatever the inner adapter
- *   does afterwards is ignored (settle-once).
+ *   inner request. Whatever the inner adapter does afterwards is ignored (settle-once).
+ * - The abort also releases a pending proxy socket. On an `https:` request that `proxy-from-env`
+ *   routes through a proxy, the inner adapter receives `proxy: false` and a per-request tunnel
+ *   agent (`proxyTunnel.ts`) hooked on **this** signal, so the deadline destroys the CONNECT socket
+ *   that axios's bundled https-proxy-agent would hold until the proxy closed it. The hook is the
+ *   signal, not the request: Node emits no event on a request destroyed before it has a socket.
+ *   `proxy: false` is load-bearing: without it axios's `setProxy` (`lib/adapters/http.js`) swaps
+ *   any non-https-proxy-agent `httpsAgent` for its own tunnel. A request with no timeout has no
+ *   signal and keeps axios's own tunnel; every client in `src/` sets a timeout.
  * - A caller's own `signal` is chained in, and a caller's cancel stays axios's `ERR_CANCELED`.
  * - The deadline timer is ref'd (G114) and cleared on every settle path, with the caller-signal
  *   listener, so the timer itself holds a process for at most `timeout`.
  *
- * This module reads no runtime axios export at module scope or in `withRequestDeadline()` itself:
+ * This module reads no runtime axios export at module scope or in `withRequestDeadline()` itself
+ * (the `proxyTunnel.js` import is ours, not axios's):
  * thirteen unit-test mocks of `axios` expose only `create`, and they construct services that call
  * this at construction. Only the returned adapter, when a request runs, reads `axios.*`.
  *
@@ -30,6 +37,7 @@
 
 import axios from 'axios';
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { createTunnelAgent, tunnelProxyFor } from './proxyTunnel.js';
 
 /** axios's `GenericAbortSignal` declares no `reason` and makes the listener methods optional. */
 type ReasonedSignal = NonNullable<InternalAxiosRequestConfig['signal']> & {
@@ -38,6 +46,23 @@ type ReasonedSignal = NonNullable<InternalAxiosRequestConfig['signal']> & {
 
 /** The abort reason that marks our own deadline, as distinct from a caller's cancel. */
 const DEADLINE = Symbol('httpDeadline.deadline');
+
+/**
+ * The proxy to tunnel `config` through: an `https:` target, no caller `proxy`, and a proxy that
+ * `proxy-from-env` selects. Anything else, including a URL that does not parse, is no tunnel.
+ */
+function tunnelProxy(config: InternalAxiosRequestConfig): URL | undefined {
+  if (config.proxy !== undefined) {
+    return undefined;
+  }
+  let href: string;
+  try {
+    href = new URL(config.url ?? '', config.baseURL).href;
+  } catch {
+    return undefined;
+  }
+  return href.startsWith('https:') ? tunnelProxyFor(href) : undefined;
+}
 
 function deadlineError(timeout: number, config: InternalAxiosRequestConfig, request?: unknown) {
   return new axios.AxiosError(
@@ -97,7 +122,16 @@ export function withRequestDeadline(inner?: AxiosAdapter): AxiosAdapter {
 
       let pending: Promise<AxiosResponse>;
       try {
-        pending = adapter({ ...config, signal: controller.signal });
+        const proxy = tunnelProxy(config);
+        pending =
+          proxy === undefined
+            ? adapter({ ...config, signal: controller.signal })
+            : adapter({
+                ...config,
+                signal: controller.signal,
+                proxy: false,
+                httpsAgent: createTunnelAgent(proxy, controller.signal)
+              });
       } catch (err) {
         pending = Promise.reject(err);
       }
