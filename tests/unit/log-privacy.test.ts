@@ -1000,7 +1000,7 @@ describe('Error-argument channel — upstream sites', () => {
         ? undefined
         : ({ status, statusText: '', headers: {}, config, data: { message: BODY_SENTINEL } } as AxiosResponse);
     const err = new AxiosError(`read ${MSG_SENTINEL}`, 'ECONNRESET', config, {}, response);
-    err.stack = 'AxiosError: ' + STACK_SENTINEL + '\n    at /home/someone/x.js:1:1';
+    err.stack = 'AxiosError: ' + STACK_SENTINEL + '\n    at /opt/app/x.js:1:1';
     return err;
   };
 
@@ -1107,7 +1107,7 @@ describe('Error-argument channel — normals and the saved-locations parse', () 
     const service = new OpenMeteoServiceImpl();
     service.clearCache();
     const err = Object.assign(new Error(`archive failed ${MSG_SENTINEL}`), { code: 'ECONNRESET' });
-    err.stack = 'Error: ' + STACK_SENTINEL + '\n    at /home/someone/x.js:1:1';
+    err.stack = 'Error: ' + STACK_SENTINEL + '\n    at /opt/app/x.js:1:1';
     vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest').mockRejectedValue(err);
     await expect(service.getClimateNormals(42.96, -85.67, 1, 15)).rejects.toThrow();
   };
