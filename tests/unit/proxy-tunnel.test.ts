@@ -209,8 +209,35 @@ describe('(e) a connect failure passes through', () => {
     agent.createConnection({ host: 'origin.invalid', port: 443, servername: 'origin.invalid' }, cb);
     const { err } = await settled;
     expect(err?.code).toBe('EUNITNET');
-    expect(err?.message).not.toContain('s3kr1t');
+    expect(err?.message).not.toMatch(/s3kr1t|127\.0\.0\.1/);
   });
+
+  // Node's dial error names the endpoint (`connect EACCES proxy.private:3128`); only its code may cross.
+  for (const scheme of ['http', 'https'] as const) {
+    it(`${scheme}: proxy → the code survives, the host, port and userinfo do not`, async () => {
+      const proxySocket = new StubSocket();
+      if (scheme === 'https') {
+        vi.spyOn(tls, 'connect').mockImplementation(() => proxySocket as unknown as tls.TLSSocket);
+      } else {
+        vi.spyOn(net, 'connect').mockImplementation(() => proxySocket as unknown as net.Socket);
+      }
+      const agent = createTunnelAgent(
+        new URL(`${scheme}://pxuser:s3kr1t@proxy.private:3128`),
+        new AbortController().signal
+      );
+      const { cb, settled } = capture();
+      agent.createConnection({ host: 'origin.invalid', port: 443, servername: 'origin.invalid' }, cb);
+      proxySocket.emit(
+        'error',
+        Object.assign(new Error('connect EACCES proxy.private:3128 pxuser:s3kr1t'), { code: 'EACCES' })
+      );
+      const { err } = await settled;
+      expect(err?.code).toBe('EACCES');
+      expect(err?.message).toBe('proxy connection failed');
+      expect(err).not.toHaveProperty('cause');
+      expect(proxySocket.destroyed).toBe(true);
+    });
+  }
 });
 
 describe('(f) the module logs nothing', () => {

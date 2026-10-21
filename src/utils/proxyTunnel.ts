@@ -16,7 +16,7 @@
  *   on a fake socket, after the proxy socket is destroyed — hpa 5's replay (`agent.js:130-152`),
  *   so a 407 reaches every service's error mapper as `response.status` 407, and no origin request
  *   byte reaches the proxy. A proxy that closes before answering is `ECONNRESET`; a socket error
- *   keeps its own code (G138).
+ *   keeps its own code (G138) under a fixed message, because Node's names the proxy endpoint.
  * - No pooling: `keepAlive: false`. The tunnel it replaces sent `Connection: close` too.
  * - It logs nothing and never stringifies the proxy URL, which can carry credentials. No error it
  *   produces names the proxy host, port or userinfo.
@@ -181,8 +181,9 @@ class TunnelAgent extends https.Agent {
       fail(abortError());
     }
 
+    // Node's dial error names the proxy host and port: keep its code (G138), never its message.
     function onError(err: Error): void {
-      fail(err);
+      fail(Object.assign(new Error('proxy connection failed'), { code: (err as NodeJS.ErrnoException).code }));
     }
 
     function onClose(): void {
