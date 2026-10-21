@@ -68,7 +68,7 @@ function decodeUserinfo(value: string): string {
 export function buildConnectRequest(host: string, port: number, proxy: URL): string {
   const authority = `${net.isIPv6(host) ? `[${host}]` : host}:${port}`;
   let request = `CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\nConnection: close\r\n`;
-  if (proxy.username !== '' || proxy.password !== '') {
+  if (proxy.username || proxy.password) {
     const credentials = `${decodeUserinfo(proxy.username)}:${decodeUserinfo(proxy.password)}`;
     request += `Proxy-Authorization: Basic ${Buffer.from(credentials).toString('base64')}\r\n`;
   }
