@@ -32,6 +32,30 @@ export function serviceDisplayName(service: ApiServiceName): string {
 }
 
 /**
+ * The runtime list of the closed `ApiServiceName` union.
+ */
+export const API_SERVICE_NAMES: readonly ApiServiceName[] = Object.freeze(
+  Object.keys(SERVICE_DISPLAY_NAMES) as ApiServiceName[]
+);
+
+/**
+ * Each service's own home page, linked under "For more information:" when it
+ * fails. A `Record` so a new service cannot be added without choosing its link.
+ */
+const SERVICE_HELP_LINKS: Record<ApiServiceName, string> = {
+  NOAA: 'https://www.weather.gov/',
+  OpenMeteo: 'https://open-meteo.com/',
+  NCEI: 'https://www.ncei.noaa.gov/',
+  RainViewer: 'https://www.rainviewer.com/',
+  Nominatim: 'https://nominatim.org/',
+  AviationWeather: 'https://aviationweather.gov/',
+};
+
+export function serviceHelpLink(service: ApiServiceName): string {
+  return SERVICE_HELP_LINKS[service];
+}
+
+/**
  * Base error class for API-related errors
  */
 export class ApiError extends Error {
@@ -108,11 +132,7 @@ export class RateLimitError extends ApiError {
       429,
       service,
       userMessage,
-      [
-        'https://weather.gov/documentation/services-web-api',
-        'https://open-meteo.com/en/features#api-documentation',
-        'https://www.ncdc.noaa.gov/cdo-web/webservices'
-      ],
+      [serviceHelpLink(service)],
       true // Retryable after waiting
     );
 
@@ -146,17 +166,13 @@ export class ServiceUnavailableError extends ApiError {
     }
 
     const userMessage = message || `The ${serviceDisplayName(service)} weather service is temporarily unavailable. Please try again in a few minutes.`;
-    const helpLink = service === 'NOAA' ? 'https://www.weather.gov/'
-      : service === 'NCEI' ? 'https://www.ncei.noaa.gov/'
-      : service === 'RainViewer' ? 'https://www.rainviewer.com/'
-      : 'https://open-meteo.com/';
 
     super(
       `${serviceDisplayName(service)} API is currently unavailable`,
       503,
       service,
       userMessage,
-      [helpLink],
+      [serviceHelpLink(service)],
       true // Retryable
     );
 
