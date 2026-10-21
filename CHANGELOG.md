@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.3] - 2026-10-21
+
+Two failure paths said more than they should. A saved-locations file that could not be parsed wrote a fragment of its contents, possibly a saved address, to the log at the default level. A wildfire (NIFC) or radar (RainViewer) failure showed raw network-library text to the user. Both now say only what went wrong, in fixed words. Normal answers are unchanged.
+
 ### Security
 - **A damaged saved-locations file no longer writes your saved places to the log.** When `~/.weather-mcp/locations.json` was not valid JSON, the log line quoted the part of the file where the parser stopped, which could include a saved location's address. That happened at the default log level. The line now names only the error type and the file path, at every log level. (`src/services/locationStore.ts`)
 
@@ -2210,7 +2214,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.2...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.3...HEAD
+[1.35.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.2...v1.35.3
 [1.35.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.1...v1.35.2
 [1.35.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.0...v1.35.1
 [1.35.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.34.9...v1.35.0
