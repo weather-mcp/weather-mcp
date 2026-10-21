@@ -19,6 +19,8 @@ import { handleGetForecast } from '../../src/handlers/forecastHandler.js';
 import { handleGetCurrentConditions } from '../../src/handlers/currentConditionsHandler.js';
 import { handleGetHistoricalWeather } from '../../src/handlers/historicalWeatherHandler.js';
 import { RainViewerService } from '../../src/services/rainviewer.js';
+import { NIFCService } from '../../src/services/nifc.js';
+import { AxiosError, AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { clampBoundingBox } from '../../src/services/aviationWeather.js';
 import { getClimateNormals } from '../../src/utils/normals.js';
 import type { NOAAService } from '../../src/services/noaa.js';
@@ -955,6 +957,113 @@ describe('failure-path log privacy', () => {
       } as unknown as NominatimService);
       const rec = find('Reverse country lookup failed; falling back to coordinate routing')[0];
       expect(rec.metadata?.message).toBe(`reverse failed near ${QUERY}`);
+    });
+  });
+});
+
+describe('Error-argument channel — upstream sites', () => {
+  // Distinct sentinels for the axios message, the stack and the response body, so a
+  // hit names its channel (G62).
+  const MSG_SENTINEL = 'zqerrmsg5527';
+  const STACK_SENTINEL = 'zqerrstack5527';
+  const BODY_SENTINEL = 'zqerrbody5527';
+
+  let savedLevel: LogLevel;
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    savedLevel = logger.getLevel();
+    logger.setLevel(LogLevel.DEBUG);
+    vi.stubEnv('LOG_PII', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    logger.setLevel(savedLevel);
+    vi.restoreAllMocks();
+  });
+
+  const records = (): (LogRecord & Record<string, unknown>)[] =>
+    errorSpy.mock.calls.map(
+      (call: unknown[]) => JSON.parse(String(call[0])) as LogRecord & Record<string, unknown>
+    );
+  const find = (message: string) => records().filter((r) => r.message === message);
+
+  const sentinelError = (status?: number): AxiosError => {
+    const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
+    const response =
+      status === undefined
+        ? undefined
+        : ({ status, statusText: '', headers: {}, config, data: { message: BODY_SENTINEL } } as AxiosResponse);
+    const err = new AxiosError(`read ${MSG_SENTINEL}`, 'ECONNRESET', config, {}, response);
+    err.stack = 'AxiosError: ' + STACK_SENTINEL + '\n    at /home/someone/x.js:1:1';
+    return err;
+  };
+
+  const stubGet = (target: object, rejection: unknown) =>
+    vi
+      .spyOn((target as { client: { get: (...a: unknown[]) => unknown } }).client, 'get')
+      .mockRejectedValue(rejection);
+
+  const driveNifc = async (): Promise<void> => {
+    const service = new NIFCService();
+    stubGet(service, sentinelError());
+    await expect(service.queryFirePerimeters(-86, 42, -85, 43)).rejects.toThrow();
+  };
+
+  const driveRainViewer = async (): Promise<void> => {
+    const service = new RainViewerService();
+    stubGet(service, sentinelError(502));
+    await expect(service.getRadarData()).rejects.toThrow();
+  };
+
+  describe('default logs', () => {
+    it('NIFC logs class and code, no message, stack or error key', async () => {
+      await driveNifc();
+      const whole = JSON.stringify(errorSpy.mock.calls);
+      expect(whole).not.toContain(MSG_SENTINEL);
+      expect(whole).not.toContain(STACK_SENTINEL);
+      const lines = find('NIFC query failed');
+      expect(lines).toHaveLength(1);
+      expect(lines[0].metadata?.name).toBe('AxiosError');
+      expect(lines[0].metadata?.code).toBe('ECONNRESET');
+      expect(lines[0]).not.toHaveProperty('error');
+    });
+
+    it('RainViewer logs class, code and status, no message, stack, body or error key', async () => {
+      await driveRainViewer();
+      const whole = JSON.stringify(errorSpy.mock.calls);
+      expect(whole).not.toContain(MSG_SENTINEL);
+      expect(whole).not.toContain(STACK_SENTINEL);
+      expect(whole).not.toContain(BODY_SENTINEL);
+      const lines = find('RainViewer API request failed');
+      expect(lines).toHaveLength(1);
+      expect(lines[0].metadata?.name).toBe('AxiosError');
+      expect(lines[0].metadata?.code).toBe('ECONNRESET');
+      expect(lines[0].metadata?.status).toBe(502);
+      expect(lines[0].metadata).not.toHaveProperty('message');
+      expect(lines[0]).not.toHaveProperty('error');
+    });
+  });
+
+  describe('LOG_PII opt-in', () => {
+    beforeEach(() => {
+      vi.stubEnv('LOG_PII', 'true');
+    });
+
+    it('NIFC carries the message, never the body', async () => {
+      await driveNifc();
+      const lines = find('NIFC query failed');
+      expect(String(lines[0].metadata?.message)).toContain(MSG_SENTINEL);
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(BODY_SENTINEL);
+    });
+
+    it('RainViewer carries the message, never the body', async () => {
+      await driveRainViewer();
+      const lines = find('RainViewer API request failed');
+      expect(String(lines[0].metadata?.message)).toContain(MSG_SENTINEL);
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(BODY_SENTINEL);
     });
   });
 });

@@ -5,8 +5,9 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
-import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging, describeErrorForLogging } from '../utils/logger.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
+import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import { RainViewerResponse, RainViewerFrame, ImageryFrame } from '../types/imagery.js';
 import { ServiceUnavailableError } from '../errors/ApiError.js';
 
@@ -142,17 +143,26 @@ export class RainViewerService {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
-        const message = error.response?.data?.message || error.message;
 
-        logger.error('RainViewer API request failed', error, {
-          status,
-          message
+        logger.error('RainViewer API request failed', undefined, {
+          ...describeErrorForLogging(error),
+          status
         });
 
-        throw new ServiceUnavailableError(
-          'RainViewer',
-          `Failed to fetch radar data: ${message}`
-        );
+        // Fixed text per class: neither the response body nor axios's own
+        // wording reaches the user. Timeouts first, then the shared set (G138).
+        // A 3xx lands in the status class (`maxRedirects: 0`); an oversized
+        // body has no response and takes the bare message.
+        if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+          throw new ServiceUnavailableError('RainViewer', 'Failed to fetch radar data: the request timed out');
+        }
+        if (isConnectionFailureCode(error.code)) {
+          throw new ServiceUnavailableError('RainViewer', 'Failed to fetch radar data: unable to connect to RainViewer');
+        }
+        if (typeof status === 'number') {
+          throw new ServiceUnavailableError('RainViewer', `Failed to fetch radar data: RainViewer returned HTTP ${status}`);
+        }
+        throw new ServiceUnavailableError('RainViewer', 'Failed to fetch radar data');
       }
 
       throw error;
