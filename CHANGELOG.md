@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.4] - 2026-10-21
+
 Behind an HTTPS proxy, two things went wrong. A request that timed out because the proxy never answered left its connection to the proxy open, so a long-running server collected one open connection per hung request. And proxy credentials written percent-encoded in `HTTPS_PROXY` were sent still encoded, so the proxy rejected them. Both are fixed. Without a proxy, nothing changes.
 
 ### Changed
@@ -2223,7 +2225,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.3...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.4...HEAD
+[1.35.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.3...v1.35.4
 [1.35.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.2...v1.35.3
 [1.35.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.1...v1.35.2
 [1.35.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.0...v1.35.1
