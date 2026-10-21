@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A request that times out behind a proxy that never answers the `CONNECT` now closes its connection to the proxy. Before, each such request left that connection open until the proxy dropped it, so a long-running server (`weather-mcp-http`, or a stdio session behind a corporate proxy) gained one open connection per hung request: five timed-out forecasts held ten. The timeout and its message are unchanged. Proven by `tests/integration/http-deadline-proxy.test.ts` (the child exits and the proxy sees its socket close) and by a live stdio session whose descriptor count stayed flat across five timed-out calls.
+- Proxy credentials written percent-encoded in `HTTPS_PROXY` (for example `p%40ss` for a password containing `@`) are now decoded before they are sent, as curl and Node's own proxy support do. Before, they were sent still encoded, so the proxy rejected them. A literal `%` in a proxy password must now be written `%25`. Proven by the credentials row in `tests/integration/http-deadline-proxy.test.ts`.
+
 ## [1.35.3] - 2026-10-21
 
 Two failure paths said more than they should. A saved-locations file that could not be parsed wrote a fragment of its contents, possibly a saved address, to the log at the default level. A wildfire (NIFC) or radar (RainViewer) failure showed raw network-library text to the user. Both now say only what went wrong, in fixed words. Normal answers are unchanged.
