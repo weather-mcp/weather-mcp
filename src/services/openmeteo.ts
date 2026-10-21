@@ -26,7 +26,7 @@ import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { isConnectionFailureCode } from '../utils/connectionFailure.js';
-import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging, describeErrorForLogging } from '../utils/logger.js';
 import { computeNormalsTable, getNormalsTableCacheKey, type NormalsTable } from '../utils/normals.js';
 import { getUserAgent } from '../utils/version.js';
 import { classifyProbeAnswer, type ServiceProbeResult } from '../utils/serviceStatusProbe.js';
@@ -2039,7 +2039,7 @@ export class OpenMeteoService {
 
       return table;
     } catch (error) {
-      logger.error('Failed to compute climate normals table', error as Error);
+      logger.error('Failed to compute climate normals table', undefined, { ...describeErrorForLogging(error) });
       throw error;
     }
   }
