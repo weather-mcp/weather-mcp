@@ -7,8 +7,9 @@ import type { NIFCQueryResponse } from '../types/wildfire.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
-import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging, describeErrorForLogging } from '../utils/logger.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
+import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 
 export interface NIFCServiceConfig {
   baseURL?: string;
@@ -147,22 +148,30 @@ export class NIFCService {
 
       return response.data;
     } catch (error) {
-      logger.error('NIFC query failed', error as Error);
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      logger.error('NIFC query failed', undefined, { ...describeErrorForLogging(error), status });
 
-      // Check for specific error types
+      // Every message is fixed text: transport and upstream wording never reach
+      // the user. Timeouts first, then the shared connection-failure set (G138).
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ECONNABORTED') {
+        if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
           throw new Error('NIFC service request timed out. The service may be temporarily unavailable.');
         }
-        if (error.response?.status === 400) {
+        if (isConnectionFailureCode(error.code)) {
+          throw new Error('Unable to connect to the NIFC service. The service may be unreachable from this network.');
+        }
+        if (status === 400) {
           throw new Error('Invalid query parameters for NIFC service.');
         }
-        if (error.response?.status === 503) {
+        if (status === 503) {
           throw new Error('NIFC service is temporarily unavailable. Please try again later.');
+        }
+        if (typeof status === 'number') {
+          throw new Error(`NIFC service returned HTTP ${status}.`);
         }
       }
 
-      throw new Error(`Failed to query NIFC fire perimeters: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error('Failed to query NIFC fire perimeters.');
     }
   }
 

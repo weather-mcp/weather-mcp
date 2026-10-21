@@ -364,6 +364,11 @@ the hash only to summarise it** — a hash tells you two things differ, never wh
 line-oriented normalisation has to account for a rendered line's surrounding whitespace as well
 as its text.
 
+
+2026-10-21 (`5620fd8`, error-object-log-channel T1) added a masking case that is **not** drift:
+`get_weather_imagery` prints `*Generated: <ISO ms>*`, the render-time wall clock, so base and branch
+**never** match raw, even back to back (equal length 807, one-line diff). Mask that one line
+(`\*Generated: [^*]+\*`) and the pair is md5-identical. Re-running does not help; masking does.
 **Status:** active, **extended 2026-08-27, 2026-09-02, 2026-09-03 and 2026-09-29**, **re-run 2026-09-01**
 (openmeteo-nullable-scalar-types T1–T3: the plan told the sweep in advance that
 a probe landing on a wire null would differ from base by exactly the omitted
@@ -6542,6 +6547,13 @@ the field regex to sweep for another field.
 `forecastHandler.ts:528`. The orchestrator's parse-by-call sweep then found `:1781`. Both were
 folded into T3 with drives and per-site mutants.
 
+
+**A string-aware text scanner has its own blind spot: regex literals.** The
+`tests/unit/logger-error-channel.test.ts` tokenizer skips strings, templates and comments, but a regex
+such as `/'/` opens a "string" that swallows every later call in the file. The allowlist rule then
+passes **green** over a restored `error as Error`. The proven guard is an independent witness: a
+per-file parity row (scanner count = a line match outside comments). That row went red, 3 failures,
+on the same mutation (2026-10-21, `2b7024b`). Any whole-call scanner added later needs the same row.
 **Status:** active. Related: [G40] (an absence claim is a grep: re-derive it per symbol), [G29]
 (the doc-side version: grep the whole set, classify every hit).
 
@@ -6890,6 +6902,12 @@ carries the sentinel when the parser's message does.
 **Evidence:** 2026-10-18, remote-http-transport review `C-R5` (the `NODE_ENV` half) and T8
 mutation (d) (the body half), `83a37ac`.
 
+
+**V8 quotes only about the first 20 characters of the input** (Node 22.23.2):
+`{"home": Zqsavedname6613 WA}` gives `Unexpected token 'Z', "{"home": Zqsavednam"... is not valid
+JSON`. A long sentinel is cut off, the premise "the message quotes the sentinel" fails, and an
+absence assertion without that premise passes vacuously. Keep the sentinel short and near the start
+(`Zqnm6613`), and assert the premise first (2026-10-21, `3b9a5ea`, error-object-log-channel T2).
 **Status:** active. Related: [G13] (the fixture must carry the secret), [G123].
 
 ---
@@ -7146,6 +7164,29 @@ corrected in the same commit.
 
 **Status:** active. Related: [G148] (race, not only signal), [G114] (why the ref'd timer cannot be
 proven on this path), [G108]. Roadmap row filed for a cancellable tunnelling agent.
+
+---
+
+## G151 — A synthetic stack frame under `/home/<name>/` in a test fails `check-doc-versions.sh`
+
+**Trigger:** a test fixture that fakes an `Error.stack`, a file path or a log line with an absolute
+path, typically to prove the stack is kept out of a log.
+
+**Rule:** use a non-home path (`/opt/app/x.js`). The script allows only the placeholders `/home/you/`
+and `/home/user/`. Any other `/home/<name>/`, `/Users/<name>/` or `C:\Users\` path fails it.
+
+**Why:** `./scripts/check-doc-versions.sh` fails on any committed home path, test files included, and
+`/release` runs it. The gate (`build`/`lint`/`test`/`audit`) does not run it, so the fixture is green
+on every task. It is caught only in the final docs task, or at release.
+
+**Verify:** add a frame `at /home/<name>/x.js:1:1` (any real-looking name) to a file under `tests/` and run
+`env -u FORCE_COLOR ./scripts/check-doc-versions.sh`. It prints `Home path in a committed file`.
+
+**Evidence:** 2026-10-21, error-object-log-channel. The impl plan's T1 step 4 prescribed
+a synthetic frame under `/home/<name>/`. It was written as told and caught by T4's doc check, then fixed in `bc0c53b`.
+
+**Status:** active. Lint candidate: a `no-restricted-syntax` literal pattern over `tests/` would catch
+it at the gate. Related: [G41].
 
 ---
 

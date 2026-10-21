@@ -124,8 +124,11 @@ export class LocationStore {
     try {
       parsed = JSON.parse(data);
     } catch (error) {
-      logger.error('Failed to parse saved locations', error as Error, {
-        path: this.storePath
+      // JSON.parse messages quote the file's bytes, which include the saved `name`,
+      // so the message is never logged, not even under LOG_PII.
+      logger.error('Failed to parse saved locations', undefined, {
+        path: this.storePath,
+        name: error instanceof Error ? error.name : typeof error
       });
       throw new LocationStoreUnreadableError(this.storePath);
     }

@@ -365,14 +365,62 @@ For more information:
 the newest frame would show an older one labelled as the latest radar. A frame that fails the check is
 evidence that the feed changed or was tampered with, so it is not worked around. The refusal is
 recorded once to the **stderr log** as a `securityEvent` warning carrying a count and a reason code,
-never the path. A redirect or an oversized metadata response fails the same way through the existing
-`Failed to fetch radar data` message.
+never the path.
+
+**RainViewer unreachable or failing.** When the request for the radar frame list itself fails, the
+tool reports a fixed message for the kind of failure. For a timeout:
+
+```
+RainViewer API Error: Failed to fetch radar data: the request timed out
+
+For more information:
+- https://www.rainviewer.com/
+```
+
+The message ends in one of four ways: `the request timed out`, `unable to connect to RainViewer`
+(the connection was refused, reset, unreachable or never resolved), `RainViewer returned HTTP <status>`, or nothing
+after `Failed to fetch radar data` for any other failure. A redirect gets the HTTP-status ending, because
+redirects are not followed. An oversized metadata response gets the bare message. Neither RainViewer's
+response text nor the network library's own wording is shown. The stderr log line
+`RainViewer API request failed` carries the error type, its code and the HTTP status, and adds the
+error's message and stack only under `LOG_PII`.
 
 **A composite tile that fails a check is dropped quietly.** With `composite: true`, every radar and
 base-map tile must come from its expected host, follow no redirects, stay under its size cap, and carry
 a PNG header of the exact tile size with no interlacing. If any tile fails, the composite image is left
 out and the response is the normal URL-based text plus the one-line note *Composite map unavailable for
 this request*. The tool call itself succeeds. The reason is logged to stderr, without the tile URL.
+
+### Wildfire (NIFC) Errors
+
+In the US, `get_wildfire_info` reads fire perimeters from the National Interagency Fire Center. When
+that request fails, the report still renders, with this section in place of the fire list:
+
+```
+❌ **Error retrieving wildfire data**
+
+Unable to fetch fire information. This may be due to:
+- Temporary service unavailability
+- Network connectivity issues
+- Service maintenance
+
+Error details: NIFC service request timed out. The service may be temporarily unavailable.
+```
+
+**The report does not say "no fires" when this happens.** It says the data could not be retrieved.
+The `Error details:` line is one of six fixed messages:
+
+| Failure | Message |
+|---|---|
+| Timeout | `NIFC service request timed out. The service may be temporarily unavailable.` |
+| Connection refused, reset, unreachable or unresolved | `Unable to connect to the NIFC service. The service may be unreachable from this network.` |
+| HTTP 400 | `Invalid query parameters for NIFC service.` |
+| HTTP 503 | `NIFC service is temporarily unavailable. Please try again later.` |
+| Any other HTTP status | `NIFC service returned HTTP <status>.` |
+| Anything else | `Failed to query NIFC fire perimeters.` |
+
+No network-library text is shown. The stderr log line `NIFC query failed` carries the error type,
+its code and the HTTP status, and adds the error's message and stack only under `LOG_PII`.
 
 ### Wildfire Containment: `not reported`
 
@@ -429,8 +477,11 @@ otherwise read "empty", save, and replace the whole file with one entry.
 **What triggers it:** the file is not valid JSON (truncated, or edited by hand into a syntax
 error); the top level is not a JSON object (an array, `null`, a string, a number); or the path
 cannot be read at all (it is a directory, or permissions deny it). The underlying cause is written
-to the **stderr log** with the path — it is deliberately kept out of the message, which stays
-fixed apart from the path.
+to the **stderr log** with the path. It is deliberately kept out of the message, which stays
+fixed apart from the path. For a file that is not valid JSON, the log names only the error type
+(`SyntaxError`) and the path, never the parser's message, because that message can quote your saved
+locations. This holds even with `LOG_PII=true`. A read-permission or directory failure logs the
+system error, which names the path and never the file's contents.
 
 **Two remedies, both yours to choose:**
 
