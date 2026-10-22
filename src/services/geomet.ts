@@ -242,9 +242,10 @@ export class GeoMetService {
         throw new GeoMetRequestError(`GeoMet API returned status ${status}`, false);
       }
 
-      // Not retried: a timeout has already spent API_TIMEOUT_MS (30 s by
-      // default) and the MCP SDK's request budget is 60 s, so a retry would
-      // answer after the client has given up — the v1.34.2 rule for NOAA and
+      // Not retried: a timeout has exhausted either its own deadline
+      // (API_TIMEOUT_MS, 30 s by default) or the enclosing tool call's
+      // remaining budget (`toolBudget.ts`); either way a retry would answer
+      // after the client has given up — the v1.34.2 rule for NOAA and
       // Open-Meteo (`isTransientFailure`).
       if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
         throw new GeoMetRequestError('GeoMet request timed out', false);

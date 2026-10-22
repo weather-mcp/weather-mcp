@@ -12,6 +12,7 @@ import { logger, redactCoordinatesForLogging, redactUrlForLogging } from '../uti
 import { LightningStrike, LightningFeedFailure, LightningFeedFailureReason } from '../types/lightning.js';
 import { calculateGeohashSubscriptions } from '../utils/geohash.js';
 import { MqttLoadFailedError, MqttUnavailableError } from '../errors/ApiError.js';
+import { remainingToolBudgetMs } from '../utils/toolBudget.js';
 
 /**
  * The `mqtt` package is an **optional** dependency: it is the only dependency
@@ -739,6 +740,22 @@ export class BlitzortungService {
     // Local to this invocation - see subscribeToLocation's `phase` parameter.
     const phase: { current: 'connect' | 'subscribe' } = { current: 'connect' };
 
+    // The tool call's remaining budget (toolBudget.ts), read once, synchronously, here: MQTT
+    // never passes the axios seam, so this query bounds its own waits. Only the caller's wait is
+    // bounded. The shared connection keeps its own 30 s timer, because pre-warm and later queries
+    // share it and one call's short budget must not abort it. `undefined` outside a tool call
+    // (pre-warm, direct service use) leaves every wait exactly as it was.
+    const budget = remainingToolBudgetMs();
+    const startedAt = performance.now();
+    if (budget === 0) {
+      // Spent before this query started: start no broker work, and report the buffer as degraded,
+      // the same shape as a connect that timed out.
+      logger.warn('Lightning query skipped: tool budget spent', { reason: 'connect_timeout' });
+      const degraded = this.filterStrikes(latitude, longitude, radiusKm, timeWindowMinutes);
+      this.feedFailures.set(degraded, { at: new Date(), reason: 'connect_timeout' });
+      return degraded;
+    }
+
     try {
       // Redact coordinates for logging to protect user privacy
       const redacted = redactCoordinatesForLogging(latitude, longitude);
@@ -750,7 +767,12 @@ export class BlitzortungService {
       });
 
       // Subscribe to the location
-      await this.subscribeToLocation(latitude, longitude, radiusKm, phase);
+      const subscribed = this.subscribeToLocation(latitude, longitude, radiusKm, phase);
+      if (budget === undefined) {
+        await subscribed;
+      } else {
+        await this.awaitWithinBudget(subscribed, budget, phase);
+      }
 
       // Captured AFTER the transport work succeeds, not before it: an initial connect that
       // mqtt retries internally bumps the counter on its way to succeeding, and comparing
@@ -761,7 +783,13 @@ export class BlitzortungService {
       // Wait for strikes to accumulate in buffer after subscription
       // This allows time for MQTT messages to arrive and be processed
       // 10 seconds provides good coverage for active lightning areas
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      // Inside a tool call, no longer than what is left of its budget.
+      const collectMs = budget === undefined
+        ? 10000
+        : Math.min(10000, Math.ceil(budget - (performance.now() - startedAt)));
+      if (collectMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, collectMs));
+      }
 
       // Filter strikes from buffer
       const strikes = this.filterStrikes(
@@ -840,6 +868,30 @@ export class BlitzortungService {
       const degraded = this.filterStrikes(latitude, longitude, radiusKm, timeWindowMinutes);
       this.feedFailures.set(degraded, { at: new Date(), reason });
       return degraded;
+    }
+  }
+
+  /**
+   * Wait for `work` no longer than `budgetMs`. On expiry, reject with the message the catch in
+   * `getLightningStrikes` classifies by the phase reached: the connect timeout's own text while
+   * connecting, a subscribe timeout after. `work` keeps running; the race observes its later
+   * rejection, so it is never unhandled. The timer is cleared on every settle path.
+   */
+  private async awaitWithinBudget(
+    work: Promise<void>,
+    budgetMs: number,
+    phase: { current: 'connect' | 'subscribe' }
+  ): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expiry = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(phase.current === 'connect' ? 'MQTT connection timeout' : 'MQTT subscribe timeout'));
+      }, Math.ceil(budgetMs));
+    });
+    try {
+      await Promise.race([work, expiry]);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
