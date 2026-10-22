@@ -30,11 +30,31 @@ Reports whether each API answered and how (normally, rate limited, with an error
 
 Each NOAA call retries a rate limit (429), a server error (5xx) or a failed
 connection up to three times with backoff, waiting at most about 7 s in total,
-before you see one of the messages below. A timeout is not retried: it has
-already used the whole configured timeout (`API_TIMEOUT_MS`). The critical-alert
-banner, fire-weather, severe/winter-weather and timezone lookups make one attempt
-only, since they never fail a response. The river-gauge lookups for
-`get_river_conditions` (NOAA NWPS and USGS) also make one attempt.
+before you see one of the messages below. A timeout is not retried: it has used
+either its own timeout (`API_TIMEOUT_MS`) or what remained of the tool call's
+budget. The critical-alert banner, fire-weather, severe/winter-weather and
+timezone lookups make one attempt only, since they never fail a response. The
+river-gauge lookups for `get_river_conditions` (NOAA NWPS and USGS) also make one
+attempt.
+
+All the requests of one tool call share one budget of `max(API_TIMEOUT_MS, 55 s)`,
+counted from the moment the tool is called. This is 55 seconds at the default,
+under the 60 seconds an MCP client usually waits. A request gets the smaller of
+its own timeout and what is left. Once the budget is spent, each further request
+fails at once with that service's timed-out message, the same text as a request
+that timed out on its own, because at the tool's level it did. For example, behind
+a proxy that never answers, `get_alerts` in the US answers at 55 s with:
+
+```
+NOAA API Error: The NOAA weather service is temporarily unavailable. Please try again in a few minutes.
+```
+
+`get_weather_summary` shows each section it could not fetch as
+`## <section> (unavailable)`. A lightning section started with the budget spent
+shows its *Live feed unavailable* note. A spent budget is never an all-clear on
+alerts: the alerts section or tool shows the failure, never
+`No active weather alerts`. A tool that makes one request, and every answer that
+arrives in time, is unchanged.
 
 #### Service Outage (5xx errors)
 ```
@@ -180,8 +200,8 @@ https://open-meteo.com/en/docs/model-updates
 `get_alerts` for a Canadian point, and the alerts section of `get_weather_summary` there, read
 Environment and Climate Change Canada's MSC GeoMet. Each GeoMet call retries a rate limit (429), a
 server error (5xx) or a failed connection up to three times with backoff, waiting at most about
-7 s in total, before you see one of the messages below. A timeout is not retried: it has already
-used the whole configured timeout (`API_TIMEOUT_MS`). Every message is fixed text written by this
+7 s in total, before you see one of the messages below. A timeout is not retried: it has used
+either its own timeout (`API_TIMEOUT_MS`) or what remained of the tool call's budget. Every message is fixed text written by this
 server. Text from GeoMet's response body, or from a gateway in front of it, is never shown.
 
 ```
@@ -204,8 +224,9 @@ Only `get_current_conditions` with `source="metar"` reads NOAA's Aviation Weathe
 `get_weather_summary` does not accept that source. Each call retries a gateway error (502, 503 or
 504) or a failed connection (refused or unresolvable) up to three times with backoff, waiting at
 most about 7 s in total, before you see one of the messages below. A timeout is not retried: it has
-already used the whole configured timeout (`API_TIMEOUT_MS`), so the tool fails at that timeout
-(30 s by default). Any other status fails at once.
+used either its own timeout (`API_TIMEOUT_MS`) or what remained of the tool call's budget. A call
+that starts with its full budget fails at that timeout (30 s by default). Any other status fails at
+once.
 
 ```
 AviationWeather API request timed out
