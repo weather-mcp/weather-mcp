@@ -75,6 +75,7 @@ import { CacheConfig } from '../config/cache.js';
 import { logger } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
+import { remainingToolBudgetMs } from '../utils/toolBudget.js';
 
 /**
  * The three national CAP feeds, as data rather than code. The only
@@ -463,13 +464,24 @@ export class NationalCapService {
     let deadlinePassed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
+    // The refresh deadline is clamped to the tool call's remaining budget
+    // (toolBudget.ts), read once, here. The limiter's sleeps and the fan-out
+    // are plain timers that never pass the axios seam, so without the clamp a
+    // refresh entered late in a call outlives the budget by up to 40 s.
+    // `runBounded` races this deadline, so it bounds the limiter's sleeps too.
+    // `undefined` outside a tool call leaves the 40 s deadline as it was. A
+    // joined in-flight refresh runs under its first caller's budget.
+    const budget = remainingToolBudgetMs();
+    const deadlineMs = budget === undefined ? REFRESH_DEADLINE_MS : Math.min(REFRESH_DEADLINE_MS, budget);
+    const clampedByBudget = deadlineMs < REFRESH_DEADLINE_MS;
+
     const deadline = new Promise<void>(resolve => {
       timer = setTimeout(() => {
         deadlinePassed = true;
         // Abort so sockets are released rather than held to their own timeout.
         controller.abort();
         resolve();
-      }, REFRESH_DEADLINE_MS);
+      }, deadlineMs);
     });
 
     try {
@@ -578,7 +590,10 @@ export class NationalCapService {
       }
 
       const list: CachedList = { warnings: all, unavailableCount, indexTrimmed };
-      if (CacheConfig.enabled) {
+      // A refresh cut short by one caller's budget is not cached: that caller's
+      // late start must not hand the next five minutes of callers, who have the
+      // full budget, a partial set. The document cache still keeps the work done.
+      if (CacheConfig.enabled && !(deadlinePassed && clampedByBudget)) {
         // Cached even when some documents failed: a partial refresh is the
         // honest answer for the next five minutes, disclosed by the count.
         this.cache.set(listKeyFor(countryCode), list, CacheConfig.ttl.alerts);

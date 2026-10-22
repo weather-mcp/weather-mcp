@@ -17,8 +17,9 @@
  * alerts contract — answer at the 55 000 ms budget instead of one deadline per request; no request
  * starts after the budget is spent; the summary names every section it could not fetch and never
  * renders an alerts all-clear; the client's own 60 s timer never fires; a single-request tool keeps
- * its own 30 000 ms timeout; and a lightning section reached with the budget spent starts no broker
- * work.
+ * its own 30 000 ms timeout; a lightning section reached with the budget spent starts no broker
+ * work; and an Indonesian alerts call whose refresh starts 29 s in, held open only by BMKG's 1 s
+ * limiter, answers at the budget, not at its own 40 s refresh deadline (diff review codex-D1).
  */
 
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -38,7 +39,7 @@ vi.hoisted(() => {
 });
 
 import axios from 'axios';
-import type { AxiosAdapter, AxiosResponse } from 'axios';
+import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { createWeatherServer, clearServiceCaches } from '../../src/server/weatherServer.js';
 import { LocationStore } from '../../src/services/locationStore.js';
 import { toolBudgetMs } from '../../src/utils/toolBudget.js';
@@ -47,23 +48,103 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 const US = { latitude: 42.9634, longitude: -85.6681 };
 const TOKYO = { latitude: 35.6762, longitude: 139.6503 };
+// Two Indonesian points: the Nominatim singleton's reverse-country cache outlives a test.
+const JAKARTA = { latitude: -6.2088, longitude: 106.8456 };
+const SURABAYA = { latitude: -7.2575, longitude: 112.7521 };
 const ALL_CLEAR = '✅ **No active weather alerts';
 const BUDGET = toolBudgetMs(30_000);
 
 // The spied clock stays monotonic across tests: the Nominatim request spacer is per process and
 // remembers its last start, so a clock that restarted at 0 would make it wait out the previous
-// test's timeline. Each test measures from its own `start`.
+// test's timeline. Each test measures from its own `start`. The faked `Date` is carried forward
+// the same way, because the BMKG limiter reads `Date.now` and also remembers its last start.
 let perfBase = 0;
+let dateCarry = 0;
 let dateBase = 0;
 let start = 0;
 let entries: number[] = [];
 let originalAdapter: typeof axios.defaults.adapter;
 
-/** Records when a request reached the network; never settles and never reads its signal. */
-const hang: AxiosAdapter = () => {
+/**
+ * Answers a request a test chooses to answer, or `undefined` to leave it hanging. A variable
+ * rather than a second adapter: each client memoises the adapter it saw first.
+ */
+let responder: ((config: InternalAxiosRequestConfig) => Promise<AxiosResponse> | undefined) | undefined;
+
+/**
+ * Records when a request reached the network. Unless `responder` answers it, it never settles and
+ * never reads its signal.
+ */
+const hang: AxiosAdapter = (config) => {
   entries.push(performance.now() - start);
-  return new Promise<AxiosResponse>(() => {});
+  return responder?.(config) ?? new Promise<AxiosResponse>(() => {});
 };
+
+/** A 200 answer `delayMs` after the request reached the network. */
+function answer(config: InternalAxiosRequestConfig, data: unknown, delayMs = 0): Promise<AxiosResponse> {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve({ data, status: 200, statusText: 'OK', headers: {}, config }), delayMs);
+  });
+}
+
+const BMKG_DOCS = 50;
+const bmkgDocUrl = (feed: string, i: number) => `https://www.bmkg.go.id/alerts/nowcast/doc/${feed}-${i}.xml`;
+
+/**
+ * The index for one test's feed. The National CAP singleton's document cache outlives a test, so
+ * each test names its own documents; a shared set would let a later test read them from cache.
+ */
+function bmkgIndex(feed: string): string {
+  const items = Array.from(
+    { length: BMKG_DOCS },
+    (_, i) => `<item><guid isPermaLink="false">${feed}-${i}</guid><link>${bmkgDocUrl(feed, i)}</link></item>`
+  ).join('');
+  return `<?xml version="1.0"?><rss version="2.0"><channel><title>BMKG</title>${items}</channel></rss>`;
+}
+
+function bmkgDoc(i: number): string {
+  return `<?xml version="1.0" ?>
+<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+  <identifier>BMKG-${i}</identifier>
+  <sender>cuaca.ekstrem@bmkg.go.id</sender>
+  <sent>2026-08-23T00:00:00+07:00</sent>
+  <status>Actual</status>
+  <msgType>Alert</msgType>
+  <scope>Public</scope>
+  <info>
+    <language>en</language>
+    <event>Thunderstorm</event>
+    <urgency>Immediate</urgency>
+    <severity>Moderate</severity>
+    <certainty>Observed</certainty>
+    <expires>2099-01-01T00:00:00+00:00</expires>
+    <headline>Test BMKG headline ${i}</headline>
+    <area>
+      <areaDesc>Test Area</areaDesc>
+      <polygon>10,10 10,20 20,20 10,10</polygon>
+    </area>
+  </info>
+</alert>`;
+}
+
+/**
+ * codex-D1's sequence: the reverse-country lookup answers `id` after 29 s (inside its own 30 s
+ * timeout), then BMKG serves a 50-document feed whose every request succeeds at once, so only the
+ * feed's 1 s limiter holds the refresh open. Unclamped, the refresh's own 40 s deadline ends it at
+ * 69 s.
+ */
+const indonesianFeed =
+  (feed: string) =>
+  (config: InternalAxiosRequestConfig): Promise<AxiosResponse> | undefined => {
+    const url = `${config.baseURL ?? ''}${config.url ?? ''}`;
+    if (url.includes('nominatim') && url.includes('/reverse')) {
+      return answer(config, { address: { country_code: 'id' } }, 29_000);
+    }
+    if (url === 'https://www.bmkg.go.id/alerts/nowcast/en') return answer(config, bmkgIndex(feed));
+    const doc = /^https:\/\/www\.bmkg\.go\.id\/alerts\/nowcast\/doc\/[a-z]+-(\d+)\.xml$/.exec(url);
+    if (doc) return answer(config, bmkgDoc(Number(doc[1])));
+    return undefined;
+  };
 
 async function drain(): Promise<void> {
   for (let i = 0; i < 5; i++) {
@@ -115,8 +196,12 @@ describe('the tool budget through the dispatch', () => {
 
   beforeEach(async () => {
     entries = [];
+    responder = undefined;
     // setImmediate stays real: the in-memory transport and the SDK defer work there.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
+    if (dateCarry > 0) {
+      vi.setSystemTime(dateCarry);
+    }
     dateBase = Date.now();
     vi.spyOn(performance, 'now').mockImplementation(() => perfBase + (Date.now() - dateBase));
     originalAdapter = axios.defaults.adapter;
@@ -134,8 +219,15 @@ describe('the tool budget through the dispatch', () => {
   });
 
   afterEach(async () => {
+    if (responder) {
+      // A refresh cut short by its deadline leaves BMKG limiter sleeps queued on the National CAP
+      // singleton. `useRealTimers` would discard those fake timers and leave the limiter's chain
+      // pending forever, so the next test's first BMKG request would never start. Let them run.
+      await tick(10_000);
+    }
     // Well past the spacer's 1 s interval, so the next test's first lookup never waits.
     perfBase = performance.now() + 10_000;
+    dateCarry = Date.now() + 10_000;
     await client.close();
     axios.defaults.adapter = originalAdapter;
     vi.useRealTimers();
@@ -238,5 +330,46 @@ describe('the tool budget through the dispatch', () => {
     expect(lightning).toContain('**Live feed unavailable:**');
     expect(lightning).toContain('this is not an all-clear');
     expect(lightning).not.toContain('🟢');
+  });
+
+  it('(f) get_alerts for Indonesia after 29 s of earlier work answers at the budget, not at 69 s', async () => {
+    responder = indonesianFeed('direct');
+    const state = track(client.callTool({ name: 'get_alerts', arguments: { ...JAKARTA } }));
+
+    await tick(BUDGET - 1);
+    expect(state.settled).toBe(false);
+    await tick(1);
+    expect(state.settled).toBe(true);
+    expect(state.error).toBeUndefined();
+
+    const text = textOf(state.value);
+    expect(text).toContain('Weather Alerts — Indonesia');
+    expect(text).toMatch(/alerts? in the BMKG feed could not be loaded/);
+    expect(text).toContain('this is not an all-clear');
+    expect(text).not.toContain('✅');
+    for (const at of entries) {
+      expect(at).toBeLessThan(BUDGET);
+    }
+  });
+
+  it("(g) the summary's alerts section for Indonesia answers at the budget, not at 69 s", async () => {
+    responder = indonesianFeed('summary');
+    const state = track(
+      client.callTool({ name: 'get_weather_summary', arguments: { ...SURABAYA, include: ['alerts'] } })
+    );
+
+    await tick(BUDGET - 1);
+    expect(state.settled).toBe(false);
+    await tick(1);
+    expect(state.settled).toBe(true);
+    expect(state.error).toBeUndefined();
+    expect((state.value as ToolResult).isError).not.toBe(true);
+
+    const text = textOf(state.value);
+    expect(text).toMatch(/alerts? in the BMKG feed could not be loaded/);
+    expect(text).not.toContain('✅');
+    for (const at of entries) {
+      expect(at).toBeLessThan(BUDGET);
+    }
   });
 });
