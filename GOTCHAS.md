@@ -7217,6 +7217,67 @@ the T4-scheduled flip had to land in T3's commit.
 
 ---
 
+## G154 — A per-tool budget read at one transport seam does not bound a transport that never reads it
+
+**Trigger:** adding or changing a per-tool-call limit (`src/utils/toolBudget.ts`) at one shared
+seam, or adding a tool or a `get_weather_summary` section whose awaited work goes through some other
+transport: `mqtt`, raw `http`/`https`, `fetch`, a callback subscription, or a plain timer.
+
+**Rule:** list the work each dispatch arm and each summary section awaits, grouped by transport.
+Each transport either reads `remainingToolBudgetMs()` and bounds its own waits, or is named as a
+user-visible exception. For a shared connection, bound the **caller's wait**, never the connection:
+read the budget once at entry, race the wait against the remainder, and leave the connection's own
+timer alone. Pre-warm and later queries share that connection.
+
+**Why:** `AsyncLocalStorage` carries a deadline value, but it interrupts nothing. The axios adapter
+honours the budget; an MQTT connect and its collection sleep did not. A summary that reached
+`lightning` after the budget was spent could wait another 40 s. The design had excluded "the MQTT
+connect" as non-axios traffic without tracing which tool calls await it.
+
+**Verify:** in `getLightningStrikes`, replace `if (budget === 0)` with `if (false)`. Lightning (a)
+in `tests/unit/tool-budget-lightning.test.ts` and (e) in `tests/unit/tool-budget-dispatch.test.ts`
+go red.
+
+**Evidence:** 2026-10-21, tool-time-budget. Codex plan review R1 found it, the plan was amended, and
+it landed in `dd53ef3`/`e521b4b`.
+
+**Status:** active. Related: [G19] (the summary's second path), [G132] (a seam change reaches
+callers nobody listed; this is the converse: a seam misses callers on another transport).
+
+---
+
+## G155 — A factory-level fake-timer test needs one monotonic clock that moves with the faked timers
+
+**Trigger:** a unit test that drives the real factory or a real service under
+`vi.useFakeTimers`, while the code reads `performance.now` (the tool budget, `RequestSpacer`), and
+the test spies that clock.
+
+**Rule:** three things, each found by a red run.
+- Derive the spied `performance.now` from the faked `Date`
+  (`perfBase + (Date.now() - dateBase)`), not from a `t` you set before
+  `advanceTimersByTimeAsync`. Work started mid-advance then reads the time its timer fired at.
+- Keep that clock **monotonic across tests**, and measure each test from its own `start`. The
+  Nominatim `RequestSpacer` is per process and remembers its last start.
+- Before you advance the clock, wait for a dynamic `import()` (`loadMqtt`) to land. Poll on a
+  **real** `setImmediate`, which also means you leave `setImmediate` out of `toFake`, because the
+  in-memory MCP transport defers work there.
+
+**Why:** a hand-moved `t` jumps to the end of the tick before any timer fires. A request started by
+that tick's first timer then sees the whole tick already gone, and gets a budget (or a spacer slot)
+that is too short. A clock that restarts at 0 per test makes the spacer wait out the previous
+test's timeline: `get_alerts` passed alone and failed after the summary test. A dynamic import
+resolves over more microtasks than a short flush gives, so the subscribe landed inside the next
+tick, and the collection sleep measured from a `t` that had already moved.
+
+**Verify:** in `tests/unit/tool-budget-dispatch.test.ts`, remove the `perfBase = …` line from
+`afterEach`. (b), (d) and (e) fail when run after (a). (b) passes alone (`-t "NOAA"`). Verified 2026-10-21.
+
+**Evidence:** 2026-10-21, tool-time-budget T2 (`dd53ef3`) and T3 (`e521b4b`); tracker NOTEs.
+
+**Status:** active. Related: [G133] (fake timers before a service is constructed).
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
