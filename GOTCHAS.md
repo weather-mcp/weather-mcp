@@ -7278,6 +7278,22 @@ tick, and the collection sleep measured from a `t` that had already moved.
 
 ---
 
+## G156 — A stale `eslint-disable` directive is a warning, so `npm run lint` exits 0 with one in the tree
+
+**Trigger:** removing the code an `eslint-disable` directive excused, or reading a green `npm run lint` as proof that no stale directive is left.
+
+**Rule:** read the lint output, not the exit code. Any `Unused eslint-disable directive` line, or any `✖ N problem` line, is a failure here, whatever the exit code is. When you delete the code a directive excused, delete the directive in the same edit.
+
+**Why:** `package.json`'s `lint` is `eslint .`, with no `--max-warnings 0`. `eslint.config.js` sets no `linterOptions.reportUnusedDisableDirectives`, so ESLint 10's default severity applies, and that default is `warn`. CLAUDE.md's Linting section says unused directives "fail the run". They do not. A directive whose reason is no longer true then stays in the tree, and the gate passes.
+
+**Verify:** append `// eslint-disable-next-line no-console -- probe` and `export const zzProbe = 1;` to `src/utils/finiteSample.ts`. `npx eslint src/utils/finiteSample.ts` prints `warning  Unused eslint-disable directive` and `✖ 1 problem (0 errors, 1 warning)`, and exits **0**. Restore by `cp` ([G27]).
+
+**Evidence:** 2026-10-23, wall-clock-test-asserts T2 (`453822c`) positive control and the orchestrator's probe on `src/`. Both reported a warning and exited 0.
+
+**Status:** active. **Lint candidate:** set `linterOptions: { reportUnusedDisableDirectives: 'error' }` in `eslint.config.js` (or add `--max-warnings 0` to the `lint` script), then retire this entry and correct CLAUDE.md's Linting sentence. Related: [G135] (a lint zero needs a mutation to mean anything).
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
