@@ -26,9 +26,14 @@
  * - A caller's own `signal` is chained in, and a caller's cancel stays axios's `ERR_CANCELED`.
  * - The deadline timer is ref'd (G114) and cleared on every settle path, with the caller-signal
  *   listener, so the timer itself holds a process for at most `timeout`.
+ * - Inside a tool call the deadline is clamped to the call's remaining budget (`toolBudget.ts`,
+ *   design plan `plan-tool-time-budget`): a request gets the smaller of its own `timeout` and the
+ *   remainder, a request with no `timeout` of its own is bounded by the remainder, and a request
+ *   that starts with the budget spent rejects at once with `timeout of 0ms exceeded`, without
+ *   calling the inner adapter. Outside a tool call nothing here changes.
  *
  * This module reads no runtime axios export at module scope or in `withRequestDeadline()` itself
- * (the `proxyTunnel.js` import is ours, not axios's):
+ * (the `proxyTunnel.js` and `toolBudget.js` imports are ours, not axios's):
  * thirteen unit-test mocks of `axios` expose only `create`, and they construct services that call
  * this at construction. Only the returned adapter, when a request runs, reads `axios.*`.
  *
@@ -38,6 +43,7 @@
 import axios from 'axios';
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { createTunnelAgent, tunnelProxyFor } from './proxyTunnel.js';
+import { remainingToolBudgetMs } from './toolBudget.js';
 
 /** axios's `GenericAbortSignal` declares no `reason` and makes the listener methods optional. */
 type ReasonedSignal = NonNullable<InternalAxiosRequestConfig['signal']> & {
@@ -86,10 +92,23 @@ export function withRequestDeadline(inner?: AxiosAdapter): AxiosAdapter {
     }
     const adapter = resolved;
 
-    const timeout = config.timeout;
-    if (timeout === undefined || !Number.isFinite(timeout) || timeout <= 0) {
-      // axios semantics: no timeout means no deadline. Same config object, no new signal.
-      return adapter(config);
+    const own = config.timeout;
+    const ownBounded = own !== undefined && Number.isFinite(own) && own > 0;
+    const remaining = remainingToolBudgetMs();
+    let timeout: number;
+    if (remaining === undefined) {
+      if (!ownBounded) {
+        // axios semantics: no timeout means no deadline. Same config object, no new signal.
+        return adapter(config);
+      }
+      timeout = own;
+    } else {
+      if (remaining <= 0) {
+        // The tool call's budget is spent: fail before any socket, in the vocabulary every mapper reads.
+        return Promise.reject(deadlineError(0, config));
+      }
+      // The clamp feeds this wrapper's timer and message only; `config.timeout` is never rewritten.
+      timeout = ownBounded ? Math.min(own, Math.ceil(remaining)) : Math.ceil(remaining);
     }
 
     const controller = new AbortController();

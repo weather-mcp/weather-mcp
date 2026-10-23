@@ -47,6 +47,8 @@ import { EnvironmentAgencyService } from '../services/environmentAgency.js';
 import { GeocodingService } from '../services/geocoding.js';
 import type { LocationStore } from '../services/locationStore.js';
 import { RequestSpacer } from '../utils/requestSpacer.js';
+import { runWithToolBudget, toolBudgetMs } from '../utils/toolBudget.js';
+import { CacheConfig } from '../config/cache.js';
 import { toolConfig, type ToolName } from '../config/tools.js';
 import { getDefaultLocation } from '../config/defaultLocation.js';
 import { logger, describeErrorForLogging, isPiiLoggingEnabled } from '../utils/logger.js';
@@ -806,6 +808,10 @@ export interface WeatherServerOptions {
 export function createWeatherServer(options: WeatherServerOptions): Server {
   const { locationStore } = options;
 
+  // Every request one tool call starts settles within this budget, so a tool that chains
+  // requests answers before a 60 s client gives up (plan-tool-time-budget; toolBudget.ts).
+  const toolBudget = toolBudgetMs(CacheConfig.apiTimeoutMs);
+
   /**
    * Create MCP server instance
    */
@@ -847,102 +853,104 @@ export function createWeatherServer(options: WeatherServerOptions): Server {
         throw new Error(`Tool '${name}' is not enabled. Please check your ENABLED_TOOLS configuration.`);
       }
 
-      switch (name) {
-        case 'get_forecast':
-          return await withAnalytics('get_forecast', async () =>
-            handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService, acisService, true, metnoService)
-          );
+      return await runWithToolBudget(toolBudget, async () => {
+        switch (name) {
+          case 'get_forecast':
+            return await withAnalytics('get_forecast', async () =>
+              handleGetForecast(args, noaaService, openMeteoService, locationStore, geocodingService, nceiService, acisService, true, metnoService)
+            );
 
-        case 'get_current_conditions':
-          return await withAnalytics('get_current_conditions', async () =>
-            handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService, acisService, aviationWeatherService, true)
-          );
+          case 'get_current_conditions':
+            return await withAnalytics('get_current_conditions', async () =>
+              handleGetCurrentConditions(args, noaaService, openMeteoService, nceiService, locationStore, geocodingService, acisService, aviationWeatherService, true)
+            );
 
-        case 'get_alerts':
-          return await withAnalytics('get_alerts', async () =>
-            handleGetAlerts(args, noaaService, locationStore, geocodingService, meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService, jmaService)
-          );
+          case 'get_alerts':
+            return await withAnalytics('get_alerts', async () =>
+              handleGetAlerts(args, noaaService, locationStore, geocodingService, meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService, jmaService)
+            );
 
-        case 'get_historical_weather':
-          return await withAnalytics('get_historical_weather', async () =>
-            handleGetHistoricalWeather(args, noaaService, openMeteoService, locationStore, geocodingService)
-          );
+          case 'get_historical_weather':
+            return await withAnalytics('get_historical_weather', async () =>
+              handleGetHistoricalWeather(args, noaaService, openMeteoService, locationStore, geocodingService)
+            );
 
-        case 'get_weather_summary':
-          return await withAnalytics('get_weather_summary', async () =>
-            handleGetWeatherSummary(
-              args, noaaService, openMeteoService, nceiService, locationStore, geocodingService,
-              meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService,
-              jmaService, true, metnoService
-            )
-          );
+          case 'get_weather_summary':
+            return await withAnalytics('get_weather_summary', async () =>
+              handleGetWeatherSummary(
+                args, noaaService, openMeteoService, nceiService, locationStore, geocodingService,
+                meteoAlarmService, geoMetService, nominatimService, googleWeatherService, nationalCapService,
+                jmaService, true, metnoService
+              )
+            );
 
-        case 'check_service_status':
-          return await withAnalytics('check_service_status', async () =>
-            handleCheckServiceStatus(noaaService, openMeteoService, SERVER_VERSION)
-          );
+          case 'check_service_status':
+            return await withAnalytics('check_service_status', async () =>
+              handleCheckServiceStatus(noaaService, openMeteoService, SERVER_VERSION)
+            );
 
-        case 'search_location':
-          return await withAnalytics('search_location', async () =>
-            handleSearchLocation(args, geocodingService)
-          );
+          case 'search_location':
+            return await withAnalytics('search_location', async () =>
+              handleSearchLocation(args, geocodingService)
+            );
 
-        case 'get_air_quality':
-          return await withAnalytics('get_air_quality', async () =>
-            handleGetAirQuality(args, openMeteoService, locationStore, geocodingService, googlePollenService)
-          );
+          case 'get_air_quality':
+            return await withAnalytics('get_air_quality', async () =>
+              handleGetAirQuality(args, openMeteoService, locationStore, geocodingService, googlePollenService)
+            );
 
-        case 'get_marine_conditions':
-          return await withAnalytics('get_marine_conditions', async () =>
-            handleGetMarineConditions(args, noaaService, openMeteoService, locationStore, geocodingService)
-          );
+          case 'get_marine_conditions':
+            return await withAnalytics('get_marine_conditions', async () =>
+              handleGetMarineConditions(args, noaaService, openMeteoService, locationStore, geocodingService)
+            );
 
-        case 'get_weather_imagery':
-          return await withAnalytics('get_weather_imagery', async () =>
-            handleGetWeatherImagery(args, locationStore, geocodingService)
-          );
+          case 'get_weather_imagery':
+            return await withAnalytics('get_weather_imagery', async () =>
+              handleGetWeatherImagery(args, locationStore, geocodingService)
+            );
 
-        case 'get_lightning_activity':
-          return await withAnalytics('get_lightning_activity', async () =>
-            handleGetLightningActivity(args, locationStore, geocodingService)
-          );
+          case 'get_lightning_activity':
+            return await withAnalytics('get_lightning_activity', async () =>
+              handleGetLightningActivity(args, locationStore, geocodingService)
+            );
 
-        case 'get_river_conditions':
-          return await withAnalytics('get_river_conditions', async () =>
-            handleGetRiverConditions(args, noaaService, locationStore, geocodingService, openMeteoService, nominatimService, environmentAgencyService)
-          );
+          case 'get_river_conditions':
+            return await withAnalytics('get_river_conditions', async () =>
+              handleGetRiverConditions(args, noaaService, locationStore, geocodingService, openMeteoService, nominatimService, environmentAgencyService)
+            );
 
-        case 'get_wildfire_info':
-          return await withAnalytics('get_wildfire_info', async () =>
-            handleGetWildfireInfo(
-              args, nifcService, locationStore, geocodingService,
-              firmsService, nominatimService
-            )
-          );
+          case 'get_wildfire_info':
+            return await withAnalytics('get_wildfire_info', async () =>
+              handleGetWildfireInfo(
+                args, nifcService, locationStore, geocodingService,
+                firmsService, nominatimService
+              )
+            );
 
-        case 'save_location':
-          return await withAnalytics('save_location', async () =>
-            handleSaveLocation(args, locationStore, nominatimService)
-          );
+          case 'save_location':
+            return await withAnalytics('save_location', async () =>
+              handleSaveLocation(args, locationStore, nominatimService)
+            );
 
-        case 'list_saved_locations':
-          return await withAnalytics('list_saved_locations', async () =>
-            handleListSavedLocations(locationStore)
-          );
+          case 'list_saved_locations':
+            return await withAnalytics('list_saved_locations', async () =>
+              handleListSavedLocations(locationStore)
+            );
 
-        case 'get_saved_location':
-          return await withAnalytics('get_saved_location', async () =>
-            handleGetSavedLocation(args, locationStore)
-          );
+          case 'get_saved_location':
+            return await withAnalytics('get_saved_location', async () =>
+              handleGetSavedLocation(args, locationStore)
+            );
 
-        case 'remove_saved_location':
-          return await withAnalytics('remove_saved_location', async () =>
-            handleRemoveSavedLocation(args, locationStore)
-          );
+          case 'remove_saved_location':
+            return await withAnalytics('remove_saved_location', async () =>
+              handleRemoveSavedLocation(args, locationStore)
+            );
 
-        default:
-          throw new Error(`Unknown tool: ${name}`);
-      }
+          default:
+            throw new Error(`Unknown tool: ${name}`);
+        }
+      });
     } catch (error) {
       // What was called and how it failed — never what the user typed. Every
       // message reaching this catch can embed a place name, query or coordinate,

@@ -225,8 +225,9 @@ export class AviationWeatherService {
    * Request with retry/backoff, mirroring `NOAAService.makeRequest`.
    * A 502/503/504 or a failed connection is retried up to `maxRetries`
    * times with jittered backoff. A timeout is **not** retried: it has
-   * already spent `API_TIMEOUT_MS` (30 s by default) and the MCP SDK's
-   * request budget is 60 s, so a retry would answer after the client gave
+   * exhausted either its own `API_TIMEOUT_MS` (30 s by default) or the
+   * enclosing tool call's remaining budget (`toolBudget.ts`), so a retry
+   * would answer after the client gave
    * up (the v1.34.2 rule, `isTransientFailure` in `noaa.ts` and
    * `openmeteo.ts`). The loop reads `causeCode`, never the message. A 204
    * resolves normally (axios treats it as success) and never reaches this

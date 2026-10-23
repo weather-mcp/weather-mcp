@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.4 (Production Ready)
+- **Version:** 1.35.5 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -82,6 +82,7 @@ src/
 │   ├── connectionFailure.ts # Transport codes meaning "connection failed before any answer"; shared by the alert-feed services, NOAA and Open-Meteo (pure)
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
 │   ├── httpDeadline.ts      # withRequestDeadline — one wall-clock deadline per axios request (proxy included), emitted as axios's own ECONNABORTED; every axios.create passes it; hands a tunnelled https request proxy: false and a per-request TunnelAgent on its own signal
+│   ├── toolBudget.ts        # Per-tool-call wall-clock budget (max(API_TIMEOUT_MS, 55 s)) carried in an AsyncLocalStorage; read by httpDeadline at the seam and by the lightning query, written by the dispatch; arms no timer (pure)
 │   ├── proxyTunnel.ts       # Per-request CONNECT tunnel agent hooked on the deadline's signal; tunnelProxyFor mirrors axios's proxy-from-env selection (no logging)
 │   ├── savedLocationShape.ts  # Saved-location record-shape contract — write-side validator and read-side describer (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
@@ -275,7 +276,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 - Cache the *table*, not the per-date slice, for anything derived from a bulk pull (normals).
 - Dedupe concurrent same-key pulls with a `Map<string, Promise<T>>` deleted in `finally`, so a rejected pull is never cached nor left behind.
 - A per-upstream rate budget is one `RequestSpacer` (`src/utils/requestSpacer.ts`) per upstream, built in the composition root and passed to every client of that upstream. It reserves each start slot synchronously before any `await` (G20) and spaces **starts**, not completions, so a slow or failed request never stalls the next. On every wake it re-checks the last *actual* start against a monotonic clock (`performance.now`) and sleeps the remainder, so overdue timers delivered together after an event-loop stall still dispatch one interval apart; the read, compare and record after each wake are one synchronous run (G20). Nominatim's is shared by `NominatimService` and `GeocodingService`'s provider, and it is per process.
-- Every `axios.create` passes `adapter: withRequestDeadline()` (`src/utils/httpDeadline.ts`), and so does the config constant of every direct `axios.get`-style call (the radar tile fetch, `RADAR_TILE_REQUEST_CONFIG`); `tests/unit/http-deadline-wiring.test.ts` fails on either without it. axios's own `timeout` is an inactivity timer, and on the follow-redirects transport it never starts behind a proxy that does not answer the `CONNECT`. The wrapper races one wall-clock deadline at the merged config's `timeout` and rejects with axios's own `ECONNABORTED` / `timeout of <N>ms exceeded`, so no error mapper changes. Its timer is ref'd (G114). The deadline also releases the proxy socket: on an `https:` request that `proxy-from-env` routes through a proxy, the wrapper passes `proxy: false` and a per-request tunnel agent (`src/utils/proxyTunnel.ts`) hooked on **its own** signal, because Node emits nothing on a request destroyed before it has a socket. `tests/integration/http-deadline-proxy.test.ts` asserts the child exits and the proxy sees the socket close.
+- Every `axios.create` passes `adapter: withRequestDeadline()` (`src/utils/httpDeadline.ts`), and so does the config constant of every direct `axios.get`-style call (the radar tile fetch, `RADAR_TILE_REQUEST_CONFIG`); `tests/unit/http-deadline-wiring.test.ts` fails on either without it. axios's own `timeout` is an inactivity timer, and on the follow-redirects transport it never starts behind a proxy that does not answer the `CONNECT`. The wrapper races one wall-clock deadline at the merged config's `timeout` and rejects with axios's own `ECONNABORTED` / `timeout of <N>ms exceeded`, so no error mapper changes. Its timer is ref'd (G114). The deadline also releases the proxy socket: on an `https:` request that `proxy-from-env` routes through a proxy, the wrapper passes `proxy: false` and a per-request tunnel agent (`src/utils/proxyTunnel.ts`) hooked on **its own** signal, because Node emits nothing on a request destroyed before it has a socket. `tests/integration/http-deadline-proxy.test.ts` asserts the child exits and the proxy sees the socket close. Every request of one tool call also settles within one budget, `max(API_TIMEOUT_MS, 55 s)` from dispatch (`src/utils/toolBudget.ts`, written by the `CallToolRequestSchema` dispatch): the wrapper clamps its deadline to the remainder, and a request that starts with the budget spent rejects at once with the same `ECONNABORTED` (`timeout of 0ms exceeded`), so no mapper changes. MQTT never passes the seam, so `getLightningStrikes` reads the same budget and bounds its own waits; the shared connection keeps its own timer.
 - Bound every upstream array (`securityEvent` warn + caveat when the cap trims): 5,000 FIRMS rows, 64 ensemble members, gridpoint series lengths.
 
 ### Process
@@ -400,7 +401,7 @@ CACHE_ENABLED=true              # Enable/disable caching (default: true)
 CACHE_MAX_SIZE=1000            # Max cache entries (100-10000, default: 1000)
 
 # API Configuration
-API_TIMEOUT_MS=30000           # API timeout in milliseconds (5000-120000, default: 30000)
+API_TIMEOUT_MS=30000           # API timeout in milliseconds (5000-120000, default: 30000) — the requests of one tool call share max(API_TIMEOUT_MS, 55 s)
 
 # Tool selection
 ENABLED_TOOLS=basic            # Preset (basic | standard | full | all) and/or names,
@@ -725,15 +726,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.4 — Production Ready ✅
-- **Test Coverage:** 4,800 tests, 100% pass rate
+- **Version:** 1.35.5 — Production Ready ✅
+- **Test Coverage:** 4,842 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.5:** A tool that makes several requests now answers before your MCP client gives up, even behind a silent proxy
 - **New in v1.35.4:** A request that times out behind a silent proxy now closes its proxy connection, and proxy credentials are percent-decoded
 - **New in v1.35.3:** Wildfire and radar failures show a fixed message, and a damaged saved-locations file no longer logs place text
-- **New in v1.35.2:** An error's help link now names the service that failed
 
 ## Useful References
 
@@ -756,7 +757,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-10-21 (v1.35.4)
+**Last Updated:** 2026-10-22 (v1.35.5)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
