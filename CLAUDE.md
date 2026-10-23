@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.4 (Production Ready)
+- **Version:** 1.35.5 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -726,15 +726,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.4 — Production Ready ✅
-- **Test Coverage:** 4,800 tests, 100% pass rate
+- **Version:** 1.35.5 — Production Ready ✅
+- **Test Coverage:** 4,842 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.5:** A tool that makes several requests now answers before your MCP client gives up, even behind a silent proxy
 - **New in v1.35.4:** A request that times out behind a silent proxy now closes its proxy connection, and proxy credentials are percent-decoded
 - **New in v1.35.3:** Wildfire and radar failures show a fixed message, and a damaged saved-locations file no longer logs place text
-- **New in v1.35.2:** An error's help link now names the service that failed
 
 ## Useful References
 
@@ -757,7 +757,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-10-21 (v1.35.4)
+**Last Updated:** 2026-10-22 (v1.35.5)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
