@@ -87,7 +87,7 @@
     "tz-lookup": "6.1.25"
   },
   "optionalDependencies": {
-    "mqtt": "^5.16.0"
+    "mqtt": "^5.16.1"
   },
   "overrides": {
     "fast-uri": "3.1.8"
