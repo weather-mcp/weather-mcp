@@ -116,5 +116,7 @@ describe('vendored ngeohash matches upstream ngeohash@0.6.4', () => {
     expect(antimeridianWraps).toBeGreaterThan(0);
     expect(poleClamps).toBeGreaterThan(0);
     expect(leadingCharCrossings).toBeGreaterThan(0);
-  });
+    // A hang guard, not a speed bound: the sweep takes ~0.5 s idle and can pass Vitest's 5 s
+    // default under a contended full suite.
+  }, 30_000);
 });
