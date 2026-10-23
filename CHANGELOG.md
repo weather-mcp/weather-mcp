@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.6] - 2026-10-23
+
 The server's behaviour and output are unchanged; the published code is identical to 1.35.5. This release is for anyone who builds from source or runs the test suite. A few unit tests checked how many milliseconds a piece of work took, and on a busy machine they failed even though the code was correct. Those timing checks are gone, so the test suite now passes or fails on correctness alone.
 
 ### Changed
@@ -2241,7 +2243,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.5...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.6...HEAD
+[1.35.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.5...v1.35.6
 [1.35.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.4...v1.35.5
 [1.35.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.3...v1.35.4
 [1.35.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.2...v1.35.3
