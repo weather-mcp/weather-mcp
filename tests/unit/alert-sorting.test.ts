@@ -201,7 +201,7 @@ describe('Alert Sorting Optimization - v1.0.0', () => {
     });
   });
 
-  describe('Optimization Performance', () => {
+  describe('Severity-cached sort', () => {
     it('should cache severity values to avoid repeated lookups', () => {
       const alerts: AlertFeature[] = Array.from({ length: 100 }, (_, i) => ({
         properties: {
@@ -227,8 +227,6 @@ describe('Alert Sorting Optimization - v1.0.0', () => {
         'Unknown': 4
       };
 
-      // Measure time for optimized approach (cache severity values)
-      const start1 = performance.now();
       const alertsWithSeverity = alerts.map(alert => ({
         alert,
         severityValue: severityOrder[alert.properties.severity as SeverityLevel] ?? 4
@@ -236,27 +234,19 @@ describe('Alert Sorting Optimization - v1.0.0', () => {
       const sorted1 = alertsWithSeverity
         .sort((a, b) => a.severityValue - b.severityValue)
         .map(item => item.alert);
-      const duration1 = performance.now() - start1;
 
-      // Measure time for unoptimized approach (lookup during sort)
-      const start2 = performance.now();
       const sorted2 = [...alerts].sort((a, b) => {
         const severityA = severityOrder[a.properties.severity as SeverityLevel] ?? 4;
         const severityB = severityOrder[b.properties.severity as SeverityLevel] ?? 4;
         return severityA - severityB;
       });
-      const duration2 = performance.now() - start2;
 
       // Both should produce same results
       expect(sorted1.length).toBe(sorted2.length);
       expect(sorted1[0].properties.severity).toBe('Extreme');
-
-      // Optimized version should complete quickly (both should be fast for 100 items)
-      expect(duration1).toBeLessThan(10);
-      expect(duration2).toBeLessThan(10);
     });
 
-    it('should handle large alert sets efficiently', () => {
+    it('should sort a large alert set', () => {
       // Test with a large number of alerts (1000)
       const alerts: AlertFeature[] = Array.from({ length: 1000 }, (_, i) => ({
         properties: {
@@ -282,8 +272,6 @@ describe('Alert Sorting Optimization - v1.0.0', () => {
         'Unknown': 4
       };
 
-      const start = performance.now();
-
       const alertsWithSeverity = alerts.map(alert => ({
         alert,
         severityValue: severityOrder[alert.properties.severity as SeverityLevel] ?? 4
@@ -293,10 +281,6 @@ describe('Alert Sorting Optimization - v1.0.0', () => {
         .sort((a, b) => a.severityValue - b.severityValue)
         .map(item => item.alert);
 
-      const duration = performance.now() - start;
-
-      // Should complete quickly even with 1000 alerts (under 50ms)
-      expect(duration).toBeLessThan(50);
       expect(sorted.length).toBe(1000);
 
       // Verify first alerts are Extreme

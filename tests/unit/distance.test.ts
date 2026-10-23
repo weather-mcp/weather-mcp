@@ -358,21 +358,8 @@ describe('Distance Calculation Utilities', () => {
     });
   });
 
-  describe('Performance', () => {
-    it('should calculate distance quickly', () => {
-      const start = performance.now();
-
-      for (let i = 0; i < 1000; i++) {
-        calculateDistance(40.7128, -74.0060, 34.0522, -118.2437);
-      }
-
-      const duration = performance.now() - start;
-
-      // 1000 calculations should complete in < 10ms
-      expect(duration).toBeLessThan(10);
-    });
-
-    it('should handle batch calculations efficiently', () => {
+  describe('Batch', () => {
+    it('should calculate distances for a batch of points', () => {
       const centerLat = 40.7128;
       const centerLon = -74.0060;
 
@@ -382,16 +369,11 @@ describe('Distance Calculation Utilities', () => {
         lon: (Math.random() * 360) - 180
       }));
 
-      const start = performance.now();
-
       const distances = points.map(p =>
         calculateDistance(centerLat, centerLon, p.lat, p.lon)
       );
 
-      const duration = performance.now() - start;
-
       expect(distances.length).toBe(100);
-      expect(duration).toBeLessThan(5);
     });
   });
 });

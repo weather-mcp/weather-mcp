@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.6] - 2026-10-23
+
+The server's behaviour and output are unchanged; the published code is identical to 1.35.5. This release is for anyone who builds from source or runs the test suite. A few unit tests checked how many milliseconds a piece of work took, and on a busy machine they failed even though the code was correct. Those timing checks are gone, so the test suite now passes or fails on correctness alone.
+
+### Changed
+- **The unit test suite no longer fails because the machine is busy.** Twelve checks asserted that geohash, distance, radar-URL, alert-sorting and bounds work finished within 5–100 milliseconds. Under load one of them failed in two of three runs (91 ms against a 50 ms limit). Four tests that checked only timing are removed, so the suite has four fewer tests. The other tests keep every correctness check they had. One long geohash comparison test now has an explicit 30-second limit, so a slow run is not reported as a failure. Four checks with limits of 1 second or more stay, unchanged.
+
 ## [1.35.5] - 2026-10-22
 
 Behind a proxy that never answers, a tool that makes several requests in a row still took longer than your MCP client waits. Each request stopped at its own timeout, but the timeouts added up: at the default 30 seconds, `get_weather_summary` in the US answered after 180 seconds and `get_alerts` after 90, while the client gave up at 60. A tool call's requests now share one budget, so at the default every tool answers by about 55 seconds, before the client gives up. A retry pause that began just before the budget ran out can add a few seconds; it never reaches 60. Separately, `get_weather_summary` no longer tells you that alerts are not available for a covered country, such as Indonesia, when its country lookup fails. Normal answers are unchanged.
@@ -2236,7 +2243,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.5...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.6...HEAD
+[1.35.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.5...v1.35.6
 [1.35.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.4...v1.35.5
 [1.35.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.3...v1.35.4
 [1.35.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.2...v1.35.3

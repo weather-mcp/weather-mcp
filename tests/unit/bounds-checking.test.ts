@@ -272,7 +272,7 @@ describe('Bounds Checking - getMaxProbabilityFromSeries', () => {
       expect(sliced.length).toBe(500);
     });
 
-    it('should maintain performance with bounded array size', () => {
+    it('should bound a large series to maxEntries', () => {
       const maxEntries = 500;
 
       // Even with large input, processing is bounded
@@ -284,28 +284,8 @@ describe('Bounds Checking - getMaxProbabilityFromSeries', () => {
         }))
       };
 
-      // Start timer
-      const start = performance.now();
-
       // Slice to max entries
       const bounded = largeSeries.values.slice(0, maxEntries);
-
-      // Process bounded array
-      let maxValue = 0;
-      const now = Date.now();
-      const futureTime = now + 48 * 60 * 60 * 1000;
-
-      for (const entry of bounded) {
-        const validTimeStart = new Date(entry.validTime.split('/')[0]).getTime();
-        if (validTimeStart >= now && validTimeStart <= futureTime && entry.value !== null) {
-          maxValue = Math.max(maxValue, entry.value);
-        }
-      }
-
-      const duration = performance.now() - start;
-
-      // Should complete quickly (under 10ms)
-      expect(duration).toBeLessThan(10);
       expect(bounded.length).toBe(maxEntries);
     });
   });

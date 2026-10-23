@@ -328,21 +328,8 @@ describe('Geohash Neighbor API Usage', () => {
     });
   });
 
-  describe('Performance', () => {
-    it('should calculate neighbors quickly', () => {
-      const start = performance.now();
-
-      for (let i = 0; i < 1000; i++) {
-        getGeohashNeighbors('dr5ru7n2');
-      }
-
-      const duration = performance.now() - start;
-
-      // 1000 neighbor calculations should be fast (< 50ms)
-      expect(duration).toBeLessThan(50);
-    });
-
-    it('should handle batch neighbor calculations efficiently', () => {
+  describe('Batch', () => {
+    it('should calculate neighbors for a batch of hashes', () => {
       const hashes = [
         'dr5r',
         'dr5x',
@@ -356,26 +343,9 @@ describe('Geohash Neighbor API Usage', () => {
         'dr5v'
       ];
 
-      const start = performance.now();
-
       const allNeighbors = hashes.map(hash => getGeohashNeighbors(hash));
 
-      const duration = performance.now() - start;
-
       expect(allNeighbors.length).toBe(hashes.length);
-      expect(duration).toBeLessThan(10);
-    });
-
-    it('should not degrade with high precision', () => {
-      const start = performance.now();
-
-      for (let i = 0; i < 100; i++) {
-        getGeohashNeighbors('dr5ru7n2qq5t'); // precision 12
-      }
-
-      const duration = performance.now() - start;
-
-      expect(duration).toBeLessThan(20);
     });
   });
 
