@@ -97,7 +97,15 @@ export async function handleGetAlerts(
   nationalCapService?: NationalCapService,
   // Trailing and optional, so every pre-existing 9-argument call site passes
   // `undefined` here and takes the old path by construction.
-  jmaService?: JmaService
+  jmaService?: JmaService,
+  // A country the caller already resolved but could not pass in `args`:
+  // `get_weather_summary` forwards bare coordinates, so a saved location's
+  // `country_code` would otherwise be lost. Read only after the reverse lookup
+  // has *failed*, and only outside the `isInUS` box, so a successful lookup and
+  // every US-box point keep the old routing. Without it, a failed lookup at a
+  // covered country (Jakarta) rendered the not-covered sentence. Not a tool
+  // input: the parameter is positional, so no caller can supply it in `args`.
+  fallbackCountryCode?: string
 ): Promise<HandlerResult> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as AlertsArgs, locationStore, geocodingService);
@@ -131,6 +139,12 @@ export async function handleGetAlerts(
         describeErrorForLogging(error)
       );
     }
+  }
+
+  // 2b. The lookup failed: fall back to the caller's known country, except
+  //     inside the US box, whose coordinate routing to NOAA stays as it was.
+  if (!countryCode && reverseLookupFailed && fallbackCountryCode && !isInUS(latitude, longitude)) {
+    countryCode = fallbackCountryCode.toLowerCase();
   }
 
   // 3. Route. The reverse answer wins over isInUS; "no country" (open

@@ -279,7 +279,7 @@ export async function handleGetWeatherSummary(
           sectionResult = await handleGetAlerts(
             subArgs, noaaService, locationStore, geocodingService,
             meteoAlarmService, geoMetService, nominatimService, googleWeatherService,
-            nationalCapService, jmaService
+            nationalCapService, jmaService, resolved.country_code
           );
           break;
         case 'air_quality':
