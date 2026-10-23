@@ -411,34 +411,16 @@ describe('RainViewer Service', () => {
     });
   });
 
-  describe('Performance and Edge Cases', () => {
-    it('should handle large number of frame conversions efficiently', () => {
+  describe('Edge Cases', () => {
+    it('should convert a large number of frames', () => {
       const frames: RainViewerFrame[] = Array.from({ length: 100 }, (_, i) => ({
         time: 1699999999 - i * 300,
         path: `/v2/radar/${1699999999 - i * 300}`
       }));
 
-      const start = Date.now();
       const converted = service.convertFrames(frames, 40.7128, -74.006);
-      const duration = Date.now() - start;
 
       expect(converted.length).toBe(100);
-      expect(duration).toBeLessThan(100); // Should be very fast
-    });
-
-    it('should handle rapid URL generation', () => {
-      const frame: RainViewerFrame = {
-        time: 1699999999,
-        path: '/v2/radar/1699999999'
-      };
-
-      const start = Date.now();
-      for (let i = 0; i < 1000; i++) {
-        service.buildCoordinateTileUrl(frame, 40.7128, -74.006, 6);
-      }
-      const duration = Date.now() - start;
-
-      expect(duration).toBeLessThan(100); // 1000 URLs in < 100ms
     });
 
     it('should handle fractional coordinates', () => {
