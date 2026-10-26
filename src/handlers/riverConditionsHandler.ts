@@ -204,6 +204,9 @@ interface RiverConditionsArgs extends UnitArgs {
   forecast_days?: number; // 1-210, default 7 — Open-Meteo path only
 }
 
+/** A rendered report plus whether its data fetch failed as a whole. */
+type RenderOutcome = { text: string; failed: boolean };
+
 /**
  * Route a river request to gauge observations or to the global discharge model.
  *
@@ -240,7 +243,7 @@ export async function handleGetRiverConditions(
   openMeteoService?: OpenMeteoService,
   nominatimService?: NominatimService,
   eaService?: EnvironmentAgencyService
-): Promise<{ content: Array<{ type: string; text: string }> }> {
+): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
   // Resolve location from coordinates, a saved location name, or a geocoded city name
   const resolved = await resolveLocationAsync(args as RiverConditionsArgs, locationStore, geocodingService);
   const { latitude, longitude } = resolved;
@@ -285,8 +288,9 @@ export async function handleGetRiverConditions(
   }
 
   let output: string;
+  let failed = false;
   if (route === 'noaa') {
-    output = await formatNOAARiverConditions(noaaService, latitude, longitude, args, detail, resolved.country_code, nominatimService);
+    ({ text: output, failed } = await formatNOAARiverConditions(noaaService, latitude, longitude, args, detail, resolved.country_code, nominatimService));
   } else if (route === 'ea') {
     output = await formatEARiverConditions(eaService, latitude, longitude, args, detail);
   } else {
@@ -299,14 +303,17 @@ export async function handleGetRiverConditions(
         type: 'text',
         text: output
       }
-    ]
+    ],
+    ...(failed ? { isError: true } : {})
   }, resolved);
 }
 
 /**
  * The US path: NWPS gauge observations, flood categories, and crest history.
  * Byte-identical to the pre-global behavior — `radius` and the Search Radius
- * line belong to this path only.
+ * line belong to this path only. Only the whole-list catch sets `failed`: a
+ * rejected per-gauge detail or stageflow call never does, because
+ * `Promise.allSettled` absorbs it.
  */
 async function formatNOAARiverConditions(
   noaaService: NOAAService,
@@ -316,7 +323,7 @@ async function formatNOAARiverConditions(
   detail: DetailLevel,
   resolvedCountryCode?: string,
   nominatimService?: NominatimService
-): Promise<string> {
+): Promise<RenderOutcome> {
   // Validate radius parameter
   let radius = (args as RiverConditionsArgs)?.radius ?? 50; // default 50 km
   if (typeof radius !== 'number' || isNaN(radius) || !isFinite(radius)) {
@@ -332,6 +339,7 @@ async function formatNOAARiverConditions(
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Search Radius:** ${radius} km (${(radius * 0.621371).toFixed(1)} miles)\n\n`;
 
+  let failed = false;
   try {
     // Calculate bounding box for the search radius
     // 1 degree of latitude ≈ 111 km, 1 degree of longitude varies by latitude
@@ -485,6 +493,7 @@ async function formatNOAARiverConditions(
       }
     }
   } catch (error) {
+    failed = true;
     output += `❌ **Error retrieving river gauge data**\n\n`;
     output += `Unable to fetch river conditions. This may be due to:\n`;
     output += `- Temporary service unavailability\n`;
@@ -497,7 +506,7 @@ async function formatNOAARiverConditions(
   output += `*Data source: NOAA National Water Prediction Service (NWPS)*\n`;
   output += `*River conditions are updated hourly. Always consult official sources for critical decisions.*\n`;
 
-  return output;
+  return { text: output, failed };
 }
 
 /** Header line naming the authority behind the Great Britain path. */
