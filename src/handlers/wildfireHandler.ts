@@ -49,7 +49,10 @@ interface WildfireArgs {
   detail?: 'summary' | 'standard' | 'full';
 }
 
-type HandlerResult = { content: Array<{ type: string; text: string }> };
+type HandlerResult = { content: Array<{ type: string; text: string }>; isError?: boolean };
+
+/** A rendered report plus whether its data fetch failed as a whole. */
+type RenderOutcome = { text: string; failed: boolean };
 
 /**
  * Country codes NIFC/WFIGS actually publishes incidents for — the criterion
@@ -223,7 +226,7 @@ export async function handleGetWildfireInfo(
     useFirms = false;
   }
 
-  const output = useFirms && firmsService
+  const { text: output, failed } = useFirms && firmsService
     ? await formatFIRMSWildfire(firmsService, latitude, longitude, radius, dayRange, detail)
     : await formatNIFCWildfire(nifcService, latitude, longitude, radius, detail, outsideNifcCoverage);
 
@@ -233,7 +236,8 @@ export async function handleGetWildfireInfo(
         type: 'text',
         text: output
       }
-    ]
+    ],
+    ...(failed ? { isError: true } : {})
   }, resolved);
 
   if (reverseLookupFailed) {
@@ -248,7 +252,8 @@ export async function handleGetWildfireInfo(
  * The original US path: NIFC/WFIGS named incidents with acreage,
  * containment, and the containment-aware safety assessment. Byte-identical
  * to the pre-global behavior (locked by tests/unit/wildfire-handler.test.ts
- * passing unedited).
+ * passing unedited). `failed` is true only when the catch replaced the fire
+ * list with the error block.
  */
 async function formatNIFCWildfire(
   nifcService: NIFCService,
@@ -263,7 +268,7 @@ async function formatNIFCWildfire(
    * trailing so every existing caller and test harness is unaffected.
    */
   outsideCoverage = false
-): Promise<string> {
+): Promise<RenderOutcome> {
   // Get timezone for proper time formatting
   const timezone = guessTimezoneFromCoords(latitude, longitude);
 
@@ -271,6 +276,7 @@ async function formatNIFCWildfire(
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Search Radius:** ${radius} km (${(radius * 0.621371).toFixed(1)} miles)\n\n`;
 
+  let failed = false;
   try {
     // Calculate bounding box from center point and radius
     // Approximate: 1 degree latitude ≈ 111 km
@@ -480,6 +486,7 @@ async function formatNIFCWildfire(
       }
     }
   } catch (error) {
+    failed = true;
     output += `❌ **Error retrieving wildfire data**\n\n`;
     output += `Unable to fetch fire information. This may be due to:\n`;
     output += `- Temporary service unavailability\n`;
@@ -493,14 +500,16 @@ async function formatNIFCWildfire(
   output += `*Wildfire data is updated throughout the day. Always consult official sources for evacuation orders and emergency information.*\n`;
   output += `*For active incidents and evacuation orders, visit: https://inciweb.nwcg.gov/*\n`;
 
-  return output;
+  return { text: output, failed };
 }
 
 /**
  * The global path: NASA FIRMS satellite heat detections, clustered and
  * framed honestly (D5) — these are hotspots, not managed incidents, so there
  * are no fire names, sizes, or containment percentages, and a no-detections
- * result never reads as all-clear.
+ * result never reads as all-clear. `failed` is true only when the outer catch
+ * replaced the detection list with the error block; a rejected key whose
+ * keyless fallback answers is a success.
  */
 async function formatFIRMSWildfire(
   firmsService: FIRMSService,
@@ -509,7 +518,7 @@ async function formatFIRMSWildfire(
   radius: number,
   dayRange: number,
   detail: 'summary' | 'standard' | 'full'
-): Promise<string> {
+): Promise<RenderOutcome> {
   let output = `# Wildfire Information Report\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Search Radius:** ${radius} km (${(radius * 0.621371).toFixed(1)} miles)\n`;
@@ -518,6 +527,7 @@ async function formatFIRMSWildfire(
   output += `sizes, or containment are available; detections may include industrial `;
   output += `heat sources, gas flares, or agricultural burns.\n\n`;
 
+  let failed = false;
   try {
     let detections: FIRMSDetection[];
     let truncated: boolean;
@@ -678,6 +688,7 @@ async function formatFIRMSWildfire(
       output += `\n`;
     }
   } catch (error) {
+    failed = true;
     output += `❌ **Error retrieving wildfire data**\n\n`;
     output += `Unable to fetch fire information. This may be due to:\n`;
     output += `- Temporary service unavailability\n`;
@@ -691,7 +702,7 @@ async function formatFIRMSWildfire(
   output += `*We acknowledge the use of data from NASA FIRMS (https://firms.modaps.eosdis.nasa.gov/), part of NASA's Earth Science Data and Information System (ESDIS).*\n`;
   output += `*Satellite detections update with each polar overpass. Always consult official sources for evacuation orders and emergency information.*\n`;
 
-  return output;
+  return { text: output, failed };
 }
 
 /** Human-readable satellite name from the FIRMS satellite code. */
