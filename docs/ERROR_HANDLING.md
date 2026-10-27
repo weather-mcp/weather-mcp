@@ -443,6 +443,12 @@ The `Error details:` line is one of six fixed messages:
 No network-library text is shown. The stderr log line `NIFC query failed` carries the error type,
 its code and the HTTP status, and adds the error's message and stack only under `LOG_PII`.
 
+The response carries `isError: true`, so a client that checks the error flag sees the failure. The
+text is the same as above. Outside the US, the same block on the satellite path (NASA FIRMS) is
+flagged the same way. A rejected `FIRMS_MAP_KEY` whose keyless fallback succeeds is **not** an
+error: the result is a normal report with the note
+*FIRMS_MAP_KEY was rejected; showing keyless 24-hour data.*
+
 ### Wildfire Containment: `not reported`
 
 `get_wildfire_info` renders `**Containment:** not reported` — with no percentage and no bar — for a
@@ -471,6 +477,30 @@ any other fire's information. `0` is a real reading — a new fire is 0% contain
 
 On the FIRMS path (everywhere outside the US) containment does not exist at all: satellite heat
 detections carry no containment, so no containment line is rendered in either form.
+
+### River Gauge (NWPS) Errors
+
+In the US, `get_river_conditions` reads gauges from the National Water Prediction Service. When the
+gauge-list request fails, the report still renders, with this section in place of the gauge list:
+
+```
+❌ **Error retrieving river gauge data**
+
+Unable to fetch river conditions. This may be due to:
+- Temporary service unavailability
+- Network connectivity issues
+- Location outside NOAA coverage area (US only)
+
+Error details: NOAA API is currently unavailable
+```
+
+The response carries `isError: true`, so a client that checks the error flag sees the failure.
+
+A single gauge whose detail or trend request fails is **not** a failure. That gauge renders without
+its trend or flood-stage section, and the result is a normal report.
+
+The Environment Agency path (Great Britain) and the Open-Meteo path (elsewhere) return an error
+response on failure, as they did before.
 
 ### Saved Locations File Unreadable
 

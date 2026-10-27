@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A wildfire or US river-gauge lookup that fails is now marked as an error in the response.** `get_wildfire_info` (NIFC in the US, NASA FIRMS elsewhere) and `get_river_conditions` (the NWPS gauge list in the US) render a `❌` block in place of the report body when the fetch fails. That response now carries `isError: true`, so a client that checks the error flag no longer reads an outage as a report. The words on screen are unchanged. A rejected `FIRMS_MAP_KEY` with a working keyless fallback, and a single gauge's missing trend or flood stage, are still normal results.
+
 ## [1.35.6] - 2026-10-23
 
 The server's behaviour and output are unchanged; the published code is identical to 1.35.5. This release is for anyone who builds from source or runs the test suite. A few unit tests checked how many milliseconds a piece of work took, and on a busy machine they failed even though the code was correct. Those timing checks are gone, so the test suite now passes or fails on correctness alone.
