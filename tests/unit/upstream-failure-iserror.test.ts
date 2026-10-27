@@ -21,7 +21,7 @@ import type { NominatimService } from '../../src/services/nominatim.js';
 import type { LocationStore } from '../../src/services/locationStore.js';
 import type { GeocodingService } from '../../src/services/geocoding.js';
 import type { FIRMSDetection } from '../../src/types/firms.js';
-import type { NIFCQueryResponse } from '../../src/types/nifc.js';
+import type { NIFCQueryResponse } from '../../src/types/wildfire.js';
 import type { NWPSGauge } from '../../src/types/noaa.js';
 
 const NIFC_FAIL = 'zq-nifc-fail-7731';
