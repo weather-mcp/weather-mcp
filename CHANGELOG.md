@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Two high and four moderate dependency advisories are cleared.** `npm audit` reported them in packages the server ships. The two high ones: `body-parser` 2.3.0 (GHSA-27r3-jxmh-p828, denial of service from trailing bytes after a compressed request body) and `zod` 4.3.6 (GHSA-mrhx-c7xc-m3w5, memory exhaustion while validating oversized constrained collections). The four moderate ones are in `fast-uri` 3.1.8, `@hono/node-server` 2.1.0 and `qs` 6.16.0. `body-parser`, `qs` and `@hono/node-server` are reached only by `weather-mcp-http`; the stdio `weather-mcp` loads none of them. `zod` and `fast-uri` sit on the SDK's schema-validation path, which both entries load. The fixed versions are `body-parser` 2.4.0, `zod` 4.6.7, `fast-uri` 3.1.9 (the project's pin is raised to match), `@hono/node-server` 2.1.5 and `qs` 6.16.1. All are inside the ranges already declared, and all are past npm's seven-day `min-release-age`. (`package.json`, `package-lock.json`)
+
 ## [1.35.6] - 2026-10-23
 
 The server's behaviour and output are unchanged; the published code is identical to 1.35.5. This release is for anyone who builds from source or runs the test suite. A few unit tests checked how many milliseconds a piece of work took, and on a busy machine they failed even though the code was correct. Those timing checks are gone, so the test suite now passes or fails on correctness alone.
