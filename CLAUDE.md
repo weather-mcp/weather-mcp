@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.6 (Production Ready)
+- **Version:** 1.35.7 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -247,6 +247,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 - **Garnish** (records, normals, composited images, pollen, fire-weather dryness lines): wrapped in one try/catch, degrades silently to "no section" or a one-line note; **no retries** (must not add latency on failure); plain `Error`s. The only garnish failure that *must* surface is a **rejected API key** — silence would hide a misconfiguration from someone who deliberately configured one.
 - **Contract** (alerts, model comparison, ensemble spread, river/wildfire routing): failures **propagate** with the service's fixed sanitized message. A fabricated "✅ no alerts" from a failed fetch is a dangerous lie on safety data. Incompatible flag combinations are **validation errors thrown before any request**, never a silent downgrade to a different answer.
 - **A positive-assertion-only element may fail silently; nothing that claims coverage may.** The critical-alert banner (`src/utils/criticalAlert.ts` for the gate and copy, `src/handlers/criticalAlertBanner.ts` for the one fetch) omits itself on any failure with a single `securityEvent` warn and no retry — safe *only* because its absence asserts nothing. The moment a description, schema or doc says these tools "check for alerts", absence becomes an implied all-clear and the posture is no longer defensible. Keep the failure posture in one module rather than at each render site.
+- **A render that replaces the whole answer with an error block is an error result and carries `isError: true`; a note, caveat or disclosure on an answer is not.** The render returns whether its catch fired, and the handler sets the flag from that (`get_wildfire_info`, `get_river_conditions` NWPS). The flag is absent, not `false`, on success. Never infer it at the dispatch by matching text (G45).
 - **Distinguish "empty" from "not covered."** HTTP 200 with all-null arrays, HTTP 404 for an uncovered region, and a real empty result mean different things; render them differently (honest-empty with a coverage caveat vs "no coverage here — not an all-clear") and cache the not-covered answer (typed null sentinel) so it isn't re-probed.
 - **A runtime dependency may legitimately be absent, and the server must still boot.** A dependency reached by a single tool is declared `optionalDependencies` and loaded through a **memoised, single-flight dynamic `import()` at its one call site** — never statically, because `src/server/weatherServer.ts` imports every service unconditionally above the tool gate, and the entry imports it, so a static import turns a missing package into a server that cannot start rather than one unavailable tool. Its absence is a **contract** failure: a distinct error naming the package and the remedy, never an empty result. Only the "module not found" code counts as absent — any other import failure is a real fault, propagates unchanged, and is **not** memoised, so it is retried rather than cached as an absence. The resolution must happen before any connection state is touched: an `await` between a synchronously-set in-flight guard and the check that reads it silently lets every concurrent caller past (`mqtt`, v1.25.0).
 
@@ -726,15 +727,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.6 — Production Ready ✅
-- **Test Coverage:** 4,838 tests, 100% pass rate
+- **Version:** 1.35.7 — Production Ready ✅
+- **Test Coverage:** 4,858 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.7:** A failed wildfire or river-gauge fetch is flagged as an error, and two high dependency advisories are cleared
 - **New in v1.35.6:** The test suite no longer fails on a busy machine; the published code is unchanged
 - **New in v1.35.5:** A tool that makes several requests now answers before your MCP client gives up, even behind a silent proxy
-- **New in v1.35.4:** A request that times out behind a silent proxy now closes its proxy connection, and proxy credentials are percent-decoded
 
 ## Useful References
 
@@ -757,7 +758,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-10-23 (v1.35.6)
+**Last Updated:** 2026-10-29 (v1.35.7)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

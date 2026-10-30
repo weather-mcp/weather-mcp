@@ -369,6 +369,14 @@ as its text.
 `get_weather_imagery` prints `*Generated: <ISO ms>*`, the render-time wall clock, so base and branch
 **never** match raw, even back to back (equal length 807, one-line diff). Mask that one line
 (`\*Generated: [^*]+\*`) and the pair is md5-identical. Re-running does not help; masking does.
+
+2026-10-27 (upstream-failure-iserror T5) added a **unit-axis vacuity** case. A sweep that runs every
+probe under `WEATHER_UNITS=imperial` and `=metric` proves nothing about units on a path that prints
+both systems: `get_wildfire_info` (`100 km (62.1 miles)`, NIFC and FIRMS) and the NWPS river path
+(`0.7 km (0.5 mi)`) hashed **the same across the two unit systems**, not only base against branch.
+Before counting the metric half of the matrix as coverage, diff imperial against metric on one side:
+an identical pair means the axis was not exercised, and a unit change on that path needs a probe that
+reaches a unit-dependent line (the Open-Meteo and EA river paths read `resolveUnitPreferences`).
 **Status:** active, **extended 2026-08-27, 2026-09-02, 2026-09-03 and 2026-09-29**, **re-run 2026-09-01**
 (openmeteo-nullable-scalar-types T1–T3: the plan told the sweep in advance that
 a probe landing on a wire null would differ from base by exactly the omitted
@@ -5500,7 +5508,12 @@ and no test asserts on captured output.
 **Status:** active. Lintable, and the better fix is in the script rather than in
 every caller — `capture-examples.mjs` should treat a captured `❌` as a failed
 capture and refuse to write it, which would retire this entry. Flagged as such
-here. Related: [G11] (read the output, the exit code is not the acceptance),
+here. **Partly addressed 2026-10-27** (upstream-failure-iserror, `ef2d84b`, `d71d056`):
+the NIFC, FIRMS and NWPS `❌` blocks now carry `isError: true`, so `capture-examples.mjs:471`
+refuses them (`tool error — keeping previous content`); T5 step 5 showed the branch keep
+`wildfires`, `athens-hotspots` and `memphis-gauges` while the base wrote three error blocks over them
+(964 deleted lines). The entry stays **active** for any handler that still renders a `❌` with the
+flag unset — the content check below is still the only guard there. Related: [G11] (read the output, the exit code is not the acceptance),
 [G47] (a throttled upstream's well-formed zero needs a positive control),
 [G58] (the narrative around a regenerated capture, which is the *other* half of
 the examples trap and fired on the same commit), [G86] (the version stamp a

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.7] - 2026-10-29
+
+When `get_wildfire_info` or the US river-gauge path of `get_river_conditions` could not reach its data source, it replaced the report with an error message but still marked the response as a success. A client or agent that reads the error flag took the outage for an answer. These failures are now flagged as errors, and the message you read is unchanged. This release also clears two high and four moderate advisories in shipped dependencies. The high pair would have blocked publishing.
+
+### Fixed
+- **A wildfire or US river-gauge lookup that fails is now marked as an error in the response.** `get_wildfire_info` (NIFC in the US, NASA FIRMS elsewhere) and `get_river_conditions` (the NWPS gauge list in the US) render a `❌` block in place of the report body when the fetch fails. That response now carries `isError: true`, so a client that checks the error flag no longer reads an outage as a report. The words on screen are unchanged. A rejected `FIRMS_MAP_KEY` with a working keyless fallback, and a single gauge's missing trend or flood stage, are still normal results.
+
+### Security
+- **Two high and four moderate dependency advisories are cleared.** `npm audit` reported them in packages the server ships. The two high ones: `body-parser` 2.3.0 (GHSA-27r3-jxmh-p828, denial of service from trailing bytes after a compressed request body) and `zod` 4.3.6 (GHSA-mrhx-c7xc-m3w5, memory exhaustion while validating oversized constrained collections). The four moderate ones are in `fast-uri` 3.1.8, `@hono/node-server` 2.1.0 and `qs` 6.16.0. `body-parser`, `qs` and `@hono/node-server` are reached only by `weather-mcp-http`; the stdio `weather-mcp` loads none of them. `zod` and `fast-uri` sit on the SDK's schema-validation path, which both entries load. The fixed versions are `body-parser` 2.4.0, `zod` 4.6.7, `fast-uri` 3.1.9 (the project's pin is raised to match), `@hono/node-server` 2.1.5 and `qs` 6.16.1. All are inside the ranges already declared, and all are past npm's seven-day `min-release-age`. (`package.json`, `package-lock.json`)
+
 ## [1.35.6] - 2026-10-23
 
 The server's behaviour and output are unchanged; the published code is identical to 1.35.5. This release is for anyone who builds from source or runs the test suite. A few unit tests checked how many milliseconds a piece of work took, and on a busy machine they failed even though the code was correct. Those timing checks are gone, so the test suite now passes or fails on correctness alone.
@@ -2243,7 +2253,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.6...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.7...HEAD
+[1.35.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.6...v1.35.7
 [1.35.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.5...v1.35.6
 [1.35.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.4...v1.35.5
 [1.35.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.3...v1.35.4
