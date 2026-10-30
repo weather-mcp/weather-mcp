@@ -15,6 +15,11 @@ import {
 } from '../../src/utils/normals.js';
 import type { OpenMeteoHistoricalResponse } from '../../src/types/openmeteo.js';
 import { METRIC_PREFERENCES } from '../../src/config/units.js';
+import {
+  DataNotFoundError,
+  RateLimitError,
+  ServiceUnavailableError
+} from '../../src/errors/ApiError.js';
 
 /**
  * Build a synthetic full-year(ish) archive response for `computeNormalsTable`.
@@ -587,6 +592,16 @@ describe('Climate Normals Utilities', () => {
       };
     }
 
+    // The service's slot-null answer: too few samples in the record for this
+    // date. Cached and stable, so the only class that may speak about the place.
+    function buildNotFoundOpenMeteoFake() {
+      return {
+        getClimateNormals: vi
+          .fn()
+          .mockRejectedValue(new DataNotFoundError('OpenMeteo', 'slot is null'))
+      };
+    }
+
     type RenderArgs = Parameters<typeof renderNormalsSection>;
 
     it('renders the climate section with departures on success', async () => {
@@ -610,7 +625,7 @@ describe('Climate Normals Utilities', () => {
       expect(output).not.toContain('not available');
     });
 
-    it('renders the aligned heading and the unchanged note on failure', async () => {
+    it('renders the aligned heading and the retrieval note on failure', async () => {
       const openMeteo = buildRejectingOpenMeteoFake();
 
       const output = await renderNormalsSection(
@@ -624,9 +639,50 @@ describe('Climate Normals Utilities', () => {
       );
 
       expect(output).toContain('## 📊 Climate Context');
-      expect(output).toContain('⚠️ Climate normals data not available for this location.');
+      expect(output).toContain('⚠️ Climate normals could not be retrieved right now; try again later.');
+      expect(output).not.toContain('for this location');
+      expect(output).not.toContain('at this location');
       // The old failure-only heading is gone.
       expect(output).not.toContain('## Climate Normals');
+    });
+
+    it('renders the not-found note naming the date on DataNotFoundError', async () => {
+      const output = await renderNormalsSection(
+        buildNotFoundOpenMeteoFake() as unknown as RenderArgs[0],
+        undefined,
+        0,
+        -160,
+        7,
+        15,
+        {}
+      );
+
+      expect(output).toContain('## 📊 Climate Context');
+      expect(output).toContain('No climate normals for Jul 15 at this location');
+      expect(output).toContain('1991-2020');
+      expect(output).not.toContain('could not be retrieved');
+    });
+
+    it.each([
+      ['RateLimitError', new RateLimitError('OpenMeteo', 'rate limited')],
+      ['ServiceUnavailableError', new ServiceUnavailableError('OpenMeteo', 'archive down')]
+    ])('renders the retrieval note on %s, saying nothing about the place', async (_name, error) => {
+      const openMeteo = { getClimateNormals: vi.fn().mockRejectedValue(error) };
+
+      const output = await renderNormalsSection(
+        openMeteo as unknown as RenderArgs[0],
+        undefined,
+        0,
+        -160,
+        7,
+        15,
+        {}
+      );
+
+      expect(output).toContain('## 📊 Climate Context');
+      expect(output).toContain('⚠️ Climate normals could not be retrieved right now; try again later.');
+      expect(output).not.toContain('for this location');
+      expect(output).not.toContain('at this location');
     });
 
     it('never throws when the normals fetch fails — normals are garnish', async () => {
@@ -668,8 +724,19 @@ describe('Climate Normals Utilities', () => {
         {}
       );
 
+      const notFound = await renderNormalsSection(
+        buildNotFoundOpenMeteoFake() as unknown as RenderArgs[0],
+        undefined,
+        0,
+        -160,
+        7,
+        15,
+        {}
+      );
+
       expect(heading(success)).toBeDefined();
       expect(heading(failure)).toBe(heading(success));
+      expect(heading(notFound)).toBe(heading(success));
     });
   });
 });

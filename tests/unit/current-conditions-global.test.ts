@@ -706,7 +706,7 @@ describe('handleGetCurrentConditions — include_normals (non-US)', () => {
     expect(text).toContain('## 📊 Climate Context');
     expect(text).toContain('**Normal High:** 65°F');
     expect(text).toContain('**Normal Low:** 45°F');
-    expect(text).not.toContain('Climate normals data not available for this location');
+    expect(text).not.toContain('could not be retrieved');
   });
 
   it('soft-fails to the aligned heading and unavailable note when getClimateNormals rejects, without failing the response', async () => {
@@ -721,7 +721,7 @@ describe('handleGetCurrentConditions — include_normals (non-US)', () => {
 
     // Normals are garnish: the parent response still resolves successfully.
     expect(text).toContain('## 📊 Climate Context');
-    expect(text).toContain('⚠️ Climate normals data not available for this location.');
+    expect(text).toContain('⚠️ Climate normals could not be retrieved right now; try again later.');
   });
 });
 

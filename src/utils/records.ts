@@ -19,7 +19,7 @@ import { logger, redactCoordinatesForLogging } from './logger.js';
 /** Attribution line rendered immediately after the records line. */
 const RECORDS_ATTRIBUTION = 'Records: NOAA Regional Climate Centers (ACIS)';
 
-const MONTH_NAMES = [
+export const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
