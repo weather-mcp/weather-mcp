@@ -297,6 +297,15 @@ fetches 25 alert documents where `standard` fetches 10, so the heavier detail
 level rate-limits (SACHET 403s) on a path the lighter one sails through. The
 sweep at default detail can be green while the at-`full` read is silently empty.
 
+The same load asymmetry on Open-Meteo: an `include_normals` probe on a cold process pulls the
+full archive table, and the archive's limit is **hourly**. About 30 such pulls in 15 minutes
+(ten base/branch pairs plus re-runs) returned `{"reason":"Hourly API request limit exceeded. …"}`
+(HTTP 429) on every later pull, and spacing the probes did not help until the hour turned
+(normals-failure-wording T3, 2026-10-30). The construct check catches it. Then stop probing,
+confirm with one two-day `archive-api.open-meteo.com/v1/archive` request, and resume after it
+answers 200. Do not widen the gap between the two spawns of a pair to dodge the limit. A 75 s gap
+drifted an observation-age line (`30 minutes ago` against `31`), which is the first trap again.
+
 **Verify:** `.claude/scratch/national-cap-alerts/alerts-sweep.mjs` (gitignored
 scratch) and the md5 table in the archived plan set's implementation notes.
 Before trusting any match, `grep -c` both outputs for the construct under test
@@ -7304,6 +7313,22 @@ tick, and the collection sleep measured from a `t` that had already moved.
 **Evidence:** 2026-10-23, wall-clock-test-asserts T2 (`453822c`) positive control and the orchestrator's probe on `src/`. Both reported a warning and exited 0.
 
 **Status:** active. **Lint candidate:** set `linterOptions: { reportUnusedDisableDirectives: 'error' }` in `eslint.config.js` (or add `--max-warnings 0` to the `lint` script), then retire this entry and correct CLAUDE.md's Linting sentence. Related: [G135] (a lint zero needs a mutation to mean anything).
+
+---
+
+## G157 — The Open-Meteo archive is gapless worldwide, so no real coordinate reaches the normals not-found path
+
+**Trigger:** a plan or test drive that wants to show `DataNotFoundError` from `OpenMeteoService.getClimateNormals` live, or the `No climate normals for <Mon D> at this location` note, by probing an "all-null" point such as open ocean or a pole. Also any doc sentence that names such places as where the note appears.
+
+**Rule:** treat the not-found normals path as **unit-proven only**. Prove it through `tests/unit/normals.test.ts` with a rejected `DataNotFoundError`, and record in the QA record that it is unreachable live. In user docs, describe it by its cause (too few samples in the 1991-2020 record for that date). Never name example places ([G46]).
+
+**Why:** a slot is null only with fewer than `NORMALS_MIN_SAMPLES` (15; 6 for Feb 29) samples (`src/utils/normals.ts:91-97`). The archive serves ERA5, which is a reanalysis with no gaps over ocean or ice. The "open ocean answers 200 with all-null arrays" rule in CLAUDE.md is true for pollen, flood and ensemble probability. It is not true for the archive. The design plan and T4 of normals-failure-wording both assumed it was, and the docs would have published an unproven place claim.
+
+**Verify:** `curl -s 'https://archive-api.open-meteo.com/v1/archive?latitude=0&longitude=-160&start_date=2000-07-15&end_date=2000-07-16&daily=temperature_2m_max,temperature_2m_min,precipitation_sum'` returns finite values. Do the same at `latitude=-90&longitude=0` and `latitude=90&longitude=0`. If any of them returns `null`, this entry is stale.
+
+**Evidence:** 2026-10-30, normals-failure-wording T3. `get_forecast include_normals:true` at `0, -160` rendered `**Normal High:** 80°F`, and the three-point curl above was complete. Dan ruled the not-found note unit-proven only (plan rev 3). The T4 docs (`0a1ef0f`) name no places.
+
+**Status:** active. Related: [G10] (the hourly archive limit that this probing also hits), [G46].
 
 ---
 
