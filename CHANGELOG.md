@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.7] - 2026-10-29
+
 When `get_wildfire_info` or the US river-gauge path of `get_river_conditions` could not reach its data source, it replaced the report with an error message but still marked the response as a success. A client or agent that reads the error flag took the outage for an answer. These failures are now flagged as errors, and the message you read is unchanged. This release also clears two high and four moderate advisories in shipped dependencies. The high pair would have blocked publishing.
 
 ### Fixed
@@ -2251,7 +2253,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.6...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.7...HEAD
+[1.35.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.6...v1.35.7
 [1.35.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.5...v1.35.6
 [1.35.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.4...v1.35.5
 [1.35.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.3...v1.35.4
