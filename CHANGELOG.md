@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A failed climate-normals, fire-weather or severe-weather fetch no longer reads as a fact about the place.** `get_forecast` and `get_current_conditions` with `include_normals`, `get_current_conditions` with `include_fire_weather`, and `get_forecast` with `include_severe_weather` all said "not available for this location" when the fetch itself failed, which is a claim about the place, not about the request. A failed fetch now says it "could not be retrieved right now; try again later". The climate-normals section also tells two cases apart. A date with too few samples in the 1991-2020 record reads `No climate normals for <date> at this location — too few samples in the 1991-2020 record.`; that answer is cached and a retry will not change it. A pull that failed reads `Climate normals could not be retrieved right now; try again later.`; nothing is cached, so the next call retries. A station with no fire-weather indices still says `No atmospheric monitoring data available for this location.` All three sections stay optional, the rest of the response is unaffected, and successful output is unchanged.
+
 ## [1.35.7] - 2026-10-29
 
 When `get_wildfire_info` or the US river-gauge path of `get_river_conditions` could not reach its data source, it replaced the report with an error message but still marked the response as a success. A client or agent that reads the error flag took the outage for an answer. These failures are now flagged as errors, and the message you read is unchanged. This release also clears two high and four moderate advisories in shipped dependencies. The high pair would have blocked publishing.
