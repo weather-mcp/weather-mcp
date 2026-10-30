@@ -862,7 +862,7 @@ async function formatNOAAForecast(
       }
     } catch {
       // If severe weather data is unavailable, just note it without failing the whole request
-      output += `\n*Note: Severe weather probability data is not available for this location.*\n`;
+      output += `\n*Note: Severe weather probability data could not be retrieved right now; try again later.*\n`;
     }
   }
 
