@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.9] - 2026-11-09
+
 The server's behaviour and output are unchanged; the published code is identical to 1.35.8. This release is for anyone who builds from source or reads the test count. The published count included about a hundred unit tests that could never fail: they checked a copy of the code written inside the test, or arithmetic the test did itself, rather than the server. Several of them claimed to cover safety output, such as the order of NOAA alerts and the "no active alerts" text, that no real test covered at all. Those tests are gone, and each behaviour they claimed now has a real test that fails when the server's code breaks.
 
 ### Changed
@@ -2269,7 +2271,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.8...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.9...HEAD
+[1.35.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.8...v1.35.9
 [1.35.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.7...v1.35.8
 [1.35.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.6...v1.35.7
 [1.35.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.5...v1.35.6
