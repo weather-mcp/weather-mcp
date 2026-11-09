@@ -2068,6 +2068,8 @@ expect the post-run result to differ by exactly your own additions — otherwise
 later reader re-runs it, sees a hit, and cannot tell a documentation comment from
 a real assertion without opening the file.
 
+**Extended 2026-11-09** (`a583fcd`, vacuous-unit-tests T4) — **a "nothing in `src/` does this" claim must grep all of `src/`, not the layer the test's title names.** The plan ruled two "should throw on `west >= east`" tests rule 3, on the grounds that nothing throws there. It cited `grep -rn "west >= east\|south >= north" src/` as returning nothing. Run, that grep found the guard in four service methods (`noaa.ts:756`, `:851`, `nifc.ts:76`, `firms.ts:128`). The river handler never throws, but the service it calls does, and no test covered it. The deletion became a rule-2 replacement. Run the grep you cite and paste its output; do not write its expected result.
+
 **Status:** active. **Re-confirmed 2026-09-01** (`f48eda3`,
 openmeteo-nullable-scalar-types T6): the executing subagent pinned
 `wind_wave_peak_period` and missed its `swell_wave_peak_period` twin twenty
@@ -2619,7 +2621,9 @@ settle that with a sweep against the unmutated function; an equivalent mutant is
 recorded as such, not "fixed" with a test that cannot exist.
 
 
-**Status:** active, **extended 2026-08-29, twice on 2026-09-01, 2026-09-03, and 2026-09-24**. Related: [G13] (a fixture that cannot discriminate),
+**Extended 2026-11-09** (`56185c5`, vacuous-unit-tests T3) — **the redundant-term rule holds for a disjunction too, and a default reached only by omission needs an omitted-input row.** The NWPS radius guard is `typeof r !== 'number' || isNaN(r) || !isFinite(r)`. Deleting `isNaN` is equivalent, because `!isFinite(NaN)` is already true. Deleting `!isFinite` is the mutation that reddens. Separately, `?? EA_DEFAULT_RADIUS_KM` → `?? 50` survived a table of NaN, ±Infinity and string rows, because the invalid-value fallback assigns the same constant on its own line. Only `radius: undefined` reaches the `??`. When the same default is written at two sites, give each site an input that reaches it alone.
+
+**Status:** active, **extended 2026-08-29, twice on 2026-09-01, 2026-09-03, 2026-09-24, and 2026-11-09**. Related: [G13] (a fixture that cannot discriminate),
 [G32] (mutating to every *rejected implementation* — this entry is about the
 *entry point*, that one about the *alternative*), [G11] (read the real output),
 [G41] (a plan's mechanical prediction is not the contract), [G57] (the run that

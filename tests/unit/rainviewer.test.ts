@@ -264,16 +264,6 @@ describe('RainViewer Service', () => {
       expect(converted).toEqual([]);
     });
 
-    it('should handle single frame', () => {
-      const frames: RainViewerFrame[] = [
-        { time: 1699999999, path: '/v2/radar/1699999999' }
-      ];
-
-      const converted = service.convertFrames(frames, 40.7128, -74.006);
-
-      expect(converted.length).toBe(1);
-    });
-
     it('should handle multiple frames', () => {
       const frames: RainViewerFrame[] = Array.from({ length: 10 }, (_, i) => ({
         time: 1699999999 - i * 300,
@@ -412,17 +402,6 @@ describe('RainViewer Service', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should convert a large number of frames', () => {
-      const frames: RainViewerFrame[] = Array.from({ length: 100 }, (_, i) => ({
-        time: 1699999999 - i * 300,
-        path: `/v2/radar/${1699999999 - i * 300}`
-      }));
-
-      const converted = service.convertFrames(frames, 40.7128, -74.006);
-
-      expect(converted.length).toBe(100);
-    });
-
     it('should handle fractional coordinates', () => {
       const frame: RainViewerFrame = {
         time: 1699999999,

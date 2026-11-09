@@ -135,33 +135,9 @@ describe('METAR field parsing', () => {
       wspd: 8
     };
 
-    it('should read absent optional fields as undefined, not empty values', () => {
-      expect(sparse.wgst).toBeUndefined();
-      expect(sparse.wxString).toBeUndefined();
-      expect(sparse.slp).toBeUndefined();
-      expect(sparse.visib).toBeUndefined();
-      expect(sparse.clouds).toBeUndefined();
-      expect(sparse.fltCat).toBeUndefined();
-    });
-
     it('should yield undefined from the parsers for absent fields', () => {
       expect(parseVisibilityMiles(sparse.visib)).toBeUndefined();
       expect(parseWindDirection(sparse.wdir)).toBe(120);
-    });
-
-    it('should still carry the always-present identity and timing fields', () => {
-      expect(sparse.icaoId).toBe('HKJK');
-      expect(typeof sparse.obsTime).toBe('number');
-      expect(typeof sparse.reportTime).toBe('string');
-      expect(sparse.rawOb).toContain('HKJK');
-    });
-
-    it('should handle a report missing temperature entirely', () => {
-      const noTemp: MetarObservation = { ...sparse, temp: undefined, dewp: undefined };
-
-      expect(noTemp.temp).toBeUndefined();
-      expect(noTemp.dewp).toBeUndefined();
-      expect(noTemp.wspd).toBe(8);
     });
   });
 });
