@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The server's behaviour and output are unchanged; the published code is identical to 1.35.8. This release is for anyone who builds from source or reads the test count. The published count included about a hundred unit tests that could never fail: they checked a copy of the code written inside the test, or arithmetic the test did itself, rather than the server. Several of them claimed to cover safety output, such as the order of NOAA alerts and the "no active alerts" text, that no real test covered at all. Those tests are gone, and each behaviour they claimed now has a real test that fails when the server's code breaks.
+
+### Changed
+- **Every unit test now exercises the server's own code.** 100 tests that could not fail are removed. New tests cover what they claimed, through the server's real handlers and services: the order NOAA alerts are listed in and the exact all-clear text; the 48-hour window and the 500-entry cap behind the severe-weather probabilities; the search-radius limits, nearest-first order and radius filter for wildfire and river results; the river-gauge search box; the lightning buffer cap; Markdown escaping of place names in search results and saved locations; and the retry delays for NOAA and Open-Meteo. Each new test was checked by breaking the line it covers and confirming the test failed. The suite count falls from 4,863 to 4,829.
+- **Five radar-tile checks stay as they were, on purpose.** Their replacement failed against the real code: at latitudes beyond about ±85°, a radar tile URL points one row past the edge of the tile grid. This release changes no server code, so the old checks stay until that is fixed in a later release.
+
 ## [1.35.8] - 2026-11-09
 
 When the climate-normals, fire-weather or severe-weather data could not be fetched, for example because an upstream was rate-limited or down, the response said that data was "not available for this location". That reads as a fact about the place, so a user could conclude a location has no climate record when the request had only failed. A failed fetch now says so and asks you to try again. This release also clears a high-severity advisory in a dependency that every upstream request uses.
