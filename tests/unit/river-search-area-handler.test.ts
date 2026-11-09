@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleGetRiverConditions } from '../../src/handlers/riverConditionsHandler.js';
 import { calculateDistance } from '../../src/utils/distance.js';
-import type { NOAAService } from '../../src/services/noaa.js';
+import { NOAAService } from '../../src/services/noaa.js';
 import type { OpenMeteoService } from '../../src/services/openmeteo.js';
 import type { LocationStore } from '../../src/services/locationStore.js';
 import type { GeocodingService } from '../../src/services/geocoding.js';
@@ -205,5 +205,98 @@ describe('handleGetRiverConditions nearest-first order and radius filter (NWPS p
     expect(text.indexOf('## Near Gauge\n')).toBeLessThan(text.indexOf('## Far Gauge\n'));
     expect(text).not.toContain('Corner Gauge');
     expect(text).toContain('**Found 2 river gauges**');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bounding box arguments (NWPS path)
+// ---------------------------------------------------------------------------
+
+// The four arguments of getNWPSGaugesInBoundingBox, in order (west, south, east, north).
+// Expected values are literals worked out by hand, not a copy of the handler's formula:
+//   latDelta = radius / 111;  lonDelta = radius / (111 * cos(lat));  each side clamped to +-90 / +-180.
+describe('handleGetRiverConditions bounding box arguments (NWPS path)', () => {
+  async function boxFor(args: Record<string, unknown>): Promise<number[]> {
+    const nwps = buildNwpsFake();
+    nwps.getNWPSGaugesInBoundingBox.mockResolvedValue([]);
+    await callNwps(nwps, args);
+    expect(nwps.getNWPSGaugesInBoundingBox).toHaveBeenCalledTimes(1);
+    return nwps.getNWPSGaugesInBoundingBox.mock.calls[0] as number[];
+  }
+
+  function expectBox(actual: number[], expected: [number, number, number, number]) {
+    expect(actual).toHaveLength(4);
+    expected.forEach((value, i) => expect(actual[i]).toBeCloseTo(value, 6));
+  }
+
+  it('Boston at 50 km passes (west, south, east, north) unclamped', async () => {
+    const box = await boxFor({ radius: 50 });
+    // latDelta = 50/111 = 0.450450; lonDelta = 50/(111*cos 42.3601 deg = 111*0.738925) = 0.609603
+    expectBox(box, [
+      -71.668503, // -71.0589 - 0.609603
+      41.909650,  //  42.3601 - 0.450450
+      -70.449297, // -71.0589 + 0.609603
+      42.810550   //  42.3601 + 0.450450
+    ]);
+  });
+
+  it('the equator at 111 km is exactly one degree on each side (cos 0 = 1)', async () => {
+    const box = await boxFor({ latitude: 0, longitude: -75, source: 'noaa', radius: 111 });
+    // latDelta = 111/111 = 1; lonDelta = 111/(111*1) = 1
+    expectBox(box, [-76, -1, -74, 1]);
+  });
+
+  it('an auto-routed Alaska point clamps west to -180 and leaves east unclamped', async () => {
+    const box = await boxFor({ latitude: 60, longitude: -179, radius: 500 });
+    // lonDelta = 500/(111*0.5) = 9.009009; west = -179 - 9.009 = -188.009 -> -180
+    // east = -179 + 9.009009 = -169.990991 (no clamp); latDelta = 500/111 = 4.504505
+    expect(box[0]).toBe(-180);
+    expect(box[1]).toBeCloseTo(55.495495, 6); // 60 - 4.504505
+    expect(box[2]).toBeCloseTo(-169.990991, 6);
+    expect(box[3]).toBeCloseTo(64.504505, 6); // 60 + 4.504505
+  });
+
+  it('forced source: a point near the north pole and dateline clamps north to 90 and east to 180', async () => {
+    const box = await boxFor({ latitude: 89, longitude: 179, radius: 500, source: 'noaa' });
+    // latDelta = 4.504505; north = 89 + 4.5045 = 93.5045 -> 90
+    // lonDelta = 500/(111*cos 89 deg = 111*0.0174524) = 258.102200; east = 179 + 258.1 = 437.1 -> 180
+    // west = 179 - 258.102200 = -79.102200 (no clamp); south = 89 - 4.504505 = 84.495495
+    expectBox(box, [-79.1022, 84.495495, 180, 90]);
+  });
+
+  it('forced source: a point near the south pole clamps south to -90', async () => {
+    const box = await boxFor({ latitude: -89, longitude: 0, radius: 500, source: 'noaa' });
+    // latDelta = 4.504505; south = -89 - 4.5045 = -93.5045 -> -90; north = -89 + 4.504505 = -84.495495
+    // lonDelta = 258.102200 -> west = -258.1 -> -180, east = 258.1 -> 180
+    expectBox(box, [-180, -90, 180, -84.495495]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The service-side guard on an inverted box
+// ---------------------------------------------------------------------------
+
+describe('NOAAService.getNWPSGaugesInBoundingBox rejects an inverted or empty box', () => {
+  // The handler always builds west < east and south < north, so the guard is
+  // reachable only by calling the service directly. It throws before any
+  // request, so no network is involved.
+  it.each([
+    ['west > east', [-90, 30, -100, 40]],
+    ['west = east', [-95, 30, -95, 40]],
+  ])('throws the longitude message for %s', async (_label, box) => {
+    const [west, south, east, north] = box as [number, number, number, number];
+    await expect(new NOAAService().getNWPSGaugesInBoundingBox(west, south, east, north)).rejects.toThrow(
+      'Invalid bounding box: west longitude must be less than east longitude'
+    );
+  });
+
+  it.each([
+    ['south > north', [-100, 40, -90, 30]],
+    ['south = north', [-100, 35, -90, 35]],
+  ])('throws the latitude message for %s', async (_label, box) => {
+    const [west, south, east, north] = box as [number, number, number, number];
+    await expect(new NOAAService().getNWPSGaugesInBoundingBox(west, south, east, north)).rejects.toThrow(
+      'Invalid bounding box: south latitude must be less than north latitude'
+    );
   });
 });
