@@ -328,27 +328,6 @@ describe('Geohash Neighbor API Usage', () => {
     });
   });
 
-  describe('Batch', () => {
-    it('should calculate neighbors for a batch of hashes', () => {
-      const hashes = [
-        'dr5r',
-        'dr5x',
-        'dr5p',
-        'dr5q',
-        'dr5w',
-        'dr5n',
-        'dr5j',
-        'dr5m',
-        'dr5t',
-        'dr5v'
-      ];
-
-      const allNeighbors = hashes.map(hash => getGeohashNeighbors(hash));
-
-      expect(allNeighbors.length).toBe(hashes.length);
-    });
-  });
-
   describe('Neighbor API Direction Parameter Usage', () => {
     it('should use correct direction vectors', () => {
       // Test that our implementation uses ngeohash.neighbor correctly

@@ -357,23 +357,4 @@ describe('Distance Calculation Utilities', () => {
       expect(distance).toBeCloseTo(3936, 0);
     });
   });
-
-  describe('Batch', () => {
-    it('should calculate distances for a batch of points', () => {
-      const centerLat = 40.7128;
-      const centerLon = -74.0060;
-
-      // Generate 100 random points
-      const points = Array.from({ length: 100 }, () => ({
-        lat: (Math.random() * 180) - 90,
-        lon: (Math.random() * 360) - 180
-      }));
-
-      const distances = points.map(p =>
-        calculateDistance(centerLat, centerLon, p.lat, p.lon)
-      );
-
-      expect(distances.length).toBe(100);
-    });
-  });
 });

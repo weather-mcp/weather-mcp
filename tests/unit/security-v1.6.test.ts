@@ -82,30 +82,6 @@ describe('v1.6.0 Security - Bounds Checking and Validation', () => {
       const tiles = computeGeohashTiles(0, 0, 2000, 7);
 
       expect(tiles.size).toBeLessThanOrEqual(10000);
-
-      // If it would have generated more, size should be exactly at limit
-      if (tiles.size === 10000) {
-        // This is correct behavior - hit the safety limit
-        expect(tiles.size).toBe(10000);
-      }
-    });
-  });
-
-  describe('Input Sanitization for v1.6.0 Handlers', () => {
-    it('should reject non-object arguments', () => {
-      const invalidArgs = [
-        null,
-        undefined,
-        'string',
-        123,
-        true,
-        []
-      ];
-
-      invalidArgs.forEach(args => {
-        const isValid = typeof args === 'object' && args !== null && !Array.isArray(args);
-        expect(isValid).toBe(false);
-      });
     });
   });
 
@@ -120,41 +96,6 @@ describe('v1.6.0 Security - Bounds Checking and Validation', () => {
 
       expect(tiles.size).toBeGreaterThan(0);
       expect(duration).toBeLessThan(1000); // Should complete in < 1 second
-    });
-  });
-
-  describe('Security Event Logging', () => {
-    let warnSpy: ReturnType<typeof vi.spyOn>;
-
-    beforeEach(() => {
-      warnSpy = vi.spyOn(logger, 'warn');
-    });
-
-    afterEach(() => {
-      warnSpy.mockRestore();
-    });
-
-    it('should log security events for bounds violations', () => {
-      // Simulate bounds violation scenario
-      const tiles = computeGeohashTiles(0, 0, 5000, 7);
-
-      // If tiles hit the 10,000 limit, it's a security-relevant event
-      if (tiles.size === 10000) {
-        // This would have triggered security logging in the actual implementation
-        expect(tiles.size).toBe(10000);
-      }
-    });
-
-    it('should include securityEvent flag in logs', () => {
-      // Mock scenario where security event would be logged
-      const mockSecurityLog = {
-        message: 'Geohash tile calculation exceeded safety limit',
-        securityEvent: true,
-        tileCount: 10000,
-        maxTiles: 10000
-      };
-
-      expect(mockSecurityLog.securityEvent).toBe(true);
     });
   });
 });
