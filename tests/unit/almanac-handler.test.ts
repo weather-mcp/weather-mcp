@@ -617,8 +617,8 @@ describe('handleGetCurrentConditions — US records gating', () => {
 
   it('still renders the records line (A5) when the normals fetch itself fails', async () => {
     // NCEI unavailable (default fake) routes normals through Open-Meteo; make
-    // that fail too so the normals section reports "not available" while the
-    // ACIS fake succeeds independently.
+    // that fail too so the normals section renders the retrieval note while
+    // the ACIS fake succeeds independently.
     const failingNormalsOpenMeteo = buildOpenMeteoCurrentFake();
     failingNormalsOpenMeteo.getClimateNormals.mockRejectedValue(new Error('normals unavailable'));
     const fakes = buildCurrentFakes();
@@ -630,7 +630,7 @@ describe('handleGetCurrentConditions — US records gating', () => {
     const result = await callCurrentConditions({ ...US_COORDS, include_normals: true }, fakes, acis);
     const text = textOf(result);
 
-    expect(text).toContain('Climate normals data not available for this location');
+    expect(text).toContain('Climate normals could not be retrieved');
     expect(text).toContain('**Records for Jan 1:**');
     expect(text).toContain('Low 49°F (1953)');
     expect(text).toContain(RECORDS_ATTRIBUTION);

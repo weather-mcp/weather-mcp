@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.8] - 2026-11-09
+
+When the climate-normals, fire-weather or severe-weather data could not be fetched, for example because an upstream was rate-limited or down, the response said that data was "not available for this location". That reads as a fact about the place, so a user could conclude a location has no climate record when the request had only failed. A failed fetch now says so and asks you to try again. This release also clears a high-severity advisory in a dependency that every upstream request uses.
+
+### Fixed
+- **A failed climate-normals, fire-weather or severe-weather fetch no longer reads as a fact about the place.** `get_forecast` and `get_current_conditions` with `include_normals`, `get_current_conditions` with `include_fire_weather`, and `get_forecast` with `include_severe_weather` all said "not available for this location" when the fetch itself failed, which is a claim about the place, not about the request. A failed fetch now says it "could not be retrieved right now; try again later". The climate-normals section also tells two cases apart. A date with too few samples in the 1991-2020 record reads `No climate normals for <date> at this location — too few samples in the 1991-2020 record.`; that answer is cached and a retry will not change it. A pull that failed reads `Climate normals could not be retrieved right now; try again later.`; nothing is cached, so the next call retries. A station with no fire-weather indices still says `No atmospheric monitoring data available for this location.` All three sections stay optional, the rest of the response is unaffected, and successful output is unchanged.
+
+### Security
+- **A high dependency advisory is cleared.** `npm audit` reported `follow-redirects` 1.16.1 (GHSA-mrwp-f3q8-3g9p: cross-realm `sensitiveHeaders` arrays are discarded, so custom credentials can follow a redirect). It is reached through `axios`, which both entries use for every upstream request. The fixed version, 1.16.2, is inside the range `axios` already declares and past npm's seven-day `min-release-age`. (`package-lock.json`)
+
 ## [1.35.7] - 2026-10-29
 
 When `get_wildfire_info` or the US river-gauge path of `get_river_conditions` could not reach its data source, it replaced the report with an error message but still marked the response as a success. A client or agent that reads the error flag took the outage for an answer. These failures are now flagged as errors, and the message you read is unchanged. This release also clears two high and four moderate advisories in shipped dependencies. The high pair would have blocked publishing.
@@ -2253,7 +2263,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.7...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.8...HEAD
+[1.35.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.7...v1.35.8
 [1.35.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.6...v1.35.7
 [1.35.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.5...v1.35.6
 [1.35.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.4...v1.35.5

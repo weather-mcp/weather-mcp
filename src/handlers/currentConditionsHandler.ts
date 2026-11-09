@@ -799,7 +799,7 @@ async function formatNOAACurrentConditions(
     } catch {
       // If fire weather data fetch fails, just skip it (don't error the whole request)
       output += `\n## Fire Weather\n\n`;
-      output += `⚠️ Fire weather data not available for this location.\n`;
+      output += `⚠️ Fire weather data could not be retrieved right now; try again later.\n`;
     }
   }
 

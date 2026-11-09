@@ -17,6 +17,8 @@ import type { OpenMeteoService } from '../services/openmeteo.js';
 import type { NCEIService } from '../services/ncei.js';
 import { logger, redactCoordinatesForLogging } from './logger.js';
 import { isInUS } from './geography.js';
+import { DataNotFoundError } from '../errors/ApiError.js';
+import { MONTH_NAMES } from './records.js';
 /**
  * The daily series are declared `(number | null)[]`, as Open-Meteo sends them.
  * `finiteSampleAt` turns a published `null` — and a missing or short array —
@@ -243,6 +245,17 @@ export function calculateDeparture(actual: number, normal: number): string {
 const CLIMATE_SECTION_HEADING = '## 📊 Climate Context';
 
 /**
+ * The two failure notes. A `DataNotFoundError` is a cached, stable answer about
+ * the place; anything else is a pull that did not complete, so its note says
+ * nothing about the place. Both are fixed strings: never render the error text.
+ */
+function notFoundNote(month: number, day: number): string {
+  return `⚠️ No climate normals for ${MONTH_NAMES[month - 1]} ${day} at this location — too few samples in the 1991-2020 record.`;
+}
+
+const RETRIEVAL_FAILURE_NOTE = '⚠️ Climate normals could not be retrieved right now; try again later.';
+
+/**
  * Format climate normals for display
  *
  * @param normals - Climate normals data
@@ -296,8 +309,11 @@ export function formatNormals(
 }
 
 /**
- * Render the climate-normals section for a location and date, or the
- * unavailable note if the normals can't be had (D6).
+ * Render the climate-normals section for a location and date, or one of two
+ * failure notes (D6). A `DataNotFoundError` (too few samples in the record for
+ * this date; cached, so stable) renders the not-found note naming the date;
+ * any other failure (the pull did not complete; nothing cached, the next call
+ * retries) renders the retrieval note, which says nothing about the place.
  *
  * This owns the try/catch, the `getClimateNormals` call, and both outcomes —
  * the five handler blocks that used to duplicate it (two in
@@ -334,9 +350,17 @@ export async function renderNormalsSection(
     );
 
     return formatNormals(normals, currentTemps, prefs);
-  } catch {
+  } catch (error) {
     // Normals failing must never fail the request that asked for them.
-    return `\n${CLIMATE_SECTION_HEADING}\n\n⚠️ Climate normals data not available for this location.\n`;
+    if (error instanceof DataNotFoundError) {
+      // The 1991-2020 record has too few samples for this date here. The all-null
+      // slot is cached (CacheConfig.ttl.normals), so the answer is stable: say so,
+      // and do not invite a retry.
+      return `\n${CLIMATE_SECTION_HEADING}\n\n${notFoundNote(month, day)}\n`;
+    }
+    // Anything else: the pull did not complete. Nothing was cached and the next
+    // call retries, so say nothing about the place.
+    return `\n${CLIMATE_SECTION_HEADING}\n\n${RETRIEVAL_FAILURE_NOTE}\n`;
   }
 }
 

@@ -189,3 +189,20 @@ describe('get_forecast — NOAA **Updated:** line', () => {
     expect(text).not.toContain('**Updated:**');
   });
 });
+
+describe('get_forecast — NOAA severe-weather fetch failure wording', () => {
+  it('words a failed gridpoint fetch as a retrieval failure, not an absence claim', async () => {
+    const periods = [buildForecastPeriod({})];
+    const noaa = buildNoaaForecastFake(periods, '2026-08-12T00:00:00-07:00');
+    const result = await callForecast({ ...US_COORDS, days: 1, include_severe_weather: true }, noaa);
+    const text = textOf(result);
+    // Positive control: the forecast periods above the note still render.
+    expect(text).toContain('# Weather Forecast (Daily)');
+    expect(text).toContain('Sunny throughout.');
+    expect(text).toContain('Severe weather probability data could not be retrieved');
+    expect(text).toMatch(
+      /^\*Note: Severe weather probability data could not be retrieved right now; try again later\.\*$/m
+    );
+    expect(text).not.toContain('for this location');
+  });
+});

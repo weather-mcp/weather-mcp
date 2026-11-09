@@ -105,6 +105,17 @@ same message without a retry. Possible causes are a problem with your own
 internet connection or DNS, or an outage at NOAA. Check your connection, then
 the planned-outages page: https://weather-gov.github.io/api/planned-outages
 
+`include_fire_weather` on `get_current_conditions` is an optional section. If its
+gridpoint fetch fails, the section reads `Fire weather data could not be retrieved
+right now; try again later.` and the rest of the response is unaffected. A
+station that publishes no fire-weather indices says `No atmospheric monitoring
+data available for this location.` instead.
+
+`include_severe_weather` on `get_forecast` is an optional section too. If its
+gridpoint fetch fails, the forecast shows the note `Severe weather probability
+data could not be retrieved right now; try again later.` and the rest of the
+response is unaffected.
+
 ### Open-Meteo API Errors
 
 Each Open-Meteo call retries a rate limit (429), a server error (5xx) or a failed
@@ -112,6 +123,15 @@ connection up to three times with backoff, waiting at most about 7 s in total. A
 timeout is not retried. The climate-normals pull keeps its own single retry on a
 rate limit. Place-name lookups that reach Open-Meteo's geocoder are not retried;
 see [Location Lookup Errors](#location-lookup-errors).
+
+`include_normals` on `get_forecast` and `get_current_conditions` is optional
+context and never fails the tool. If the archive pull fails, after that one
+retry, the Climate Context section reads `⚠️ Climate normals could not be
+retrieved right now; try again later.` Nothing is cached, so the next call tries
+again. If the 1991-2020 record has too few samples for the date, it reads
+`⚠️ No climate normals for Jul 15 at this location — too few samples in the
+1991-2020 record.` That answer is cached with the location's normals, so a retry
+will not change it.
 
 **`get_forecast` outside the US does not show most of these.** A transient
 Open-Meteo failure — a 5xx, a rate limit, a timeout, or a network failure, after

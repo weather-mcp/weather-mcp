@@ -537,6 +537,27 @@ describe('handleGetCurrentConditions — fire-weather NOAA path keys on the prin
     );
     expect(text).toContain('**🟠 Grassland Fire Danger:** 2.5 (High)');
   });
+
+  it('a failed gridpoint fetch renders a retrieval-failure line, not an absence claim', async () => {
+    const noaa = buildNoaaFake(buildObservation(16090));
+    noaa.getGridpointDataByCoordinates.mockRejectedValue(new Error('gridpoint down'));
+    const support = buildSupportFakes();
+    const result = await handleGetCurrentConditions(
+      { ...US_COORDS, include_fire_weather: true },
+      noaa as unknown as NOAAService,
+      support.openMeteo as unknown as OpenMeteoService,
+      support.ncei as unknown as NCEIService,
+      support.locationStore as unknown as LocationStore,
+      support.geocoding as unknown as GeocodingService
+    );
+    const text = textOf(result);
+    // Positive control: the observation above the section still rendered.
+    expect(text).toContain('Clear');
+    expect(text).toContain('## Fire Weather');
+    expect(text).toContain('Fire weather data could not be retrieved');
+    const section = text.slice(text.indexOf('## Fire Weather')).split(/\n## /)[0];
+    expect(section).not.toContain('for this location');
+  });
 });
 
 // ---------------------------------------------------------------------------
