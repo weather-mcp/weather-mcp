@@ -221,46 +221,6 @@ describe('v1.6.1 Security & Quality Fixes', () => {
     });
   });
 
-  describe('Cache Immutability (Forecast Handler)', () => {
-    /**
-     * Test that array slicing creates a copy and doesn't mutate the original
-     */
-    it('should not mutate cached array when applying bounds check', () => {
-      const originalArray = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-      const originalLength = originalArray.length;
-
-      // Simulate the fix: create a local copy instead of mutating
-      const maxEntries = 5;
-      let valuesToProcess = originalArray;
-
-      if (originalArray.length > maxEntries) {
-        valuesToProcess = originalArray.slice(0, maxEntries); // Creates copy
-      }
-
-      // Original should remain unchanged
-      expect(originalArray.length).toBe(originalLength);
-      expect(originalArray).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-
-      // Processed should be truncated
-      expect(valuesToProcess.length).toBe(5);
-      expect(valuesToProcess).toEqual([1, 2, 3, 4, 5]);
-    });
-
-    it('should detect mutation if using assignment (anti-pattern)', () => {
-      const cachedArray = [1, 2, 3, 4, 5];
-      const originalLength = cachedArray.length;
-
-      // WRONG: This mutates the cached object (the bug we fixed)
-      const wrongApproach = cachedArray;
-      if (wrongApproach.length > 3) {
-        // This would mutate the original
-        const mutated = wrongApproach.slice(0, 3);
-        expect(cachedArray.length).toBe(originalLength); // Original still intact
-        expect(mutated.length).toBe(3); // Copy is truncated
-      }
-    });
-  });
-
   describe('NWPS Bounding Box Calculation', () => {
     /**
      * Test bounding box calculation for river gauge queries

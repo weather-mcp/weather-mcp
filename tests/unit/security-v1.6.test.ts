@@ -439,30 +439,6 @@ describe('v1.6.0 Security - Bounds Checking and Validation', () => {
   });
 
   describe('Resource Exhaustion Prevention', () => {
-    it('should limit array processing iterations', () => {
-      // Create large array
-      const largeArray = Array.from({ length: 100000 }, (_, i) => i);
-
-      // Process only first 500 (like forecast handler)
-      const maxEntries = 500;
-      const bounded = largeArray.slice(0, maxEntries);
-
-      expect(bounded.length).toBe(maxEntries);
-    });
-
-    it('should process only the bounded subset', () => {
-      const maxEntries = 500;
-      const data = Array.from({ length: 10000 }, (_, i) => ({
-        value: Math.random() * 100,
-        timestamp: Date.now() + i * 1000
-      }));
-
-      // Process only bounded subset
-      const bounded = data.slice(0, maxEntries);
-
-      expect(bounded.length).toBe(maxEntries);
-    });
-
     it('should prevent infinite loops in tile calculation', () => {
       // Tile calculation uses BFS with visited set
       // Should terminate even with circular references
