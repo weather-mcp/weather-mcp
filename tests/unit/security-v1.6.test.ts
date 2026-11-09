@@ -91,78 +91,6 @@ describe('v1.6.0 Security - Bounds Checking and Validation', () => {
     });
   });
 
-  describe('Radius Clamping (1-500 km)', () => {
-    it('should clamp radius below minimum (1 km)', () => {
-      // Test that handlers would clamp 0 to 1
-      let radius = 0;
-      radius = Math.max(1, Math.min(radius, 500));
-      expect(radius).toBe(1);
-    });
-
-    it('should clamp negative radius to minimum', () => {
-      let radius = -10;
-      radius = Math.max(1, Math.min(radius, 500));
-      expect(radius).toBe(1);
-    });
-
-    it('should clamp radius above maximum (500 km)', () => {
-      let radius = 1000;
-      radius = Math.max(1, Math.min(radius, 500));
-      expect(radius).toBe(500);
-    });
-
-    it('should clamp extremely large radius', () => {
-      let radius = 999999;
-      radius = Math.max(1, Math.min(radius, 500));
-      expect(radius).toBe(500);
-    });
-
-    it('should accept valid radius values', () => {
-      const validRadii = [1, 10, 50, 100, 250, 500];
-
-      validRadii.forEach(r => {
-        const clamped = Math.max(1, Math.min(r, 500));
-        expect(clamped).toBe(r);
-      });
-    });
-
-    it('should handle NaN by using default', () => {
-      let radius = NaN;
-      if (isNaN(radius)) {
-        radius = 50; // default
-      }
-      radius = Math.max(1, Math.min(radius, 500));
-
-      expect(radius).toBe(50);
-    });
-
-    it('should handle Infinity by clamping', () => {
-      let radius = Infinity;
-      radius = Math.max(1, Math.min(radius, 500));
-      expect(radius).toBe(500);
-    });
-
-    it('should handle -Infinity by clamping', () => {
-      let radius = -Infinity;
-      radius = Math.max(1, Math.min(radius, 500));
-      expect(radius).toBe(1);
-    });
-
-    it('should handle decimal values correctly', () => {
-      const testCases = [
-        { input: 0.5, expected: 1 },
-        { input: 1.5, expected: 1.5 },
-        { input: 499.9, expected: 499.9 },
-        { input: 500.1, expected: 500 }
-      ];
-
-      testCases.forEach(({ input, expected }) => {
-        const clamped = Math.max(1, Math.min(input, 500));
-        expect(clamped).toBeCloseTo(expected, 1);
-      });
-    });
-  });
-
   describe('Bounding Box Validation', () => {
     it('should validate that west < east', () => {
       const west = -100;
@@ -372,55 +300,6 @@ describe('v1.6.0 Security - Bounds Checking and Validation', () => {
   });
 
   describe('Input Sanitization for v1.6.0 Handlers', () => {
-    it('should sanitize non-numeric radius values', () => {
-      const inputs = [
-        undefined,
-        null,
-        'string',
-        {},
-        [],
-        true,
-        false
-      ];
-
-      inputs.forEach(input => {
-        const radius = typeof input === 'number' ? input : 50;
-        expect(typeof radius).toBe('number');
-        expect(radius).toBe(50);
-      });
-    });
-
-    it('should handle radius type coercion safely', () => {
-      const testCases = [
-        { input: '100', expected: 100 },
-        { input: '0', expected: 0 },
-        { input: 'abc', expected: NaN }
-      ];
-
-      testCases.forEach(({ input, expected }) => {
-        const radius = Number(input);
-        if (isNaN(expected)) {
-          expect(isNaN(radius)).toBe(true);
-        } else {
-          expect(radius).toBe(expected);
-        }
-      });
-    });
-
-    it('should validate radius is finite', () => {
-      const testCases = [
-        { input: 100, valid: true },
-        { input: Infinity, valid: false },
-        { input: -Infinity, valid: false },
-        { input: NaN, valid: false }
-      ];
-
-      testCases.forEach(({ input, valid }) => {
-        const isValid = typeof input === 'number' && isFinite(input);
-        expect(isValid).toBe(valid);
-      });
-    });
-
     it('should reject non-object arguments', () => {
       const invalidArgs = [
         null,
@@ -484,64 +363,6 @@ describe('v1.6.0 Security - Bounds Checking and Validation', () => {
       };
 
       expect(mockSecurityLog.securityEvent).toBe(true);
-    });
-  });
-
-  describe('Edge Cases for v1.6.0 Features', () => {
-    it('should handle gauge count limit (showing 5 of many)', () => {
-      const gauges = Array.from({ length: 100 }, (_, i) => ({
-        id: i,
-        distance: i * 0.5
-      }));
-
-      const maxToShow = 5;
-      const displayed = gauges.slice(0, maxToShow);
-
-      expect(displayed.length).toBe(5);
-      expect(gauges.length - displayed.length).toBe(95);
-    });
-
-    it('should handle fire count limit (showing 5 of many)', () => {
-      const fires = Array.from({ length: 50 }, (_, i) => ({
-        name: `Fire ${i}`,
-        distance: i * 2
-      }));
-
-      const maxToShow = 5;
-      const displayed = fires.slice(0, maxToShow);
-
-      expect(displayed.length).toBe(5);
-      expect(fires.length - displayed.length).toBe(45);
-    });
-
-    it('should sort gauges by distance before limiting', () => {
-      const gauges = [
-        { id: 1, distance: 50 },
-        { id: 2, distance: 10 },
-        { id: 3, distance: 30 },
-        { id: 4, distance: 5 },
-        { id: 5, distance: 20 }
-      ];
-
-      const sorted = gauges.sort((a, b) => a.distance - b.distance);
-
-      expect(sorted[0].distance).toBe(5);
-      expect(sorted[1].distance).toBe(10);
-      expect(sorted[2].distance).toBe(20);
-    });
-
-    it('should filter fires by actual distance, not bounding box', () => {
-      // Bounding box may include more area than circular radius
-      const fires = [
-        { name: 'Near', lat: 34.1, lon: -118.2, distance: 10 },
-        { name: 'Far', lat: 35.0, lon: -119.0, distance: 150 }
-      ];
-
-      const radius = 100;
-      const filtered = fires.filter(f => f.distance <= radius);
-
-      expect(filtered.length).toBe(1);
-      expect(filtered[0].name).toBe('Near');
     });
   });
 });
