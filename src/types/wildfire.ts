@@ -12,15 +12,15 @@ export interface FirePerimeterAttributes {
   attr_IncidentTypeCategory?: string; // WF=Wildfire, RX=Prescribed Fire
 
   // Acreage data
-  poly_GISAcres?: number; // GIS-calculated acres
-  attr_FinalAcres?: number; // Final incident acreage
-  attr_CalculatedAcres?: number; // Calculated size metric
+  poly_GISAcres?: number | null; // GIS-calculated acres
+  attr_FinalAcres?: number | null; // Final incident acreage
+  attr_CalculatedAcres?: number | null; // Calculated size metric
 
   // Containment & status
   attr_PercentContained?: number; // Containment percentage (0-100)
   attr_ContainmentDateTime?: number; // Containment timestamp (epoch ms)
   poly_FeatureStatus?: string; // Approval status
-  attr_FireDiscoveryDateTime?: number; // Discovery timestamp (epoch ms)
+  attr_FireDiscoveryDateTime?: number | null; // Discovery timestamp (epoch ms)
 
   // Location
   attr_InitialLatitude?: number | null; // Fire origin latitude (null on live rows)
@@ -94,7 +94,8 @@ export interface WildfireInfo {
   distance: number | null;
   /** What `distance` was measured to. */
   distanceBasis: 'perimeter' | 'origin' | 'unlocated';
-  acres: number;
+  /** Acres, or `null` when NIFC published no size greater than zero ("not reported"). */
+  acres: number | null;
   /**
    * Containment percentage 0-100, or `null` when NIFC published no usable
    * containment for this incident. `null` means "not reported", not
@@ -102,7 +103,8 @@ export interface WildfireInfo {
    * contained) and both encodings occur live.
    */
   containment: number | null;
-  discoveryDate: Date;
+  /** Discovery date, or `null` when NIFC published no usable timestamp ("not reported"). */
+  discoveryDate: Date | null;
   /** Reported point of origin; set only when both coordinates are usable. */
   latitude?: number;
   longitude?: number;

@@ -353,3 +353,183 @@ describe('contract 9: a one-vertex ring equal to the origin', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// T3: branch on the filtered list (D3); absent size and date read "not reported" (D4)
+// ---------------------------------------------------------------------------
+
+interface StatusSpec {
+  name: string;
+  /** One-vertex ring at this offset; the origin is the same point. */
+  northKm: number;
+  gisAcres: unknown;
+  finalAcres: unknown;
+  calculatedAcres: unknown;
+  discovery: unknown;
+  containment: unknown;
+}
+
+/** Every status field is required and passed through verbatim (G95). */
+function statusFire(spec: StatusSpec): FirePerimeterFeature {
+  const p = offset(spec.northKm, 0);
+  return {
+    attributes: {
+      poly_IncidentName: spec.name,
+      attr_IncidentTypeCategory: 'WF',
+      poly_GISAcres: spec.gisAcres,
+      attr_FinalAcres: spec.finalAcres,
+      attr_CalculatedAcres: spec.calculatedAcres,
+      attr_PercentContained: spec.containment,
+      attr_FireDiscoveryDateTime: spec.discovery,
+      attr_InitialLatitude: p.lat,
+      attr_InitialLongitude: p.lon,
+      attr_POOState: 'CA'
+    },
+    geometry: { rings: [[[p.lon, p.lat]]] }
+  } as unknown as FirePerimeterFeature;
+}
+
+/** The `### Status` sub-block of one fire. Throws if absent. */
+function statusBlock(text: string, name: string): string {
+  const block = fireBlock(text, name);
+  const at = block.indexOf('### Status\n');
+  if (at < 0) throw new Error(`no status block for ${name}`);
+  return block.slice(at);
+}
+
+const DISCOVERED = Date.parse('2026-07-10T12:00:00Z');
+
+describe('contract 7: every feature lies beyond the radius', () => {
+  const beyond = (): FirePerimeterFeature[] => [60.3, 70.3, 80.3].map((km, i) => statusFire({
+    name: `Far Fire ${i}`, northKm: km, gisAcres: 500, finalAcres: undefined,
+    calculatedAcres: undefined, discovery: DISCOVERED, containment: 10
+  }));
+
+  it('renders the no-fires branch, not a zero count', async () => {
+    const text = await render(beyond(), 50);
+    expect(text).toContain('✅ **No active wildfires found within 50 km**\n');
+    expect(text).not.toMatch(/Found \d/);
+    expect(text).not.toMatch(/^## /m);
+    expect(text).not.toContain('*Results may be incomplete');
+  });
+
+  it('keeps the truncation caveat when the service truncated the response', async () => {
+    queryFirePerimetersMock.mockResolvedValue({ features: beyond(), exceededTransferLimit: true } as NIFCQueryResponse);
+    const result = await handleGetWildfireInfo(
+      { latitude: BASE_LAT, longitude: BASE_LON, radius: 50 },
+      nifcService, locationStore, geocodingService
+    );
+    const text = result.content[0].text;
+    expect(text).toContain('✅ **No active wildfires found within 50 km**\n\n' +
+      '*Results may be incomplete — the fire data service truncated the response.*\n');
+    expect(text).not.toMatch(/Found \d/);
+  });
+
+  it('discloses coverage, with no ✅, when source "nifc" is forced outside coverage', async () => {
+    const LISBON = { latitude: 38.7223, longitude: -9.1393 };
+    const far = { lat: LISBON.latitude + 60.3 / 111, lon: LISBON.longitude };
+    queryFirePerimetersMock.mockResolvedValue({
+      features: [{
+        attributes: {
+          poly_IncidentName: 'Iberian Fire', attr_IncidentTypeCategory: 'WF',
+          attr_InitialLatitude: far.lat, attr_InitialLongitude: far.lon
+        },
+        geometry: { rings: [[[far.lon, far.lat]]] }
+      }]
+    } as unknown as NIFCQueryResponse);
+    const nominatim = { reverseCountry: vi.fn(async () => 'pt') } as never;
+    const result = await handleGetWildfireInfo(
+      { ...LISBON, radius: 50, source: 'nifc' },
+      nifcService, locationStore, geocodingService, undefined, nominatim
+    );
+    const text = result.content[0].text;
+    expect(text).toContain('**NIFC/WFIGS tracks wildfire incidents in the United States and its territories only, ' +
+      'and this location appears to be outside that coverage.**\n');
+    expect(text).not.toContain('✅');
+    expect(text).not.toMatch(/Found \d/);
+  });
+});
+
+describe('contract 8: absent size and discovery date read "not reported"', () => {
+  it.each([
+    ['all three acreage fields absent', undefined, undefined, undefined],
+    ['all three acreage fields 0', 0, 0, 0],
+    ['all three null', null, null, null],
+    ['all three NaN', NaN, NaN, NaN],
+    ['negative and non-numeric', -5, '1200', Infinity]
+  ])('%s: Size reads not reported', async (_label, gis, final, calc) => {
+    const text = await render([
+      statusFire({ name: 'No Size Fire', northKm: 10.3, gisAcres: gis, finalAcres: final,
+        calculatedAcres: calc, discovery: DISCOVERED, containment: 10 }),
+      statusFire({ name: 'Sized Fire', northKm: 20.3, gisAcres: 900, finalAcres: undefined,
+        calculatedAcres: undefined, discovery: DISCOVERED, containment: 10 })
+    ], 50);
+
+    expect(statusBlock(text, 'No Size Fire')).toContain('### Status\n**Size:** not reported\n');
+    expect(statusBlock(text, 'Sized Fire')).toContain('**Size:** 900 acres (364 hectares)\n');
+  });
+
+  it('takes the first field greater than zero: 0 then 1200 prints 1200 acres', async () => {
+    const text = await render([
+      statusFire({ name: 'Second Field Fire', northKm: 10.3, gisAcres: 0, finalAcres: 1200,
+        calculatedAcres: 7, discovery: DISCOVERED, containment: 10 })
+    ], 50);
+    expect(statusBlock(text, 'Second Field Fire')).toContain('**Size:** 1200 acres (486 hectares)\n');
+  });
+
+  it.each([
+    ['absent', undefined],
+    ['null', null],
+    ['NaN', NaN],
+    ['epoch 0', 0],
+    ['Number.MAX_VALUE (finite, outside the Date range)', Number.MAX_VALUE]
+  ])('discovery date %s: Discovery Date reads not reported and Days Active is absent', async (_label, discovery) => {
+    const text = await render([
+      statusFire({ name: 'Undated Fire', northKm: 10.3, gisAcres: 500, finalAcres: undefined,
+        calculatedAcres: undefined, discovery, containment: 10 }),
+      statusFire({ name: 'Dated Fire', northKm: 20.3, gisAcres: 500, finalAcres: undefined,
+        calculatedAcres: undefined, discovery: DISCOVERED, containment: 10 })
+    ], 50);
+
+    const undated = statusBlock(text, 'Undated Fire');
+    expect(undated).toContain('**Discovery Date:** not reported\n');
+    expect(undated).not.toContain('**Days Active:**');
+    const dated = statusBlock(text, 'Dated Fire');
+    expect(dated).toContain('**Discovery Date:** 7/10/2026\n');
+    expect(dated).toMatch(/\*\*Days Active:\*\* \d+\n/);
+  });
+
+  it('G59: a fire with size, date, containment and location all absent still lists, with four not-reported lines', async () => {
+    const text = await render([{
+      attributes: { poly_IncidentName: 'Bare Fire', attr_IncidentTypeCategory: 'WF' }
+    } as unknown as FirePerimeterFeature], 50);
+
+    const block = fireBlock(text, 'Bare Fire');
+    expect(block).toContain(`**Distance:** not reported\n${UNLOCATED_LINE}`);
+    expect(block).toContain(
+      '### Status\n**Size:** not reported\n**Containment:** not reported\n**Discovery Date:** not reported\n'
+    );
+    expect(block).not.toContain('**Days Active:**');
+    expect(text).toContain('🔥 **Found 1 active fire**\n');
+  });
+
+  it('a fully populated fire renders its Status block exactly as before', async () => {
+    // Pin the clock so Days Active is deterministic: 2026-08-01T00:00Z is 21.5 days on.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-08-01T00:00:00Z') });
+    try {
+      const text = await render([
+        statusFire({ name: 'Full Fire', northKm: 10.3, gisAcres: 2471.2, finalAcres: 3000,
+          calculatedAcres: 2500, discovery: DISCOVERED, containment: 35 })
+      ], 50);
+      expect(statusBlock(text, 'Full Fire')).toBe(
+        '### Status\n' +
+        '**Size:** 2471 acres (1000 hectares)\n' +
+        '**Containment:** 35% ███░░░░░░░\n' +
+        '**Discovery Date:** 7/10/2026\n' +
+        '**Days Active:** 21\n'
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
