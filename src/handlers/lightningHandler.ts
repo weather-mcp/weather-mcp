@@ -13,6 +13,7 @@ import {
   LightningSafetyLevel
 } from '../types/lightning.js';
 import { blitzortungService } from '../services/blitzortung.js';
+import type { CoverageStartBound } from '../services/blitzortung.js';
 import { LocationStore } from '../services/locationStore.js';
 import { GeocodingService } from '../services/geocoding.js';
 import { resolveLocationAsync, prependLocationLine } from '../utils/locationResolver.js';
@@ -270,7 +271,10 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
   // monitoring began after the start of the requested window (fresh server, or
   // first query for this area), a "no strikes" result is inconclusive — say so
   // instead of implying verified safety.
-  const coverageStart = blitzortungService.getCoverageStart(latitude, longitude, radius);
+  // Which bound decided the start: a reconnect inside the window shortens coverage for a reason
+  // that is neither a cold start nor an outage, and the render names it.
+  const coverageBound: CoverageStartBound = {};
+  const coverageStart = blitzortungService.getCoverageStart(latitude, longitude, radius, coverageBound);
   const coverageMinutes = coverageStart
     ? Math.max(0, Math.min(timeWindow, (now.getTime() - coverageStart.getTime()) / (1000 * 60)))
     : 0;
@@ -287,7 +291,9 @@ export async function getLightningActivity(params: LightningActivityParams): Pro
     // complete-looking window - and every caveat below is gated on `!isComplete`, so the outage
     // text would be skipped entirely. `coverageMinutes` stays honest about earlier monitoring.
     isComplete: coverageMinutes >= timeWindow && !feedUnavailable,
-    feedUnavailable
+    feedUnavailable,
+    // Added only when true, so every existing state keeps its exact object shape.
+    ...(coverageBound.boundedBy === 'connection' ? { reconnectBounded: true } : {})
   };
 
   if (!coverage.isComplete && safety.level === 'safe') {
@@ -374,6 +380,9 @@ export function formatLightningActivityResponse(
   // than an outage. The internal safety level stays `safe` - this is a render-time substitution,
   // not a fifth level - and only `safe` is overridden, so a buffered EXTREME keeps its own heading.
   const feedDown = response.coverage.feedUnavailable === true;
+  // Strict `=== true` for the same reason: a fixture without the field reads as a cold start.
+  const reconnectedAt = response.coverage.monitoringSince;
+  const reconnected = response.coverage.reconnectBounded === true && reconnectedAt !== null;
   const statusSuffix = limitedData && response.safety.level === 'safe' ? ' (LIMITED DATA)' : '';
   if (feedDown && response.safety.level === 'safe') {
     lines.push('## ⚪ Safety Status: UNKNOWN (LIVE FEED UNAVAILABLE)');
@@ -427,12 +436,19 @@ export function formatLightningActivityResponse(
       );
       lines.push('');
       // Explain WHY coverage is limited so a fresh/near-zero reading is not mistaken for
-      // verified calm — this is expected on a first query, not an error.
+      // verified calm — this is expected on a first query, not an error. A window shortened by a
+      // feed reconnect is neither a cold start nor an outage: telling someone "first lookup" about
+      // an area watched for hours would be a false explanation, so that case names the reconnect.
       lines.push(
-        '*Why: lightning is monitored via a live feed that only begins buffering strikes once ' +
-        'an area is first queried, so a location’s first lookup starts near zero coverage and ' +
-        'builds over the following minutes. Saved locations are pre-warmed at startup. Historical ' +
-        'strikes cannot be backfilled.*'
+        reconnected
+          ? '*Why: the connection to the live Blitzortung.org lightning feed dropped and was ' +
+            `re-established at ${reconnectedAt.toISOString()}. Strikes during the gap ` +
+            'were not received and cannot be backfilled, so coverage of this area restarts at the reconnect ' +
+            'and builds over the following minutes.*'
+          : '*Why: lightning is monitored via a live feed that only begins buffering strikes once ' +
+            'an area is first queried, so a location’s first lookup starts near zero coverage and ' +
+            'builds over the following minutes. Saved locations are pre-warmed at startup. Historical ' +
+            'strikes cannot be backfilled.*'
       );
     }
     lines.push('');
