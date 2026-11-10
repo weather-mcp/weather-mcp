@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.11] - 2026-11-10
+
 A lightning report could give a plain green all-clear for a stretch of time it never watched. If the connection to the live lightning feed dropped and came back between two questions, the minutes of the outage still counted as watched, though no strike could arrive during them. The report now starts its coverage at the reconnect and says why it is short. A question asked during the outage also no longer opens a second feed connection.
 
 ### Fixed
@@ -2291,7 +2293,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.10...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.11...HEAD
+[1.35.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.10...v1.35.11
 [1.35.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.9...v1.35.10
 [1.35.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.8...v1.35.9
 [1.35.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.7...v1.35.8
