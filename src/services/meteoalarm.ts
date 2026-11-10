@@ -21,8 +21,10 @@
  *   result is cached for the alerts TTL (5 min) and the feed is never
  *   fetched per-request without the cache in front.
  *
- * Errors are plain sanitized `Error`s (the ACIS/NIFC precedent — no
- * `ApiError` union change): the alerts handler formats them for users.
+ * Errors are `MeteoAlarmRequestError`s with fixed, pre-written messages (the
+ * GeoMet precedent — no `ApiError` union change): upstream body text and
+ * axios text are never forwarded, and the retry decision is the error's
+ * `transient` flag, never its message.
  *
  * Licence terms honoured downstream (renderer): alerts display unmodified,
  * attribution "EUMETNET – MeteoAlarm" plus the national service, time of
@@ -41,6 +43,7 @@ import { logger } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
 import { Cache } from '../utils/cache.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
+import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import { CacheConfig } from '../config/cache.js';
 
 export interface MeteoAlarmServiceConfig {
@@ -204,6 +207,19 @@ export function filterActiveWarnings(warnings: MeteoAlarmWarning[], now: Date): 
 }
 
 /**
+ * A MeteoAlarm failure already classified by `handleError`. `transient` is the
+ * retry decision — read by `makeRequest`, decided in exactly one place. A plain
+ * `Error` subclass on purpose: MeteoAlarm is outside `ApiServiceName` (CLAUDE.md,
+ * Error Handling), so `formatErrorForUser` renders `Error: <message>` unchanged.
+ */
+class MeteoAlarmRequestError extends Error {
+  constructor(message: string, public readonly transient: boolean) {
+    super(message);
+    this.name = 'MeteoAlarmRequestError';
+  }
+}
+
+/**
  * MeteoAlarm country feed client. No API key required.
  */
 export class MeteoAlarmService {
@@ -271,7 +287,7 @@ export class MeteoAlarmService {
         country: countryCode,
         securityEvent: true
       });
-      throw new Error('MeteoAlarm feed returned an unexpected shape');
+      throw new MeteoAlarmRequestError('MeteoAlarm feed returned an unexpected shape', false);
     }
     const warnings = parseFeed(data);
 
@@ -283,9 +299,11 @@ export class MeteoAlarmService {
   }
 
   /**
-   * Make a request with retry on transient failures (rate limit, server
-   * error, timeout), exponential backoff with jitter — the NOAA client's
-   * pattern.
+   * Request with retry/backoff: a 429, a 5xx or a failed connection is
+   * retried up to `maxRetries` times with exponential backoff and jitter; a
+   * timeout and any other status are not. The decision is
+   * `MeteoAlarmRequestError.transient`, set once in `handleError` — the
+   * thrown message is never read.
    * @private
    */
   private async makeRequest<T>(url: string, retries = 0): Promise<T> {
@@ -293,27 +311,20 @@ export class MeteoAlarmService {
       const response = await this.client.get<T>(url);
       return response.data;
     } catch (error) {
-      if (retries < this.maxRetries) {
-        const message = (error as Error).message ?? '';
-        const shouldRetry =
-          message.includes('rate limit') ||
-          message.includes('server error') ||
-          message.includes('timed out');
-
-        if (shouldRetry) {
-          const baseDelay = Math.pow(2, retries) * 1000;
-          const delay = baseDelay * (0.5 + Math.random() * 0.5);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.makeRequest<T>(url, retries + 1);
-        }
+      if (retries < this.maxRetries && error instanceof MeteoAlarmRequestError && error.transient) {
+        const baseDelay = Math.pow(2, retries) * 1000;
+        const delay = baseDelay * (0.5 + Math.random() * 0.5);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.makeRequest<T>(url, retries + 1);
       }
       throw error;
     }
   }
 
   /**
-   * Normalize API failures into plain sanitized `Error`s — never leak
-   * internals; the alerts handler formats messages for users.
+   * Normalize API failures into `MeteoAlarmRequestError`s with fixed,
+   * pre-written messages — upstream body text and axios text are never
+   * forwarded; the alerts handler formats messages for users.
    * @private
    */
   private async handleError(error: unknown): Promise<never> {
@@ -321,32 +332,40 @@ export class MeteoAlarmService {
       if (error.response) {
         const status = error.response.status;
         if (status === 429) {
-          throw new Error('MeteoAlarm API rate limit exceeded');
+          throw new MeteoAlarmRequestError('MeteoAlarm API rate limit exceeded', true);
         }
         if (status >= 500) {
-          throw new Error(`MeteoAlarm API server error (status ${status})`);
+          throw new MeteoAlarmRequestError(`MeteoAlarm API server error (status ${status})`, true);
         }
-        throw new Error(`MeteoAlarm API returned status ${status}`);
+        throw new MeteoAlarmRequestError(`MeteoAlarm API returned status ${status}`, false);
       }
 
+      // Not retried: a timeout has exhausted either its own deadline
+      // (API_TIMEOUT_MS, 30 s by default) or the enclosing tool call's
+      // remaining budget (`toolBudget.ts`); either way a retry would answer
+      // after the client has given up — the v1.34.2 rule for NOAA and
+      // Open-Meteo. Checked before the connection set, which excludes it.
       if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-        throw new Error('MeteoAlarm request timed out');
+        throw new MeteoAlarmRequestError('MeteoAlarm request timed out', false);
       }
 
-      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-        throw new Error('Unable to connect to the MeteoAlarm feed service');
+      // The retry flag (`true`) is MeteoAlarm's own decision, not the util's.
+      if (isConnectionFailureCode(error.code)) {
+        throw new MeteoAlarmRequestError('Unable to connect to the MeteoAlarm feed service', true);
       }
 
-      if (error.message) {
-        throw new Error(error.message);
+      if ((error as { message?: unknown }).message) {
+        throw new MeteoAlarmRequestError('MeteoAlarm request failed', false);
       }
     }
 
+    // `isAxiosLikeError` accepts any object, so this rethrow is reached only
+    // by an `Error` whose message is empty — there is no text to forward.
     if (error instanceof Error) {
       throw error;
     }
 
-    throw new Error('Unknown error occurred while contacting MeteoAlarm');
+    throw new MeteoAlarmRequestError('Unknown error occurred while contacting MeteoAlarm', false);
   }
 
   /** Get cache statistics. */
@@ -360,11 +379,14 @@ export class MeteoAlarmService {
   }
 }
 
-/** Minimal structural shape of an axios-style error, checked without `any`. */
+/**
+ * Minimal structural shape of an axios-style error, checked without `any`.
+ * Deliberately carries no `message` field: `handleError` never forwards
+ * upstream body text or the HTTP client's own text.
+ */
 interface AxiosLikeError {
   response?: { status: number };
   code?: string;
-  message?: string;
 }
 
 function isAxiosLikeError(error: unknown): error is AxiosLikeError {
