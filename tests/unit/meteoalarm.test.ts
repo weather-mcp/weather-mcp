@@ -43,6 +43,7 @@ import {
   parseReferences,
   filterActiveWarnings
 } from '../../src/services/meteoalarm.js';
+import { CONNECTION_FAILURE_CODES } from '../../src/utils/connectionFailure.js';
 import type {
   MeteoAlarmCapAlert,
   MeteoAlarmCapInfo,
@@ -426,5 +427,201 @@ describe('MeteoAlarmService.getWarnings', () => {
     await expect(service.getWarnings('de')).rejects.toThrow(
       'MeteoAlarm API returned status 404'
     );
+  });
+
+  describe('wrong-shaped 200 body', () => {
+    const REFUSAL = 'MeteoAlarm feed returned an unexpected shape';
+
+    it.each<[string, unknown]>([
+      ['an HTML page', '<html><body>Maintenance</body></html>'],
+      ['a gateway error object', { error: 'Bad gateway' }],
+      ['an empty body (axios delivers "")', ''],
+      ['JSON null', null],
+      ['an empty object', {}],
+      ['warnings that is not an array', { warnings: null }],
+      ['a bare array', []],
+      ['a null element', { warnings: [null] }],
+      ['a string element', { warnings: ['x'] }],
+      ['an alert that is a string', { warnings: [{ alert: 'malformed-alert' }] }],
+      ['an alert that is null', { warnings: [{ alert: null }] }],
+      ['an alert that is an array', { warnings: [{ alert: [] }] }],
+      ['an identifier that is a number', { warnings: [{ alert: { identifier: 7, info: [] } }] }],
+      ['an info that is an empty string', { warnings: [{ alert: { identifier: 'x', info: '' } }] }],
+      ['an info that is an object', { warnings: [{ alert: { identifier: 'x', info: {} } }] }],
+      ['an info element that is null', { warnings: [{ alert: { identifier: 'x', info: [null] } }] }]
+    ])('refuses %s, does not retry it and does not cache it', async (_label, body) => {
+      mockGet.mockImplementation(() => jsonResponse(body));
+      const service = new MeteoAlarmService();
+
+      await expect(service.getWarnings('gb')).rejects.toThrow(
+        new RegExp(`^${REFUSAL}$`)
+      );
+      expect(mockGet).toHaveBeenCalledTimes(1);
+
+      // Nothing was cached: the next call goes back to the feed.
+      mockGet.mockImplementation(() => jsonResponse({ warnings: [] }));
+      await expect(service.getWarnings('gb')).resolves.toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+
+    it.each<[string, unknown]>([
+      ['an entry with no alert', { warnings: [{ uuid: 'u-1' }] }],
+      ['an alert with no identifier', { warnings: [{ alert: { info: [] } }] }],
+      ['an alert with no info', { warnings: [{ alert: { identifier: 'x' } }] }]
+    ])('still skips %s in the verified shape, resolving []', async (_label, body) => {
+      mockGet.mockImplementation(() => jsonResponse(body));
+      const service = new MeteoAlarmService();
+
+      await expect(service.getWarnings('gb')).resolves.toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('positive control: the honest empty feed resolves [] and is cached', async () => {
+      mockGet.mockImplementation(() => jsonResponse({ warnings: [] }));
+      const service = new MeteoAlarmService();
+
+      await expect(service.getWarnings('gb')).resolves.toEqual([]);
+      await expect(service.getWarnings('gb')).resolves.toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('error ladder', () => {
+    const SENTINEL = 'UPSTREAM-SENTINEL-TEXT';
+    const CONNECT_MESSAGE = 'Unable to connect to the MeteoAlarm feed service';
+
+    /** Drive a call to its rejection value with fake timers running the backoff. */
+    async function settleRejection(start: () => Promise<unknown>): Promise<unknown> {
+      const pending = start().then(
+        () => new Error('expected a rejection, got a resolution'),
+        (e: unknown) => e
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      return pending;
+    }
+
+    /** Reject every `get` with `rejection`; return what `getWarnings` rejected with. */
+    async function rejectWith(rejection: unknown): Promise<unknown> {
+      mockGet.mockImplementation(() => Promise.reject(rejection));
+      const service = new MeteoAlarmService(); // before fake timers (G133)
+      vi.useFakeTimers();
+      return settleRejection(() => service.getWarnings('gb'));
+    }
+
+    function expectFixed(error: unknown, message: string, calls: number): void {
+      expect(error).toBeInstanceOf(Error);
+      const err = error as Error;
+      expect(err.message).toBe(message);
+      expect(err.message).not.toContain(SENTINEL);
+      expect(err.name).toBe('MeteoAlarmRequestError');
+      expect(mockGet).toHaveBeenCalledTimes(calls);
+    }
+
+    it('retries a sustained 503 to the cap (4 requests) with fixed text', async () => {
+      expectFixed(
+        await rejectWith({ response: { status: 503 } }),
+        'MeteoAlarm API server error (status 503)',
+        4
+      );
+    });
+
+    it('retries a sustained 429 to the cap (4 requests) with fixed text', async () => {
+      expectFixed(
+        await rejectWith({ response: { status: 429 } }),
+        'MeteoAlarm API rate limit exceeded',
+        4
+      );
+    });
+
+    it('recovers when a 503 is followed by a 200', async () => {
+      mockGet
+        .mockImplementationOnce(() => Promise.reject({ response: { status: 503 } }))
+        .mockImplementation(() => jsonResponse(feedOf(makeAlert())));
+      const service = new MeteoAlarmService();
+      vi.useFakeTimers();
+
+      const pending = service.getWarnings('gb');
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      await expect(pending).resolves.toHaveLength(1);
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry a 404', async () => {
+      expectFixed(
+        await rejectWith({ response: { status: 404 } }),
+        'MeteoAlarm API returned status 404',
+        1
+      );
+    });
+
+    it('does not retry ECONNABORTED (timeout text from axios is not forwarded)', async () => {
+      expectFixed(
+        await rejectWith({ code: 'ECONNABORTED', message: 'timeout of 30000ms exceeded' }),
+        'MeteoAlarm request timed out',
+        1
+      );
+    });
+
+    it('does not retry ETIMEDOUT', async () => {
+      expectFixed(
+        await rejectWith({ code: 'ETIMEDOUT' }),
+        'MeteoAlarm request timed out',
+        1
+      );
+    });
+
+    // The two L5 codes are named so they stay pinned if the shared set ever drops them;
+    // the Set removes the duplicates while the shared set still holds them.
+    it.each([...new Set([...CONNECTION_FAILURE_CODES, 'EHOSTUNREACH', 'EAI_AGAIN'])])(
+      'retries connection failure %s to the cap with fixed text',
+      async code => {
+        expectFixed(
+          await rejectWith({ code, message: `connect ${code} 10.0.0.1:443 ${SENTINEL}` }),
+          CONNECT_MESSAGE,
+          4
+        );
+      }
+    );
+
+    it('replaces bare axios text with a fixed message and does not retry', async () => {
+      expectFixed(
+        await rejectWith({ message: `getaddrinfo ${SENTINEL} feeds.meteoalarm.org` }),
+        'MeteoAlarm request failed',
+        1
+      );
+    });
+
+    it('does not forward a body message on a non-transient status', async () => {
+      expectFixed(
+        await rejectWith({ response: { status: 400, data: { message: SENTINEL } } }),
+        'MeteoAlarm API returned status 400',
+        1
+      );
+    });
+
+    it('replaces an Error with text by a fixed message and does not retry', async () => {
+      expectFixed(
+        await rejectWith(new Error(SENTINEL)),
+        'MeteoAlarm request failed',
+        1
+      );
+    });
+
+    it('rethrows an Error with an empty message as the same instance', async () => {
+      const original = new Error('');
+      const error = await rejectWith(original);
+
+      expect(error).toBe(original);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('maps a non-object rejection to the unknown-error message', async () => {
+      expectFixed(
+        await rejectWith(SENTINEL),
+        'Unknown error occurred while contacting MeteoAlarm',
+        1
+      );
+    });
   });
 });

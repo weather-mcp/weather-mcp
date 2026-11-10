@@ -122,10 +122,29 @@ data is the single worst failure this codebase can produce. Note
 object, so the check must be `isPlainObject`, not truthiness.
 
 **Verify:** `parseCapIndex`'s envelope checks and the corresponding cases in
-`tests/unit/cap-parse.test.ts` / `tests/unit/national-cap-service.test.ts`.
+`tests/unit/cap-parse.test.ts` / `tests/unit/national-cap-service.test.ts`; for the
+JSON feeds, the `wrong-shaped 200 body` blocks in `tests/unit/meteoalarm.test.ts` /
+`tests/unit/geomet.test.ts` and `tests/integration/alert-feed-body-shape.test.ts`.
 
 **Evidence:** 2026-08-23 (`f1b757e`) — raised as a blocker in the Codex plan
-review (codex-R2) before implementation.
+review (codex-R2) before implementation. 2026-11-10, alert-feed-body-shape
+(`09e7311`): MeteoAlarm and GeoMet read their list with `?? []`, so an HTML page,
+a gateway object or `''` rendered the all-clear and MeteoAlarm cached it for 5 min.
+Both now guard the JSON envelope with `isPlainObject` + `Array.isArray` before
+`cache.set`. Where the guard also requires `Array.isArray(body.list)`, a truthiness
+outer check is an *equivalent* mutant for JSON (G45): no JSON value is truthy, not a
+plain object, and carries an array-valued key. Keep `isPlainObject` anyway; it is
+what states the contract.
+
+**Extended 2026-11-10** (`a5fb0bb`, alert-feed-body-shape diff review codex-C1) —
+**check every level the parser skips on, not only the list members.** The first guard
+required each `warnings[]` entry to be an object, but `parseFeed` skips an entry whose
+`alert.identifier` or `info` is unusable. `{ warnings: [{ alert: "malformed-alert" }] }`,
+a `null` alert and an `info` of `''` therefore passed the guard, were skipped as empty,
+and rendered the all-clear. A field the parser may skip on is allowed to be **absent**
+(that is the verified empty shape). When it is present it must have the verified type,
+or the guard throws. Pin one body whose outer element is an object and whose nested
+record is a string, through the service and through the dispatch.
 
 **Status:** active. Sharper instance of CLAUDE.md's "never trust the HTTP 200
 alone" and "distinguish empty from not-covered".
@@ -175,7 +194,7 @@ count computed at refresh time and cached will be rendered over a
 *re-filtered* list later — so a disclosure line can name a number that
 contradicts the block printed beneath it.
 
-**Verify:** `MeteoAlarmService.getWarnings` (`src/services/meteoalarm.ts:238-270`)
+**Verify:** `MeteoAlarmService.getWarnings` (`src/services/meteoalarm.ts:266-299`)
 and `NationalCapService.readView`; the resurrection and derived-count tests in
 `tests/unit/national-cap-service.test.ts`.
 
@@ -6872,7 +6891,7 @@ test that follows G9 rethrows it. On 2026-10-15 a PAGASA outage did exactly that
 tag.
 
 **Verify:** `grep -rn "'ECONNREFUSED'" src/services/` lists only the services the plan
-deliberately left on their own lists (nominatim, ncei, meteoalarm, environmentAgency,
+deliberately left on their own lists (nominatim, ncei, environmentAgency,
 aviationWeather, acis, metno). A new hit is a new copy.
 
 **Evidence:** 2026-10-15, plan `alert-feed-connect-codes`: `d5f5f67` (shared util; GeoMet moved
@@ -6880,11 +6899,14 @@ unchanged), `9091854` (JMA), `7d3b868` (nationalCap). Node reported `EHOSTUNREAC
 PAGASA while `api.weather.gov` answered 200. 2026-10-16, plan `noaa-openmeteo-connect-codes`:
 `371e914` moved NOAA and Open-Meteo onto the shared set. Their catch-all was already retryable, so
 the five unlisted codes had been retried all along and only the message was wrong — measure a
-service's catch-all before assuming its retry follows its list.
+service's catch-all before assuming its retry follows its list. 2026-11-10, plan
+`alert-feed-body-shape`: `d67ebc0` moved MeteoAlarm onto the shared set with a class-keyed
+`MeteoAlarmRequestError.transient`; its old two-code list had left `ENOTFOUND`/`ECONNREFUSED`
+unretried and forwarded every other code's axios text.
 
-**Status:** active. Seven services still carry their own lists, deferred because their error
+**Status:** active. Six services still carry their own lists, deferred because their error
 classes and retry rules differ. Lint candidate: a `no-restricted-syntax` rule on an
-`'ECONNREFUSED'` literal under `src/services/`, once those seven migrate.
+`'ECONNREFUSED'` literal under `src/services/`, once those six migrate.
 
 ---
 
@@ -7333,6 +7355,36 @@ tick, and the collection sleep measured from a `t` that had already moved.
 **Evidence:** 2026-10-30, normals-failure-wording T3. `get_forecast include_normals:true` at `0, -160` rendered `**Normal High:** 80°F`, and the three-point curl above was complete. Dan ruled the not-found note unit-proven only (plan rev 3). The T4 docs (`0a1ef0f`) name no places.
 
 **Status:** active. Related: [G10] (the hourly archive limit that this probing also hits), [G46].
+
+---
+
+## G158 — `clearServiceCaches()` clears only NOAA and Open-Meteo, so a dispatch test's other-service cache leaks between tests
+
+**Trigger:** a unit test that drives `createWeatherServer` over `InMemoryTransport` (the
+`upstream-failure-iserror-dispatch.test.ts` harness) and stubs a service *other than* NOAA or
+Open-Meteo, e.g. `MeteoAlarmService.prototype.makeRequest`, with more than one test in the file.
+
+**Rule:** do not rely on `clearServiceCaches()` in `beforeEach`/`afterEach` to isolate those tests.
+The factory's services are module-scope singletons, and `clearServiceCaches()`
+(`src/server/weatherServer.ts`) calls only `noaaService.clearCache()` and
+`openMeteoService.clearCache()`. Pin `CACHE_ENABLED='false'` in the file's `vi.hoisted` env (it is
+read at import by `src/config/cache.ts`), or give each test a distinct cache key.
+
+**Why:** an answer cached by one test is served to the next with no request. The next test's
+`makeRequest` spy then counts 0, or it renders the earlier answer, and whether a row passes depends on
+the order of the tests. A mutant that caches a wrong `[]` leaks it the same way, so the mutation reddens
+rows it never reached. The rows also pass in file order and fail when shuffled.
+
+**Verify:** `grep -n -A4 "export function clearServiceCaches" src/server/weatherServer.ts` — while
+it names only NOAA and Open-Meteo, this entry holds.
+
+**Evidence:** 2026-11-10, alert-feed-body-shape T5 (`596fe70`). The subagent's mutation run showed
+`MeteoAlarm cache hit` in a later row, and its positive control had to stay last to pass. Pinning
+`CACHE_ENABLED=false` made the file pass under `--sequence.shuffle` and narrowed the mutation's red
+rows to exactly the two it reaches.
+
+**Status:** active. Fix candidate: make `clearServiceCaches()` clear every factory service. That is a
+`src/` change with its own plan. Related: [G70] (stub at the factory's prototype), [G45].
 
 ---
 

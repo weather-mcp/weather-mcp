@@ -433,4 +433,43 @@ describe('GeoMetService', () => {
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('wrong-shaped 200 body', () => {
+    const REFUSAL = 'GeoMet API returned an unexpected shape';
+    const LAT = 43.6532;
+    const LON = -79.3832;
+    const respond = (data: unknown) => Promise.resolve({ data, status: 200 });
+
+    it.each<[string, unknown]>([
+      ['an HTML page', '<html><body>Maintenance</body></html>'],
+      ['a gateway error object', { error: 'Bad gateway' }],
+      ['an empty body (axios delivers "")', ''],
+      ['JSON null', null],
+      ['an empty object', {}],
+      ['features that is not an array', { features: 'x' }],
+      ['a bare array', []],
+      ['a null feature', { features: [null] }],
+      ['a feature without properties', { features: [{ type: 'Feature' }] }]
+    ])('refuses %s, does not retry it and does not cache it', async (_label, body) => {
+      mockGet.mockImplementation(() => respond(body));
+      const service = new GeoMetService();
+
+      await expect(service.getAlerts(LAT, LON)).rejects.toThrow(new RegExp(`^${REFUSAL}$`));
+      expect(mockGet).toHaveBeenCalledTimes(1);
+
+      // Nothing was cached: the next call goes back to the feed.
+      mockGet.mockImplementation(() => jsonResponse(collection([], 0)));
+      await expect(service.getAlerts(LAT, LON)).resolves.toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+
+    it('positive control: the honest empty collection resolves [] and is cached', async () => {
+      mockGet.mockImplementation(() => jsonResponse(collection([], 0)));
+      const service = new GeoMetService();
+
+      await expect(service.getAlerts(LAT, LON)).resolves.toEqual([]);
+      await expect(service.getAlerts(LAT, LON)).resolves.toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+  });
 });

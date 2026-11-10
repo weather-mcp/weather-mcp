@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.10] - 2026-11-10
+
+When the European (MeteoAlarm) or Canadian (MSC GeoMet) alert service answered with something other than its alert list, such as a maintenance page, a gateway error or an empty reply, `get_alerts` and the alerts section of `get_weather_summary` showed the green "no active alerts" message. On safety data that is the worst possible mistake: a reader takes an outage for an all-clear. These answers are now reported as errors. MeteoAlarm's error messages are also now fixed text, and it retries the failures a retry can fix.
+
+### Fixed
+- **A broken European or Canadian alerts answer no longer reads as "no alerts".** `get_alerts` and the alerts section of `get_weather_summary` used to print the green all-clear when MeteoAlarm or GeoMet answered with a maintenance page, a gateway error or an empty body. MeteoAlarm also served that all-clear to every caller for five minutes. Both now report an error, `MeteoAlarm feed returned an unexpected shape` or `GeoMet API returned an unexpected shape`, and cache nothing. A malformed warning entry (an `alert`, `identifier` or `info` of the wrong type) fails the whole answer rather than being skipped as empty.
+- **MeteoAlarm errors are fixed text.** Failures no longer echo connection details such as `connect EHOSTUNREACH`. Every failed connection reads `Unable to connect to the MeteoAlarm feed service`, and any other transport failure reads `MeteoAlarm request failed`. The full list is in the error-handling guide.
+
+### Changed
+- **MeteoAlarm retries a failed connection and no longer retries a timeout.** A failed connection is now retried up to three times, so a European alerts call can take about 7 s longer before it reports one. A timeout is no longer retried, because it has already used the request's time budget, so it reports at once instead of after up to four attempts. This matches how the Canadian GeoMet feed has behaved since 1.34.4.
+
 ## [1.35.9] - 2026-11-09
 
 The server's behaviour and output are unchanged; the published code is identical to 1.35.8. This release is for anyone who builds from source or reads the test count. The published count included about a hundred unit tests that could never fail: they checked a copy of the code written inside the test, or arithmetic the test did itself, rather than the server. Several of them claimed to cover safety output, such as the order of NOAA alerts and the "no active alerts" text, that no real test covered at all. Those tests are gone, and each behaviour they claimed now has a real test that fails when the server's code breaks.
@@ -2271,7 +2282,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.9...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.10...HEAD
+[1.35.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.9...v1.35.10
 [1.35.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.8...v1.35.9
 [1.35.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.7...v1.35.8
 [1.35.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.6...v1.35.7
