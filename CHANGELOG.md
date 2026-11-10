@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.11] - 2026-11-10
+
+A lightning report could give a plain green all-clear for a stretch of time it never watched. If the connection to the live lightning feed dropped and came back between two questions, the minutes of the outage still counted as watched, though no strike could arrive during them. The report now starts its coverage at the reconnect and says why it is short. A question asked during the outage also no longer opens a second feed connection.
+
+### Fixed
+- **A lightning report after a feed outage no longer claims the whole window was watched.** When the connection to the Blitzortung feed dropped and came back between two queries, `get_lightning_activity` and the lightning section of `get_weather_summary` counted the outage as watched time and could print a plain `🟢 SAFE` over minutes in which no strike could be received. Coverage now starts at the reconnect, the report shows `SAFE (LIMITED DATA)`, and it says that the feed connection dropped and was re-established, with the time, instead of calling the area's lookup its first.
+- **A lightning query during a feed outage no longer opens a second broker connection.** Each such query used to open a new connection and leave the previous one running. It now waits, for up to 30 seconds, for the server's one connection to come back, and reports the feed as unavailable if it does not.
+
+### Changed
+- **Dependencies** — `mqtt` 5.16.0 → 5.16.1 (Dependabot #122), `fast-xml-parser` 5.11.2 → 5.12.0 (#128), and `@modelcontextprotocol/sdk` 1.32.1 → 1.32.2, `axios` 1.20 → 1.21 and `dotenv` 18.0.7 → 18.0.9 (#126); `express` 5.2.1 → 5.3.0 (#124) and `jose` 6.1.3 → 6.2.15 (#129), which only the `weather-mcp-http` entry uses; development-only bumps to ESLint, `typescript-eslint`, `globals`, the Vitest coverage plugin and `@types/node` (#130). Lightning was checked live on `mqtt` 5.16.1. No behaviour change.
+
 ## [1.35.10] - 2026-11-10
 
 When the European (MeteoAlarm) or Canadian (MSC GeoMet) alert service answered with something other than its alert list, such as a maintenance page, a gateway error or an empty reply, `get_alerts` and the alerts section of `get_weather_summary` showed the green "no active alerts" message. On safety data that is the worst possible mistake: a reader takes an outage for an all-clear. These answers are now reported as errors. MeteoAlarm's error messages are also now fixed text, and it retries the failures a retry can fix.
@@ -2282,7 +2293,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.10...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.11...HEAD
+[1.35.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.10...v1.35.11
 [1.35.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.9...v1.35.10
 [1.35.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.8...v1.35.9
 [1.35.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.7...v1.35.8

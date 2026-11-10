@@ -295,7 +295,7 @@ describe('lightning pre-warm capacity & coverage contracts (blitzortung.ts)', ()
     }
   });
 
-  it('contract 5: prewarm never opens a second client while mqtt.js is reconnecting; a query in the same state still does', async () => {
+  it('contract 5: while mqtt.js is reconnecting, neither prewarm nor a query opens a second client', async () => {
     const client = createFakeMqttClient();
     const { esModule, connect } = createPresentMqttModule(client);
     vi.doMock('mqtt', () => esModule);
@@ -315,14 +315,14 @@ describe('lightning pre-warm capacity & coverage contracts (blitzortung.ts)', ()
       expect(outcome.status).toBe('skipped-reconnecting');
       expect(connect).toHaveBeenCalledTimes(1); // no second client opened
 
-      // A query in the same state is NOT guarded — this only asserts it reaches
-      // ensureConnected (and therefore mqtt.connect) again, not that the result is
-      // desirable; today's behaviour can orphan a client here (see mqtt-optional.test.ts
-      // contract 8's regression note for the general hazard this guard does not cover).
+      // A query in the same state waits on the SAME client for its next connect (RF-24); it
+      // never opens a second one. This fake never reconnects, so the wait runs out at the
+      // connect timeout (30 s) and the query degrades as `connect_timeout`.
       const pending = blitzortungService.getLightningStrikes(SINGLES[2].lat, SINGLES[2].lon, 100, 60);
-      await vi.advanceTimersByTimeAsync(10000);
-      await pending;
-      expect(connect).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(30000);
+      const result = await pending;
+      expect(connect).toHaveBeenCalledTimes(1);
+      expect(blitzortungService.getFeedFailure(result)?.reason).toBe('connect_timeout');
     } finally {
       vi.useRealTimers();
     }

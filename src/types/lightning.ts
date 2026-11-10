@@ -67,6 +67,7 @@ export interface LightningMonitoringCoverage {
   coverageMinutes: number;      // Minutes of the requested window actually monitored
   isComplete: boolean;          // True when coverage spans the full requested window
   feedUnavailable: boolean;     // True when THIS query's transport to the live feed failed - never set by pre-warm
+  reconnectBounded?: boolean;   // True when coverage restarts at a feed reconnect inside the window
 }
 
 /**

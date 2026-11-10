@@ -898,6 +898,11 @@ module in.
 acceptance — and [G100], the same mechanism one layer up: there the `await` sits
 between a read and the write that depends on it, and the module it reads through
 being fully synchronous does not help.
+**Extended 2026-11-10** (`ef973a6`, lightning-reconnect-coverage T1): `ensureConnected` now has a
+**third** guard in the same synchronous run — a client that exists but is neither connected nor
+connecting (mqtt.js is reconnecting it) is waited on, never replaced, so `mqtt.connect` runs only
+when `this.client` is null. Lock: `tests/unit/lightning-reconnect-coverage.test.ts` C6 (three
+queries during a reconnect, one `connect` call).
 
 ---
 
@@ -1462,6 +1467,13 @@ here but not sufficient), [G10] (a clean-looking result from an un-run measureme
 related: the auto-memory note `live-verification-driver-hangs` — the driver holds
 a persistent MQTT connection, so it needs an explicit `process.exit(0)` and two
 must never run in parallel. Not lintable.
+**Extended 2026-11-10** (lightning-reconnect-coverage T5, `.devdocs/archive/completed/qa-lightning-reconnect-coverage.md`):
+a **reconnect** repro through a loopback TCP relay has three traps of its own. (1) Set
+`BLITZORTUNG_MQTT_URL` to the relay, or the service connects straight to the broker and stopping
+the relay proves nothing (0 SUBSCRIBE packets through it is the tell). (2) Use `timeWindow: 5`: a
+60-minute window cannot show full coverage within one run, so the base never reproduces the defect.
+(3) Pause a few seconds after stopping the relay before the outage query, or the query beats the
+`close` event, takes the mid-query loss path ([G44]), and base opens no second client.
 
 ---
 
@@ -1623,6 +1635,11 @@ it. Mutating only to the shipped bug would have looked complete while leaving
 both rejected parsers undiscriminated. Sharper instance of [G13] — the
 degeneracy is not in a *value* the fixture repeats but in a *set* the fixture
 leaves empty.
+**Extended 2026-11-10** (`d754d9e`, lightning-reconnect-coverage T2): a rejected alternative can be
+**masked by a later-of composition**. "Re-stamp every geohash on `close`" survived the plan's C1,
+because the close-time stamp is always earlier than the reconnect and `max(stamp, lastConnectAt)`
+hides it. Only a close and a reconnect in the **same millisecond** tells them apart, and then only
+through the bound label (`C1b`). When a fix combines two bounds, look for the tie.
 
 ---
 
@@ -2482,6 +2499,10 @@ path the plan had not enumerated.
 **Status:** active. Related: [G43] (the per-query binding this classification is
 carried on), [G9] (a live smoke test must rethrow what is not a transport
 failure). Not lintable.
+**Extended 2026-11-10** (`ef973a6`, lightning-reconnect-coverage): the generation check sees a loss
+only **during** one query's collection window. A loss **between** queries, healed by mqtt.js before
+the next one, is covered by a different mechanism: `getCoverageStart` clamps to the newest
+`connect` (`lastConnectAt`). Lock: `tests/unit/lightning-reconnect-coverage.test.ts` C1.
 
 ---
 
@@ -6057,6 +6078,11 @@ subagent a debugging cycle; settled with a `settleStartup()` helper that advance
 
 **Status:** active. Related: [G20] (the `isConnecting` guard that forces the
 poll), [G21] (the fresh-import pattern these tests use).
+**Extended 2026-11-10** (`ef973a6`, lightning-reconnect-coverage T1): a **third** parked state now
+exists beside the poll. After a `close`, any query waits for the same client's next `connect`
+(`waitForReconnect`). A fake-timer test that calls the real service after `close` must emit
+`connect` or advance past `connectTimeout` (30 s), or its `await` never returns. Evidence: the flip
+of `lightning-prewarm-service.test.ts` contract 5, which advanced only 10 s.
 
 ---
 

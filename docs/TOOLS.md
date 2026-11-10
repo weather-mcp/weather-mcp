@@ -848,6 +848,10 @@ subscribed, so a report can carry one of two coverage disclosures in place of a 
   strikes cannot be backfilled. The exception is saved locations while pre-warm is active
   (`WEATHER_LIGHTNING_PREWARM`, with this tool enabled): they have coverage from startup and keep it
   for as long as they stay saved. Every other area starts cold on its first query.
+  The same state follows a dropped connection. If the connection to the feed drops and is restored
+  while the server runs, coverage of every area restarts at the reconnect, because strikes during
+  the gap were not received. The report then names the reconnect and its time in place of the
+  first-query explanation, and re-checking in a few minutes works as it does after a first query.
 - **`⚪ UNKNOWN (LIVE FEED UNAVAILABLE)`** — the server could not reach the Blitzortung feed for this
   query, either because the connection never succeeded or because it dropped partway through
   collection. **This is not an all-clear**: no live strike data could be collected, so nothing is
