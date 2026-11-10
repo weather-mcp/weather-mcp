@@ -571,7 +571,9 @@ describe('MeteoAlarmService.getWarnings', () => {
       );
     });
 
-    it.each([...CONNECTION_FAILURE_CODES, 'EHOSTUNREACH', 'EAI_AGAIN'])(
+    // The two L5 codes are named so they stay pinned if the shared set ever drops them;
+    // the Set removes the duplicates while the shared set still holds them.
+    it.each([...new Set([...CONNECTION_FAILURE_CODES, 'EHOSTUNREACH', 'EAI_AGAIN'])])(
       'retries connection failure %s to the cap with fixed text',
       async code => {
         expectFixed(
