@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- **A broken European or Canadian alerts answer no longer reads as "no alerts".** `get_alerts` and the alerts section of `get_weather_summary` used to print the green all-clear when MeteoAlarm or GeoMet answered with a maintenance page, a gateway error or an empty body. MeteoAlarm also served that all-clear to every caller for five minutes. Both now report an error, `MeteoAlarm feed returned an unexpected shape` or `GeoMet API returned an unexpected shape`, and cache nothing. A warning entry that is not an object fails the whole answer rather than being skipped.
+- **A broken European or Canadian alerts answer no longer reads as "no alerts".** `get_alerts` and the alerts section of `get_weather_summary` used to print the green all-clear when MeteoAlarm or GeoMet answered with a maintenance page, a gateway error or an empty body. MeteoAlarm also served that all-clear to every caller for five minutes. Both now report an error, `MeteoAlarm feed returned an unexpected shape` or `GeoMet API returned an unexpected shape`, and cache nothing. A malformed warning entry (an `alert`, `identifier` or `info` of the wrong type) fails the whole answer rather than being skipped as empty.
 - **MeteoAlarm errors are fixed text, and it retries only what a retry can fix.** Failures no longer echo connection details such as `connect EHOSTUNREACH`. A failed connection is now retried, up to three times and about 7 s in total, a timeout no longer is, and every connection failure reads `Unable to connect to the MeteoAlarm feed service`. Any other transport failure reads `MeteoAlarm request failed`.
 
 ## [1.35.9] - 2026-11-09

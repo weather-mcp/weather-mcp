@@ -441,7 +441,14 @@ describe('MeteoAlarmService.getWarnings', () => {
       ['warnings that is not an array', { warnings: null }],
       ['a bare array', []],
       ['a null element', { warnings: [null] }],
-      ['a string element', { warnings: ['x'] }]
+      ['a string element', { warnings: ['x'] }],
+      ['an alert that is a string', { warnings: [{ alert: 'malformed-alert' }] }],
+      ['an alert that is null', { warnings: [{ alert: null }] }],
+      ['an alert that is an array', { warnings: [{ alert: [] }] }],
+      ['an identifier that is a number', { warnings: [{ alert: { identifier: 7, info: [] } }] }],
+      ['an info that is an empty string', { warnings: [{ alert: { identifier: 'x', info: '' } }] }],
+      ['an info that is an object', { warnings: [{ alert: { identifier: 'x', info: {} } }] }],
+      ['an info element that is null', { warnings: [{ alert: { identifier: 'x', info: [null] } }] }]
     ])('refuses %s, does not retry it and does not cache it', async (_label, body) => {
       mockGet.mockImplementation(() => jsonResponse(body));
       const service = new MeteoAlarmService();
@@ -455,6 +462,18 @@ describe('MeteoAlarmService.getWarnings', () => {
       mockGet.mockImplementation(() => jsonResponse({ warnings: [] }));
       await expect(service.getWarnings('gb')).resolves.toEqual([]);
       expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+
+    it.each<[string, unknown]>([
+      ['an entry with no alert', { warnings: [{ uuid: 'u-1' }] }],
+      ['an alert with no identifier', { warnings: [{ alert: { info: [] } }] }],
+      ['an alert with no info', { warnings: [{ alert: { identifier: 'x' } }] }]
+    ])('still skips %s in the verified shape, resolving []', async (_label, body) => {
+      mockGet.mockImplementation(() => jsonResponse(body));
+      const service = new MeteoAlarmService();
+
+      await expect(service.getWarnings('gb')).resolves.toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
     it('positive control: the honest empty feed resolves [] and is cached', async () => {

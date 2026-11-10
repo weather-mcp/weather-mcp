@@ -130,6 +130,29 @@ describe('alert-feed wrong-shaped 200 through the MCP dispatch', () => {
     expect(result.isError).not.toBe(true);
   });
 
+  it('get_alerts, Berlin: an entry whose alert is a string is an error result, not the all-clear', async () => {
+    const spy = stubMeteoAlarm({ warnings: [{ alert: 'malformed-alert' }] });
+
+    const { result, text } = await call('get_alerts', BERLIN);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(result.isError).toBe(true);
+    expect(text).toBe(`Error: ${METEOALARM_MSG}`);
+    expect(text).not.toContain(ALL_CLEAR);
+  });
+
+  it('get_weather_summary, Berlin: an entry whose alert is a string leaves the alerts section unavailable', async () => {
+    const spy = stubMeteoAlarm({ warnings: [{ alert: 'malformed-alert' }] });
+
+    const { result, text } = await call('get_weather_summary', { ...BERLIN, include: ['alerts'] });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const section = alertsSection(text);
+    expect(section).toContain(METEOALARM_MSG);
+    expect(section).not.toContain(ALL_CLEAR);
+    expect(result.isError).not.toBe(true);
+  });
+
   it('positive control: an empty MeteoAlarm envelope renders the all-clear with no isError key', async () => {
     const spy = stubMeteoAlarm({ warnings: [] });
 

@@ -402,12 +402,39 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 type MeteoAlarmFeedEnvelope = MeteoAlarmFeedResponse & { warnings: MeteoAlarmFeedWarning[] };
 
 /**
- * True only for the verified envelope `{ warnings: [ {…}, … ] }`. An HTML page,
- * a gateway's `{ error }` object, `''`, `null`, a bare array, or any non-object
- * element is refused; the caller throws rather than reading an empty list.
+ * True for one `warnings[]` entry in the verified shape. `parseFeed` skips an
+ * entry with no `alert`, no `identifier` or no `info`, so each of those may be
+ * **absent**. When present it must be the verified type: `alert` an object,
+ * `identifier` a string, `info` an array of objects. Otherwise a malformed entry
+ * would be skipped like an empty one, and a feed of them would render the
+ * all-clear (G4, one level down). All 3,612 entries of the 38 live feeds had the
+ * full shape on 2026-11-10.
+ */
+function isMeteoAlarmEntry(entry: unknown): boolean {
+  if (!isPlainObject(entry)) {
+    return false;
+  }
+  if (entry.alert === undefined) {
+    return true;
+  }
+  const alert = entry.alert;
+  if (!isPlainObject(alert)) {
+    return false;
+  }
+  if (alert.identifier !== undefined && typeof alert.identifier !== 'string') {
+    return false;
+  }
+  return alert.info === undefined || (Array.isArray(alert.info) && alert.info.every(isPlainObject));
+}
+
+/**
+ * True only for the verified envelope `{ warnings: [ {…}, … ] }` whose every
+ * entry passes `isMeteoAlarmEntry`. An HTML page, a gateway's `{ error }`
+ * object, `''`, `null`, a bare array, or any malformed entry is refused; the
+ * caller throws rather than reading an empty list.
  */
 function isMeteoAlarmFeed(data: unknown): data is MeteoAlarmFeedEnvelope {
-  return isPlainObject(data) && Array.isArray(data.warnings) && data.warnings.every(isPlainObject);
+  return isPlainObject(data) && Array.isArray(data.warnings) && data.warnings.every(isMeteoAlarmEntry);
 }
 
 /**

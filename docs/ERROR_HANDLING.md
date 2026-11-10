@@ -249,7 +249,7 @@ server error (5xx) or a failed connection up to three times with backoff, waitin
 7 s in total, before you see one of the messages below. A timeout is not retried: it has used
 either its own timeout (`API_TIMEOUT_MS`) or what remained of the tool call's budget. A 200 answer
 whose body is not the warnings feed (a maintenance page, a gateway's error object, an empty body,
-or a warning entry that is not an object) is an error, never an empty answer, and it is not
+or a warning entry whose `alert`, `identifier` or `info` has the wrong type) is an error, never an empty answer, and it is not
 retried. Every message is fixed text written by this server. Text from the feed, or from a gateway
 in front of it, is never shown.
 
