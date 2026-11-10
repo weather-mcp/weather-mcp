@@ -11,13 +11,15 @@ you're getting.
 **Claude Code answered** (using `get_wildfire_info`):
 
 <!-- answer -->
-There are **7 active fires within 300 km of Denver, but none close enough to threaten the city** — the safety assessment comes back at the lowest "Awareness" tier.
+There are **3 active fires within 300 km of Denver, but none close enough to threaten the city** — the safety assessment comes back at the lowest "Awareness" tier.
 
-The ones worth knowing about:
+Each distance is measured to the nearest edge of the fire's mapped perimeter, not to the spot where it started, and the report says so under every distance:
 
-- **Willow** — the nearest, 88 miles away near Leadville: 7,259 acres, 80% contained.
-- **Aspen Acres** — the big one, 110 miles south near Beulah: 102,003 acres, 82% contained after 80 days.
-- **Swiss Roll**, furthest out near Pagosa Springs, is **0% contained** — a real reading, not a missing one. A fire NIFC has published no containment figure for reads `not reported` instead, and either way the server treats it as uncontained when it picks the fire that drives the danger tier.
+- **Willow** — the nearest, 82 miles away near Leadville: 7,259 acres, 92% contained.
+- **Aspen Acres** — the big one, 106 miles away near Beulah: 102,003 acres, 96% contained after 134 days.
+- **Elk**, furthest out near Lake City: 7,257 acres, 90% contained.
+
+A fire NIFC has published no containment figure for would read `not reported` instead, and the server would still treat it as uncontained when it picks the fire that drives the danger tier.
 
 For Denver itself the practical question is smoke, not flame — let's check the air quality next.
 <!-- /answer -->
@@ -44,86 +46,57 @@ get_wildfire_info({
 **Location:** 39.7392, -104.9903
 **Search Radius:** 300 km (186.4 miles)
 
-🔥 **Found 7 active fires**
-   - 7 wildfires
+🔥 **Found 3 active fires**
+   - 3 wildfires
 
 ## Willow
 
 **Type:** 🔥 Wildfire
-**Distance:** 141.5 km (87.92 mi)
+**Distance:** 132.3 km (82.21 mi)
+**Measured to:** nearest edge of the mapped fire perimeter
 **Location:** US-CO, Lake County near Leadville
-**Coordinates:** 39.1872, -106.4753
+**Point of Origin (reported):** 39.1872, -106.4753
 
 ### Status
 **Size:** 7259 acres (2937 hectares)
-**Containment:** 80% ████████░░
+**Containment:** 92% █████████░
 **Discovery Date:** 6/28/2026
-**Days Active:** 80
+**Days Active:** 135
 
 ---
 
 ## Aspen Acres
 
 **Type:** 🔥 Wildfire
-**Distance:** 177.5 km (110.29 mi)
+**Distance:** 169.9 km (105.57 mi)
+**Measured to:** nearest edge of the mapped fire perimeter
 **Location:** US-CO, Custer County near Beulah
-**Coordinates:** 38.1500, -105.1855
+**Point of Origin (reported):** 38.1500, -105.1855
 
 ### Status
 **Size:** 102003 acres (41279 hectares)
-**Containment:** 82% ████████░░
+**Containment:** 96% █████████░
 **Discovery Date:** 6/29/2026
-**Days Active:** 80
-
----
-
-## Moonshine
-
-**Type:** 🔥 Wildfire
-**Distance:** 247.9 km (154.04 mi)
-**Location:** US-WY, Albany County near Wheatland
-**Coordinates:** 41.9611, -105.2366
-
-### Status
-**Size:** 7321 acres (2963 hectares)
-**Containment:** 51% █████░░░░░
-**Discovery Date:** 9/7/2026
-**Days Active:** 9
+**Days Active:** 134
 
 ---
 
 ## Elk
 
 **Type:** 🔥 Wildfire
-**Distance:** 272.2 km (169.14 mi)
+**Distance:** 269.4 km (167.40 mi)
+**Measured to:** nearest edge of the mapped fire perimeter
 **Location:** US-CO, Hinsdale County near Lake City
-**Coordinates:** 38.1242, -107.3548
+**Point of Origin (reported):** 38.1242, -107.3548
 
 ### Status
 **Size:** 7257 acres (2937 hectares)
-**Containment:** 73% ███████░░░
+**Containment:** 90% █████████░
 **Discovery Date:** 7/9/2026
-**Days Active:** 70
+**Days Active:** 124
 
 ---
 
-## Swiss Roll
-
-**Type:** 🔥 Wildfire
-**Distance:** 292.6 km (181.81 mi)
-**Location:** US-CO, Archuleta County near Pagosa Springs
-**Coordinates:** 37.5148, -106.7905
-
-### Status
-**Size:** 777 acres (314 hectares)
-**Containment:** 0% ░░░░░░░░░░
-**Discovery Date:** 8/20/2026
-**Days Active:** 28
-
----
-
-
-*Note: 2 additional fires found within radius (showing nearest 5 only — use detail="full" for more)*
 
 ## Safety Assessment
 
@@ -144,9 +117,9 @@ get_wildfire_info({
 **And for smoke / air quality** (using `get_air_quality`):
 
 <!-- answer-2 -->
-**Your run is fine.** US AQI is **64 — "Moderate"** — and the smoke signal specifically, PM2.5, is low at 6.5 μg/m³, so the distant fires aren't putting meaningful smoke at street level in Denver right now. Only unusually sensitive people are advised to trim prolonged outdoor exertion.
+**Your run is fine.** US AQI is **56 — "Moderate"** — and the smoke signal specifically, PM2.5, is 11 μg/m³, so the distant fires aren't putting meaningful smoke at street level in Denver right now. Only unusually sensitive people are advised to trim prolonged outdoor exertion.
 
-One thing to note about the timing: this was an evening check, so the UV index reads 0.0 (Low). Ask again before an afternoon run and the same report carries the daytime figure — at Denver's elevation that is the number to plan sunscreen around.
+The UV index at this 2 PM reading is 1.4 (Low), so sunscreen isn't a concern today either.
 <!-- /answer-2 -->
 
 <!-- capture:air-quality -->
@@ -171,9 +144,9 @@ get_air_quality({
 **Timezone:** America/Denver
 **Elevation:** 1599m
 
-**Observation Time:** 9/17/2026, 1:00:00 PM
+**Observation Time:** 11/10/2026, 2:00:00 PM
 
-## 🟡 US Air Quality Index: 55
+## 🟡 US Air Quality Index: 56
 
 **Category:** Moderate (Yellow)
 **Description:** Air quality is acceptable
@@ -183,30 +156,21 @@ Air quality is acceptable; however, unusually sensitive people may experience mi
 
 ⚠️ **Caution:** Unusually sensitive people should consider reducing prolonged outdoor exertion.
 
-## 🟠 UV Index: 6.5
+## 🟢 UV Index: 1.4
 
-**Level:** High
-**Description:** Protection essential
-**Recommendation:** Apply SPF 30+ sunscreen. Wear protective clothing, hat, and sunglasses. Reduce midday sun exposure.
-
-*Note: UV index under clear sky would be 8.1*
+**Level:** Low
+**Description:** Minimal protection required
+**Recommendation:** No protection required. You can safely stay outside.
 
 ## Pollutant Concentrations
 
-**PM2.5 (Fine Particulate Matter):** 6.1 μg/m³
-**PM10 (Coarse Particulate Matter):** 7.5 μg/m³
+**PM2.5 (Fine Particulate Matter):** 11 μg/m³
+**PM10 (Coarse Particulate Matter):** 15 μg/m³
 **Ozone (O₃):** 96 μg/m³
-**Nitrogen Dioxide (NO₂):** 3.5 μg/m³
-**Sulfur Dioxide (SO₂):** 0.90 μg/m³
-**Carbon Monoxide (CO):** 143 μg/m³
-**Aerosol Optical Depth:** 0.140 (atmospheric haze indicator)
-
-## 🌾 Pollen
-
-**Grass:** 1 (Very Low)
-**Weed:** 4 (High)
-
-*Universal Pollen Index (0–5) for today. Source: Includes pollen data from Google.*
+**Nitrogen Dioxide (NO₂):** 10 μg/m³
+**Sulfur Dioxide (SO₂):** 1.5 μg/m³
+**Carbon Monoxide (CO):** 156 μg/m³
+**Aerosol Optical Depth:** 0.100 (atmospheric haze indicator)
 
 *European AQI: 38 (Fair)*
 ````
@@ -217,9 +181,9 @@ Air quality is acceptable; however, unusually sensitive people may experience mi
 **And the fire-weather side of it** (using `get_current_conditions` with `include_fire_weather`):
 
 <!-- answer-3 -->
-**Nothing to worry about today — it's actively raining at the reporting station.** NOAA rates the seasonal fire risk **Moderate** and explicitly says conditions don't meet the thresholds that trigger its danger indices, so Haines, Grassland Fire Danger, and Red Flag Threat simply aren't being calculated right now.
+**Nothing to worry about today.** It's clear and 64°F at the reporting station. NOAA rates the seasonal fire risk **Low** — winter season — so Haines, Grassland Fire Danger, and Red Flag Threat simply aren't being calculated right now.
 
-What it *does* give you is the smoke-dispersion picture: a **147 ft mixing height (very poor dispersion)** with a 7 mph transport wind. That combination is worth knowing — if something did ignite, the smoke would sit low rather than lift away.
+What it *does* give you is the smoke-dispersion picture: a **111 ft mixing height (very poor dispersion)** with a 6 mph transport wind. That combination is worth knowing — if something did ignite, the smoke would sit low rather than lift away.
 
 Note where these numbers come from: NOAA **publishes** fire-weather indices for US points, so on this path the server reports them rather than deriving anything.
 <!-- /answer-3 -->
@@ -244,25 +208,25 @@ get_current_conditions({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KBJC
-**Time:** Sep 17, 2026, 12:45 PM (56 minutes ago)
+**Time:** Nov 10, 2026, 12:53 PM (1.8 hours ago)
 
-**Conditions:** Mostly Cloudy
-**Temperature:** 72°F
-**Dewpoint:** 54°F
-**Humidity:** 53%
-**Wind:** 6 mph from 310°
-**Pressure:** 30.27 inHg
+**Conditions:** Clear
+**Temperature:** 64°F
+**Dewpoint:** 27°F
+**Humidity:** 24%
+**Wind:** 5 mph from 90°
+**Pressure:** 30.19 inHg
 **Visibility:** 10.0 miles (clear)
-**Cloud Cover:** Broken clouds at 10991ft
+**Cloud Cover:** Clear
 
 ## Fire Weather
 
-🟡 **Seasonal Fire Risk:** Moderate
-Current conditions do not meet thresholds for fire weather concerns. Fire danger indices are calculated during periods of low humidity, high temperatures, and strong winds.
+ℹ️ **Seasonal Fire Risk:** Low
+Winter season with minimal fire risk due to cold temperatures, snow cover, or high humidity. Fire danger indices are calculated during dry, warm periods with elevated fire potential.
 
 **Atmospheric Monitoring:**
-**Mixing Height:** 141 ft (very poor dispersion)
-**Transport Wind:** 7 mph (moderate smoke transport)
+**Mixing Height:** 111 ft (very poor dispersion)
+**Transport Wind:** 6 mph (moderate smoke transport)
 
 *Fire danger indices (Haines Index, Grassland Fire Danger, Red Flag Threat) are calculated during elevated fire risk periods, typically during dry seasons or when Red Flag conditions are possible.*
 
@@ -282,13 +246,13 @@ Current conditions do not meet thresholds for fire weather concerns. Fire danger
 **Claude Code answered** (using `get_wildfire_info`):
 
 <!-- answer-4 -->
-**Yes — 2 satellite heat detections in the last 3 days, in 2 clusters within 200 km**, and the nearest is close enough to put this at **HIGH ALERT**: 24.1 km NW of the city center.
+**Yes — 3 satellite heat detections in the last 3 days, in 3 clusters within 200 km**, but none is close: the nearest is 52.6 km NE of the city center, so the assessment stays at **AWARENESS**.
 
 But read this differently from the Denver answer, because it *is* different data:
 
 - These are **hotspots, not incidents.** There are no fire names, no acreage, no containment percentages — because no agency is publishing them here. What a satellite sees is heat.
-- Some of these may not be wildfires at all. The server says so up front: detections can be industrial heat sources, gas flares, or agricultural burns. The 24.1 km cluster is a single low-power hotspot (2.0 MW) last seen **2 days ago**, which reads more like a burn scar or a one-off than an advancing fire.
-- The only other signal is **Cluster 2** — one 0.7 MW hotspot, also **2 days old**, and 165.6 km away to the NNW.
+- Some of these may not be wildfires at all. The server says so up front: detections can be industrial heat sources, gas flares, or agricultural burns. Each cluster is a single low-power hotspot (1.1 to 2.7 MW), which reads more like scattered burns than an advancing fire.
+- The other two are farther out to the NNW and NW, at 152.8 km and 188.9 km.
 
 So: worth watching, not worth panicking. And critically, if this had come back empty it still wouldn't have meant "no fires" — cloud cover hides fires from satellites, and the server refuses to print an all-clear it can't back up.
 <!-- /answer-4 -->
@@ -377,9 +341,9 @@ get_wildfire_info({
 **And the conditions themselves** (using `get_current_conditions` with `include_fire_weather`):
 
 <!-- answer-5 -->
-**Conditions right now are calm — Fosberg index 8 (Low)** — but that's a 5 AM reading on a still morning (78°F, 4 mph wind), and the index is deliberately a *now* number, not a forecast.
+**Conditions right now are calm — Fosberg index 1 (Low)** — on an overcast, humid night (60°F, 94% humidity, 2 mph wind), and the index is deliberately a *now* number, not a forecast.
 
-The line underneath it is the one that matters for next week: **vapour-pressure deficit 1.9 kPa (moderate drying power)** and **topsoil moisture 0.08 m³/m³ (very dry)**. The topsoil is parched even though this particular hour is quiet. Add the afternoon heat — today's range runs up to 96°F — and a windy day would move that index fast.
+The dryness lines agree: **vapour-pressure deficit 0.1 kPa (low drying power)** and **topsoil moisture 0.36 m³/m³ (wet)**, with today's range topping out at 67°F. That says little about next week — a dry, windy afternoon would move the index fast — so check again closer to the day.
 
 Two honesty notes the server makes itself, worth repeating:
 
@@ -406,26 +370,25 @@ get_current_conditions({
 ````markdown
 # Current Weather Conditions
 
-**Time:** Sep 17, 2026, 10:30 PM
+**Time:** Nov 10, 2026, 11:30 PM
 
-**Conditions:** Clear sky
-**Temperature:** 69°F
-**Feels Like:** 66°F
-**Today's Range:** High 83°F / Low 65°F
-**Dewpoint:** 43°F
-**Humidity:** 39%
-**Wind:** 3 mph from 36°, gusting to 9 mph
-**Pressure:** 29.95 inHg
-**Cloud Cover:** 0%
+**Conditions:** Overcast
+**Temperature:** 60°F
+**Today's Range:** High 67°F / Low 51°F
+**Dewpoint:** 58°F
+**Humidity:** 94%
+**Wind:** 2 mph from 120°, gusting to 4 mph
+**Pressure:** 30.13 inHg
+**Cloud Cover:** 88%
 
 ## Fire Weather
 
-**🟢 Fosberg Fire Weather Index:** 6 (Low)
+**🟢 Fosberg Fire Weather Index:** 1 (Low)
 Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.
 
 **Dryness context:**
-- **Vapour-pressure deficit:** 1.5 kPa (moderate drying power)
-- **Topsoil moisture (top 1 cm):** 0.10 m³/m³ (dry)
+- **Vapour-pressure deficit:** 0.1 kPa (low drying power)
+- **Topsoil moisture (top 1 cm):** 0.36 m³/m³ (wet)
 
 *Derived by this server from Open-Meteo model data — not an official fire-danger rating. Heed warnings from your national fire authority.*
 
@@ -438,8 +401,8 @@ Computed from current temperature, humidity, and sustained wind. Higher values m
 
 ---
 
-**Features shown:** `get_wildfire_info` on both paths — NIFC named incidents in the US (containment, distance, safety tier) and NASA FIRMS satellite heat detections everywhere else (clustered hotspots, no names or containment, never an all-clear) · `get_current_conditions` with `include_fire_weather` on both paths — NOAA's published indices in the US, a server-computed Fosberg index with dryness context elsewhere, each labeled for what it is · `get_air_quality` on the US path — US AQI scale, pollutant breakdown (PM2.5 is the smoke signal), UV index, health recommendations.
+**Features shown:** `get_wildfire_info` on both paths — NIFC named incidents in the US (containment, distance to the mapped perimeter, safety tier) and NASA FIRMS satellite heat detections everywhere else (clustered hotspots, no names or containment, never an all-clear) · `get_current_conditions` with `include_fire_weather` on both paths — NOAA's published indices in the US, a server-computed Fosberg index with dryness context elsewhere, each labeled for what it is · `get_air_quality` on the US path — US AQI scale, pollutant breakdown (PM2.5 is the smoke signal), UV index, health recommendations.
 
 <!-- capture-stamp -->
-*Captured 2026-09-17 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-11-10 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

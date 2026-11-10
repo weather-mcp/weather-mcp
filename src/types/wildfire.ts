@@ -12,19 +12,19 @@ export interface FirePerimeterAttributes {
   attr_IncidentTypeCategory?: string; // WF=Wildfire, RX=Prescribed Fire
 
   // Acreage data
-  poly_GISAcres?: number; // GIS-calculated acres
-  attr_FinalAcres?: number; // Final incident acreage
-  attr_CalculatedAcres?: number; // Calculated size metric
+  poly_GISAcres?: number | null; // GIS-calculated acres
+  attr_FinalAcres?: number | null; // Final incident acreage
+  attr_CalculatedAcres?: number | null; // Calculated size metric
 
   // Containment & status
   attr_PercentContained?: number; // Containment percentage (0-100)
   attr_ContainmentDateTime?: number; // Containment timestamp (epoch ms)
   poly_FeatureStatus?: string; // Approval status
-  attr_FireDiscoveryDateTime?: number; // Discovery timestamp (epoch ms)
+  attr_FireDiscoveryDateTime?: number | null; // Discovery timestamp (epoch ms)
 
   // Location
-  attr_InitialLatitude?: number; // Fire origin latitude
-  attr_InitialLongitude?: number; // Fire origin longitude
+  attr_InitialLatitude?: number | null; // Fire origin latitude (null on live rows)
+  attr_InitialLongitude?: number | null; // Fire origin longitude (null on live rows)
   attr_POOState?: string; // Place of origin - State
   attr_POOCounty?: string; // Place of origin - County
   attr_POOCity?: string; // Place of origin - City
@@ -53,7 +53,8 @@ export interface ArcGISPolygonGeometry {
  */
 export interface FirePerimeterFeature {
   attributes: FirePerimeterAttributes;
-  geometry: ArcGISPolygonGeometry;
+  /** Read through `distanceToPerimeterKm`, which narrows the rings itself. */
+  geometry?: ArcGISPolygonGeometry;
 }
 
 /**
@@ -84,8 +85,17 @@ export interface NIFCQueryResponse {
  */
 export interface WildfireInfo {
   name: string;
-  distance: number; // km from query location
-  acres: number;
+  /**
+   * Km from the query location to the fire, on the basis `distanceBasis`
+   * names, or `null` when NIFC published neither a usable perimeter nor a
+   * usable point of origin. `null` means "unlocated", not zero and not far:
+   * an unknown distance is not evidence of distance.
+   */
+  distance: number | null;
+  /** What `distance` was measured to. */
+  distanceBasis: 'perimeter' | 'origin' | 'unlocated';
+  /** Acres, or `null` when NIFC published no size greater than zero ("not reported"). */
+  acres: number | null;
   /**
    * Containment percentage 0-100, or `null` when NIFC published no usable
    * containment for this incident. `null` means "not reported", not
@@ -93,7 +103,9 @@ export interface WildfireInfo {
    * contained) and both encodings occur live.
    */
   containment: number | null;
-  discoveryDate: Date;
+  /** Discovery date, or `null` when NIFC published no usable timestamp ("not reported"). */
+  discoveryDate: Date | null;
+  /** Reported point of origin; set only when both coordinates are usable. */
   latitude?: number;
   longitude?: number;
   state?: string;

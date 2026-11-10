@@ -2,8 +2,9 @@
  * Handler for get_wildfire_info tool.
  *
  * Routed by country (see docs/plans/global-wildfire-plan.md D1/D2):
- *   US → NIFC/WFIGS named incidents (the original path, byte-identical
- *   output), elsewhere → NASA FIRMS satellite fire detections (VIIRS, near
+ *   US → NIFC/WFIGS named incidents, each measured to its mapped perimeter
+ *   (the reported point of origin only when no usable perimeter is
+ *   published), elsewhere → NASA FIRMS satellite fire detections (VIIRS, near
  *   real-time, global). An explicit `source` forces the branch; there is
  *   deliberately no cross-fallback — managed incidents (names, acreage,
  *   containment) and satellite heat detections are different claims, and
@@ -26,6 +27,7 @@ import { resolveCountryCode, resolveLocationAsync, prependLocationLine } from '.
 import { validateDetail } from '../utils/validation.js';
 import { guessTimezoneFromCoords, formatObservationAge } from '../utils/timezone.js';
 import { calculateDistance, kmToMiles } from '../utils/distance.js';
+import { distanceToPerimeterKm } from '../utils/firePerimeter.js';
 import { displayValue } from '../utils/displayBanding.js';
 import { isInUS } from '../utils/geography.js';
 import { logger } from '../utils/logger.js';
@@ -132,6 +134,80 @@ function formatContainmentLine(containment: number | null): string {
 function formatDistanceFigure(km: number): string {
   const shownKm = displayValue(km, 1);
   return `${shownKm.toFixed(1)} km (${kmToMiles(shownKm).toFixed(2)} mi)`;
+}
+
+/**
+ * Parse NIFC's reported point of origin, or `null` when either coordinate is
+ * unusable.
+ *
+ * Usable means finite, in coordinate range, and **non-zero**. No incident in
+ * NIFC's covered set (US, PR, VI, GU) can sit on the equator or the prime
+ * meridian, so a `0` is a second "not recorded" encoding beside `null`
+ * (GOTCHAS G56), not a coordinate. Treating it as one would measure the fire
+ * thousands of km away and drop it at the radius filter; treating it as absent
+ * keeps the fire listed as unlocated, the cautious direction.
+ */
+function parseOrigin(rawLat: unknown, rawLon: unknown): { latitude: number; longitude: number } | null {
+  if (typeof rawLat !== 'number' || typeof rawLon !== 'number') return null;
+  if (!Number.isFinite(rawLat) || !Number.isFinite(rawLon)) return null;
+  if (rawLat === 0 || rawLon === 0) return null;
+  if (rawLat < -90 || rawLat > 90 || rawLon < -180 || rawLon > 180) return null;
+  return { latitude: rawLat, longitude: rawLon };
+}
+
+/**
+ * The first acreage field that is a finite number greater than zero, or `null`
+ * meaning "NIFC published no size". Zero is absent here, unlike containment: a
+ * mapped perimeter of zero area is not a reading, it is a second "not
+ * recorded" encoding (GOTCHAS G56). The old `|| 0` printed `0 acres`.
+ */
+function parseAcres(candidates: unknown[]): number | null {
+  for (const raw of candidates) {
+    if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return raw;
+  }
+  return null;
+}
+
+/**
+ * NIFC's discovery timestamp (epoch ms) as a `Date`, or `null` meaning "NIFC
+ * published no discovery date". Epoch `0` is absent, not 1 January 1970: no
+ * current incident was discovered then. A finite value outside the `Date`
+ * range (e.g. `Number.MAX_VALUE`) is absent too. The old fallback was
+ * `new Date()`, which printed today's date and `Days Active: 0`.
+ */
+function parseDiscoveryDate(raw: unknown): Date | null {
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return null;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** The line beneath `**Distance:**` naming what the distance was measured to. */
+function formatDistanceBasisLine(fire: WildfireInfo): string {
+  switch (fire.distanceBasis) {
+    case 'perimeter':
+      return fire.distance === 0
+        ? `**Measured to:** the mapped fire perimeter — this location is inside it\n`
+        : `**Measured to:** nearest edge of the mapped fire perimeter\n`;
+    case 'origin':
+      return `**Measured to:** reported point of origin (NIFC published no usable perimeter)\n`;
+    case 'unlocated':
+      return `**Measured to:** not available — NIFC published neither a perimeter nor a point of origin\n`;
+  }
+}
+
+/**
+ * The Safety Assessment line for wildfires with no published location. They
+ * select no tier, because a tier is a claim about a distance, so the section
+ * must say they exist and that it is not an all-clear.
+ */
+function formatUnlocatedWildfireLine(names: string[]): string {
+  const n = names.length;
+  const shown = names.slice(0, 5).join(', ');
+  const more = n > 5 ? ` and ${n - 5} more` : '';
+  const one = n === 1;
+  return `⚠️ ${n} wildfire${one ? '' : 's'} in this search area ${one ? 'has' : 'have'} no published location (${shown}${more}). ` +
+    `${one ? 'Its' : 'Their'} distance is unknown and is not reflected in any tier above. ` +
+    `Do not read this section as an all-clear.\n`;
 }
 
 export async function handleGetWildfireInfo(
@@ -249,11 +325,12 @@ export async function handleGetWildfireInfo(
 }
 
 /**
- * The original US path: NIFC/WFIGS named incidents with acreage,
- * containment, and the containment-aware safety assessment. Byte-identical
- * to the pre-global behavior (locked by tests/unit/wildfire-handler.test.ts
- * passing unedited). `failed` is true only when the catch replaced the fire
- * list with the error block.
+ * The US path: NIFC/WFIGS named incidents with acreage, containment, and the
+ * containment-aware safety assessment. Each fire is measured to its mapped
+ * perimeter (zero inside it), else to its reported point of origin, else it is
+ * listed as unlocated with no distance; the line beneath `**Distance:**` names
+ * which. `failed` is true only when the catch replaced the fire list with the
+ * error block.
  */
 async function formatNIFCWildfire(
   nifcService: NIFCService,
@@ -292,7 +369,85 @@ async function formatNIFCWildfire(
     const response = await nifcService.queryFirePerimeters(west, south, east, north);
     const features = response.features || [];
 
-    if (features.length === 0 && outsideCoverage) {
+    // Measure and filter first, then branch on the filtered list (D3): a
+    // response whose every feature lies beyond the radius is the no-fires
+    // case (or the coverage disclosure), never a "Found 0 active fire" count.
+    const firesWithDistance: Array<{ fire: WildfireInfo; distance: number | null }> = [];
+
+    for (const feature of features) {
+      const attrs = feature.attributes;
+
+      // Basis order: mapped perimeter → reported point of origin → unlocated.
+      // A fire is an area; the origin is a coordinate entered once and is
+      // sometimes far from the fire, so it is only the fallback. `null` is
+      // a refusal to measure, never a number (GOTCHAS G68).
+      const origin = parseOrigin(attrs.attr_InitialLatitude, attrs.attr_InitialLongitude);
+      const perimeterKm = distanceToPerimeterKm(latitude, longitude, feature.geometry?.rings);
+      let fireDistance: number | null;
+      let distanceBasis: WildfireInfo['distanceBasis'];
+      if (perimeterKm !== null) {
+        fireDistance = perimeterKm;
+        distanceBasis = 'perimeter';
+      } else if (origin !== null) {
+        fireDistance = calculateDistance(latitude, longitude, origin.latitude, origin.longitude);
+        distanceBasis = 'origin';
+      } else {
+        fireDistance = null;
+        distanceBasis = 'unlocated';
+      }
+
+      // Keep a located fire within the radius, and every unlocated fire:
+      // an unknown distance is not evidence that the fire is far away.
+      if (fireDistance === null || fireDistance <= radius) {
+        if (fireDistance === null) {
+          logger.warn('NIFC published no usable location for an incident', {
+            incident: attrs.poly_IncidentName
+          });
+        }
+        // Parsed before the literal so the warn can be guarded on the result.
+        // Warn only when the value is present but unusable — a plain
+        // null/undefined is the normal wire shape for a quarter of live rows,
+        // and warning on it would emit ~50 lines per request on a healthy
+        // feed. This is a data-quality event, not a security one, so no
+        // securityEvent flag (unlike the FIRMS row cap below).
+        const containment = parseContainment(attrs.attr_PercentContained);
+        if (attrs.attr_PercentContained != null && containment === null) {
+          logger.warn('NIFC published an unusable containment value', {
+            incident: attrs.poly_IncidentName,
+            value: attrs.attr_PercentContained
+          });
+        }
+
+        const fireInfo: WildfireInfo = {
+          name: attrs.poly_IncidentName || 'Unknown Fire',
+          distance: fireDistance,
+          distanceBasis,
+          acres: parseAcres([attrs.poly_GISAcres, attrs.attr_FinalAcres, attrs.attr_CalculatedAcres]),
+          containment,
+          discoveryDate: parseDiscoveryDate(attrs.attr_FireDiscoveryDateTime),
+          latitude: origin?.latitude,
+          longitude: origin?.longitude,
+          state: attrs.attr_POOState,
+          county: attrs.attr_POOCounty,
+          city: attrs.attr_POOCity,
+          type: attrs.attr_IncidentTypeCategory === 'WF' ? 'Wildfire' :
+                attrs.attr_IncidentTypeCategory === 'RX' ? 'Prescribed Fire' : 'Unknown',
+          status: attrs.poly_FeatureStatus || 'Active'
+        };
+
+        firesWithDistance.push({ fire: fireInfo, distance: fireDistance });
+      }
+    }
+
+    // Sort by distance (nearest first), unlocated fires last. The sort is
+    // stable, so unlocated fires keep the upstream order among themselves.
+    firesWithDistance.sort((a, b) => {
+      if (a.distance === null) return b.distance === null ? 0 : 1;
+      if (b.distance === null) return -1;
+      return a.distance - b.distance;
+    });
+
+    if (firesWithDistance.length === 0 && outsideCoverage) {
       // Forced `source: "nifc"` outside NIFC coverage. An empty result here
       // means "this authority does not track fires at this location", which
       // is emphatically not an all-clear — so no ✅ and no "currently clear"
@@ -304,7 +459,7 @@ async function formatNIFCWildfire(
       output += `all-clear. There may be active fires here that NIFC does not report.\n\n`;
       output += `Use \`source: "firms"\` (or omit \`source\`) for NASA FIRMS satellite fire `;
       output += `detections, which are global.\n`;
-    } else if (features.length === 0) {
+    } else if (firesWithDistance.length === 0) {
       output += `✅ **No active wildfires found within ${radius} km**\n\n`;
       if (response.exceededTransferLimit) {
         output += `*Results may be incomplete — the fire data service truncated the response.*\n\n`;
@@ -312,69 +467,6 @@ async function formatNIFCWildfire(
       output += `The area is currently clear of reported wildfire activity.\n\n`;
       output += `**Note:** This data includes active wildfires and prescribed burns tracked by the National Interagency Fire Center. Small fires or very recent ignitions may not yet be included.\n`;
     } else {
-      // Process and filter fires by actual distance
-      const firesWithDistance: Array<{ fire: WildfireInfo; distance: number }> = [];
-
-      for (const feature of features) {
-        const attrs = feature.attributes;
-
-        // Calculate distance from center point to fire origin
-        let fireDistance = radius; // default if no coordinates
-
-        if (attrs.attr_InitialLatitude && attrs.attr_InitialLongitude) {
-          fireDistance = calculateDistance(
-            latitude,
-            longitude,
-            attrs.attr_InitialLatitude,
-            attrs.attr_InitialLongitude
-          );
-        } else if (feature.geometry?.rings?.[0]?.[0]) {
-          // Use first point of fire perimeter if no origin coordinates
-          const [fireLon, fireLat] = feature.geometry.rings[0][0];
-          fireDistance = calculateDistance(latitude, longitude, fireLat, fireLon);
-        }
-
-        // Only include fires within radius
-        if (fireDistance <= radius) {
-          // Parsed before the literal so the warn can be guarded on the result.
-          // Warn only when the value is present but unusable — a plain
-          // null/undefined is the normal wire shape for a quarter of live rows,
-          // and warning on it would emit ~50 lines per request on a healthy
-          // feed. This is a data-quality event, not a security one, so no
-          // securityEvent flag (unlike the FIRMS row cap below).
-          const containment = parseContainment(attrs.attr_PercentContained);
-          if (attrs.attr_PercentContained != null && containment === null) {
-            logger.warn('NIFC published an unusable containment value', {
-              incident: attrs.poly_IncidentName,
-              value: attrs.attr_PercentContained
-            });
-          }
-
-          const fireInfo: WildfireInfo = {
-            name: attrs.poly_IncidentName || 'Unknown Fire',
-            distance: fireDistance,
-            acres: attrs.poly_GISAcres || attrs.attr_FinalAcres || attrs.attr_CalculatedAcres || 0,
-            containment,
-            discoveryDate: attrs.attr_FireDiscoveryDateTime
-              ? new Date(attrs.attr_FireDiscoveryDateTime)
-              : new Date(),
-            latitude: attrs.attr_InitialLatitude,
-            longitude: attrs.attr_InitialLongitude,
-            state: attrs.attr_POOState,
-            county: attrs.attr_POOCounty,
-            city: attrs.attr_POOCity,
-            type: attrs.attr_IncidentTypeCategory === 'WF' ? 'Wildfire' :
-                  attrs.attr_IncidentTypeCategory === 'RX' ? 'Prescribed Fire' : 'Unknown',
-            status: attrs.poly_FeatureStatus || 'Active'
-          };
-
-          firesWithDistance.push({ fire: fireInfo, distance: fireDistance });
-        }
-      }
-
-      // Sort by distance (nearest first)
-      firesWithDistance.sort((a, b) => a.distance - b.distance);
-
       const fireCount = firesWithDistance.length;
       const wildfireCount = firesWithDistance.filter(f => f.fire.type === 'Wildfire').length;
       const prescribedCount = firesWithDistance.filter(f => f.fire.type === 'Prescribed Fire').length;
@@ -397,8 +489,8 @@ async function formatNIFCWildfire(
       const maxFiresToShow = detail === 'full' ? 25 : 5;
       const firesToShow = firesWithDistance.slice(0, maxFiresToShow);
 
-      for (const { fire, distance } of firesToShow) {
-        output += formatFireDetails(fire, distance, timezone);
+      for (const { fire } of firesToShow) {
+        output += formatFireDetails(fire, timezone);
       }
 
       if (firesWithDistance.length > maxFiresToShow) {
@@ -428,9 +520,16 @@ async function formatNIFCWildfire(
       // old `|| 0` made it: an unknown containment is not evidence of
       // containment. displayValue does not accept null, so the case is
       // spelled out rather than coerced.
+      const isDisplayedUncontained = (f: { fire: WildfireInfo }): boolean =>
+        f.fire.containment === null || displayValue(f.fire.containment, 0) < 100;
+      // Only a located fire can select a tier: a tier is a claim about a
+      // distance, and an unlocated fire has none (GOTCHAS G68).
       const nearestWildfire = wildfires.find(
-        f => f.fire.containment === null || displayValue(f.fire.containment, 0) < 100
+        (f): f is { fire: WildfireInfo; distance: number } =>
+          f.distance !== null && isDisplayedUncontained(f)
       );
+      const unlocatedWildfires = wildfires.filter(f => f.distance === null);
+      const unlocatedUncontained = unlocatedWildfires.some(isDisplayedUncontained);
 
       if (wildfires.length > 0) {
         output += `\n## Safety Assessment\n\n`;
@@ -449,8 +548,11 @@ async function formatNIFCWildfire(
           // them, do not assume symmetry. And because the sentence printed
           // beneath says "within 5 km", which includes 5.0.
           const dist = displayValue(nearestWildfire.distance, 1);
+          // Located fires sort first, so whenever a located nearestWildfire
+          // exists, wildfires[0] is located too; the null check narrows the
+          // type and is never the deciding term.
           const nearestOverall = wildfires[0];
-          if (nearestOverall !== nearestWildfire) {
+          if (nearestOverall !== nearestWildfire && nearestOverall.distance !== null) {
             output += `ℹ️ Nearest fire (${nearestOverall.fire.name}, ${nearestOverall.distance.toFixed(1)} km) is 100% contained and excluded from the danger assessment.\n\n`;
           }
 
@@ -473,7 +575,7 @@ async function formatNIFCWildfire(
             output += `- Stay informed about fire progression\n`;
             output += `- Air quality may be affected by smoke\n`;
           }
-        } else {
+        } else if (!unlocatedUncontained) {
           // Wildfires are present but every one is 100% contained. Still
           // surface the section — omitting it would hide that fires exist
           // nearby — pinned at the lowest (AWARENESS) tier.
@@ -481,6 +583,13 @@ async function formatNIFCWildfire(
           output += `ℹ️ All fires within radius are 100% contained.\n`;
           output += `- Stay informed about fire progression\n`;
           output += `- Air quality may be affected by smoke\n`;
+        }
+        // Otherwise an unlocated wildfire is not displayed-contained: no
+        // tier and no all-contained line. The line below names it.
+        if (unlocatedWildfires.length > 0) {
+          const blockAbove = nearestWildfire !== undefined || !unlocatedUncontained;
+          if (blockAbove) output += `\n`;
+          output += formatUnlocatedWildfireLine(unlocatedWildfires.map(f => f.fire.name));
         }
         output += `\n`;
       }
@@ -767,7 +876,7 @@ function formatClusterDetails(cluster: FIRMSCluster, ordinal: number): string {
 /**
  * Format detailed information for a single wildfire
  */
-function formatFireDetails(fire: WildfireInfo, distance: number, timezone: string): string {
+function formatFireDetails(fire: WildfireInfo, timezone: string): string {
   let output = `## ${fire.name}\n\n`;
 
   // Fire type emoji
@@ -775,7 +884,10 @@ function formatFireDetails(fire: WildfireInfo, distance: number, timezone: strin
                     fire.type === 'Prescribed Fire' ? '🟦' : '⚪';
 
   output += `**Type:** ${typeEmoji} ${fire.type}\n`;
-  output += `**Distance:** ${formatDistanceFigure(distance)}\n`;
+  output += fire.distance === null
+    ? `**Distance:** not reported\n`
+    : `**Distance:** ${formatDistanceFigure(fire.distance)}\n`;
+  output += formatDistanceBasisLine(fire);
 
   if (fire.state) {
     let location = fire.state;
@@ -784,15 +896,20 @@ function formatFireDetails(fire: WildfireInfo, distance: number, timezone: strin
     output += `**Location:** ${location}\n`;
   }
 
-  if (fire.latitude && fire.longitude) {
-    output += `**Coordinates:** ${fire.latitude.toFixed(4)}, ${fire.longitude.toFixed(4)}\n`;
+  // Set only when parseOrigin found both coordinates usable. Labelled as the
+  // reported origin because, once distance is measured to the perimeter, an
+  // unlabelled coordinate far from the printed distance reads as a contradiction.
+  if (fire.latitude !== undefined && fire.longitude !== undefined) {
+    output += `**Point of Origin (reported):** ${fire.latitude.toFixed(4)}, ${fire.longitude.toFixed(4)}\n`;
   }
 
   output += `\n`;
 
   // Fire statistics
   output += `### Status\n`;
-  output += `**Size:** ${fire.acres.toFixed(0)} acres (${(fire.acres * 0.404686).toFixed(0)} hectares)\n`;
+  output += fire.acres === null
+    ? `**Size:** not reported\n`
+    : `**Size:** ${fire.acres.toFixed(0)} acres (${(fire.acres * 0.404686).toFixed(0)} hectares)\n`;
 
   // The bar is the completed tenths of the printed figure: a full bar means
   // the printed figure is `100%`, an empty bar means it is below `10%`, and
@@ -800,10 +917,16 @@ function formatFireDetails(fire: WildfireInfo, distance: number, timezone: strin
   // containment for reads `not reported`, with no bar at all.
   output += formatContainmentLine(fire.containment);
 
-  const now = new Date();
-  const daysActive = Math.floor((now.getTime() - fire.discoveryDate.getTime()) / (1000 * 60 * 60 * 24));
-  output += `**Discovery Date:** ${fire.discoveryDate.toLocaleDateString('en-US', { timeZone: timezone })}\n`;
-  output += `**Days Active:** ${daysActive}\n`;
+  // A day count derived from a date nobody published has no honest value, so
+  // Days Active is omitted, not zeroed, when the date is absent.
+  if (fire.discoveryDate === null) {
+    output += `**Discovery Date:** not reported\n`;
+  } else {
+    const now = new Date();
+    const daysActive = Math.floor((now.getTime() - fire.discoveryDate.getTime()) / (1000 * 60 * 60 * 24));
+    output += `**Discovery Date:** ${fire.discoveryDate.toLocaleDateString('en-US', { timeZone: timezone })}\n`;
+    output += `**Days Active:** ${daysActive}\n`;
+  }
 
   output += `\n---\n\n`;
   return output;

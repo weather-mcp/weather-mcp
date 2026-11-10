@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.11 (Production Ready)
+- **Version:** 1.35.12 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -95,6 +95,7 @@ src/
 │   ├── modelComparison.ts / ensembleSpread.ts        # Forecast agreement + member spread (pure)
 │   ├── fireWeather.ts / thermalStress.ts             # Fire indices incl. Fosberg; wind chill, frostbite, WBGT (pure)
 │   ├── firmsHotspots.ts / metarStation.ts / riverDischarge.ts  # FIRMS parse+cluster; METAR picker; GloFAS cell snap (pure)
+│   ├── firePerimeter.ts     # NIFC perimeter distance: zero inside, nearest edge outside, even-odd over all rings (pure)
 │   ├── eaGauges.ts          # EA station filter, measure selection, level banding (pure)
 │   ├── capParse.ts / pointInPolygon.ts  # CAP 1.2 XML → records, active filter, feed-URL allowlist; ray-casting point-in-ring (pure)
 │   ├── jmaParse.ts          # JMA index + warning-document parsers; class10 level selection (pure)
@@ -727,15 +728,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.11 — Production Ready ✅
-- **Test Coverage:** 4,910 tests, 100% pass rate
+- **Version:** 1.35.12 — Production Ready ✅
+- **Test Coverage:** 4,968 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.12:** US wildfire distances are measured to the fire's mapped perimeter, not its reported point of origin
 - **New in v1.35.11:** A lightning report after a healed feed outage no longer claims the whole window was watched
 - **New in v1.35.10:** A broken European or Canadian alerts answer reports an error instead of a false all-clear
-- **New in v1.35.9:** The test suite no longer counts unit tests that could never fail; the published code is unchanged
 
 ## Useful References
 
@@ -758,7 +759,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-10 (v1.35.11)
+**Last Updated:** 2026-11-10 (v1.35.12)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

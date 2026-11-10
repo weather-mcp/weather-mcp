@@ -3335,6 +3335,18 @@ plan's own acceptance bullet had specified the right answer ("one whose `flow` i
 `0` renders no clause") and the code did not match it — the plan was more correct
 than the code, which is the reverse of the usual direction and easy to miss.
 
+**Evidence, third instance:** 2026-11-10 (`509c78d`, `889452e`, RF-26 wildfire perimeter
+distance). Swapping the truthy guards on NIFC's origin and discovery date admitted `0` for
+both, as this entry predicts: a `0` origin would be measured to the equator and dropped by
+the radius filter, and epoch `0` would print `1/1/1970`. Both are now excluded explicitly,
+because no NIFC-covered fire sits at `0` latitude or longitude or was discovered in 1970.
+**The enumeration itself has a trap on ArcGIS:** `attr_FireDiscoveryDateTime = 0` answers
+**HTTP 400** ("Unable to perform query"), because the field is `esriFieldTypeDate` and a
+numeric literal is invalid SQL there. Count epoch zero with a timestamp literal —
+`attr_FireDiscoveryDateTime < TIMESTAMP '1971-01-01 00:00:00'` — and pair it with the
+complement (`>= TIMESTAMP '1971-01-01 00:00:00'`) as the control, which must equal the
+`1=1` total. A 400 on the `= 0` form is not a zero count.
+
 **Status:** active. Related: [G11] (read the rendered output — the only check
 that caught this), [G4] (never trust the HTTP 200 alone), [G51] (the wire sends
 what the type denies; here the wire sends two things where the guard names one),
@@ -3457,7 +3469,17 @@ text — and one claim was wrong in *kind* rather than in number ("no rain in si
 a capture reading `Showers And Thunderstorms Likely`). Worth noting for scope: the eight
 restored captures were last regenerated three minor releases earlier, at v1.25.18.
 
-**Status:** active, **second instance 2026-09-01**. Related: [G46] (a docs task writes the plan's promise, not the
+**Evidence, third instance:** 2026-11-10 (`cd0b409`, `0738b8a`, RF-26). Two scope facts
+the rule needs. **A filtered run is per file, not per capture:** `npm run examples
+wildfire` rewrote all five captures in `examples/wildfire-awareness.md` — the NIFC one
+whose shape changed, plus air quality, two fire-weather captures and the Athens FIRMS
+capture — so all five answer blocks went stale, not only the one the plan named. **A
+capture restored from `main` brings its own staleness with it:** the Athens section put
+back from `main` already disagreed with itself (prose: 2 detections at HIGH ALERT 24.1 km;
+capture: 3 clusters, nearest 52.6 km, AWARENESS). Read restored prose against its capture
+too.
+
+**Status:** active, **third instance 2026-11-10**. Related: [G46] (a docs task writes the plan's promise, not the
 code's behaviour — this is its sibling, where the docs describe an *older run* of
 the code), [G11] (read the rendered output), [G29] (sweep the whole doc set).
 Lintable: a check that every decimal in an example's narrative appears somewhere
@@ -4373,6 +4395,16 @@ day. The feature was rebuilt against `data.jma.go.jp/developer/xml/feed/` and
 ships a per-request cross-check, because a check that the answer actually covers
 the point asked about is the only mechanism that catches this class in the
 field.
+
+**Evidence, second instance:** 2026-11-10, NASA FIRMS, found during RF-26 live
+verification. `VIIRS_SNPP_NRT` returned **0 rows worldwide** for 1, 3 and 5 days, and
+the keyless `SUOMI_VIIRS_C2_*_24h.csv` answered HTTP 200 with a header and no rows.
+Meanwhile the sibling product `VIIRS_NOAA20_NRT` returned **60,042** rows for one day.
+`src/services/firms.ts` reads SNPP only, so every FIRMS report printed "no detections".
+The not-an-all-clear caveat held, so nothing fabricated an all-clear, but no test,
+gate or probe flagged it. Only a sibling product exposed the outage. Here the control
+is a sibling **product** on the same API; for JMA it was a sibling endpoint. Filed as a
+ROADMAP Hardening row.
 
 **Status:** active. Related: [G47] (the fast sibling — a throttled upstream
 returning a plausible zero; same "well-formed body, wrong answer" family, but

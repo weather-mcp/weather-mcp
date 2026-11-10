@@ -969,11 +969,13 @@ Country routing matches `get_alerts`: saved/geocoded locations use their known c
 ```
 
 **Returns (US / NIFC):**
-- Active wildfire locations within search radius
-- Fire size in acres and hectares
+- Active wildfire locations within search radius. When fires are returned but none is within the radius, the answer is the no-fires message, never a count of zero
+- Fire size in acres and hectares, or `**Size:** not reported` when NIFC publishes no size greater than zero
 - Containment percentage with a ten-cell bar showing the **completed tenths of the printed figure**, so the bar is full only at `100%` and empty below `10%`. A fire NIFC publishes no usable containment for reads `not reported`, with **no bar** — and still counts as **uncontained** for the safety assessment, because an unknown containment is not evidence of containment
-- Distance from query location to each fire, in kilometres and miles — the miles figure is derived from the **displayed** kilometres at two decimals, so it can never disagree with the km figure or the tier beside it
-- Discovery date and days active
+- Distance from query location to each fire, in kilometres and miles — the miles figure is derived from the **displayed** kilometres at two decimals, so it can never disagree with the km figure or the tier beside it. The distance is to the **nearest point of the fire's mapped perimeter**, and is `0.0 km` when the location is inside it. Where NIFC publishes no usable perimeter, it is to the **reported point of origin**. A `**Measured to:**` line beneath every distance names which, and says so in words when the location is inside the perimeter
+- A fire with neither a usable perimeter nor a usable point of origin is still listed, with `**Distance:** not reported`, after every located fire
+- The reported point of origin, labelled `**Point of Origin (reported):**`, when NIFC publishes a usable one
+- Discovery date and days active. When NIFC publishes no usable discovery date, the line reads `**Discovery Date:** not reported` and the days-active line is omitted
 - Fire type (Wildfire vs Prescribed Fire)
 - Location details (state, county, city)
 
@@ -987,7 +989,7 @@ Country routing matches `get_alerts`: saved/geocoded locations use their known c
 - **CAUTION** (>25–50 km): Monitor conditions
 - **AWARENESS** (>50 km): Stay informed
 
-On the NIFC path a fire whose containment **displays** as `100%` is excluded from the assessment, and the report says so by name; the tier keys on the nearest fire that is not.
+On the NIFC path the tier is banded on the distance to the mapped perimeter, so a large fire whose edge is near selects the tier its edge earns, however far away it started. A fire whose containment **displays** as `100%` is excluded from the assessment, and the report says so by name; the tier keys on the nearest fire that is not. A wildfire with no published location selects **no** tier, because a tier is a claim about a distance. The assessment names it instead and says not to read the section as an all-clear; when it is the only uncontained wildfire, no tier line is printed at all.
 
 **Note:** US data from NIFC WFIGS (Wildland Fire Interagency Geospatial Services); global detections from NASA FIRMS (Fire Information for Resource Management System). Always consult official sources for evacuation orders — in the US, https://inciweb.nwcg.gov/
 

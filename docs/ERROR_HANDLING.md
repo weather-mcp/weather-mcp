@@ -528,6 +528,23 @@ any other fire's information. `0` is a real reading — a new fire is 0% contain
 On the FIRMS path (everywhere outside the US) containment does not exist at all: satellite heat
 detections carry no containment, so no containment line is rendered in either form.
 
+### Wildfire Size, Discovery Date and Distance: `not reported`
+
+The same framing applies to three more lines on the NIFC path. Each is a **gap in NIFC's data, not
+a server failure**: the rest of the report is complete, and there is nothing to retry.
+
+- `**Size:** not reported` — none of NIFC's acreage fields holds a number greater than zero. A
+  zero-area perimeter is not a measurement, so `0` reads as `not reported`, not `0 acres`.
+- `**Discovery Date:** not reported` — NIFC published no usable discovery timestamp. The
+  `**Days Active:**` line is then left out, because a day count from a date nobody published has
+  no honest value.
+- `**Distance:** not reported` — NIFC published neither a usable fire perimeter nor a usable point
+  of origin, so the fire cannot be placed. A point of origin at latitude or longitude `0` counts as
+  unusable, because no fire NIFC covers sits on the equator or the prime meridian. The fire is
+  **still listed**, after every located fire, and the safety assessment names it and says not to
+  read the section as an all-clear. It selects no danger tier. Each such fire is recorded once to
+  the **stderr log** as a data-quality warning carrying the incident name only.
+
 ### River Gauge (NWPS) Errors
 
 In the US, `get_river_conditions` reads gauges from the National Water Prediction Service. When the
