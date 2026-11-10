@@ -43,6 +43,7 @@ import {
   parseReferences,
   filterActiveWarnings
 } from '../../src/services/meteoalarm.js';
+import { CONNECTION_FAILURE_CODES } from '../../src/utils/connectionFailure.js';
 import type {
   MeteoAlarmCapAlert,
   MeteoAlarmCapInfo,
@@ -463,6 +464,143 @@ describe('MeteoAlarmService.getWarnings', () => {
       await expect(service.getWarnings('gb')).resolves.toEqual([]);
       await expect(service.getWarnings('gb')).resolves.toEqual([]);
       expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('error ladder', () => {
+    const SENTINEL = 'UPSTREAM-SENTINEL-TEXT';
+    const CONNECT_MESSAGE = 'Unable to connect to the MeteoAlarm feed service';
+
+    /** Drive a call to its rejection value with fake timers running the backoff. */
+    async function settleRejection(start: () => Promise<unknown>): Promise<unknown> {
+      const pending = start().then(
+        () => new Error('expected a rejection, got a resolution'),
+        (e: unknown) => e
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      return pending;
+    }
+
+    /** Reject every `get` with `rejection`; return what `getWarnings` rejected with. */
+    async function rejectWith(rejection: unknown): Promise<unknown> {
+      mockGet.mockImplementation(() => Promise.reject(rejection));
+      const service = new MeteoAlarmService(); // before fake timers (G133)
+      vi.useFakeTimers();
+      return settleRejection(() => service.getWarnings('gb'));
+    }
+
+    function expectFixed(error: unknown, message: string, calls: number): void {
+      expect(error).toBeInstanceOf(Error);
+      const err = error as Error;
+      expect(err.message).toBe(message);
+      expect(err.message).not.toContain(SENTINEL);
+      expect(err.name).toBe('MeteoAlarmRequestError');
+      expect(mockGet).toHaveBeenCalledTimes(calls);
+    }
+
+    it('retries a sustained 503 to the cap (4 requests) with fixed text', async () => {
+      expectFixed(
+        await rejectWith({ response: { status: 503 } }),
+        'MeteoAlarm API server error (status 503)',
+        4
+      );
+    });
+
+    it('retries a sustained 429 to the cap (4 requests) with fixed text', async () => {
+      expectFixed(
+        await rejectWith({ response: { status: 429 } }),
+        'MeteoAlarm API rate limit exceeded',
+        4
+      );
+    });
+
+    it('recovers when a 503 is followed by a 200', async () => {
+      mockGet
+        .mockImplementationOnce(() => Promise.reject({ response: { status: 503 } }))
+        .mockImplementation(() => jsonResponse(feedOf(makeAlert())));
+      const service = new MeteoAlarmService();
+      vi.useFakeTimers();
+
+      const pending = service.getWarnings('gb');
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      await expect(pending).resolves.toHaveLength(1);
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry a 404', async () => {
+      expectFixed(
+        await rejectWith({ response: { status: 404 } }),
+        'MeteoAlarm API returned status 404',
+        1
+      );
+    });
+
+    it('does not retry ECONNABORTED (timeout text from axios is not forwarded)', async () => {
+      expectFixed(
+        await rejectWith({ code: 'ECONNABORTED', message: 'timeout of 30000ms exceeded' }),
+        'MeteoAlarm request timed out',
+        1
+      );
+    });
+
+    it('does not retry ETIMEDOUT', async () => {
+      expectFixed(
+        await rejectWith({ code: 'ETIMEDOUT' }),
+        'MeteoAlarm request timed out',
+        1
+      );
+    });
+
+    it.each([...CONNECTION_FAILURE_CODES, 'EHOSTUNREACH', 'EAI_AGAIN'])(
+      'retries connection failure %s to the cap with fixed text',
+      async code => {
+        expectFixed(
+          await rejectWith({ code, message: `connect ${code} 10.0.0.1:443 ${SENTINEL}` }),
+          CONNECT_MESSAGE,
+          4
+        );
+      }
+    );
+
+    it('replaces bare axios text with a fixed message and does not retry', async () => {
+      expectFixed(
+        await rejectWith({ message: `getaddrinfo ${SENTINEL} feeds.meteoalarm.org` }),
+        'MeteoAlarm request failed',
+        1
+      );
+    });
+
+    it('does not forward a body message on a non-transient status', async () => {
+      expectFixed(
+        await rejectWith({ response: { status: 400, data: { message: SENTINEL } } }),
+        'MeteoAlarm API returned status 400',
+        1
+      );
+    });
+
+    it('replaces an Error with text by a fixed message and does not retry', async () => {
+      expectFixed(
+        await rejectWith(new Error(SENTINEL)),
+        'MeteoAlarm request failed',
+        1
+      );
+    });
+
+    it('rethrows an Error with an empty message as the same instance', async () => {
+      const original = new Error('');
+      const error = await rejectWith(original);
+
+      expect(error).toBe(original);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('maps a non-object rejection to the unknown-error message', async () => {
+      expectFixed(
+        await rejectWith(SENTINEL),
+        'Unknown error occurred while contacting MeteoAlarm',
+        1
+      );
     });
   });
 });
