@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **US wildfire distances are measured to the fire's mapped perimeter, not to where it started.** `get_wildfire_info` used to measure every NIFC fire to its reported point of origin, which can be tens of kilometres from the fire itself. A large fire whose edge was close could print a far distance and a low danger tier, or be left out of the report by the radius filter. Distances now go to the nearest edge of the mapped perimeter, and read `0.0 km` when the location is inside it. A new `**Measured to:**` line names the basis under every distance, and the origin line is relabelled `**Point of Origin (reported):**`. A printed distance can move either way: nearer for a large fire, farther where the reported origin was wrong. The danger tier can move with it. Where NIFC publishes no usable perimeter, the reported origin is still used, and the line says so.
+- **A US fire with no published location no longer prints the search radius as its distance.** It is listed with `**Distance:** not reported`, sorted last, and named in the safety assessment, which says not to read the section as an all-clear. It no longer selects a danger tier.
+- **US wildfire reports no longer invent a fire count of zero, today's date, or a size of zero.** When fires were returned but none lay within the radius, the report printed `Found 0 active fire`; it now gives the no-fires answer. A fire with no published discovery date printed today's date and `Days Active: 0`, and one with no published size printed `0 acres (0 hectares)`. Both now read `not reported`, and the days-active line is left out.
+
 ## [1.35.11] - 2026-11-10
 
 A lightning report could give a plain green all-clear for a stretch of time it never watched. If the connection to the live lightning feed dropped and came back between two questions, the minutes of the outage still counted as watched, though no strike could arrive during them. The report now starts its coverage at the reconnect and says why it is short. A question asked during the outage also no longer opens a second feed connection.
