@@ -58,6 +58,15 @@ export interface PrewarmOutcome {
 }
 
 /**
+ * Which bound decided a coverage start: the newest subscription stamp, or the newest connect.
+ * An out-parameter of `getCoverageStart`, for the same reason as `PrewarmOutcome`: the service
+ * is a shared singleton, so a "last bound" field would be read by the wrong caller.
+ */
+export interface CoverageStartBound {
+  boundedBy?: 'subscription' | 'connection';
+}
+
+/**
  * Three-state resolution memo. `undefined` = not yet attempted, a module =
  * loaded, `null` = attempted and confirmed absent. Without it, an absent module
  * re-throws and re-logs on every query and every prewarmed location.
@@ -242,6 +251,16 @@ export class BlitzortungService {
   // what makes a mid-query outage distinguishable from a first-query cold start.
   private connectionLossGeneration = 0;
 
+  // Wall-clock time of the newest `connect` on the current client, first connect or mqtt.js
+  // reconnect. Strikes arrive only while connected, so no coverage start can be earlier than it.
+  // Connection state, not per-request state: every query reads the same connection.
+  private lastConnectAt: number | null = null;
+
+  // Callers waiting for the current client's next `connect` while mqtt.js reconnects it. Held on
+  // the service, not as listeners on the client: the existing `connect` handler drains it, so a
+  // settled waiter leaves no listener behind.
+  private readonly reconnectWaiters = new Set<{ resolve: () => void; reject: (error: Error) => void }>();
+
   constructor() {
     // Start cleanup interval
     this.startCleanupInterval();
@@ -269,6 +288,16 @@ export class BlitzortungService {
       });
     }
 
+    if (this.client) {
+      // A client that exists but is neither connected nor connecting is one mqtt.js is reconnecting
+      // by itself (reconnectPeriod), and it re-sends every subscription when it gets back. Wait for
+      // THAT client's next connect. Never open a second one: the first would keep its handlers,
+      // mark this service connected for a client it no longer holds, and bump the shared loss
+      // generation on its own close (RF-24). Decided in the same synchronous run as the two guards
+      // above (G20).
+      return this.waitForReconnect();
+    }
+
     // NOTHING may await between the `isConnecting` check above and the
     // assignment below. That flag is the only guard against concurrent callers
     // each opening their own broker connection, and it works precisely because
@@ -282,6 +311,9 @@ export class BlitzortungService {
     //
     // Invariant: `isConnecting` is false on every path out of this method that
     // did not connect — the catch at the foot of the try restores it.
+    //
+    // `this.client` is null here: the broker connect below runs only on first use and after
+    // `disconnect()`. A client mqtt.js is reconnecting is waited on above, never replaced.
     this.isConnecting = true;
 
     try {
@@ -313,11 +345,18 @@ export class BlitzortungService {
           reject(new Error('MQTT connection timeout'));
         }, this.connectTimeout);
 
+        // Runs on the first connect and on every mqtt.js reconnect of this client. On a reconnect
+        // the `clearTimeout` and `resolve` below are no-ops on a spent timer and a settled promise.
         this.client!.on('connect', () => {
           clearTimeout(timeoutId);
+          this.lastConnectAt = Date.now();
           this.isConnected = true;
           this.isConnecting = false;
           logger.info('Connected to Blitzortung MQTT broker');
+          for (const waiter of [...this.reconnectWaiters]) {
+            waiter.resolve();
+          }
+          this.reconnectWaiters.clear();
           resolve();
         });
 
@@ -349,6 +388,34 @@ export class BlitzortungService {
       this.isConnecting = false;
       throw error;
     }
+  }
+
+  /**
+   * Wait for the current client's next `connect` while mqtt.js reconnects it. Bounded by the
+   * connect timeout, with the same message as a first connect, so the query's catch classifies it
+   * `connect_timeout`. Sets and reads no `isConnecting`, so pre-warm's `skipped-reconnecting`
+   * keeps its meaning. The timer is ref'd: it is a deadline that bounds a caller (G114). Every
+   * settle path clears it and removes the waiter.
+   */
+  private waitForReconnect(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const entry = {
+        resolve: (): void => {
+          clearTimeout(timer);
+          this.reconnectWaiters.delete(entry);
+          resolve();
+        },
+        reject: (error: Error): void => {
+          clearTimeout(timer);
+          this.reconnectWaiters.delete(entry);
+          reject(error);
+        }
+      };
+      const timer = setTimeout(() => {
+        entry.reject(new Error('MQTT connection timeout'));
+      }, this.connectTimeout);
+      this.reconnectWaiters.add(entry);
+    });
   }
 
   /**
@@ -966,8 +1033,19 @@ export class BlitzortungService {
    * monitored, or null if any part of it is not currently subscribed (or the
    * broker is disconnected). Callers use this to detect that a "0 strikes"
    * result covers less than the requested time window.
+   *
+   * The start is the later of the newest first-subscription stamp for the area and the newest
+   * `connect` on the client. A subscription stamp survives an outage that mqtt.js heals by
+   * reconnecting and re-subscribing, but no strike was received during that gap, so the watched
+   * time restarts at the reconnect. `bound`, when given, receives which of the two decided the
+   * start; it is written only when the result is non-null.
    */
-  getCoverageStart(latitude: number, longitude: number, radiusKm: number): Date | null {
+  getCoverageStart(
+    latitude: number,
+    longitude: number,
+    radiusKm: number,
+    bound?: CoverageStartBound
+  ): Date | null {
     if (!this.isConnected) {
       return null;
     }
@@ -985,7 +1063,18 @@ export class BlitzortungService {
       }
     }
 
-    return coverageStart > 0 ? new Date(coverageStart) : null;
+    if (coverageStart <= 0) {
+      return null;
+    }
+
+    // Strictly greater decides 'connection': on a first query the connect precedes the stamp, so
+    // the subscription wins and a cold start keeps its cold-start explanation. A tie reads as one.
+    const connectedAt = this.lastConnectAt ?? 0;
+    const start = Math.max(coverageStart, connectedAt);
+    if (bound) {
+      bound.boundedBy = connectedAt > coverageStart ? 'connection' : 'subscription';
+    }
+    return new Date(start);
   }
 
   /**
@@ -1074,12 +1163,20 @@ export class BlitzortungService {
         activeSubscriptions: this.subscribedGeohashes.size
       });
 
+      // A caller waiting on a reconnect settles now, not at its timeout. Classified by phase
+      // (`connect`) as `connection_error`; the text never renders.
+      for (const waiter of [...this.reconnectWaiters]) {
+        waiter.reject(new Error('MQTT client disconnected'));
+      }
+      this.reconnectWaiters.clear();
+
       try {
         await new Promise<void>((resolve, reject) => {
           this.client!.end(false, {}, (error?: Error) => {
             this.isConnected = false;
             this.subscribedGeohashes.clear();
             this.geohashFirstSubscribed.clear();
+            this.lastConnectAt = null;
             if (error) {
               // No log here: mqtt's errors can carry the broker host. The caller (the shutdown
               // coordinator) logs the failure by name and code only.
