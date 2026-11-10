@@ -21,8 +21,12 @@ let server: http.Server;
 let origin: string;
 let mode: Mode = 'empty-json';
 let requests = 0;
+const savedNoProxy = { upper: process.env.NO_PROXY, lower: process.env.no_proxy };
 
 beforeAll(async () => {
+  // Loopback must bypass any proxy in the environment (G119), or axios sends it to the proxy.
+  process.env.NO_PROXY = '127.0.0.1,localhost';
+  process.env.no_proxy = '127.0.0.1,localhost';
   server = http.createServer((_req, res) => {
     requests += 1;
     switch (mode) {
@@ -51,6 +55,10 @@ beforeAll(async () => {
 afterAll(async () => {
   server.closeAllConnections();
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  for (const [key, value] of [['NO_PROXY', savedNoProxy.upper], ['no_proxy', savedNoProxy.lower]] as const) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
 });
 
 beforeEach(() => {
