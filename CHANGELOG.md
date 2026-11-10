@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.12] - 2026-11-10
+
+A US wildfire report measured each fire from the spot where it was first reported, not from the fire itself. A fire is an area, and that reported spot can be far from it — one live fire's is in the Atlantic, more than 2,000 km from its own burn area. A place 3 km from a burning, partly contained fire could get a report of no fires at all. Distances and danger tiers now use the fire's mapped edge. The same report also stops inventing three values it was never given: a fire count of zero, today's date as a discovery date, and a size of zero acres.
+
 ### Fixed
-- **US wildfire distances are measured to the fire's mapped perimeter, not to where it started.** `get_wildfire_info` used to measure every NIFC fire to its reported point of origin, which can be tens of kilometres from the fire itself. A large fire whose edge was close could print a far distance and a low danger tier, or be left out of the report by the radius filter. Distances now go to the nearest edge of the mapped perimeter, and read `0.0 km` when the location is inside it. A new `**Measured to:**` line names the basis under every distance, and the origin line is relabelled `**Point of Origin (reported):**`. A printed distance can move either way: nearer for a large fire, farther where the reported origin was wrong. The danger tier can move with it. Where NIFC publishes no usable perimeter, the reported origin is still used, and the line says so.
 - **A US fire with no published location no longer prints the search radius as its distance.** It is listed with `**Distance:** not reported`, sorted last, and named in the safety assessment, which says not to read the section as an all-clear. It no longer selects a danger tier.
 - **US wildfire reports no longer invent a fire count of zero, today's date, or a size of zero.** When fires were returned but none lay within the radius, the report printed `Found 0 active fire`; it now gives the no-fires answer. A fire with no published discovery date printed today's date and `Days Active: 0`, and one with no published size printed `0 acres (0 hectares)`. Both now read `not reported`, and the days-active line is left out.
+
+### Changed
+- **US wildfire distances are measured to the fire's mapped perimeter, not to where it started.** `get_wildfire_info` used to measure every NIFC fire to its reported point of origin, which is often kilometres and sometimes far more from the fire itself. A large fire whose edge was close could print a far distance and a low danger tier, or be left out of the report by the radius filter. Distances now go to the nearest edge of the mapped perimeter, and read `0.0 km` when the location is inside it. A new `**Measured to:**` line names the basis under every distance, and the origin line is relabelled `**Point of Origin (reported):**`. A printed distance can move either way: nearer for a large fire, farther where the reported origin was wrong. The danger tier can move with it. Where NIFC publishes no usable perimeter, the reported origin is still used, and the line says so. A reported origin at latitude or longitude 0 is treated as missing, since no fire NIFC covers sits on the equator or the prime meridian. Satellite fire detections outside the US are unchanged.
 
 ## [1.35.11] - 2026-11-10
 
@@ -2298,7 +2304,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.11...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.12...HEAD
+[1.35.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.11...v1.35.12
 [1.35.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.10...v1.35.11
 [1.35.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.9...v1.35.10
 [1.35.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.8...v1.35.9
