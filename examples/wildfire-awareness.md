@@ -246,14 +246,15 @@ Winter season with minimal fire risk due to cold temperatures, snow cover, or hi
 **Claude Code answered** (using `get_wildfire_info`):
 
 <!-- answer-4 -->
-**No satellite fire detections within 200 km in the last 3 days.**
+**Yes — 3 satellite heat detections in the last 3 days, in 3 clusters within 200 km**, but none is close: the nearest is 52.6 km NE of the city center, so the assessment stays at **AWARENESS**.
 
 But read this differently from the Denver answer, because it *is* different data:
 
-- These are **hotspots, not incidents.** There are no fire names, no acreage, no containment percentages — because no agency is publishing them here. What a satellite sees is heat, and the server says up front that a detection can also be an industrial heat source, a gas flare, or an agricultural burn.
-- **Empty is not an all-clear.** Cloud cover hides fires from satellites, and small or new fires can evade detection. The server prints that caveat directly under the result instead of an all-clear it can't back up.
+- These are **hotspots, not incidents.** There are no fire names, no acreage, no containment percentages — because no agency is publishing them here. What a satellite sees is heat.
+- Some of these may not be wildfires at all. The server says so up front: detections can be industrial heat sources, gas flares, or agricultural burns. Each cluster is a single low-power hotspot (1.1 to 2.7 MW), which reads more like scattered burns than an advancing fire.
+- The other two are farther out to the NNW and NW, at 152.8 km and 188.9 km.
 
-So the honest reading is "no detections", not "no fires". Ask again closer to your trip.
+So: worth watching, not worth panicking. And critically, if this had come back empty it still wouldn't have meant "no fires" — cloud cover hides fires from satellites, and the server refuses to print an all-clear it can't back up.
 <!-- /answer-4 -->
 
 <!-- capture:athens-hotspots -->
@@ -282,9 +283,51 @@ get_wildfire_info({
 
 ⚠️ Satellite heat detections — not managed incident data. No fire names, sizes, or containment are available; detections may include industrial heat sources, gas flares, or agricultural burns.
 
-**No satellite fire detections in the last 3 days within 200 km.**
+🔥 **3 satellite fire detections in the last 3 days, grouped into 3 clusters within 200 km**
 
-*Note: absence of detections is not an all-clear — cloud cover can hide fires from satellites, and small or new fires may evade detection.*
+## Detection Cluster 1
+
+**Detections:** 1 hotspot (0 day / 1 night)
+**Distance:** 52.6 km (32.68 mi) NE
+**Center:** 38.3762, 24.0634
+**Peak intensity:** 1.1 MW (fire radiative power)
+**Newest detection:** 19.7 hours ago
+**Confidence:** 1 nominal
+**Satellite:** Suomi NPP (VIIRS)
+
+---
+
+## Detection Cluster 2
+
+**Detections:** 1 hotspot (0 day / 1 night)
+**Distance:** 152.8 km (94.95 mi) NNW
+**Center:** 39.1706, 22.8417
+**Peak intensity:** 2.7 MW (fire radiative power)
+**Newest detection:** 19.7 hours ago
+**Confidence:** 1 nominal
+**Satellite:** Suomi NPP (VIIRS)
+
+---
+
+## Detection Cluster 3
+
+**Detections:** 1 hotspot (1 day / 0 night)
+**Distance:** 188.9 km (117.38 mi) NW
+**Center:** 39.3758, 22.4804
+**Peak intensity:** 1.6 MW (fire radiative power)
+**Newest detection:** 32 hours ago
+**Confidence:** 1 nominal
+**Satellite:** Suomi NPP (VIIRS)
+
+---
+
+
+## Safety Assessment
+
+ℹ️ **AWARENESS** - Satellite fire detections within 200 km
+- Stay informed about fire activity in the area
+- Air quality may be affected by smoke
+
 
 ---
 *Data source: NASA FIRMS (Fire Information for Resource Management System)*
