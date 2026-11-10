@@ -222,12 +222,15 @@ Environment and Climate Change Canada's MSC GeoMet. Each GeoMet call retries a r
 server error (5xx) or a failed connection up to three times with backoff, waiting at most about
 7 s in total, before you see one of the messages below. A timeout is not retried: it has used
 either its own timeout (`API_TIMEOUT_MS`) or what remained of the tool call's budget. Every message is fixed text written by this
-server. Text from GeoMet's response body, or from a gateway in front of it, is never shown.
+server. Text from GeoMet's response body, or from a gateway in front of it, is never shown. A 200
+answer whose body is not the alerts collection (a maintenance page, a gateway's error object, an
+empty body) is an error, never an empty answer, and it is not retried.
 
 ```
 GeoMet API returned status 429 (rate limit)
 GeoMet API returned status 503 (server error)
 GeoMet API returned status 404
+GeoMet API returned an unexpected shape
 GeoMet request timed out
 Unable to connect to GeoMet API
 GeoMet request failed
@@ -237,6 +240,33 @@ Unknown error occurred while contacting GeoMet API
 `get_alerts` fails with the message. `get_weather_summary` keeps its other sections and renders
 this one as `## alerts (unavailable)` with the same message. Alerts are safety data, so a failed
 fetch is always an error and never an empty "no alerts" answer.
+
+### MeteoAlarm (Europe) Errors
+
+`get_alerts` for a point in a MeteoAlarm country, and the alerts section of `get_weather_summary`
+there, read EUMETNET's MeteoAlarm country feed. Each MeteoAlarm call retries a rate limit (429), a
+server error (5xx) or a failed connection up to three times with backoff, waiting at most about
+7 s in total, before you see one of the messages below. A timeout is not retried: it has used
+either its own timeout (`API_TIMEOUT_MS`) or what remained of the tool call's budget. A 200 answer
+whose body is not the warnings feed (a maintenance page, a gateway's error object, an empty body,
+or a warning entry that is not an object) is an error, never an empty answer, and it is not
+retried. Every message is fixed text written by this server. Text from the feed, or from a gateway
+in front of it, is never shown.
+
+```
+MeteoAlarm API rate limit exceeded
+MeteoAlarm API server error (status 503)
+MeteoAlarm API returned status 404
+MeteoAlarm request timed out
+Unable to connect to the MeteoAlarm feed service
+MeteoAlarm request failed
+Unknown error occurred while contacting MeteoAlarm
+MeteoAlarm feed returned an unexpected shape
+```
+
+`get_alerts` fails with the message. `get_weather_summary` keeps its other sections and renders
+this one as `## alerts (unavailable)` with the same message. Alerts are safety data, so a failed
+or unrecognised fetch is always an error and never an empty "no alerts" answer.
 
 ### AviationWeather (METAR) Errors
 
