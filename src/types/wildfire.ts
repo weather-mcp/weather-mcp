@@ -23,8 +23,8 @@ export interface FirePerimeterAttributes {
   attr_FireDiscoveryDateTime?: number; // Discovery timestamp (epoch ms)
 
   // Location
-  attr_InitialLatitude?: number; // Fire origin latitude
-  attr_InitialLongitude?: number; // Fire origin longitude
+  attr_InitialLatitude?: number | null; // Fire origin latitude (null on live rows)
+  attr_InitialLongitude?: number | null; // Fire origin longitude (null on live rows)
   attr_POOState?: string; // Place of origin - State
   attr_POOCounty?: string; // Place of origin - County
   attr_POOCity?: string; // Place of origin - City
@@ -53,7 +53,8 @@ export interface ArcGISPolygonGeometry {
  */
 export interface FirePerimeterFeature {
   attributes: FirePerimeterAttributes;
-  geometry: ArcGISPolygonGeometry;
+  /** Read through `distanceToPerimeterKm`, which narrows the rings itself. */
+  geometry?: ArcGISPolygonGeometry;
 }
 
 /**
@@ -84,7 +85,15 @@ export interface NIFCQueryResponse {
  */
 export interface WildfireInfo {
   name: string;
-  distance: number; // km from query location
+  /**
+   * Km from the query location to the fire, on the basis `distanceBasis`
+   * names, or `null` when NIFC published neither a usable perimeter nor a
+   * usable point of origin. `null` means "unlocated", not zero and not far:
+   * an unknown distance is not evidence of distance.
+   */
+  distance: number | null;
+  /** What `distance` was measured to. */
+  distanceBasis: 'perimeter' | 'origin' | 'unlocated';
   acres: number;
   /**
    * Containment percentage 0-100, or `null` when NIFC published no usable
@@ -94,6 +103,7 @@ export interface WildfireInfo {
    */
   containment: number | null;
   discoveryDate: Date;
+  /** Reported point of origin; set only when both coordinates are usable. */
   latitude?: number;
   longitude?: number;
   state?: string;
