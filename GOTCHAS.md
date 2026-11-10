@@ -136,6 +136,16 @@ outer check is an *equivalent* mutant for JSON (G45): no JSON value is truthy, n
 plain object, and carries an array-valued key. Keep `isPlainObject` anyway; it is
 what states the contract.
 
+**Extended 2026-11-10** (`a5fb0bb`, alert-feed-body-shape diff review codex-C1) —
+**check every level the parser skips on, not only the list members.** The first guard
+required each `warnings[]` entry to be an object, but `parseFeed` skips an entry whose
+`alert.identifier` or `info` is unusable. `{ warnings: [{ alert: "malformed-alert" }] }`,
+a `null` alert and an `info` of `''` therefore passed the guard, were skipped as empty,
+and rendered the all-clear. A field the parser may skip on is allowed to be **absent**
+(that is the verified empty shape). When it is present it must have the verified type,
+or the guard throws. Pin one body whose outer element is an object and whose nested
+record is a string, through the service and through the dispatch.
+
 **Status:** active. Sharper instance of CLAUDE.md's "never trust the HTTP 200
 alone" and "distinguish empty from not-covered".
 
