@@ -65,6 +65,26 @@ class GeoMetRequestError extends Error {
   }
 }
 
+/** A JSON object — not `null`, not an array, not a string (G4, G111: `''` is the real empty body). */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * True only for the verified collection: an object whose `features` is an
+ * array of objects that each carry a `properties` object. An HTML page, a
+ * gateway's `{ error }` object, `''`, `null` or a bare array is refused.
+ */
+function isGeoMetCollection(
+  data: unknown
+): data is GeoMetFeatureCollection & { features: GeoMetAlertFeature[] } {
+  return (
+    isPlainObject(data) &&
+    Array.isArray(data.features) &&
+    data.features.every(feature => isPlainObject(feature) && isPlainObject(feature.properties))
+  );
+}
+
 /** Build a GeoMet `bbox` string ("minLon,minLat,maxLon,maxLat") around a coordinate. */
 function buildBbox(latitude: number, longitude: number, halfExtent: number): string {
   const minLon = longitude - halfExtent;
@@ -180,8 +200,14 @@ export class GeoMetService {
     }
 
     const bbox = buildBbox(latitude, longitude, BBOX_HALF_EXTENT);
-    const data = await this.makeRequest(bbox);
-    const features = data.features ?? [];
+    const data: unknown = await this.makeRequest(bbox);
+    // A 200 whose body is not the verified collection is an error, never an empty list (G4).
+    // Thrown outside `makeRequest`, so it is never retried, and before `cache.set`, so never cached.
+    if (!isGeoMetCollection(data)) {
+      logger.warn('GeoMet API returned an unexpected shape', { ...redacted, securityEvent: true });
+      throw new GeoMetRequestError('GeoMet API returned an unexpected shape', false);
+    }
+    const features = data.features;
 
     logger.info('Fetched GeoMet alerts', {
       ...redacted,

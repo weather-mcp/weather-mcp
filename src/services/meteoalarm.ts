@@ -34,6 +34,7 @@ import type {
   MeteoAlarmCapInfo,
   MeteoAlarmCountryFeed,
   MeteoAlarmFeedResponse,
+  MeteoAlarmFeedWarning,
   MeteoAlarmWarning
 } from '../types/meteoalarm.js';
 import { logger } from '../utils/logger.js';
@@ -262,7 +263,16 @@ export class MeteoAlarmService {
     }
 
     logger.info('MeteoAlarm feed fetch', { country: countryCode, slug: feed.slug });
-    const data = await this.makeRequest<MeteoAlarmFeedResponse>(`/feeds-${feed.slug}`);
+    const data: unknown = await this.makeRequest<unknown>(`/feeds-${feed.slug}`);
+    // A 200 whose body is not the verified envelope is an error, never an empty list (G4).
+    // Thrown outside `makeRequest`, so it is never retried, and before `cache.set`, so never cached.
+    if (!isMeteoAlarmFeed(data)) {
+      logger.warn('MeteoAlarm feed returned an unexpected shape', {
+        country: countryCode,
+        securityEvent: true
+      });
+      throw new Error('MeteoAlarm feed returned an unexpected shape');
+    }
     const warnings = parseFeed(data);
 
     if (CacheConfig.enabled) {
@@ -361,15 +371,33 @@ function isAxiosLikeError(error: unknown): error is AxiosLikeError {
   return typeof error === 'object' && error !== null;
 }
 
+/** A JSON object — not `null`, not an array, not a string (G4, G111: `''` is the real empty body). */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** The verified feed envelope: an object whose `warnings` is an array of objects. */
+type MeteoAlarmFeedEnvelope = MeteoAlarmFeedResponse & { warnings: MeteoAlarmFeedWarning[] };
+
 /**
- * Parse a raw country feed into flat single-language warnings. Entries
- * without an identifier or any `info` content are skipped (nothing to
- * render or track).
+ * True only for the verified envelope `{ warnings: [ {…}, … ] }`. An HTML page,
+ * a gateway's `{ error }` object, `''`, `null`, a bare array, or any non-object
+ * element is refused; the caller throws rather than reading an empty list.
  */
-function parseFeed(data: MeteoAlarmFeedResponse): MeteoAlarmWarning[] {
+function isMeteoAlarmFeed(data: unknown): data is MeteoAlarmFeedEnvelope {
+  return isPlainObject(data) && Array.isArray(data.warnings) && data.warnings.every(isPlainObject);
+}
+
+/**
+ * Parse a country feed into flat single-language warnings. The envelope has
+ * already passed `isMeteoAlarmFeed`, so a missing list is not tolerated here.
+ * Object entries without an identifier or any `info` content are skipped
+ * (nothing to render or track).
+ */
+function parseFeed(data: MeteoAlarmFeedEnvelope): MeteoAlarmWarning[] {
   const warnings: MeteoAlarmWarning[] = [];
 
-  for (const entry of data?.warnings ?? []) {
+  for (const entry of data.warnings) {
     const alert = entry.alert;
     if (!alert?.identifier) {
       continue;
