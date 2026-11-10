@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A lightning report after a feed outage no longer claims the whole window was watched.** When the connection to the Blitzortung feed dropped and came back between two queries, `get_lightning_activity` and the lightning section of `get_weather_summary` counted the outage as watched time and could print a plain `🟢 SAFE` over minutes in which no strike could be received. Coverage now starts at the reconnect, the report shows `SAFE (LIMITED DATA)`, and it says that the feed connection dropped and was re-established, with the time, instead of calling the area's lookup its first.
+- **A lightning query during a feed outage no longer opens a second broker connection.** Each such query used to open a new connection and leave the previous one running. It now waits, for up to 30 seconds, for the server's one connection to come back, and reports the feed as unavailable if it does not.
+
 ## [1.35.10] - 2026-11-10
 
 When the European (MeteoAlarm) or Canadian (MSC GeoMet) alert service answered with something other than its alert list, such as a maintenance page, a gateway error or an empty reply, `get_alerts` and the alerts section of `get_weather_summary` showed the green "no active alerts" message. On safety data that is the worst possible mistake: a reader takes an outage for an all-clear. These answers are now reported as errors. MeteoAlarm's error messages are also now fixed text, and it retries the failures a retry can fix.
