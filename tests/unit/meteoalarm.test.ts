@@ -427,4 +427,42 @@ describe('MeteoAlarmService.getWarnings', () => {
       'MeteoAlarm API returned status 404'
     );
   });
+
+  describe('wrong-shaped 200 body', () => {
+    const REFUSAL = 'MeteoAlarm feed returned an unexpected shape';
+
+    it.each<[string, unknown]>([
+      ['an HTML page', '<html><body>Maintenance</body></html>'],
+      ['a gateway error object', { error: 'Bad gateway' }],
+      ['an empty body (axios delivers "")', ''],
+      ['JSON null', null],
+      ['an empty object', {}],
+      ['warnings that is not an array', { warnings: null }],
+      ['a bare array', []],
+      ['a null element', { warnings: [null] }],
+      ['a string element', { warnings: ['x'] }]
+    ])('refuses %s, does not retry it and does not cache it', async (_label, body) => {
+      mockGet.mockImplementation(() => jsonResponse(body));
+      const service = new MeteoAlarmService();
+
+      await expect(service.getWarnings('gb')).rejects.toThrow(
+        new RegExp(`^${REFUSAL}$`)
+      );
+      expect(mockGet).toHaveBeenCalledTimes(1);
+
+      // Nothing was cached: the next call goes back to the feed.
+      mockGet.mockImplementation(() => jsonResponse({ warnings: [] }));
+      await expect(service.getWarnings('gb')).resolves.toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+
+    it('positive control: the honest empty feed resolves [] and is cached', async () => {
+      mockGet.mockImplementation(() => jsonResponse({ warnings: [] }));
+      const service = new MeteoAlarmService();
+
+      await expect(service.getWarnings('gb')).resolves.toEqual([]);
+      await expect(service.getWarnings('gb')).resolves.toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+  });
 });
