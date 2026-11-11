@@ -483,7 +483,11 @@ export interface NWPSGauge {
       recent?: HistoricCrest[];
     };
   };
-  inService?: boolean;
+  // Detail endpoint only (GET /gauges/{lid}); live it is an object, e.g.
+  // { enabled: false, message: "Gage is currently out of service." }. Not read by
+  // the handler: that entry is cached 24h, so the Status line reads the list's
+  // observed category instead (RF-27 D4).
+  inService?: { enabled?: boolean; message?: string };
   upstreamLid?: string;
   downstreamLid?: string;
 }

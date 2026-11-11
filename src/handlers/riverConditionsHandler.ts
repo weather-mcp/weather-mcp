@@ -1136,9 +1136,14 @@ function formatGaugeDetails(
   output += `**Location:** ${gauge.state?.abbreviation ?? 'Unknown'}${gauge.county ? `, ${gauge.county} County` : ''}\n`;
   output += `**Coordinates:** ${gauge.latitude.toFixed(4)}, ${gauge.longitude.toFixed(4)}\n`;
   output += `**Gauge ID:** ${gauge.lid}${gauge.usgsId ? ` (USGS: ${gauge.usgsId})` : ''}\n`;
-  // inService is only present on the per-gauge detail endpoint; gauges returned
-  // by the bounding-box query are active by definition, so default to Active.
-  output += `**Status:** ${gauge.inService === false ? '❌ Out of Service' : '✅ Active'}\n\n`;
+  // The service state comes from the bounding-box list's own observed category, which
+  // NWPS sets to `out_of_service` for a gauge it has taken out of service, and which is
+  // at most 30 minutes old (CacheConfig.ttl.nwpsGaugeStatus). The detail endpoint's
+  // `inService` object is deliberately not read: that entry is cached 24h, so a gauge
+  // restored to service would read out of service for a day, and it is absent whenever
+  // the detail fetch fails (G7, RF-27 D4).
+  const outOfService = normalizeFloodCategory(gauge.status.observed?.floodCategory) === 'out of service';
+  output += `**Status:** ${outOfService ? '❌ Out of Service' : '✅ Active'}\n\n`;
 
   // Whether this gauge block printed a **Flood Category:** line carrying a category
   // NOAA actually published. The no-thresholds line below cites that line only when
@@ -1329,6 +1334,11 @@ function deriveFloodCategory(stage: number, categories: FloodCategories): 'major
   return null;
 }
 
+/** NWPS uses underscore-delimited categories (e.g. "no_flooding", "not_defined"). */
+function normalizeFloodCategory(category: string | null | undefined): string {
+  return (category ?? '').toLowerCase().replace(/_/g, ' ').trim();
+}
+
 /** The marker and text a flood category renders as, and whether NOAA published one. */
 interface FloodCategoryDisplay {
   marker: string;
@@ -1347,8 +1357,7 @@ interface FloodCategoryDisplay {
  * Every other value keeps its marker and its upper-cased NOAA name.
  */
 function describeFloodCategory(category: string | null | undefined): FloodCategoryDisplay {
-  // NWPS uses underscore-delimited categories (e.g. "no_flooding", "not_defined")
-  const normalized = (category ?? '').toLowerCase().replace(/_/g, ' ').trim();
+  const normalized = normalizeFloodCategory(category);
   if (normalized === '' || normalized === 'not defined') {
     return { marker: '⚪', text: 'no category published', published: false };
   }

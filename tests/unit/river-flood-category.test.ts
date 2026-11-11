@@ -52,6 +52,8 @@ interface GaugeSpec {
   /** Thresholds the detail endpoint returns; `undefined` means no detail `flood`. */
   flood: FloodCategories | undefined;
   offset?: number;
+  /** The detail endpoint's live inService object, when the test needs one. */
+  detailInService?: { enabled?: boolean; message?: string };
 }
 
 function buildGauge(spec: GaugeSpec): NWPSGauge {
@@ -74,12 +76,17 @@ function buildGauge(spec: GaugeSpec): NWPSGauge {
 
 function noaaFor(specs: GaugeSpec[], forecastSeriesStage?: number): NOAAService {
   const gauges = specs.map(buildGauge);
-  const floodByLid = new Map(specs.map(s => [s.lid, s.flood]));
+  const specByLid = new Map(specs.map(s => [s.lid, s]));
   return {
     getNWPSGaugesInBoundingBox: vi.fn(async () => gauges),
     getNWPSGauge: vi.fn(async (lid: string) => {
-      const categories = floodByLid.get(lid);
-      return { lid, ...(categories ? { flood: { stageUnits: 'ft', categories } } : {}) };
+      const spec = specByLid.get(lid);
+      const categories = spec?.flood;
+      return {
+        lid,
+        ...(categories ? { flood: { stageUnits: 'ft', categories } } : {}),
+        ...(spec?.detailInService ? { inService: spec.detailInService } : {})
+      };
     }),
     getNWPSStageFlow: vi.fn(async () => ({
       observed: { data: [] },
@@ -254,5 +261,70 @@ describe('the forecast-series clause keeps its markers', () => {
     const seriesLines = block.split('\n').filter(l => l.startsWith('- **') && l.includes(' ft'));
     expect(seriesLines).toHaveLength(1);
     expect(seriesLines[0].endsWith('5.00 ft')).toBe(true);
+  });
+});
+
+describe('the Status line follows the list\'s own observed category (RF-27 D4)', () => {
+  it('out_of_service with a real stage → ❌ Out of Service, and the stage block still renders', async () => {
+    const block = gaugeBlock(await render([{ lid: 'OOS01', observed: 'out_of_service', forecast: undefined, flood: undefined }]), 'OOS01');
+    expect(linesStarting(block, '**Status:**')).toEqual(['**Status:** ❌ Out of Service']);
+    expect(block).toContain('**River Stage:** 4.20 ft');
+    expect(block).toContain('**Flood Category:** ⚪ OUT OF SERVICE\n');
+  });
+
+  it('out_of_service with no usable observation → ❌ Out of Service', async () => {
+    const gauge = buildGauge({ lid: 'OOS02', observed: undefined, forecast: undefined, flood: undefined });
+    gauge.status.observed = statusBlock('out_of_service', '0001-01-01T00:00:00Z', -999);
+    const noaa = {
+      getNWPSGaugesInBoundingBox: vi.fn(async () => [gauge]),
+      getNWPSGauge: vi.fn(async (lid: string) => ({ lid })),
+      getNWPSStageFlow: vi.fn(async () => ({ observed: { data: [] }, forecast: { data: [] } }))
+    } as unknown as NOAAService;
+    const result = await handleGetRiverConditions(
+      { latitude: BOSTON.latitude, longitude: BOSTON.longitude },
+      noaa,
+      {} as unknown as LocationStore,
+      {} as unknown as GeocodingService
+    );
+    const block = gaugeBlock(result.content[0].text, 'OOS02');
+    expect(block).toContain('*No current observations available*');
+    expect(linesStarting(block, '**Status:**')).toEqual(['**Status:** ❌ Out of Service']);
+  });
+
+  for (const category of ['no_flooding', 'not_defined', null, 'obs_not_current', 'low_threshold'] as const) {
+    it(`${String(category)} → ✅ Active, unchanged`, async () => {
+      const block = gaugeBlock(await render([{ lid: 'ACT01', observed: category, forecast: undefined, flood: undefined }]), 'ACT01');
+      expect(linesStarting(block, '**Status:**')).toEqual(['**Status:** ✅ Active']);
+    });
+  }
+
+  it('a detail response saying out of service does not override the list (D4 rejected alternative)', async () => {
+    const block = gaugeBlock(
+      await render([
+        {
+          lid: 'DET01',
+          observed: 'no_flooding',
+          forecast: undefined,
+          flood: NO_THRESHOLDS,
+          detailInService: { enabled: false, message: 'Gage is currently out of service.' }
+        }
+      ]),
+      'DET01'
+    );
+    expect(linesStarting(block, '**Status:**')).toEqual(['**Status:** ✅ Active']);
+  });
+
+  it('a forecast of out_of_service does not mark an observed no_flooding gauge out of service', async () => {
+    const block = gaugeBlock(await render([{ lid: 'FCO01', observed: 'no_flooding', forecast: 'out_of_service', flood: undefined }]), 'FCO01');
+    expect(linesStarting(block, '**Status:**')).toEqual(['**Status:** ✅ Active']);
+  });
+
+  it('two gauges in one report each get their own Status', async () => {
+    const text = await render([
+      { lid: 'TWS1', observed: 'out_of_service', forecast: undefined, flood: undefined, offset: 0.01 },
+      { lid: 'TWS2', observed: 'no_flooding', forecast: undefined, flood: undefined, offset: 0.02 }
+    ]);
+    expect(linesStarting(gaugeBlock(text, 'TWS1'), '**Status:**')).toEqual(['**Status:** ❌ Out of Service']);
+    expect(linesStarting(gaugeBlock(text, 'TWS2'), '**Status:**')).toEqual(['**Status:** ✅ Active']);
   });
 });
