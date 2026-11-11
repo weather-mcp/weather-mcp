@@ -684,9 +684,10 @@ export class NationalCapService {
     }
 
     if (!record) {
-      // A well-formed document with no identifier or no info block is a
-      // shape failure, not an honest empty: count it, and do not cache it as
-      // a successful document.
+      // A well-formed document with no identifier, or no info block and not
+      // an info-less Cancel (`flattenCapAlert` keeps those for their
+      // references), is a shape failure, not an honest empty: count it, and
+      // do not cache it as a successful document.
       logger.warn('National CAP document had an unusable shape', { country: countryCode });
       return undefined;
     }

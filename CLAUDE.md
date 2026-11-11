@@ -99,6 +99,7 @@ src/
 │   ├── firePerimeter.ts     # NIFC perimeter distance: zero inside, nearest edge outside, even-odd over all rings (pure)
 │   ├── eaGauges.ts          # EA station filter, measure selection, level banding (pure)
 │   ├── capParse.ts / pointInPolygon.ts  # CAP 1.2 XML → records, active filter, feed-URL allowlist; ray-casting point-in-ring (pure)
+│   ├── capActiveFilter.ts   # CAP lifecycle filter shared by MeteoAlarm and national CAP: status, Cancel, expiry, Update supersession (pure)
 │   ├── jmaParse.ts          # JMA index + warning-document parsers; class10 level selection (pure)
 │   ├── metnoParse.ts        # met.no timeseries → daily across the 1 h/6 h seam; symbol gloss (pure, SI in/SI out)
 │   ├── jmaAreaResolver.ts   # Coordinate → class10 area (pure) + the artifact's one lazy load site
