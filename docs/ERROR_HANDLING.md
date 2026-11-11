@@ -90,6 +90,18 @@ If this persists, check:
 - Report issues: https://weather-gov.github.io/api/reporting-issues
 ```
 
+#### Invalid Point (400 error)
+```
+NOAA API Error: Parameter "point" is invalid: out of bounds
+```
+
+NOAA rejects a point it does not serve. `get_alerts` sends every request for
+Puerto Rico, Guam, the Northern Mariana Islands, the US Virgin Islands and
+American Samoa to NOAA, and NOAA decides which points it accepts. At a remote
+point it does not accept (for example Farallon de Pajaros, at the north end of
+the Northern Marianas), you get this error. It is an error result, never an
+empty alert list, so it never reads as an all-clear.
+
 #### Connection Issues
 ```
 NOAA API Error: The NOAA weather service is temporarily unavailable. Please try again in a few minutes.
