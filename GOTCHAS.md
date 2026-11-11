@@ -194,7 +194,7 @@ count computed at refresh time and cached will be rendered over a
 *re-filtered* list later — so a disclosure line can name a number that
 contradicts the block printed beneath it.
 
-**Verify:** `MeteoAlarmService.getWarnings` (`src/services/meteoalarm.ts:266-299`)
+**Verify:** `MeteoAlarmService.getWarnings` (`src/services/meteoalarm.ts:245-278`; both returns go through `filterActiveWarnings`, now `filterCapLifecycle`)
 and `NationalCapService.readView`; the resurrection and derived-count tests in
 `tests/unit/national-cap-service.test.ts`.
 
@@ -868,6 +868,13 @@ express the same constraint or say why they differ.
 **Evidence:** raised as `copilot-R1` in the plan review, re-rated to minor by
 triage, accepted by the owner at `/run-plan`'s opening and landed in T4.
 
+
+**Live-probe limit (2026-11-11, `plan-alert-territory-trim-cancel` T6):** the summary forwards bare coordinates and
+reads the caller's saved `country_code` only after the reverse lookup **fails** (`fallbackCountryCode`). A live
+probe of a saved territory location through `get_weather_summary` therefore routes the same on base and branch,
+because the lookup succeeds and answers `us`. The fallback arm cannot be shown live without breaking the lookup.
+A plan that expects a base/branch difference on that path is expecting the unit test's scenario: prove it there,
+and say so in the QA record.
 ---
 
 ## G20 — Never introduce an `await` between a synchronous guard flag and the check that reads it
@@ -2054,6 +2061,11 @@ Related: [G9] and [G14] (release tooling that runs more than it appears to),
 [G38] (the sibling case — a release check that reports a confident failure it
 never actually measured).
 
+
+**Extended 2026-11-11 (`plan-alert-territory-trim-cancel` T1):** `FORCE_COLOR=` with an **empty** value is not
+unset. `node -p` still colours its output, so the same false `server.json description length` ❌ appears. In that
+run the script also printed none of the 8 test-count failures it reported a minute later under `env -u FORCE_COLOR`,
+on the same tree. So the empty form can hide a real failure as well as fake one. Use `env -u`, never `FORCE_COLOR=`.
 ---
 
 ## G40 — A plan's claim that no test covers something is a grep, and a fixed function's twin has a twin test
@@ -7461,6 +7473,36 @@ rows to exactly the two it reaches.
 
 **Status:** active. Fix candidate: make `clearServiceCaches()` clear every factory service. That is a
 `src/` change with its own plan. Related: [G70] (stub at the factory's prototype), [G45].
+
+---
+
+## G159 — A lifecycle filter cannot act on a record the normaliser already discarded
+
+**Trigger:** adding or changing a lifecycle rule that reads alert-level fields: CAP `Cancel`, `Update`
+supersession, `references`, `status`. The rule sits behind a parser or flattener that requires a render-shape block
+(CAP `info`) for every record. In this repo that is `flattenCapAlert` (`src/utils/capParse.ts`) and MeteoAlarm
+`parseFeed` (`src/services/meteoalarm.ts`), in front of `filterCapLifecycle` (`src/utils/capActiveFilter.ts`).
+
+**Rule:** keep a lifecycle-only record through normalisation before the render-shape requirement applies. Keep
+the condition narrow (identifier **and** the lifecycle `msgType` **and** non-empty references), so a malformed
+record stays an unusable shape. Test the rule through each real ingestion seam, `parseCapDocument` →
+`flattenCapAlert` → filter and `MeteoAlarmService.getWarnings`, not only with hand-built normalised fixtures. A
+normalised fixture proves the filter, not that production can reach it.
+
+**Why:** CAP 1.2 lets a cancellation stand alone, with no `info`. A renderer needs `info`, so normalisers drop
+records without it, and the downstream filter is then correct and unreachable. The planned `Cancel` rule would
+have shipped with green tests and fixed nothing for that shape. Keeping such a record also moves a count: an
+info-less national CAP document was a shape failure counted in `unavailableCount`, and is no longer one.
+
+**Verify:** `npx vitest run tests/unit/cap-active-filter.test.ts -t "ingestion"`. Then restore either parser's
+no-`info` early return. That route's ingestion test must go red.
+
+**Evidence:** found by the codex plan review (R1) of `plan-alert-territory-trim-cancel`, 2026-11-11, before any
+code was written. Fixed in `22a3ca3`. No live feed sent an info-less `Cancel` on 2026-11-11 (38 MeteoAlarm feeds,
+SACHET, BMKG).
+
+**Status:** active. Related: [G6] (read-time filter over the cached set), [G45] (a mutation goes red only where the
+contract can reach it), [G48].
 
 ---
 
