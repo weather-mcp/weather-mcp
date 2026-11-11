@@ -24,6 +24,7 @@ import { NOAAService } from '../services/noaa.js';
 import { isInUS, isInNwsTerritory } from '../utils/geography.js';
 import { logger } from '../utils/logger.js';
 import type { ResolvedLocation } from '../utils/locationResolver.js';
+import { NWS_CODE_ALONE, NWS_CODE_PLUS_BOX } from '../utils/nwsJurisdiction.js';
 import {
   formatCriticalAlertBanner,
   selectCriticalAlert,
@@ -52,56 +53,6 @@ function httpStatusOf(error: unknown): number | undefined {
 }
 
 /**
- * Country codes that settle NWS jurisdiction **on their own**, with no geography.
- *
- * Two sets, not one with a special case: a single set whose membership means
- * different things for different members is how the next reader gets it wrong.
- * The names state the rule.
- *
- * `'pr'` belongs **here and not in `NWS_CODE_PLUS_BOX`, and that is a correctness
- * constraint rather than a style one.** Puerto Rico lives in `isInUS`, *not* in
- * `isInNwsTerritory` — the new predicate covers only the four territories `isInUS`
- * leaves out. Pairing `'pr'` with the territory box would therefore evaluate
- * `false` and silently drop the banner for every Open-Meteo-geocoded Puerto Rico
- * request, turning a coverage fix into a coverage regression. Tidying it across is
- * the obvious wrong move; a mutation row in the plan pins it, and a relocation has
- * the same red set as a deletion.
- *
- * `us` also stays code-alone because making it conditional on a box would silently
- * narrow behaviour this change does not touch.
- *
- * **Which provider emits which value** (G48 — a fixture value the live resolver
- * never produces proves nothing). `us` comes from Census (`geocoding.ts:150`,
- * hard-coded), from Nominatim (`geocoding.ts:239` — OSM resolves every US
- * territory to `US` at country zoom, measured in issue #86 and again 2026-09-18),
- * and from saved locations. The ISO territory codes `GU`/`MP`/`VI`/`AS`/`PR` come
- * **only** from the Open-Meteo geocoder (`geocoding.ts:334`), the last provider in
- * both `GeocodingService` orders (`:443`, `:447`), reached when the first two
- * return nothing. So `pr` is reachable on that path and nowhere else.
- *
- * COFA codes (`fm`, `pw`, `mh`) are absent from both sets deliberately: sovereign
- * countries, `/points` answers 500, out of scope until someone asks.
- *
- * Lower-cased, as `NIFC_COVERED_COUNTRIES` is (`wildfireHandler.ts:68`); these live
- * beside their only consumer because they are not geography facts.
- */
-const NWS_CODE_ALONE: ReadonlySet<string> = new Set(['us', 'pr']);
-
-/**
- * Territory codes that require `isInNwsTerritory` **as well**.
- *
- * A country code is a *fast path* — a resolved location already knows its country,
- * so the common case costs no geography at all — and a fast path must not admit
- * what the authoritative predicate rejects. `MP` is the one code in either set that
- * spans served and unserved area: it names the whole Northern Marianas while NWS
- * accepts only the southern arc, so `'MP'` deciding alone would re-open, through
- * the Open-Meteo geocoder, exactly the northern-CNMI request the box was drawn to
- * prevent — an uncached HTTP 400 and two `securityEvent` warns at the points the
- * box exists to exclude.
- */
-const NWS_CODE_PLUS_BOX: ReadonlySet<string> = new Set(['gu', 'mp', 'vi', 'as']);
-
-/**
  * The banner for this point, or `''` — which is every path but one.
  *
  * In order:
@@ -112,7 +63,7 @@ const NWS_CODE_PLUS_BOX: ReadonlySet<string> = new Set(['gu', 'mp', 'vi', 'as'])
  *    (Guam, the southern Marianas, the USVI, American Samoa). `isInUS` is not
  *    widened to absorb them because it backs a *rendered* NWPS coverage claim in
  *    `get_river_conditions`, where Puerto Rico is gauged and Guam is not
- *    (GOTCHAS G53). The code path is the two sets above, and there are two of
+ *    (GOTCHAS G53). The code path is the two sets in `src/utils/nwsJurisdiction.ts`, and there are two of
  *    them because a code settles `us` and `pr` on its own while the four
  *    territory codes must also satisfy `isInNwsTerritory` — `MP` names a
  *    territory NWS serves only the southern half of. NOAA is the only upstream
@@ -168,7 +119,7 @@ export async function resolveCriticalAlertBanner(
   //
   // The conjunction on the territory arm is not decoration: a code from
   // NWS_CODE_PLUS_BOX must also satisfy the box, because `MP` names a territory
-  // NWS serves only the southern half of. See the two sets' comments above.
+  // NWS serves only the southern half of. See the two sets' comments in `src/utils/nwsJurisdiction.ts`.
   const countryCode =
     typeof resolved.country_code === 'string' && resolved.country_code.length > 0
       ? resolved.country_code.toLowerCase()
