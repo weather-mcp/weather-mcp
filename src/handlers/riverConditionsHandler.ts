@@ -473,11 +473,11 @@ async function formatNOAARiverConditions(
         // pre-T7 behavior.
         const forecastSeries = detail === 'full' ? stageflowByLid.get(gauge.lid)?.forecast?.data : undefined;
         // G7 — spread the BBOX gauge and take ONLY `flood` from the detail response.
-        // Never `{ ...detail }` and never mutate the gauge in the bbox array: that
-        // array is cached for 24h and the detail response is too, while both carry
-        // `status.observed`/`status.forecast`, which are per-refresh state on a
-        // 30-minute cache. Importing the detail response's status would freeze a
-        // 30-minute observation into a 24-hour entry.
+        // Never `{ ...detail }` and never mutate the gauge in the bbox array. The bbox
+        // list and the stage/flow series carry `status.observed`/`status.forecast`,
+        // per-refresh state cached on `CacheConfig.ttl.nwpsGaugeStatus` (30 minutes);
+        // the detail response carries the same keys but is cached 24h for its
+        // thresholds. Importing its status would freeze a reading for a day.
         const enriched: NWPSGauge = { ...gauge, flood: floodByLid.get(gauge.lid) };
         output += formatGaugeDetails(enriched, distance, timezone, crestCap, trend, forecastSeries);
       }
@@ -1136,9 +1136,19 @@ function formatGaugeDetails(
   output += `**Location:** ${gauge.state?.abbreviation ?? 'Unknown'}${gauge.county ? `, ${gauge.county} County` : ''}\n`;
   output += `**Coordinates:** ${gauge.latitude.toFixed(4)}, ${gauge.longitude.toFixed(4)}\n`;
   output += `**Gauge ID:** ${gauge.lid}${gauge.usgsId ? ` (USGS: ${gauge.usgsId})` : ''}\n`;
-  // inService is only present on the per-gauge detail endpoint; gauges returned
-  // by the bounding-box query are active by definition, so default to Active.
-  output += `**Status:** ${gauge.inService === false ? '❌ Out of Service' : '✅ Active'}\n\n`;
+  // The service state comes from the bounding-box list's own observed category, which
+  // NWPS sets to `out_of_service` for a gauge it has taken out of service, and which is
+  // at most 30 minutes old (CacheConfig.ttl.nwpsGaugeStatus). The detail endpoint's
+  // `inService` object is deliberately not read: that entry is cached 24h, so a gauge
+  // restored to service would read out of service for a day, and it is absent whenever
+  // the detail fetch fails (G7, RF-27 D4).
+  const outOfService = normalizeFloodCategory(gauge.status.observed?.floodCategory) === 'out of service';
+  output += `**Status:** ${outOfService ? '❌ Out of Service' : '✅ Active'}\n\n`;
+
+  // Whether this gauge block printed a **Flood Category:** line carrying a category
+  // NOAA actually published. The no-thresholds line below cites that line only when
+  // it did; otherwise it would point the reader at a line that is absent or empty.
+  let observedCategoryPublished = false;
 
   // Current conditions. An observed status can be a placeholder too (year-0001
   // validTime, no real values, "obs_not_current" category) — treat it exactly
@@ -1158,10 +1168,9 @@ function formatGaugeDetails(
       output += `**Flow Rate:** ${obs.secondary.toFixed(2)} kcfs (${(obs.secondary * 1000).toFixed(0)} cfs)\n`;
     }
 
-    // Flood category with emoji
-    const floodEmoji = getFloodEmoji(obs.floodCategory);
-    const floodText = obs.floodCategory ? obs.floodCategory.replace(/_/g, ' ').toUpperCase() : 'NO FLOODING';
-    output += `**Flood Category:** ${floodEmoji} ${floodText}\n\n`;
+    const observedCategory = describeFloodCategory(obs.floodCategory);
+    observedCategoryPublished = observedCategory.published;
+    output += `**Flood Category:** ${observedCategory.marker} ${observedCategory.text}\n\n`;
   } else {
     output += `### Current Conditions\n`;
     output += `*No current observations available*\n`;
@@ -1208,7 +1217,14 @@ function formatGaugeDetails(
         output += `**Current stage is ${pctToAction}% of action stage**\n\n`;
       }
     } else {
-      output += `*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published thresholds, not an absence of flood risk — the **Flood Category:** line above comes from NOAA's own status.*\n\n`;
+      // Two forms (RF-27 D3). The first cites the category line, so it renders only
+      // when that line was printed in this block with a category NOAA published. The
+      // second covers a gauge with neither, and still refuses to read as an all-clear.
+      if (observedCategoryPublished) {
+        output += `*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published thresholds, not an absence of flood risk — the **Flood Category:** line above comes from NOAA's own status.*\n\n`;
+      } else {
+        output += `*NOAA publishes no flood-stage thresholds for this gauge. It publishes no flood category for it either. Neither absence is an all-clear: nothing here says whether this river is in flood.*\n\n`;
+      }
     }
   }
 
@@ -1227,9 +1243,8 @@ function formatGaugeDetails(
       output += `**Forecasted Flow:** ${forecast.secondary.toFixed(2)} kcfs\n`;
     }
 
-    const forecastFloodEmoji = getFloodEmoji(forecast.floodCategory);
-    const forecastFloodText = forecast.floodCategory ? forecast.floodCategory.replace(/_/g, ' ').toUpperCase() : 'NO FLOODING';
-    output += `**Forecasted Category:** ${forecastFloodEmoji} ${forecastFloodText}\n\n`;
+    const forecastCategory = describeFloodCategory(forecast.floodCategory);
+    output += `**Forecasted Category:** ${forecastCategory.marker} ${forecastCategory.text}\n\n`;
   }
 
   // Multi-point NWPS forecast series (detail="full" only — see D4). Most gauges have
@@ -1246,7 +1261,7 @@ function formatGaugeDetails(
       for (const point of shown) {
         const stage = point.primary as number;
         const category = gauge.flood?.categories ? deriveFloodCategory(stage, gauge.flood.categories) : null;
-        const categoryClause = category ? ` ${getFloodEmoji(category)} ${category.toUpperCase()}` : '';
+        const categoryClause = category ? ` ${describeFloodCategory(category).marker} ${category.toUpperCase()}` : '';
         output += `- **${formatInTimezone(point.validTime, timezone)}:** ${stage.toFixed(2)} ft${categoryClause}\n`;
       }
       if (usablePoints.length > FORECAST_SERIES_CAP) {
@@ -1319,16 +1334,38 @@ function deriveFloodCategory(stage: number, categories: FloodCategories): 'major
   return null;
 }
 
+/** NWPS uses underscore-delimited categories (e.g. "no_flooding", "not_defined"). */
+function normalizeFloodCategory(category: string | null | undefined): string {
+  return (category ?? '').toLowerCase().replace(/_/g, ' ').trim();
+}
+
+/** The marker and text a flood category renders as, and whether NOAA published one. */
+interface FloodCategoryDisplay {
+  marker: string;
+  text: string;
+  published: boolean;
+}
+
 /**
- * Get emoji for flood category
+ * Classify an NWPS flood category for display — the one place both category lines
+ * and the forecast-series clause read, so they cannot drift.
+ *
+ * An unpublished category (absent, null, empty, or NWPS's `not_defined`) renders a
+ * neutral marker and the lower-case words `no category published`: NOAA sent no
+ * finding, so this must never render `✅` or the words `NO FLOODING` (RF-27 D3). The
+ * lower case keeps the words from reading as one of NOAA's own upper-cased codes.
+ * Every other value keeps its marker and its upper-cased NOAA name.
  */
-function getFloodEmoji(category: string | null | undefined): string {
-  // NWPS uses underscore-delimited categories (e.g. "no_flooding", "not_defined")
-  const normalized = category?.replace(/_/g, ' ');
-  if (!normalized || normalized === 'no flooding' || normalized === 'not defined') return '✅';
-  if (normalized === 'action') return '🟡';
-  if (normalized === 'minor') return '🟠';
-  if (normalized === 'moderate') return '🔴';
-  if (normalized === 'major') return '🔴🔴';
-  return '⚪';
+function describeFloodCategory(category: string | null | undefined): FloodCategoryDisplay {
+  const normalized = normalizeFloodCategory(category);
+  if (normalized === '' || normalized === 'not defined') {
+    return { marker: '⚪', text: 'no category published', published: false };
+  }
+  const text = (category as string).replace(/_/g, ' ').toUpperCase();
+  if (normalized === 'no flooding') return { marker: '✅', text, published: true };
+  if (normalized === 'action') return { marker: '🟡', text, published: true };
+  if (normalized === 'minor') return { marker: '🟠', text, published: true };
+  if (normalized === 'moderate') return { marker: '🔴', text, published: true };
+  if (normalized === 'major') return { marker: '🔴🔴', text, published: true };
+  return { marker: '⚪', text, published: true };
 }

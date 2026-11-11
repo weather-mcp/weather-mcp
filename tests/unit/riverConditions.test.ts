@@ -782,7 +782,7 @@ describe('handleGetRiverConditions flood stages and crests (T2)', () => {
       moderate: { stage: -9999 },
       major: { stage: -9999 }
     };
-    const gauge = buildGauge({ flood: { stageUnits: 'ft', categories } });
+    const gauge = buildGauge({ status: { observed: status() }, flood: { stageUnits: 'ft', categories } });
 
     for (const detail of ['standard', 'full'] as const) {
       getNWPSGaugesInBoundingBoxMock.mockResolvedValue([gauge]);

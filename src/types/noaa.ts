@@ -435,15 +435,12 @@ export interface HistoricCrest {
 export interface GaugeStatus {
   primary: number | null; // Stage in feet
   secondary: number | null; // Flow in kcfs (thousand cubic feet per second)
-  // NWPS returns underscore-delimited categories (e.g. "no_flooding", "not_defined")
-  floodCategory:
-    | 'major'
-    | 'moderate'
-    | 'minor'
-    | 'action'
-    | 'no_flooding'
-    | 'not_defined'
-    | null;
+  // NWPS returns underscore-delimited categories. Live values (2026-11-11, all
+  // 12,970 gauges): no_flooding, not_defined, obs_not_current, out_of_service,
+  // low_threshold, action, minor, moderate, major; forecasts also carry
+  // fcst_not_current. The list is not closed — third-party data, so any string.
+  // not_defined (or absent/null/empty) means NOAA published no category.
+  floodCategory?: string | null;
   validTime: string; // ISO 8601 datetime
   primaryUnit?: string; // e.g. "ft"
   secondaryUnit?: string; // e.g. "kcfs"
@@ -486,7 +483,11 @@ export interface NWPSGauge {
       recent?: HistoricCrest[];
     };
   };
-  inService?: boolean;
+  // Detail endpoint only (GET /gauges/{lid}); live it is an object, e.g.
+  // { enabled: false, message: "Gage is currently out of service." }. Not read by
+  // the handler: that entry is cached 24h, so the Status line reads the list's
+  // observed category instead (RF-27 D4).
+  inService?: { enabled?: boolean; message?: string };
   upstreamLid?: string;
   downstreamLid?: string;
 }

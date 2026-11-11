@@ -124,6 +124,12 @@ export const CacheConfig = {
     // deliberately not read (see riverConditionsHandler's fresh-copy merge).
     nwpsGaugeDetail: 24 * HOUR,
 
+    // NWPS gauge status — the bounding-box list (each gauge's live observed and
+    // forecast stage, flow and flood category) and the per-gauge stage/flow series.
+    // NWPS observations are roughly hourly; 30 minutes adds at most half a period.
+    // Per-refresh state: never reuse this for the 24 h gauge-detail entry (G7).
+    nwpsGaugeStatus: 30 * MINUTE,
+
     // Google Pollen API (optional global pollen fallback)
     // Pollen models update ~daily; 6h matches the daily-model posture and
     // shields the 5,000/month free-tier quota once the 1h air-quality cache

@@ -226,7 +226,16 @@ fail-then-succeed-across-refreshes test in
 **Evidence:** 2026-08-23 (`0918007`) — raised as a major plan-review finding
 (R1) before implementation.
 
-**Status:** active.
+**Extended 2026-11-10** (`34ec78d`, river-gauge-staleness T1) — **a response
+whose body *is* per-refresh state takes the state's TTL, not the identity's.**
+The NWPS bounding-box list looks like gauge identity (names, coordinates) but
+carries each gauge's live stage, flow and flood category, and it was cached 24 h
+— so a river that went into flood kept its green check for a day, while a code
+comment beside it described the status as "on a 30-minute cache". Before reusing
+a long TTL for a list, check whether any field the render reads is a reading;
+if one is, the list is on the reading's clock (`CacheConfig.ttl.nwpsGaugeStatus`).
+
+**Status:** active, extended 2026-11-10.
 
 ---
 
@@ -2663,7 +2672,9 @@ recorded as such, not "fixed" with a test that cannot exist.
 
 **Extended 2026-11-09** (`56185c5`, vacuous-unit-tests T3) — **the redundant-term rule holds for a disjunction too, and a default reached only by omission needs an omitted-input row.** The NWPS radius guard is `typeof r !== 'number' || isNaN(r) || !isFinite(r)`. Deleting `isNaN` is equivalent, because `!isFinite(NaN)` is already true. Deleting `!isFinite` is the mutation that reddens. Separately, `?? EA_DEFAULT_RADIUS_KM` → `?? 50` survived a table of NaN, ±Infinity and string rows, because the invalid-value fallback assigns the same constant on its own line. Only `radius: undefined` reaches the `??`. When the same default is written at two sites, give each site an input that reaches it alone.
 
-**Status:** active, **extended 2026-08-29, twice on 2026-09-01, 2026-09-03, 2026-09-24, and 2026-11-09**. Related: [G13] (a fixture that cannot discriminate),
+**Extended 2026-11-10** (`a7f5754`, river-gauge-staleness T3) — **a test that pins a rejected source behind a strip-on-merge is a lock on the merge, so a read-only mutation cannot redden it.** The Status line must ignore the detail endpoint's `inService` (G7). The planned mutation "read `inService?.enabled === false` from the merged gauge" reddened the `out_of_service` rows but **not** the row whose detail says out of service, because the fresh-copy merge `{ ...gauge, flood }` never carries `inService`, so the read is always `undefined`. Only a compound mutation — import the field at the merge **and** read it — reddens that row. When a plan's row says a rejected-source test reddens under a read mutation, check whether an upstream strip already makes the read unobservable; if so, record the row as a merge lock and run the compound mutation.
+
+**Status:** active, **extended 2026-08-29, twice on 2026-09-01, 2026-09-03, 2026-09-24, 2026-11-09, and 2026-11-10**. Related: [G13] (a fixture that cannot discriminate),
 [G32] (mutating to every *rejected implementation* — this entry is about the
 *entry point*, that one about the *alternative*), [G11] (read the real output),
 [G41] (a plan's mechanical prediction is not the contract), [G57] (the run that
@@ -3852,6 +3863,13 @@ fallback alone outlasts the 60 s per-test budget. The tag push is the publish
 trigger and `gh release create` had already run, so the visible artefacts of a
 release existed before the package did — the half-published state `/release`
 step 7 warns about.
+
+**Update 2026-11-10** (`34ec78d`, river-gauge-staleness T1): the NWPS heavy
+fallback named in **Why** is removed. A refused bounding-box request now fails
+at once as the river error result (`isError: true`) instead of starting a 13 MB
+download, so on `safety-hazards.test.ts` the symptom should change from a 60 s
+timeout to a fast assertion failure. The log line `NWPS bounding box query
+failed` no longer exists; grep for `currently unavailable` or `Rate limit`.
 
 **Verify:** `gh run view <id> --log-failed | grep -E 'NWPS bounding box query
 failed|currently unavailable'` names the upstream; `npm view

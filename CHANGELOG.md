@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.13] - 2026-11-11
+
+A US river report could show a green check for a river that was already in flood. The gauge readings behind it were kept for up to a day, and a gauge for which NOAA publishes no flood category was shown with the same green check as a gauge with no flooding. Readings are now at most 30 minutes old, a missing category is shown as missing, and a failed or unusable answer from NOAA's gauge service is reported as an error instead of as an empty search.
+
+### Changed
+- **A gauge with no NOAA flood category no longer shows a green check.** NOAA publishes no flood category for many US gauges and reports them as "not defined". The report printed `**Flood Category:** ✅ NOT DEFINED` for them, and `✅ NO FLOODING` when the category was missing altogether. Neither was a finding of no flooding. Such a gauge now reads `**Flood Category:** ⚪ no category published`, on the observed and the forecast line. Where the gauge also has no published flood-stage thresholds, the note under **Flood Stages** says that neither absence is an all-clear, instead of pointing at the category line.
+- **An out-of-service US gauge is labelled.** Every gauge showed `**Status:** ✅ Active`. A gauge NOAA reports out of service now shows `**Status:** ❌ Out of Service`. Where it still has a reading, the reading is shown with its observation time.
+
+### Fixed
+- **US river gauge status is no longer served up to a day old.** `get_river_conditions` kept each gauge's stage, flow and flood category for 24 hours after the first question about an area, so a river that rose into flood could keep its green check for a day. Gauge status is now at most 30 minutes old, the same as the stage trend beside it. NOAA updates most gauges about once an hour.
+- **A failed US gauge-list request is now an error result, and no longer downloads every gauge in the country.** When the request for the gauges around a point failed, including on a rate limit, the server fetched the whole NOAA gauge catalogue instead, which could take longer than the default timeout and then fail after holding the call for its full deadline. The report now shows its error section at once, with `isError: true`.
+- **An unusable answer from the US gauge service is an error result, not "No river gauges found".** When NOAA's gauge service answered a request with something other than a gauge list, such as a maintenance page or an error object, `get_river_conditions` read it as an empty list and reported that no gauges were near. It now shows its error section, with `isError: true`, and does not keep the bad answer. A real empty list still gives the no-gauges answer. A single unusable entry in an otherwise good list is left out and the other gauges are shown.
+
 ## [1.35.12] - 2026-11-10
 
 A US wildfire report measured each fire from the spot where it was first reported, not from the fire itself. A fire is an area, and that reported spot can be far from it — one live fire's is in the Atlantic, more than 2,000 km from its own burn area. A place 3 km from a burning, partly contained fire could get a report of no fires at all. Distances and danger tiers now use the fire's mapped edge. The same report also stops inventing three values it was never given: a fire count of zero, today's date as a discovery date, and a size of zero acres.
@@ -2304,7 +2317,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.12...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.13...HEAD
+[1.35.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.12...v1.35.13
 [1.35.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.11...v1.35.12
 [1.35.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.10...v1.35.11
 [1.35.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.9...v1.35.10
