@@ -100,10 +100,12 @@ describe('NWPS gauge capture shape lock — real bytes through the renderer', ()
     const text = await renderCapture(KCMO3);
 
     expect(text).toContain('### Flood Stages');
+    // KCMO3's observed category is not_defined, so it carries no category to cite:
+    // the second no-thresholds form, and the neutral category line (RF-27 D3).
+    expect(text).toContain('**Flood Category:** ⚪ no category published\n');
     expect(text).toContain(
-      '*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published ' +
-        'thresholds, not an absence of flood risk — the **Flood Category:** line above comes from ' +
-        "NOAA's own status.*"
+      '*NOAA publishes no flood-stage thresholds for this gauge. It publishes no flood category for ' +
+        'it either. Neither absence is an all-clear: nothing here says whether this river is in flood.*'
     );
     expect(countThresholdRows(text)).toBe(0);
   });
