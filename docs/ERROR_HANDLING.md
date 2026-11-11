@@ -566,6 +566,11 @@ The response carries `isError: true`, so a client that checks the error flag see
 There is no fallback request: the server does not try a larger download in place of the failed one,
 so a rate limit or an outage is reported at once rather than after the call's full deadline.
 
+An answer that is not a gauge list is the same error result, with the same section and the same
+`isError: true`. This covers an empty body, a maintenance page, an error object, and a list in which
+no entry is usable. Only a real empty list gives "No river gauges found". One unusable entry beside
+usable ones is left out, and the other gauges render.
+
 A single gauge whose detail or trend request fails is **not** a failure. That gauge renders without
 its trend or flood-stage section, and the result is a normal report.
 

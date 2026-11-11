@@ -32,6 +32,58 @@ import {
   isRetryableError
 } from '../errors/ApiError.js';
 
+/** A JSON object — not `null`, not an array, not a string (G4: `''` is the real empty body). */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** A list member carrying every field the river handler reads without a guard. */
+function isUsableNWPSGauge(value: unknown): value is NWPSGauge {
+  return (
+    isPlainObject(value) &&
+    typeof value.lid === 'string' &&
+    typeof value.name === 'string' &&
+    typeof value.latitude === 'number' &&
+    Number.isFinite(value.latitude) &&
+    typeof value.longitude === 'number' &&
+    Number.isFinite(value.longitude) &&
+    isPlainObject(value.status)
+  );
+}
+
+/**
+ * The gauges of an NWPS bounding-box answer, or a throw when the body is not that
+ * answer (G4). `{ gauges: [] }` is the honest empty list. A body with no array
+ * `gauges` (an HTML page, `''`, a gateway's `{ error }`, `gauges: null`) is an
+ * upstream failure, and so is a non-empty list with no usable member. An unusable
+ * member beside usable ones is dropped with a warning, so that one bad gauge
+ * cannot blank the rest.
+ */
+function usableNWPSGauges(data: unknown): NWPSGauge[] {
+  if (!isPlainObject(data) || !Array.isArray(data.gauges)) {
+    logger.warn('NWPS gauge list has no usable envelope', {
+      service: 'NOAA',
+      bodyType: Array.isArray(data) ? 'array' : data === null ? 'null' : typeof data,
+      securityEvent: true
+    });
+    throw new ServiceUnavailableError('NOAA');
+  }
+  const members: unknown[] = data.gauges;
+  const usable = members.filter(isUsableNWPSGauge);
+  if (usable.length < members.length) {
+    logger.warn('NWPS gauge list has unusable members', {
+      service: 'NOAA',
+      total: members.length,
+      dropped: members.length - usable.length,
+      securityEvent: true
+    });
+    if (usable.length === 0) {
+      throw new ServiceUnavailableError('NOAA');
+    }
+  }
+  return usable;
+}
+
 export interface NOAAServiceConfig {
   userAgent?: string;
   baseURL?: string;
@@ -756,7 +808,7 @@ export class NOAAService {
     };
 
     const response = await this.nwpsClient.get<NWPSGaugesResponse>('/gauges', { params });
-    const result = response.data.gauges ?? [];
+    const result = usableNWPSGauges(response.data);
 
     if (CacheConfig.enabled) {
       const cacheKey = Cache.generateKey('nwps-gauges-bbox', bboxKey);

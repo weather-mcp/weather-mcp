@@ -207,3 +207,79 @@ describe('get_river_conditions — a rate-limited gauge list is an error result'
     expect(calls[0].params?.srid).toBe('EPSG_4326');
   });
 });
+
+/**
+ * Diff-review codex C1 (G4): an HTTP 200 whose body is not the gauge-list envelope
+ * is an upstream failure, never an honest empty list. Only `{ gauges: [] }` is empty.
+ */
+describe('NWPS gauge list — an unusable HTTP-200 body is not an empty list', () => {
+  const UNUSABLE: Array<[string, unknown]> = [
+    ["axios's empty body ''", ''],
+    ['an HTML maintenance page', '<html><body>Scheduled maintenance</body></html>'],
+    ['a gateway error object', { error: 'maintenance' }],
+    ['gauges: null', { gauges: null }],
+    ['a bare array', [LIST_BODY.gauges[0]]],
+    ['a non-empty list with no usable member', { gauges: [{}, { lid: 'X', name: 'Y', latitude: 'n/a', longitude: 1, status: {} }] }]
+  ];
+
+  it.each(UNUSABLE)('%s → ServiceUnavailableError, and nothing is cached', async (_label, body) => {
+    const service = new NOAAService();
+    const { calls } = scriptAdapter(service, [{ status: 200, data: body }, { status: 200, data: LIST_BODY }]);
+    const error: unknown = await list(service).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ServiceUnavailableError);
+    expect((error as Error).message).not.toContain('maintenance');
+    const second = await list(service);
+    expect(second).toHaveLength(1);
+    expect(calls).toHaveLength(2);
+    assertEveryCallParameterised(calls);
+  });
+
+  it('{ gauges: [] } is the honest empty list, and is cached', async () => {
+    const service = new NOAAService();
+    const { calls } = scriptAdapter(service, [{ status: 200, data: { gauges: [] } }]);
+    expect(await list(service)).toEqual([]);
+    expect(await list(service)).toEqual([]);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('drops an unusable member beside a usable one, with one securityEvent warning', async () => {
+    const service = new NOAAService();
+    scriptAdapter(service, [{ status: 200, data: { gauges: [{}, LIST_BODY.gauges[0], null] } }]);
+    const result = (await list(service)) as Array<{ lid: string }>;
+    expect(result.map(g => g.lid)).toEqual(['MEMT1']);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      'NWPS gauge list has unusable members',
+      expect.objectContaining({ total: 3, dropped: 2, securityEvent: true })
+    );
+  });
+});
+
+describe('get_river_conditions — an unusable gauge-list body is an error result', () => {
+  const handle = (service: NOAAService) =>
+    handleGetRiverConditions(
+      { latitude: 35.1495, longitude: -90.049 },
+      service,
+      {} as unknown as LocationStore,
+      {} as unknown as GeocodingService
+    );
+
+  it('a string body → error block and isError true, never "No river gauges found"', async () => {
+    const service = new NOAAService();
+    scriptAdapter(service, [{ status: 200, data: 'upstream maintenance page' }]);
+    const result = await handle(service);
+    const text = result.content[0].text;
+    expect(text).toContain('❌ **Error retrieving river gauge data**');
+    expect(text).not.toContain('No river gauges found');
+    expect(text).not.toContain('maintenance page');
+    expect(result.isError).toBe(true);
+  });
+
+  it('control: { gauges: [] } → the normal no-gauges answer, with no error flag', async () => {
+    const service = new NOAAService();
+    scriptAdapter(service, [{ status: 200, data: { gauges: [] } }]);
+    const result = await handle(service);
+    expect(result.content[0].text).toContain('No river gauges found');
+    expect(result.isError).toBeUndefined();
+  });
+});

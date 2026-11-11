@@ -730,7 +730,7 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 ## Project Status
 
 - **Version:** 1.35.12 — Production Ready ✅
-- **Test Coverage:** 5,010 tests, 100% pass rate
+- **Test Coverage:** 5,020 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
