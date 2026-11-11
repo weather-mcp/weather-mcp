@@ -695,8 +695,8 @@ export class NOAAService {
       const response = await this.nwpsClient.get<NWPSStageFlowResponse>(`/gauges/${lid}/stageflow`);
       const result = response.data;
 
-      // Cache for 30 minutes (frequently updated)
-      this.cache.set(cacheKey, result, 1800000);
+      // Per-refresh readings: the same status clock as the bounding-box list.
+      this.cache.set(cacheKey, result, CacheConfig.ttl.nwpsGaugeStatus);
       return result;
     }
 
@@ -705,36 +705,10 @@ export class NOAAService {
   }
 
   /**
-   * Get all NWPS gauges (warning: large response, should be filtered)
-   * Note: This endpoint returns all gauges across the US. Consider using
-   * geographic filtering or querying by specific gauge IDs instead.
-   * @returns Array of all river gauges
-   * @deprecated Use getNWPSGaugesInBoundingBox instead to avoid downloading entire catalog
-   */
-  async getAllNWPSGauges(): Promise<NWPSGauge[]> {
-    // Check cache first (if enabled) - cache for 24 hours (gauges rarely change)
-    if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('nwps-all-gauges');
-      const cached = this.cache.get(cacheKey);
-      if (cached) {
-        return cached as NWPSGauge[];
-      }
-
-      const response = await this.nwpsClient.get<NWPSGaugesResponse>('/gauges');
-      const result = response.data.gauges ?? [];
-
-      // Cache for 24 hours (gauge locations don't change often)
-      this.cache.set(cacheKey, result, 86400000);
-      return result;
-    }
-
-    const response = await this.nwpsClient.get<NWPSGaugesResponse>('/gauges');
-    return response.data.gauges ?? [];
-  }
-
-  /**
    * Get NWPS river gauges within a bounding box
-   * More efficient than getAllNWPSGauges() for location-specific queries
+   * The list carries each gauge's live observed and forecast status, so it is
+   * cached on the status clock. A failure propagates with the error handleError
+   * mapped; there is no fallback (the whole-catalogue pull was removed, RF-27).
    * @param west Western longitude boundary
    * @param south Southern latitude boundary
    * @param east Eastern longitude boundary
@@ -781,47 +755,15 @@ export class NOAAService {
       srid: 'EPSG_4326'
     };
 
-    try {
-      const response = await this.nwpsClient.get<NWPSGaugesResponse>('/gauges', { params });
-      const result = response.data.gauges ?? [];
+    const response = await this.nwpsClient.get<NWPSGaugesResponse>('/gauges', { params });
+    const result = response.data.gauges ?? [];
 
-      // Cache for 24 hours
-      if (CacheConfig.enabled) {
-        const cacheKey = Cache.generateKey('nwps-gauges-bbox', bboxKey);
-        this.cache.set(cacheKey, result, 86400000);
-      }
-
-      return result;
-    } catch (error) {
-      // If the bounding-box query fails, fall back to downloading the entire
-      // gauge catalog and filtering client-side. This is a heavy path (~13MB /
-      // ~12,700 gauges) and should be rare — a sustained occurrence signals the
-      // NWPS bbox query has regressed (see v1.7.1 fix) and needs investigation.
-      logger.warn(
-        'NWPS bounding box query failed; falling back to full gauge catalog download (heavy path)',
-        {
-          error: error instanceof Error ? error.message : String(error),
-          fallback: 'getAllNWPSGauges',
-          securityEvent: true
-        }
-      );
-
-      const allGauges = await this.getAllNWPSGauges();
-      const filtered = allGauges.filter(gauge =>
-        gauge.longitude >= west &&
-        gauge.longitude <= east &&
-        gauge.latitude >= south &&
-        gauge.latitude <= north
-      );
-
-      // Cache the filtered result
-      if (CacheConfig.enabled) {
-        const cacheKey = Cache.generateKey('nwps-gauges-bbox', bboxKey);
-        this.cache.set(cacheKey, filtered, 86400000);
-      }
-
-      return filtered;
+    if (CacheConfig.enabled) {
+      const cacheKey = Cache.generateKey('nwps-gauges-bbox', bboxKey);
+      this.cache.set(cacheKey, result, CacheConfig.ttl.nwpsGaugeStatus);
     }
+
+    return result;
   }
 
   /**
