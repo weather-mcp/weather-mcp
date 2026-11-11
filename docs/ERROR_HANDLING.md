@@ -548,7 +548,8 @@ a server failure**: the rest of the report is complete, and there is nothing to 
 ### River Gauge (NWPS) Errors
 
 In the US, `get_river_conditions` reads gauges from the National Water Prediction Service. When the
-gauge-list request fails, the report still renders, with this section in place of the gauge list:
+gauge-list request fails for any reason — a rate limit (HTTP 429), a rejected request, a server error
+or a timeout — the report still renders, with this section in place of the gauge list:
 
 ```
 ❌ **Error retrieving river gauge data**
@@ -562,6 +563,8 @@ Error details: NOAA API is currently unavailable
 ```
 
 The response carries `isError: true`, so a client that checks the error flag sees the failure.
+There is no fallback request: the server does not try a larger download in place of the failed one,
+so a rate limit or an outage is reported at once rather than after the call's full deadline.
 
 A single gauge whose detail or trend request fails is **not** a failure. That gauge renders without
 its trend or flood-stage section, and the result is a normal report.

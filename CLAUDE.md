@@ -479,6 +479,7 @@ via `src/utils/unitFormat.ts`.
 - **Historical data (>1 day old):** Infinity (finalized)
 - **Recent historical (<1 day):** 1 hour (may be corrected)
 - **NWPS gauge detail (flood-stage thresholds):** 24 hours (gauge metadata, revised ~annually)
+- **NWPS gauge status (list + stage/flow series):** 30 minutes (per-refresh readings; observations are roughly hourly)
 - **EA bulk latest readings:** 15 minutes (every EA gauge measure publishes on a 15-minute period)
 - **EA station detail (typical-range thresholds):** 24 hours (gauge metadata; the threshold projection only — never a reading, see GOTCHAS G7)
 - Newer entries (normals, Google pollen, FIRMS, tiles, composites) are documented inline in `CacheConfig`
@@ -729,7 +730,7 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 ## Project Status
 
 - **Version:** 1.35.12 — Production Ready ✅
-- **Test Coverage:** 4,968 tests, 100% pass rate
+- **Test Coverage:** 5,010 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):

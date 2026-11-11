@@ -7,11 +7,11 @@ The same tool answers both questions, but from different kinds of data — offic
 **Claude Code answered** (using `get_river_conditions` — US NOAA gauges, `detail: "full"`):
 
 <!-- answer -->
-**No flood risk at Memphis.** The Mississippi River gauge at Memphis (MEMT1, 2.4 miles from downtown) reads **9.54 ft and falling** — about a third of its 28 ft action stage — with an official flood category of NO FLOODING, and the same is true at all 20 gauges within the 50 km search radius (Wolf River, Loosahatchie, Nonconnah Creek, and the rest).
+**No flood risk at Memphis.** The Mississippi River gauge at Memphis (MEMT1, 2.4 miles from downtown) reads **-2.34 ft and falling slightly** — far below its 28 ft action stage — with an official flood category of NO FLOODING. Fourteen of the 20 gauges within the 50 km search radius report NO FLOODING too (Wolf River, Loosahatchie, Nonconnah Creek, and the rest).
 
-The forecast series shows the river **continuing to fall through mid-September**, to around -2.3 ft — a normal late-summer drawdown that stays far below flood stage the whole way.
+The other six — among them Fletcher Creek at Bartlett and the two Tyronza River gauges — have **no NOAA flood category at all**, and the server says so: `⚪ no category published`, not a green check. Those same six also have no published flood-stage thresholds, and their **Flood Stages** note says that neither absence is an all-clear. For those six, this report cannot tell you whether the river is in flood.
 
-Every gauge carries a **Flood Stages** section. Fourteen of the twenty publish the thresholds NOAA has set for them; the other six state plainly that NOAA publishes none, rather than leaving a silent gap the reader would have to interpret.
+The forecast series has the Mississippi **rising by about 2.7 ft to 0.40 ft around Nov 15–16**, then easing back — a small rise that stays far below flood stage the whole way.
 <!-- /answer -->
 
 <!-- capture:memphis-gauges -->
@@ -47,8 +47,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:00 PM
-**River Stage:** 2.54 ft  ↘ falling (-0.3 ft / 6h)
+**Observed:** Nov 10, 2026, 7:00 PM
+**River Stage:** -2.34 ft  ↘ falling (-0.1 ft / 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -57,71 +57,72 @@ get_river_conditions({
 **Moderate Flood:** 40.0 ft
 **Major Flood:** 46.0 ft
 
-**Current stage is 9% of action stage**
+**Current stage is -8% of action stage**
 
 ### Forecast
-**Valid Time:** Sep 2, 2026, 7:00 PM
-**Forecasted Stage:** 2.40 ft
+**Valid Time:** Nov 15, 2026, 6:00 PM
+**Forecasted Stage:** 0.40 ft
 **Forecasted Category:** ✅ NO FLOODING
 
 ### Forecast Series
-- **Sep 2, 2026, 1:00 PM:** 2.70 ft
-- **Sep 2, 2026, 7:00 PM:** 2.40 ft
-- **Sep 3, 2026, 1:00 AM:** 2.10 ft
-- **Sep 3, 2026, 7:00 AM:** 1.80 ft
-- **Sep 3, 2026, 1:00 PM:** 1.60 ft
-- **Sep 3, 2026, 7:00 PM:** 1.20 ft
-- **Sep 4, 2026, 1:00 AM:** 0.90 ft
-- **Sep 4, 2026, 7:00 AM:** 0.80 ft
-- **Sep 4, 2026, 1:00 PM:** 0.50 ft
-- **Sep 4, 2026, 7:00 PM:** 0.10 ft
-- **Sep 5, 2026, 1:00 AM:** -0.20 ft
-- **Sep 5, 2026, 7:00 AM:** -0.40 ft
-- **Sep 5, 2026, 1:00 PM:** -0.60 ft
-- **Sep 5, 2026, 7:00 PM:** -0.70 ft
-- **Sep 6, 2026, 1:00 AM:** -0.80 ft
-- **Sep 6, 2026, 7:00 AM:** -0.80 ft
-- **Sep 6, 2026, 1:00 PM:** -0.90 ft
-- **Sep 6, 2026, 7:00 PM:** -1.10 ft
-- **Sep 7, 2026, 1:00 AM:** -1.20 ft
-- **Sep 7, 2026, 7:00 AM:** -1.40 ft
-- **Sep 7, 2026, 1:00 PM:** -1.50 ft
-- **Sep 7, 2026, 7:00 PM:** -1.70 ft
-- **Sep 8, 2026, 1:00 AM:** -1.90 ft
-- **Sep 8, 2026, 7:00 AM:** -2.10 ft
-- **Sep 8, 2026, 1:00 PM:** -2.40 ft
-- **Sep 8, 2026, 7:00 PM:** -2.60 ft
-- **Sep 9, 2026, 1:00 AM:** -2.90 ft
-- **Sep 9, 2026, 7:00 AM:** -3.10 ft
-- **Sep 9, 2026, 1:00 PM:** -3.20 ft
-- **Sep 9, 2026, 7:00 PM:** -3.30 ft
-- **Sep 10, 2026, 1:00 AM:** -3.40 ft
-- **Sep 10, 2026, 7:00 AM:** -3.50 ft
-- **Sep 10, 2026, 1:00 PM:** -3.60 ft
-- **Sep 10, 2026, 7:00 PM:** -3.80 ft
-- **Sep 11, 2026, 1:00 AM:** -3.80 ft
-- **Sep 11, 2026, 7:00 AM:** -3.90 ft
-- **Sep 11, 2026, 1:00 PM:** -4.00 ft
-- **Sep 11, 2026, 7:00 PM:** -4.10 ft
-- **Sep 12, 2026, 1:00 AM:** -4.10 ft
-- **Sep 12, 2026, 7:00 AM:** -4.20 ft
-- **Sep 12, 2026, 1:00 PM:** -4.20 ft
-- **Sep 12, 2026, 7:00 PM:** -4.30 ft
-- **Sep 13, 2026, 1:00 AM:** -4.30 ft
-- **Sep 13, 2026, 7:00 AM:** -4.40 ft
-- **Sep 13, 2026, 1:00 PM:** -4.40 ft
-- **Sep 13, 2026, 7:00 PM:** -4.50 ft
-- **Sep 14, 2026, 1:00 AM:** -4.50 ft
-- **Sep 14, 2026, 7:00 AM:** -4.50 ft
-- **Sep 14, 2026, 1:00 PM:** -4.60 ft
-- **Sep 14, 2026, 7:00 PM:** -4.60 ft
-- **Sep 15, 2026, 1:00 AM:** -4.70 ft
-- **Sep 15, 2026, 7:00 AM:** -4.70 ft
-- **Sep 15, 2026, 1:00 PM:** -4.80 ft
-- **Sep 15, 2026, 7:00 PM:** -4.80 ft
-- **Sep 16, 2026, 1:00 AM:** -4.90 ft
-- **Sep 16, 2026, 7:00 AM:** -4.90 ft
-- **Sep 16, 2026, 1:00 PM:** -4.90 ft
+- **Nov 10, 2026, 12:00 PM:** -2.30 ft
+- **Nov 10, 2026, 6:00 PM:** -2.30 ft
+- **Nov 11, 2026, 12:00 AM:** -2.20 ft
+- **Nov 11, 2026, 6:00 AM:** -2.10 ft
+- **Nov 11, 2026, 12:00 PM:** -1.90 ft
+- **Nov 11, 2026, 6:00 PM:** -1.70 ft
+- **Nov 12, 2026, 12:00 AM:** -1.50 ft
+- **Nov 12, 2026, 6:00 AM:** -1.30 ft
+- **Nov 12, 2026, 12:00 PM:** -1.10 ft
+- **Nov 12, 2026, 6:00 PM:** -0.90 ft
+- **Nov 13, 2026, 12:00 AM:** -0.60 ft
+- **Nov 13, 2026, 6:00 AM:** -0.40 ft
+- **Nov 13, 2026, 12:00 PM:** -0.30 ft
+- **Nov 13, 2026, 6:00 PM:** -0.20 ft
+- **Nov 14, 2026, 12:00 AM:** -0.20 ft
+- **Nov 14, 2026, 6:00 AM:** -0.10 ft
+- **Nov 14, 2026, 12:00 PM:** 0.00 ft
+- **Nov 14, 2026, 6:00 PM:** 0.10 ft
+- **Nov 15, 2026, 12:00 AM:** 0.20 ft
+- **Nov 15, 2026, 6:00 AM:** 0.30 ft
+- **Nov 15, 2026, 12:00 PM:** 0.30 ft
+- **Nov 15, 2026, 6:00 PM:** 0.40 ft
+- **Nov 16, 2026, 12:00 AM:** 0.40 ft
+- **Nov 16, 2026, 6:00 AM:** 0.40 ft
+- **Nov 16, 2026, 12:00 PM:** 0.30 ft
+- **Nov 16, 2026, 6:00 PM:** 0.20 ft
+- **Nov 17, 2026, 12:00 AM:** 0.10 ft
+- **Nov 17, 2026, 6:00 AM:** 0.10 ft
+- **Nov 17, 2026, 12:00 PM:** 0.00 ft
+- **Nov 17, 2026, 6:00 PM:** 0.00 ft
+- **Nov 18, 2026, 12:00 AM:** -0.10 ft
+- **Nov 18, 2026, 6:00 AM:** -0.20 ft
+- **Nov 18, 2026, 12:00 PM:** -0.30 ft
+- **Nov 18, 2026, 6:00 PM:** -0.40 ft
+- **Nov 19, 2026, 12:00 AM:** -0.40 ft
+- **Nov 19, 2026, 6:00 AM:** -0.50 ft
+- **Nov 19, 2026, 12:00 PM:** -0.60 ft
+- **Nov 19, 2026, 6:00 PM:** -0.80 ft
+- **Nov 20, 2026, 12:00 AM:** -0.90 ft
+- **Nov 20, 2026, 6:00 AM:** -0.90 ft
+- **Nov 20, 2026, 12:00 PM:** -1.10 ft
+- **Nov 20, 2026, 6:00 PM:** -1.20 ft
+- **Nov 21, 2026, 12:00 AM:** -1.30 ft
+- **Nov 21, 2026, 6:00 AM:** -1.40 ft
+- **Nov 21, 2026, 12:00 PM:** -1.50 ft
+- **Nov 21, 2026, 6:00 PM:** -1.60 ft
+- **Nov 22, 2026, 12:00 AM:** -1.70 ft
+- **Nov 22, 2026, 6:00 AM:** -1.80 ft
+- **Nov 22, 2026, 12:00 PM:** -1.90 ft
+- **Nov 22, 2026, 6:00 PM:** -2.00 ft
+- **Nov 23, 2026, 12:00 AM:** -2.10 ft
+- **Nov 23, 2026, 6:00 AM:** -2.20 ft
+- **Nov 23, 2026, 12:00 PM:** -2.30 ft
+- **Nov 23, 2026, 6:00 PM:** -2.40 ft
+- **Nov 24, 2026, 12:00 AM:** -2.50 ft
+- **Nov 24, 2026, 6:00 AM:** -2.60 ft
+- **Nov 24, 2026, 12:00 PM:** -2.60 ft
+- **Nov 24, 2026, 6:00 PM:** -2.70 ft
 
 ### Recent Historic Crests
 - **2025:** 37.55 ft
@@ -161,15 +162,15 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 2:45 PM
-**River Stage:** 6.57 ft  → steady (last 6h)
+**Observed:** Nov 10, 2026, 7:45 PM
+**River Stage:** 6.69 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
 **Action Stage:** 26.0 ft
 **Minor Flood:** 31.0 ft
 
-**Current stage is 25% of action stage**
+**Current stage is 26% of action stage**
 
 ### Recent Historic Crests
 - **2017:** 27.83 ft
@@ -189,8 +190,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:15 PM
-**River Stage:** -2.78 ft  ↗ rising (+0.1 ft / 6h)
+**Observed:** Nov 10, 2026, 7:15 PM
+**River Stage:** -1.96 ft  ↘ falling (-0.1 ft / 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -199,7 +200,7 @@ get_river_conditions({
 **Moderate Flood:** 12.0 ft
 **Major Flood:** 15.0 ft
 
-**Current stage is -56% of action stage**
+**Current stage is -39% of action stage**
 
 ### Recent Historic Crests
 - **2017:** 11.48 ft
@@ -239,8 +240,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 2:00 PM
-**River Stage:** 5.33 ft  → steady (last 6h)
+**Observed:** Nov 10, 2026, 6:00 PM
+**River Stage:** 5.32 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -268,12 +269,12 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:30 PM
-**River Stage:** 1.95 ft  → steady (last 6h)
-**Flood Category:** ✅ NOT DEFINED
+**Observed:** Nov 10, 2026, 7:30 PM
+**River Stage:** 1.83 ft  → steady (last 6h)
+**Flood Category:** ⚪ no category published
 
 ### Flood Stages
-*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published thresholds, not an absence of flood risk — the **Flood Category:** line above comes from NOAA's own status.*
+*NOAA publishes no flood-stage thresholds for this gauge. It publishes no flood category for it either. Neither absence is an all-clear: nothing here says whether this river is in flood.*
 
 ### Recent Historic Crests
 - **2017:** 15.14 ft
@@ -293,12 +294,12 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:45 PM
-**River Stage:** 1.72 ft  → steady (last 6h)
-**Flood Category:** ✅ NOT DEFINED
+**Observed:** Nov 10, 2026, 7:45 PM
+**River Stage:** 1.71 ft  → steady (last 6h)
+**Flood Category:** ⚪ no category published
 
 ### Flood Stages
-*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published thresholds, not an absence of flood risk — the **Flood Category:** line above comes from NOAA's own status.*
+*NOAA publishes no flood-stage thresholds for this gauge. It publishes no flood category for it either. Neither absence is an all-clear: nothing here says whether this river is in flood.*
 
 ### Recent Historic Crests
 - **2017:** 20.12 ft
@@ -314,9 +315,9 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 2:45 PM
-**River Stage:** 2.75 ft  → steady (last 6h)
-**Flow Rate:** 0.18 kcfs (180 cfs)
+**Observed:** Nov 10, 2026, 6:45 PM
+**River Stage:** 3.57 ft  → steady (last 6h)
+**Flow Rate:** 0.43 kcfs (432 cfs)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -325,35 +326,35 @@ get_river_conditions({
 **Moderate Flood:** 25.0 ft
 **Major Flood:** 28.0 ft
 
-**Current stage is 18% of action stage**
+**Current stage is 24% of action stage**
 
 ### Forecast
-**Valid Time:** Sep 2, 2026, 7:00 PM
-**Forecasted Stage:** 2.70 ft
-**Forecasted Flow:** 0.17 kcfs
+**Valid Time:** Nov 11, 2026, 12:00 AM
+**Forecasted Stage:** 3.60 ft
+**Forecasted Flow:** 0.44 kcfs
 **Forecasted Category:** ✅ NO FLOODING
 
 ### Forecast Series
-- **Sep 2, 2026, 1:00 PM:** 2.80 ft
-- **Sep 2, 2026, 7:00 PM:** 2.70 ft
-- **Sep 3, 2026, 1:00 AM:** 2.70 ft
-- **Sep 3, 2026, 7:00 AM:** 2.70 ft
-- **Sep 3, 2026, 1:00 PM:** 2.70 ft
-- **Sep 3, 2026, 7:00 PM:** 2.70 ft
-- **Sep 4, 2026, 1:00 AM:** 2.70 ft
-- **Sep 4, 2026, 7:00 AM:** 2.70 ft
-- **Sep 4, 2026, 1:00 PM:** 2.70 ft
-- **Sep 4, 2026, 7:00 PM:** 2.70 ft
-- **Sep 5, 2026, 1:00 AM:** 2.70 ft
-- **Sep 5, 2026, 7:00 AM:** 2.70 ft
-- **Sep 5, 2026, 1:00 PM:** 2.70 ft
-- **Sep 5, 2026, 7:00 PM:** 2.70 ft
-- **Sep 6, 2026, 1:00 AM:** 2.70 ft
-- **Sep 6, 2026, 7:00 AM:** 2.70 ft
-- **Sep 6, 2026, 1:00 PM:** 2.70 ft
-- **Sep 6, 2026, 7:00 PM:** 2.70 ft
-- **Sep 7, 2026, 1:00 AM:** 2.70 ft
-- **Sep 7, 2026, 7:00 AM:** 2.70 ft
+- **Nov 10, 2026, 12:00 PM:** 3.60 ft
+- **Nov 10, 2026, 6:00 PM:** 3.60 ft
+- **Nov 11, 2026, 12:00 AM:** 3.60 ft
+- **Nov 11, 2026, 6:00 AM:** 3.60 ft
+- **Nov 11, 2026, 12:00 PM:** 3.50 ft
+- **Nov 11, 2026, 6:00 PM:** 3.50 ft
+- **Nov 12, 2026, 12:00 AM:** 3.50 ft
+- **Nov 12, 2026, 6:00 AM:** 3.50 ft
+- **Nov 12, 2026, 12:00 PM:** 3.50 ft
+- **Nov 12, 2026, 6:00 PM:** 3.50 ft
+- **Nov 13, 2026, 12:00 AM:** 3.40 ft
+- **Nov 13, 2026, 6:00 AM:** 3.40 ft
+- **Nov 13, 2026, 12:00 PM:** 3.40 ft
+- **Nov 13, 2026, 6:00 PM:** 3.40 ft
+- **Nov 14, 2026, 12:00 AM:** 3.40 ft
+- **Nov 14, 2026, 6:00 AM:** 3.40 ft
+- **Nov 14, 2026, 12:00 PM:** 3.40 ft
+- **Nov 14, 2026, 6:00 PM:** 3.40 ft
+- **Nov 15, 2026, 12:00 AM:** 3.40 ft
+- **Nov 15, 2026, 6:00 AM:** 3.40 ft
 
 ### Recent Historic Crests
 - **2025:** 25.29 ft (21454 cfs)
@@ -393,15 +394,15 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:45 PM
-**River Stage:** 6.61 ft  → steady (last 6h)
+**Observed:** Nov 10, 2026, 7:45 PM
+**River Stage:** 6.64 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
 **Action Stage:** 16.0 ft
 **Minor Flood:** 23.0 ft
 
-**Current stage is 41% of action stage**
+**Current stage is 42% of action stage**
 
 ### Recent Historic Crests
 - **2019:** 27.96 ft
@@ -430,8 +431,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:00 PM
-**River Stage:** 9.49 ft  → steady (last 6h)
+**Observed:** Nov 10, 2026, 7:00 PM
+**River Stage:** 9.43 ft  → steady (last 6h)
 **Flow Rate:** 0.02 kcfs (18 cfs)
 **Flood Category:** ✅ NO FLOODING
 
@@ -441,7 +442,7 @@ get_river_conditions({
 **Moderate Flood:** 38.0 ft
 **Major Flood:** 42.0 ft
 
-**Current stage is 37% of action stage**
+**Current stage is 36% of action stage**
 
 ### Recent Historic Crests
 - **2024:** 38.53 ft (13330 cfs)
@@ -481,8 +482,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:15 PM
-**River Stage:** 3.65 ft  → steady (last 6h)
+**Observed:** Nov 10, 2026, 7:15 PM
+**River Stage:** 3.67 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -531,8 +532,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 2:45 PM
-**River Stage:** 10.97 ft  → steady (last 6h)
+**Observed:** Nov 10, 2026, 7:45 PM
+**River Stage:** 11.00 ft  ↘ falling (-0.1 ft / 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -558,8 +559,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 2:45 PM
-**River Stage:** 3.00 ft  → steady (last 6h)
+**Observed:** Nov 10, 2026, 7:45 PM
+**River Stage:** 3.51 ft  ↘ falling (-0.1 ft / 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -568,7 +569,7 @@ get_river_conditions({
 **Moderate Flood:** 16.0 ft
 **Major Flood:** 19.0 ft
 
-**Current stage is 33% of action stage**
+**Current stage is 39% of action stage**
 
 ### Recent Historic Crests
 - **2017:** 14.51 ft
@@ -587,9 +588,9 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:00 PM
-**River Stage:** 0.49 ft  → steady (last 6h)
-**Flow Rate:** 0.05 kcfs (47 cfs)
+**Observed:** Nov 10, 2026, 7:00 PM
+**River Stage:** 0.65 ft  → steady (last 6h)
+**Flow Rate:** 0.06 kcfs (65 cfs)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -613,9 +614,9 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:15 PM
-**River Stage:** 0.86 ft  → steady (last 6h)
-**Flow Rate:** 0.10 kcfs (102 cfs)
+**Observed:** Nov 10, 2026, 7:15 PM
+**River Stage:** 1.01 ft  → steady (last 6h)
+**Flow Rate:** 0.12 kcfs (124 cfs)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -627,32 +628,32 @@ get_river_conditions({
 **Current stage is 5% of action stage**
 
 ### Forecast
-**Valid Time:** Sep 2, 2026, 7:00 PM
-**Forecasted Stage:** 0.80 ft
-**Forecasted Flow:** 0.10 kcfs
+**Valid Time:** Nov 11, 2026, 12:00 AM
+**Forecasted Stage:** 1.00 ft
+**Forecasted Flow:** 0.12 kcfs
 **Forecasted Category:** ✅ NO FLOODING
 
 ### Forecast Series
-- **Sep 2, 2026, 1:00 PM:** 0.90 ft
-- **Sep 2, 2026, 7:00 PM:** 0.80 ft
-- **Sep 3, 2026, 1:00 AM:** 0.80 ft
-- **Sep 3, 2026, 7:00 AM:** 0.80 ft
-- **Sep 3, 2026, 1:00 PM:** 0.80 ft
-- **Sep 3, 2026, 7:00 PM:** 0.80 ft
-- **Sep 4, 2026, 1:00 AM:** 0.80 ft
-- **Sep 4, 2026, 7:00 AM:** 0.80 ft
-- **Sep 4, 2026, 1:00 PM:** 0.80 ft
-- **Sep 4, 2026, 7:00 PM:** 0.80 ft
-- **Sep 5, 2026, 1:00 AM:** 0.80 ft
-- **Sep 5, 2026, 7:00 AM:** 0.80 ft
-- **Sep 5, 2026, 1:00 PM:** 0.80 ft
-- **Sep 5, 2026, 7:00 PM:** 0.80 ft
-- **Sep 6, 2026, 1:00 AM:** 0.80 ft
-- **Sep 6, 2026, 7:00 AM:** 0.80 ft
-- **Sep 6, 2026, 1:00 PM:** 0.80 ft
-- **Sep 6, 2026, 7:00 PM:** 0.80 ft
-- **Sep 7, 2026, 1:00 AM:** 0.80 ft
-- **Sep 7, 2026, 7:00 AM:** 0.80 ft
+- **Nov 10, 2026, 12:00 PM:** 1.00 ft
+- **Nov 10, 2026, 6:00 PM:** 1.00 ft
+- **Nov 11, 2026, 12:00 AM:** 1.00 ft
+- **Nov 11, 2026, 6:00 AM:** 1.00 ft
+- **Nov 11, 2026, 12:00 PM:** 1.00 ft
+- **Nov 11, 2026, 6:00 PM:** 1.00 ft
+- **Nov 12, 2026, 12:00 AM:** 1.00 ft
+- **Nov 12, 2026, 6:00 AM:** 1.00 ft
+- **Nov 12, 2026, 12:00 PM:** 1.00 ft
+- **Nov 12, 2026, 6:00 PM:** 1.00 ft
+- **Nov 13, 2026, 12:00 AM:** 1.00 ft
+- **Nov 13, 2026, 6:00 AM:** 1.00 ft
+- **Nov 13, 2026, 12:00 PM:** 1.00 ft
+- **Nov 13, 2026, 6:00 PM:** 1.00 ft
+- **Nov 14, 2026, 12:00 AM:** 1.00 ft
+- **Nov 14, 2026, 6:00 AM:** 1.00 ft
+- **Nov 14, 2026, 12:00 PM:** 1.00 ft
+- **Nov 14, 2026, 6:00 PM:** 1.00 ft
+- **Nov 15, 2026, 12:00 AM:** 1.00 ft
+- **Nov 15, 2026, 6:00 AM:** 1.00 ft
 
 ### Recent Historic Crests
 - **2025:** 21.13 ft (7458 cfs)
@@ -692,12 +693,12 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:00 PM
-**River Stage:** 247.10 ft  → steady (last 6h)
-**Flood Category:** ✅ NOT DEFINED
+**Observed:** Nov 10, 2026, 7:00 PM
+**River Stage:** 247.33 ft  → steady (last 6h)
+**Flood Category:** ⚪ no category published
 
 ### Flood Stages
-*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published thresholds, not an absence of flood risk — the **Flood Category:** line above comes from NOAA's own status.*
+*NOAA publishes no flood-stage thresholds for this gauge. It publishes no flood category for it either. Neither absence is an all-clear: nothing here says whether this river is in flood.*
 
 ### Recent Historic Crests
 - **2019:** 55.32 ft
@@ -715,8 +716,8 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:00 PM
-**River Stage:** 208.50 ft  → steady (last 6h)
+**Observed:** Nov 10, 2026, 7:00 PM
+**River Stage:** 204.22 ft  → steady (last 6h)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -750,12 +751,12 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:00 PM
-**River Stage:** 7.40 ft  → steady (last 6h)
-**Flood Category:** ✅ NOT DEFINED
+**Observed:** Nov 10, 2026, 7:00 PM
+**River Stage:** 6.17 ft  → steady (last 6h)
+**Flood Category:** ⚪ no category published
 
 ### Flood Stages
-*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published thresholds, not an absence of flood risk — the **Flood Category:** line above comes from NOAA's own status.*
+*NOAA publishes no flood-stage thresholds for this gauge. It publishes no flood category for it either. Neither absence is an all-clear: nothing here says whether this river is in flood.*
 
 ### Recent Historic Crests
 - **1988:** 34.65 ft
@@ -771,9 +772,9 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:00 PM
-**River Stage:** 1.57 ft  → steady (last 6h)
-**Flow Rate:** 0.17 kcfs (168 cfs)
+**Observed:** Nov 10, 2026, 7:00 PM
+**River Stage:** 2.40 ft  ↘ falling (-0.1 ft / 6h)
+**Flow Rate:** 0.37 kcfs (369 cfs)
 **Flood Category:** ✅ NO FLOODING
 
 ### Flood Stages
@@ -782,35 +783,35 @@ get_river_conditions({
 **Moderate Flood:** 14.0 ft
 **Major Flood:** 15.5 ft
 
-**Current stage is 14% of action stage**
+**Current stage is 22% of action stage**
 
 ### Forecast
-**Valid Time:** Sep 2, 2026, 7:00 PM
-**Forecasted Stage:** 1.60 ft
-**Forecasted Flow:** 0.17 kcfs
+**Valid Time:** Nov 11, 2026, 12:00 AM
+**Forecasted Stage:** 2.50 ft
+**Forecasted Flow:** 0.39 kcfs
 **Forecasted Category:** ✅ NO FLOODING
 
 ### Forecast Series
-- **Sep 2, 2026, 1:00 PM:** 1.60 ft
-- **Sep 2, 2026, 7:00 PM:** 1.60 ft
-- **Sep 3, 2026, 1:00 AM:** 1.60 ft
-- **Sep 3, 2026, 7:00 AM:** 1.60 ft
-- **Sep 3, 2026, 1:00 PM:** 1.60 ft
-- **Sep 3, 2026, 7:00 PM:** 1.60 ft
-- **Sep 4, 2026, 1:00 AM:** 1.60 ft
-- **Sep 4, 2026, 7:00 AM:** 1.60 ft
-- **Sep 4, 2026, 1:00 PM:** 1.50 ft
-- **Sep 4, 2026, 7:00 PM:** 1.50 ft
-- **Sep 5, 2026, 1:00 AM:** 1.50 ft
-- **Sep 5, 2026, 7:00 AM:** 1.50 ft
-- **Sep 5, 2026, 1:00 PM:** 1.50 ft
-- **Sep 5, 2026, 7:00 PM:** 1.50 ft
-- **Sep 6, 2026, 1:00 AM:** 1.50 ft
-- **Sep 6, 2026, 7:00 AM:** 1.50 ft
-- **Sep 6, 2026, 1:00 PM:** 1.50 ft
-- **Sep 6, 2026, 7:00 PM:** 1.50 ft
-- **Sep 7, 2026, 1:00 AM:** 1.50 ft
-- **Sep 7, 2026, 7:00 AM:** 1.50 ft
+- **Nov 10, 2026, 12:00 PM:** 2.60 ft
+- **Nov 10, 2026, 6:00 PM:** 2.50 ft
+- **Nov 11, 2026, 12:00 AM:** 2.50 ft
+- **Nov 11, 2026, 6:00 AM:** 2.50 ft
+- **Nov 11, 2026, 12:00 PM:** 2.40 ft
+- **Nov 11, 2026, 6:00 PM:** 2.40 ft
+- **Nov 12, 2026, 12:00 AM:** 2.40 ft
+- **Nov 12, 2026, 6:00 AM:** 2.40 ft
+- **Nov 12, 2026, 12:00 PM:** 2.30 ft
+- **Nov 12, 2026, 6:00 PM:** 2.30 ft
+- **Nov 13, 2026, 12:00 AM:** 2.30 ft
+- **Nov 13, 2026, 6:00 AM:** 2.30 ft
+- **Nov 13, 2026, 12:00 PM:** 2.30 ft
+- **Nov 13, 2026, 6:00 PM:** 2.30 ft
+- **Nov 14, 2026, 12:00 AM:** 2.30 ft
+- **Nov 14, 2026, 6:00 AM:** 2.30 ft
+- **Nov 14, 2026, 12:00 PM:** 2.20 ft
+- **Nov 14, 2026, 6:00 PM:** 2.20 ft
+- **Nov 15, 2026, 12:00 AM:** 2.20 ft
+- **Nov 15, 2026, 6:00 AM:** 2.20 ft
 
 ### Recent Historic Crests
 - **2025:** 14.23 ft (21891 cfs)
@@ -845,12 +846,12 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 2:00 PM
-**River Stage:** 4.72 ft  → steady (last 6h)
-**Flood Category:** ✅ NOT DEFINED
+**Observed:** Nov 10, 2026, 7:00 PM
+**River Stage:** 0.47 ft  → steady (last 6h)
+**Flood Category:** ⚪ no category published
 
 ### Flood Stages
-*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published thresholds, not an absence of flood risk — the **Flood Category:** line above comes from NOAA's own status.*
+*NOAA publishes no flood-stage thresholds for this gauge. It publishes no flood category for it either. Neither absence is an all-clear: nothing here says whether this river is in flood.*
 
 ---
 
@@ -863,12 +864,12 @@ get_river_conditions({
 **Status:** ✅ Active
 
 ### Current Conditions
-**Observed:** Sep 2, 2026, 3:00 PM
-**River Stage:** 8.38 ft  → steady (last 6h)
-**Flood Category:** ✅ NOT DEFINED
+**Observed:** Nov 10, 2026, 7:00 PM
+**River Stage:** 7.34 ft  → steady (last 6h)
+**Flood Category:** ⚪ no category published
 
 ### Flood Stages
-*NOAA publishes no flood-stage thresholds for this gauge. That is an absence of published thresholds, not an absence of flood risk — the **Flood Category:** line above comes from NOAA's own status.*
+*NOAA publishes no flood-stage thresholds for this gauge. It publishes no flood category for it either. Neither absence is an all-clear: nothing here says whether this river is in flood.*
 
 ---
 
@@ -888,7 +889,7 @@ get_river_conditions({
 <!-- answer-2 -->
 There are no physical gauges here, so this is **modeled discharge** (GloFAS), and the server frames it accordingly — against the river's own recent history rather than flood categories that don't exist for model data.
 
-The Amazon at Manaus is moving about **104,000 m³/s** (the model cell snapped ~6 km east of your point, to the actual river channel — disclosed in the output). It's **falling, down 10% over six days** and running below its 31-day mean of ~136,000 m³/s: the seasonal recession after the annual flood peak, right on schedule for August. The 10-day ensemble forecast agrees — a steady, tightly clustered decline.
+The Amazon at Manaus is moving about **54,700 m³/s** (the model cell snapped ~6 km east of your point, to the actual river channel — disclosed in the output). It's **steady**, near its 31-day mean of ~53,300 m³/s. The ensemble forecast has it rising slowly, by about 3.5% over the next week, with the members tightly clustered: the start of the seasonal rise that follows the low-water months.
 <!-- /answer-2 -->
 
 <!-- capture:manaus-glofas -->
@@ -919,20 +920,20 @@ Nearest modeled river channel: ~6 km E of requested point
 
 ## Current Discharge
 
-**Discharge:** 77,803 m³/s (2,747,576 ft³/s)  → steady (last 6d)
-**vs. recent history:** near the recent average — 31-day mean 98,708 m³/s (3,485,858 ft³/s)
+**Discharge:** 54,701 m³/s (1,931,735 ft³/s)  → steady (last 6d)
+**vs. recent history:** near the recent average — 31-day mean 53,334 m³/s (1,883,475 ft³/s)
 
 ## Ensemble Forecast
 
 Daily median with the p25–p75 ensemble band, in ft³/s, starting today. Members stay tightly clustered for the first few days and diverge from about day 4, so a near-zero band early on reflects that clustering, not certainty.
 
-- **Sep 2:** 2,747,576 · p25–p75 2,747,576–2,747,576
-- **Sep 3:** 2,741,257 · p25–p75 2,741,257–2,741,257
-- **Sep 4:** 2,734,953 · p25–p75 2,734,953–2,734,953
-- **Sep 5:** 2,709,880 · p25–p75 2,709,880–2,709,880
-- **Sep 6:** 2,672,698 · p25–p75 2,672,698–2,672,698
-- **Sep 7:** 2,629,965 · p25–p75 2,629,965–2,629,965
-- **Sep 8:** 2,593,880 · p25–p75 2,593,880–2,599,859
+- **Nov 10:** 1,931,735 · p25–p75 1,931,735–1,931,735
+- **Nov 11:** 1,945,127 · p25–p75 1,945,127–1,945,127
+- **Nov 12:** 1,958,609 · p25–p75 1,958,609–1,958,609
+- **Nov 13:** 1,976,733 · p25–p75 1,976,733–1,976,733
+- **Nov 14:** 1,990,434 · p25–p75 1,990,434–1,990,434
+- **Nov 15:** 1,999,621 · p25–p75 1,995,022–1,999,621
+- **Nov 16:** 1,999,621 · p25–p75 1,995,022–1,999,621
 
 *Note: 3 more forecast days available — use detail="full" for the full range and the min/max envelope*
 
@@ -984,36 +985,36 @@ get_river_conditions({
 
 ### River Ouse — Viking Recorder
 - **Distance:** 0.4 km (0.2 mi)
-- **Level:** 0.63 ft above the gauge datum
-- **Observed:** 35 minutes ago
+- **Level:** 0.89 ft above the gauge datum
+- **Observed:** 45 minutes ago
 - **Typical range:** 0.15 ft to 6.23 ft
 - **Against typical range:** within the published typical range
 
 ### River Foss — York Castle Mills Sluices
 - **Distance:** 0.6 km (0.4 mi)
-- **Level:** 24.88 ft above Ordnance Datum (a water-surface elevation, not river depth)
-- **Observed:** 20 minutes ago
+- **Level:** 24.83 ft above Ordnance Datum (a water-surface elevation, not river depth)
+- **Observed:** 30 minutes ago
 - **Typical range:** 24.63 ft to 25.58 ft
 - **Against typical range:** within the published typical range
 
 ### Tang Hall Beck — York James Street Trashscreen
 - **Distance:** 0.7 km (0.5 mi)
-- **Level:** 19.03 ft above Ordnance Datum (a water-surface elevation, not river depth)
-- **Observed:** 35 minutes ago
+- **Level:** 19.01 ft above Ordnance Datum (a water-surface elevation, not river depth)
+- **Observed:** 45 minutes ago
 - **Typical range:** 17.95 ft to 25.21 ft
 - **Against typical range:** within the published typical range
 
 ### Browney Dyke — York Foss Barrier
 - **Distance:** 0.8 km (0.5 mi)
-- **Level:** 16.97 ft above Ordnance Datum (a water-surface elevation, not river depth)
-- **Observed:** 20 minutes ago
+- **Level:** 17.17 ft above Ordnance Datum (a water-surface elevation, not river depth)
+- **Observed:** 30 minutes ago
 - **Typical range:** 16.65 ft to 22.81 ft
 - **Against typical range:** within the published typical range
 
 ### River Ouse — York Foss Barrier
 - **Distance:** 0.9 km (0.5 mi)
-- **Level:** 16.95 ft above Ordnance Datum (a water-surface elevation, not river depth)
-- **Observed:** 20 minutes ago
+- **Level:** 17.19 ft above Ordnance Datum (a water-surface elevation, not river depth)
+- **Observed:** 30 minutes ago
 - **Typical range:** 16.57 ft to 25.92 ft
 - **Against typical range:** within the published typical range
 
@@ -1029,8 +1030,8 @@ get_river_conditions({
 
 ---
 
-**Features shown:** US path — NWPS gauge observations, official flood categories, observed trend, forecast series (`detail: "full"`) · Great Britain path — Environment Agency observed river levels against each gauge's published typical range, with the measurement basis stated per gauge and no forecast or flood categories · global path — GloFAS v4 modeled discharge snapped to the river channel, framed against its own 31-day history and forecast ensemble, `forecast_days` up to 210.
+**Features shown:** US path — NWPS gauge observations, official flood categories where NOAA publishes one, observed trend, forecast series (`detail: "full"`) · Great Britain path — Environment Agency observed river levels against each gauge's published typical range, with the measurement basis stated per gauge and no forecast or flood categories · global path — GloFAS v4 modeled discharge snapped to the river channel, framed against its own 31-day history and forecast ensemble, `forecast_days` up to 210.
 
 <!-- capture-stamp -->
-*Captured 2026-09-02 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-11-11 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->
