@@ -145,7 +145,7 @@ describe('Blitzortung message validation (M4 through the public seam)', () => {
     await settle(env.firstQuery);
     expect(await queryAt(env.service, LAT, LON)).toEqual([]);
 
-    const rendered = env.handleGetLightningActivity({ latitude: LAT, longitude: LON, radius: 50, timeWindow: 60 });
+    const rendered = env.handleGetLightningActivity({ latitude: LAT, longitude: LON, radius: 50, timeWindow: 60 }, {} as never, {} as never);
     await vi.advanceTimersByTimeAsync(11_000);
     const result = await rendered;
     const text = result.content.map(c => ('text' in c ? c.text : '')).join('\n');
@@ -205,7 +205,7 @@ describe('Blitzortung message validation (M4 through the public seam)', () => {
 describe('Bounded reject warn', () => {
   it('warns once for 100 rejects in a minute, then carries the counts since', async () => {
     const env = await connected();
-    const rejectWarns = () => env.warn.mock.calls.filter(c => c[0] === REJECT_MESSAGE);
+    const rejectWarns = () => env.warn.mock.calls.filter((c: unknown[]) => c[0] === REJECT_MESSAGE);
     const now = Date.now();
 
     // First reject: not JSON, and the bytes carry the payload sentinel.
@@ -243,7 +243,7 @@ describe('Bounded reject warn', () => {
     const env = await connected();
     emitJson(env.client, { lat: 40.01, lon: LON, time: Date.now() * 1e6, pol: 1, mcs: 12000, stat: 9 });
     expect(env.buffer.size).toBe(1);
-    expect(env.warn.mock.calls.filter(c => c[0] === REJECT_MESSAGE)).toHaveLength(0);
+    expect(env.warn.mock.calls.filter((c: unknown[]) => c[0] === REJECT_MESSAGE)).toHaveLength(0);
     await settle(env.firstQuery);
   });
 });

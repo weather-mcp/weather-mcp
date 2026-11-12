@@ -59,7 +59,7 @@ function textOf(result: { content: Array<{ type: string; text?: string }> }): st
 
 async function render(strikes: LightningStrike[]): Promise<string> {
   (blitzortungService.getLightningStrikes as Mock).mockResolvedValue(strikes);
-  return textOf(await handleGetLightningActivity({ latitude: LAT, longitude: LON, radius: 50, timeWindow: 60 }));
+  return textOf(await handleGetLightningActivity({ latitude: LAT, longitude: LON, radius: 50, timeWindow: 60 }, {} as never, {} as never));
 }
 
 /** A negative number inside a "(… minutes ago)" construct, never a bare `-` (G62, G96). */
