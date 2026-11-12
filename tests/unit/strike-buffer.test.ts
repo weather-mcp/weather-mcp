@@ -249,6 +249,16 @@ describe('StrikeBuffer', () => {
     expect(buf.size).toBe(18);
   });
 
+  it('drops at least one entry at a cap below 10, so the buffer never exceeds it', () => {
+    const buf = new StrikeBuffer({ maxSize: 1, retentionMs });
+    expect(buf.add('k0', strikeAt(now, 40, -100)).trimmed).toBe(0);
+    const result = buf.add('k1', strikeAt(now, 40, -100));
+    expect(result.trimmed).toBe(1);
+    expect(buf.size).toBe(1);
+    expect(buf.has('k0')).toBe(false);
+    expect(buf.has('k1')).toBe(true);
+  });
+
   describe('query', () => {
     it('excludes strikes before the cutoff, includes one exactly at it', () => {
       const buf = new StrikeBuffer({ maxSize: 100, retentionMs });

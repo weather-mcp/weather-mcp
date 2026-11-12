@@ -102,11 +102,14 @@ export class StrikeBuffer {
     return this.strikes.has(key);
   }
 
-  /** Add a strike; at capacity, first drop the oldest 10% by insertion order (also on a duplicate key). */
+  /**
+   * Add a strike; at capacity, first drop the oldest 10% by insertion order (also on a duplicate key).
+   * At least one entry is dropped, so a cap below 10 still holds.
+   */
   add(key: string, strike: LightningStrike): { trimmed: number } {
     let trimmed = 0;
     if (this.strikes.size >= this.maxSize) {
-      const entriesToRemove = Math.floor(this.maxSize * 0.1);
+      const entriesToRemove = Math.max(1, Math.floor(this.maxSize * 0.1));
       const iterator = this.strikes.keys();
       for (let i = 0; i < entriesToRemove; i++) {
         const result = iterator.next();
