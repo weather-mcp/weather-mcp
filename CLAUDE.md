@@ -259,6 +259,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 - **Never trust the HTTP 200 alone.** Open-Meteo and others return 200 with all-null series for uncovered points (pollen outside Europe, flood at sea, ensemble probability). Guard with `!= null`, not `!== undefined` — JSON `null` survives `!== undefined` and then coerces to 0 in arithmetic/conversion (the v1.20.0 F1 and normals-averaging bugs). The Open-Meteo series types declare this honestly (`field?: (number | null)[]`), and so do the `current.*` and geocoding scalars (`field?: number | null`), so the compiler now enumerates the guard sites rather than certifying their absence; `finiteSampleAt` (`src/utils/finiteSample.ts`) is the shared accessor for reading one sample.
 - **Parse CSV/JSON by field name, never by position.** Two live shapes of the same feed have differed in column order and count.
+- **A pushed feed is validated before it is buffered.** The Blitzortung strike buffer holds only strikes with finite, in-range coordinates and a time no later than ingest plus 5 minutes; `parseStrike` (`src/utils/strikeBuffer.ts`) is the only way in, and latitude or longitude 0 is valid. Rejects are counted per reason and warned at most once a minute, with no topic or payload text, because a per-message warn hands the broker the stderr write rate and copies its bytes into the log.
 - **Verify documented shapes live before building on them.** Documented field names, enum casing, duration formats, and error codes have all been wrong upstream (Google Weather: six divergences; FIRMS Area API counts calendar UTC days while flat files are rolling 24 h). Record the verified shape in the plan doc.
 - **Bands and categories are computed from the rounded display value** — via `displayValue` (`src/utils/displayBanding.ts`), which mirrors the render site's `toFixed` rather than `Math.round`, because the two disagree on negative halves — so the displayed number and its category can never disagree.
 - **When a station publishes a value, band off the published value** (NOAA `windChill`) so the risk line never contradicts the "Feels Like" line above it; when computing, say what basis was used.
@@ -733,7 +734,7 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 ## Project Status
 
 - **Version:** 1.35.14 — Production Ready ✅
-- **Test Coverage:** 5,089 tests, 100% pass rate
+- **Test Coverage:** 5,165 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):

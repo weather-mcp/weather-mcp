@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Malformed, oversize and future-dated lightning feed messages are dropped before use.** A strike whose coordinate arrived as text could stop the lightning report with an error, and a strike dated hours ahead of the clock stayed "recent" until the clock caught up, so the report could show extreme danger from a strike that had not happened. Every feed message is now checked for size, shape, coordinate type and range, and time before it is kept. A wrong-typed polarity, amplitude or station count no longer drops the strike; that field reads as absent. Rejected messages are counted in one log warning a minute, which carries no message text. Thanks to MagicCactus42 for the field validation (#132).
+- **Lightning strikes on the equator and the prime meridian are no longer dropped.** A strike at latitude 0 or longitude 0 was discarded as incomplete, so a storm there could read as a clear sky.
+- **A lightning query at the subscription limit no longer drops the area being queried.** When the server already followed 50 areas, a query for a new one could stop following part of its own area, restart that area's monitoring time, and leave more than 50 areas followed. Two queries at once could also pass the limit together. A query now stops following only as many of the oldest other areas as it needs.
+- **The plaintext-connection warning no longer fires for `ssl://`, `tls://`, `wxs://` and `alis://` brokers.** The `mqtt` client treats all four as encrypted: `ssl://` and `tls://` connect over TLS as `mqtts://` does, and `wxs://` and `alis://` are its secure WebSocket schemes for browsers. None of them is a plaintext link, and the connection log line now says `encrypted: true` for them. The scheme is read case-insensitively.
+
 ## [1.35.14] - 2026-11-11
 
 Three alert answers could tell you less than the truth. A US territory such as Puerto Rico or Guam could be told that alerts were not available there, although NOAA issues them. A long national alert list from India, the Philippines or Indonesia could end in a green check when only part of it had been checked. And an alert that its issuer had cancelled stayed on the list until it expired. Each of these now gives the honest answer.
