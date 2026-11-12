@@ -509,16 +509,18 @@ export class BlitzortungService {
 
     const now = Date.now();
 
-    // Check if we need to evict old subscriptions before adding new ones
+    // Check if we need to evict old subscriptions before adding new ones. No `await` may sit
+    // between this check and the stage loop below, on either path, or two concurrent callers both
+    // pass it and jointly overflow the cap (G20). The query path evicts synchronously for that reason.
     const potentialNewSubs = Array.from(geohashes).filter(g => !this.subscribedGeohashes.has(g));
-    if (this.subscribedGeohashes.size + potentialNewSubs.length > this.maxSubscriptions) {
+    const excess = this.subscribedGeohashes.size + potentialNewSubs.length - this.maxSubscriptions;
+    if (excess > 0) {
       if (prewarm) {
-        // Skip the whole location and stamp nothing. No `await` may sit between this check and
-        // the stage loop below, or two concurrent pre-warms both pass it and jointly overflow.
+        // Skip the whole location and stamp nothing.
         prewarm.outcome.status = 'skipped-capacity';
         return;
       }
-      await this.evictOldestSubscriptions(potentialNewSubs.length);
+      this.evictOldestSubscriptions(excess, geohashes);
     }
     if (prewarm && potentialNewSubs.length > 0) {
       logSubscribing();
@@ -594,19 +596,28 @@ export class BlitzortungService {
   }
 
   /**
-   * Evict oldest subscriptions to make room for new ones (LRU eviction)
+   * Evict the oldest subscriptions to make room for new ones (LRU eviction): exactly `excess` of
+   * them, never one the current request needs (`keep`), so the queried area keeps its coverage
+   * start and the map never ends above the cap.
+   *
+   * Synchronous on purpose (G20): the caller's capacity check, these deletes, the `unsubscribe`
+   * call and the caller's stage loop are one run, so a concurrent query cannot pass the same check.
+   * The UNSUBACK is not awaited. That is safe because the evicted set and the staged set are
+   * disjoint (`keep`), so no unsubscribe/re-subscribe pair of one topic exists to order, and mqtt
+   * sends packets in call order (the property `pruneStaleSubscriptions` relies on).
    */
-  private async evictOldestSubscriptions(slotsNeeded: number): Promise<void> {
-    if (!this.client || slotsNeeded <= 0) {
+  private evictOldestSubscriptions(excess: number, keep: ReadonlySet<string>): void {
+    if (!this.client || excess <= 0) {
       return;
     }
 
-    // Sort by access time (oldest first)
+    // Candidates: everything this request does not need, oldest access first
     const sorted = Array.from(this.subscribedGeohashes.entries())
+      .filter(([geohash]) => !keep.has(geohash))
       .sort((a, b) => a[1] - b[1]);
 
     // Evict oldest entries
-    const toEvict = sorted.slice(0, slotsNeeded);
+    const toEvict = sorted.slice(0, Math.min(excess, sorted.length));
     const topics = toEvict.map(([geohash]) => {
       const geohashPath = geohash.split('').join('/');
       return `${this.topicPrefix}/${geohashPath}/#`;
@@ -614,7 +625,7 @@ export class BlitzortungService {
 
     logger.info('Evicting old geohash subscriptions (LRU)', {
       count: toEvict.length,
-      slotsNeeded,
+      slotsNeeded: excess,
       currentSize: this.subscribedGeohashes.size,
       maxSubscriptions: this.maxSubscriptions,
       securityEvent: true
@@ -628,22 +639,28 @@ export class BlitzortungService {
       this.geohashFirstSubscribed.delete(geohash);
     }
 
-    // Unsubscribe from topics
-    await new Promise<void>((resolve) => {
-      this.client!.unsubscribe(topics, (error) => {
-        if (error) {
-          // Name and code only, as on the subscribe path: mqtt's errors carry the broker host
-          // and port in message and stack.
-          const failure = error as NodeJS.ErrnoException;
-          logger.warn('Failed to unsubscribe from topics', {
-            name: failure.name,
-            code: failure.code,
-            topics: topics.slice(0, 3) // Log first 3 for debugging
-          });
-        }
-        resolve(); // Always resolve to avoid blocking
+    // Name and code only, as on the subscribe path: mqtt's errors carry the broker host and port
+    // in message and stack.
+    const logUnsubscribeFailure = (error: unknown): void => {
+      const failure = error as NodeJS.ErrnoException;
+      logger.warn('Failed to unsubscribe from topics', {
+        name: failure.name,
+        code: failure.code,
+        topics: topics.slice(0, 3) // Log first 3 for debugging
       });
-    });
+    };
+
+    // Unsubscribe from topics. Not awaited (see above); a failure only logs, and the query
+    // continues, because the maps are already updated.
+    try {
+      this.client.unsubscribe(topics, (error) => {
+        if (error) {
+          logUnsubscribeFailure(error);
+        }
+      });
+    } catch (error) {
+      logUnsubscribeFailure(error);
+    }
 
     logger.debug('Eviction complete', {
       remainingSubscriptions: this.subscribedGeohashes.size
