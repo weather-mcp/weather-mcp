@@ -165,15 +165,22 @@ async function loadMqtt(): Promise<MqttModule> {
 }
 
 /**
- * Raw lightning strike data from MQTT
+ * Raw lightning strike data from MQTT. Every field is `unknown`: the broker is a third party, the
+ * default connection is plaintext, and the payload is whatever its JSON held. Each field is checked
+ * in `handleMessage` before it is stored or rendered.
  */
 interface MQTTLightningStrike {
-  lat: number;
-  lon: number;
-  time: number; // Unix timestamp in milliseconds
-  pol?: number; // Polarity
-  mcs?: number; // Amplitude (milli-coulomb-seconds, or kA)
-  stat?: number; // Number of stations that detected the strike
+  lat?: unknown;
+  lon?: unknown;
+  time?: unknown; // Unix timestamp in milliseconds or nanoseconds
+  pol?: unknown; // Polarity
+  mcs?: unknown; // Amplitude (milli-coulomb-seconds, or kA)
+  stat?: unknown; // Number of stations that detected the strike
+}
+
+/** A JSON number that is neither NaN nor an infinity. */
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 /**
@@ -437,6 +444,19 @@ export class BlitzortungService {
         return;
       }
 
+      // A string here would be rendered into the tool output as written, or throw in `toFixed`
+      // on every later query for the area.
+      if (
+        !isFiniteNumber(data.lat) ||
+        !isFiniteNumber(data.lon) ||
+        !isFiniteNumber(data.time) ||
+        Math.abs(data.lat) > 90 ||
+        Math.abs(data.lon) > 180
+      ) {
+        logger.warn('Lightning strike has invalid fields', { topic, securityEvent: true });
+        return;
+      }
+
       // Convert timestamp - Blitzortung sends nanoseconds, convert to milliseconds
       // Example: 1762715394083570200 nanoseconds -> 1731178800000 milliseconds
       let timestampMs = data.time;
@@ -450,9 +470,9 @@ export class BlitzortungService {
         timestamp: new Date(timestampMs),
         latitude: data.lat,
         longitude: data.lon,
-        polarity: data.pol || 0,
-        amplitude: data.mcs || 0,
-        stationCount: data.stat,
+        polarity: isFiniteNumber(data.pol) ? data.pol : 0,
+        amplitude: isFiniteNumber(data.mcs) ? data.mcs : 0,
+        stationCount: isFiniteNumber(data.stat) ? data.stat : undefined,
         distance: 0 // Will be calculated when filtering
       };
 

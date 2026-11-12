@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **A lightning broker message with a field of the wrong type is dropped.** The default broker is a third party on an unencrypted connection, and only the presence of `lat`, `lon` and `time` was checked. Text in `stat` was printed in the `Detected by` line of `get_lightning_activity` as written, and a string `lat` or `mcs` made every later query for that area fail. `lat`, `lon` and `time` must now be finite numbers in range, and `pol`, `mcs` and `stat` are used only when they are finite numbers. (`src/services/blitzortung.ts`)
+
 ## [1.35.14] - 2026-11-11
 
 Three alert answers could tell you less than the truth. A US territory such as Puerto Rico or Guam could be told that alerts were not available there, although NOAA issues them. A long national alert list from India, the Philippines or Indonesia could end in a green check when only part of it had been checked. And an alert that its issuer had cancelled stayed on the list until it expired. Each of these now gives the honest answer.
