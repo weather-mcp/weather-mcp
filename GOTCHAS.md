@@ -6775,6 +6775,8 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 **Evidence:** 2026-09-30, spacer-wake-recheck. Plan review codex-R2 found that T3 built `main` in a new worktree with no install step, and `.claude/dev-workflow.conf:31` sets `DEVWF_WORKTREE_SETUP="npm ci"` for the same reason. T3 ran with `npm ci` added and left one worktree.
 
+**Extended 2026-11-12** (blitzortung-message-validation T1/T8): **the cheaper alternative, a copied base `dist/`, has its own trap.** `dist/utils/version.js` reads `../package.json` at import time, so a `cp -r dist <scratch>/base-dist` fails at the first import with `ENOENT … <scratch>/package.json`. Nest the copy as `<scratch>/base/dist` with `package.json` copied to `<scratch>/base/`. Packages still resolve upward to the repo's `node_modules`, as long as the scratch dir sits inside the repo. Take the snapshot **before** the first source change, since `npm run build` overwrites `dist/` in place.
+
 **Status:** active.
 
 ---
@@ -7503,6 +7505,35 @@ SACHET, BMKG).
 
 **Status:** active. Related: [G6] (read-time filter over the cached set), [G45] (a mutation goes red only where the
 contract can reach it), [G48].
+
+---
+
+## G160 — A boundary test that imports the threshold constant moves with the mutation, so the mutation survives
+
+**Trigger:** writing a boundary row ("accepted exactly at the limit", "rejected one past it") for a threshold the
+module exports as a constant: a skew, a cap, a byte limit, an interval. Mutating that constant is a row in the
+mutation table.
+
+**Rule:** build the boundary fixture from the **literal** value the design settled (`300000`, not
+`STRIKE_FUTURE_SKEW_MS`), and add one assertion that the exported constant equals that literal. The import may
+stay for readability elsewhere in the file. The boundary rows must not read it.
+
+**Why:** a fixture computed as `now + CONSTANT` tracks any change to `CONSTANT`. Set the skew to 0 and the
+"exactly at the skew" fixture becomes `now + 0`, which the mutated code still accepts. The test stays green over
+the precise regression it was written to catch, and the mutation table reports a survivor that looks like a weak
+test rather than a self-referential one.
+
+**Verify:** mutate the exported constant (`STRIKE_FUTURE_SKEW_MS = 0`) and run its test file. The boundary row
+must go red, and so must the literal-equality assertion.
+
+**Evidence:** 2026-11-12, blitzortung-message-validation T2 (`6e9acb5`). The skew → 0 mutation passed
+`tests/unit/strike-buffer.test.ts` until the boundary rows were rewritten to the literal `300000`, with an added
+assertion on the constant. A curation read of the same file found the identical shape on
+`STRIKE_PAYLOAD_MAX_BYTES`: the oversize rows build from the constant, and a cap of 100000 passed them all. It was
+pinned to `4096` in `424666c`, after which that mutation goes red.
+
+**Status:** active. Lint candidate: flag a test that both imports an exported numeric constant and uses it in an
+arithmetic fixture expression. Related: [G65] (where mutation rows come from), [G45].
 
 ---
 
