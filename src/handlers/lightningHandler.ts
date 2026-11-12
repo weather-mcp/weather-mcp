@@ -501,13 +501,15 @@ export function formatLightningActivityResponse(
     const strikesToShow = response.strikes.slice(0, maxStrikesToShow);
 
     strikesToShow.forEach((strike, index) => {
+      // A strike may sit up to the parser's skew (STRIKE_FUTURE_SKEW_MS) ahead of the host clock.
+      // Only the displayed age is floored; the timestamp prints verbatim (G68).
       const ageMinutes = (response.generatedAt.getTime() - strike.timestamp.getTime()) / (1000 * 60);
       const polaritySymbol = strike.polarity > 0 ? '+' : '−';
       lines.push(`### Strike ${index + 1}`);
       lines.push(strike.distance != null
         ? `- **Distance:** ${strike.distance.toFixed(1)} km`
         : '- **Distance:** unavailable');
-      lines.push(`- **Time:** ${strike.timestamp.toISOString()} (${ageMinutes.toFixed(1)} minutes ago)`);
+      lines.push(`- **Time:** ${strike.timestamp.toISOString()} (${Math.max(0, ageMinutes).toFixed(1)} minutes ago)`);
       lines.push(`- **Location:** ${strike.latitude.toFixed(4)}, ${strike.longitude.toFixed(4)}`);
       lines.push(`- **Polarity:** ${polaritySymbol} (${strike.polarity > 0 ? 'Positive' : 'Negative'})`);
       lines.push(`- **Amplitude:** ${strike.amplitude.toFixed(1)} kA`);
