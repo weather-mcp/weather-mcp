@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **A proxy's answer to `CONNECT` can no longer stand in for the upstream's HTTPS response.** With `HTTPS_PROXY` set, any answer other than `200` was handed to the request as the origin's own response, with no TLS. A `203` with a body was accepted as data, and a `302` was followed. A 4xx or 5xx now reaches the request as its status code alone, and any other status is a connection reset. Thanks to MagicCactus42 for the report and fix (#131). (`src/utils/proxyTunnel.ts`)
+
 ## [1.35.15] - 2026-11-13
 
 The lightning report trusted every message the feed sent. A malformed message could stop the report with an error, a strike dated in the future could show extreme danger from a storm that had not happened, and a strike on the equator or the prime meridian was thrown away, so a storm there could read as a clear sky. Every feed message is now checked before it counts. This release also moves the HTTP entry's web-server libraries past seven moderate advisories.

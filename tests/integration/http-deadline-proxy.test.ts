@@ -21,7 +21,8 @@ import { join } from 'node:path';
  * bundled https-proxy-agent, which has no cancel hook (the positive control).
  *
  * The tunnel rows prove a working proxy still tunnels, over a plain and an `https:` proxy, with
- * credentials, and that a proxy's 407 still reaches axios as `response.status` 407. They tunnel
+ * credentials, that a proxy's 407 still reaches axios as `response.status` 407, and that a proxy's
+ * 203 with a body is never taken for the origin's answer. They tunnel
  * to a loopback TLS origin whose self-signed certificate (`tests/fixtures/tls/`) the child trusts
  * through `NODE_EXTRA_CA_CERTS`.
  *
@@ -52,7 +53,7 @@ interface Proxy {
   lastHeaders: Record<string, string>;
 }
 
-type ProxyMode = 'silent' | 'reset' | 'tunnel' | 'refuse';
+type ProxyMode = 'silent' | 'reset' | 'tunnel' | 'refuse' | 'forge';
 
 /** CONNECT header lines after the request line, as a lower-cased name → value map. */
 function parseHeaders(head: string): Record<string, string> {
@@ -66,14 +67,14 @@ function parseHeaders(head: string): Record<string, string> {
 
 /**
  * 'silent' accepts the CONNECT and never answers; 'reset' resets it. 'tunnel' answers 200 and
- * pipes to the loopback origin at `originPort`; 'refuse' answers 407. `tls` serves the proxy itself
- * over TLS, from the fixture.
+ * pipes to the loopback origin at `originPort`; 'refuse' answers 407; 'forge' answers 203 with a
+ * JSON body, as if it were the origin. `tls` serves the proxy itself over TLS, from the fixture.
  */
 function startProxy(mode: ProxyMode, options: { tls?: boolean; originPort?: number } = {}): Promise<Proxy> {
   const sockets = new Set<Socket>();
   const server = options.tls ? createTlsServer({ cert: TLS_CERT, key: TLS_KEY }) : createServer();
   const proxy: Proxy = { server, sockets, connects: 0, port: 0, lastHeaders: {} };
-  if (mode === 'tunnel' || mode === 'refuse') {
+  if (mode === 'tunnel' || mode === 'refuse' || mode === 'forge') {
     proxy.server.on(options.tls ? 'secureConnection' : 'connection', (socket: Socket) => {
       sockets.add(socket);
       socket.on('error', () => undefined);
@@ -90,6 +91,13 @@ function startProxy(mode: ProxyMode, options: { tls?: boolean; originPort?: numb
           socket.end(
             'HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm="test"\r\n' +
               'Content-Length: 0\r\nConnection: close\r\n\r\n'
+          );
+          return;
+        }
+        if (mode === 'forge') {
+          socket.end(
+            'HTTP/1.1 203 Non-Authoritative Information\r\nContent-Type: application/json\r\n' +
+              'Content-Length: 15\r\nConnection: close\r\n\r\n{"forged":true}'
           );
           return;
         }
@@ -254,6 +262,7 @@ let origin: Origin;
 let tunnel: Proxy;
 let tlsTunnel: Proxy;
 let refuse: Proxy;
+let forge: Proxy;
 
 beforeAll(async () => {
   silent = await startProxy('silent');
@@ -262,10 +271,11 @@ beforeAll(async () => {
   tunnel = await startProxy('tunnel', { originPort: origin.port });
   tlsTunnel = await startProxy('tunnel', { originPort: origin.port, tls: true });
   refuse = await startProxy('refuse');
+  forge = await startProxy('forge');
 });
 
 afterAll(async () => {
-  for (const proxy of [silent, reset, tunnel, tlsTunnel, refuse]) {
+  for (const proxy of [silent, reset, tunnel, tlsTunnel, refuse, forge]) {
     for (const socket of proxy.sockets) socket.destroy();
     await new Promise<void>((resolve) => proxy.server.close(() => resolve()));
   }
@@ -277,7 +287,7 @@ afterAll(async () => {
 afterEach(() => {
   for (const child of liveChildren) child.kill('SIGKILL');
   liveChildren.clear();
-  for (const proxy of [silent, reset, tunnel, tlsTunnel, refuse]) proxy.connects = 0;
+  for (const proxy of [silent, reset, tunnel, tlsTunnel, refuse, forge]) proxy.connects = 0;
   origin.requests = 0;
 });
 
@@ -433,6 +443,23 @@ describe('a working proxy still tunnels, and a refusal keeps its status', () => 
       expect(outcome.status).toBe(407);
       expect(code).toBe(0);
       expect(refuse.connects).toBe(1);
+      expect(origin.requests).toBe(0);
+    },
+    CASE_TIMEOUT_MS
+  );
+
+  it(
+    "a proxy's 203 with a body is not the origin's answer: ECONNRESET, exit 0",
+    async () => {
+      const running = await run(forge, buildScript(true, '', target(), TUNNEL_TIMEOUT_MS), {
+        extraEnv: trustFixture
+      });
+      const code = await running.exited;
+      const outcome = parseOutcome(running.stdout());
+      expect(outcome.code).toBe('ECONNRESET');
+      expect(outcome.status).toBeUndefined();
+      expect(code).toBe(0);
+      expect(forge.connects).toBe(1);
       expect(origin.requests).toBe(0);
     },
     CASE_TIMEOUT_MS
