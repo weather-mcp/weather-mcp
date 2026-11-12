@@ -142,6 +142,9 @@ describe('parseStrike', () => {
 
   describe('rejects', () => {
     it('rejects an oversize payload before decoding it', () => {
+      // The cap is pinned to its literal: the rows below build from the constant, so a changed value
+      // would move them with it (G160).
+      expect(STRIKE_PAYLOAD_MAX_BYTES).toBe(4096);
       // 0xff is never valid UTF-8; a decode-then-parse order would yield not_json instead.
       const payload = new Uint8Array(STRIKE_PAYLOAD_MAX_BYTES + 1).fill(0xff);
       expect(parseStrike(payload, now)).toEqual({ ok: false, reason: 'oversize' });
