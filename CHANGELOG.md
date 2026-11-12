@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.14] - 2026-11-11
+
 Three alert answers could tell you less than the truth. A US territory such as Puerto Rico or Guam could be told that alerts were not available there, although NOAA issues them. A long national alert list from India, the Philippines or Indonesia could end in a green check when only part of it had been checked. And an alert that its issuer had cancelled stayed on the list until it expired. Each of these now gives the honest answer.
 
 ### Changed
@@ -2327,7 +2329,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.13...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.14...HEAD
+[1.35.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.13...v1.35.14
 [1.35.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.12...v1.35.13
 [1.35.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.11...v1.35.12
 [1.35.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.10...v1.35.11
