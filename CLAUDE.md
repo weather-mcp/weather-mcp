@@ -106,6 +106,7 @@ src/
 │   ├── jmaWarningNames.ts   # JMA warning-name English gloss and tier classification (pure)
 │   ├── composite.ts         # PNG stitch/blend/marker/encode (pure)
 │   ├── airQuality.ts / marine.ts / snow.ts / distance.ts / geohash.ts
+│   ├── strikeBuffer.ts      # Blitzortung message parser (size, JSON, typed coordinates/time, future skew) and the bounded strike buffer (pure)
 │   └── version.ts
 ├── config/
 │   ├── cache.ts             # Cache TTLs + CACHE_*/API_TIMEOUT_MS parsing
