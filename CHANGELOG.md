@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.14] - 2026-11-11
+
+Three alert answers could tell you less than the truth. A US territory such as Puerto Rico or Guam could be told that alerts were not available there, although NOAA issues them. A long national alert list from India, the Philippines or Indonesia could end in a green check when only part of it had been checked. And an alert that its issuer had cancelled stayed on the list until it expired. Each of these now gives the honest answer.
+
+### Changed
+- **With a Google Weather key set, alerts for a US territory now come from NOAA, not Google.** A saved or geocoded location in Puerto Rico, Guam, the Northern Mariana Islands, the US Virgin Islands or American Samoa was sent to the Google Weather API when a key was configured. It now gets NOAA's alerts, with NOAA as the data source, the same as a US state. Other countries outside the built-in coverage still use Google when the key is set.
+
+### Fixed
+- **`get_alerts` serves Puerto Rico, Guam, the Northern Mariana Islands, the US Virgin Islands and American Samoa.** A location that carried one of these territories' own country codes was told `Weather alerts are not yet available` when no Google key was set. A `city_name` the geocoder resolved to a territory code, and a saved location that stored one, both reached that answer, and so did `get_weather_summary` for a saved territory location when the country lookup failed. A territory point with no country answer was also told it was not covered. All of these now get NOAA's alerts. NOAA decides which points it serves: at a remote point it rejects, the answer is NOAA's error, never an empty list.
+- **A national CAP alert list that was cut short no longer shows a green check.** When the feed for India, the Philippines or Indonesia listed more than 200 alerts, `get_alerts` checked only the first 200 and said so, then printed `✅ No active weather alerts` when none of those covered the point. An alert past the cut could still cover it. The answer now says no alert covering the location was found among those checked, and that this is not an all-clear. A result with matching alerts is unchanged.
+- **A cancelled CAP alert is no longer listed.** When a national CAP feed or a MeteoAlarm feed published an `Actual` cancellation of an alert, the cancelled alert stayed in `get_alerts` until its own expiry. It is now removed, even if the cancellation message has itself expired, and also when the cancellation arrives with no alert details of its own. A test or exercise cancellation changes nothing.
+
 ## [1.35.13] - 2026-11-11
 
 A US river report could show a green check for a river that was already in flood. The gauge readings behind it were kept for up to a day, and a gauge for which NOAA publishes no flood category was shown with the same green check as a gauge with no flooding. Readings are now at most 30 minutes old, a missing category is shown as missing, and a failed or unusable answer from NOAA's gauge service is reported as an error instead of as an empty search.
@@ -2317,7 +2329,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.13...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.14...HEAD
+[1.35.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.13...v1.35.14
 [1.35.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.12...v1.35.13
 [1.35.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.11...v1.35.12
 [1.35.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.10...v1.35.11

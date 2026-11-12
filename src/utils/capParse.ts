@@ -35,6 +35,7 @@
  */
 
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { filterCapLifecycle } from './capActiveFilter.js';
 import type {
   CapAlertArea,
   CapAlertDocument,
@@ -560,8 +561,39 @@ export function linkedPolygonUrl(info: CapAlertInfo): string | undefined {
 }
 
 /**
+ * CAP 1.2 lets a cancellation stand alone, with no `info` block. Such a
+ * document carries nothing to render, but its `references` are what
+ * `filterCapLifecycle` retires, so it must survive normalisation: a
+ * lifecycle-only record with no area and no geometry. It never renders — the
+ * filter drops every `Cancel` — so the empty `areaDesc`/`polygons` reach no
+ * matcher. Narrow on purpose: `Cancel` **and** at least one reference. No
+ * status test here; the filter owns `Actual`/`Test`/`Exercise`.
+ */
+function lifecycleOnlyCancel(
+  doc: CapAlertDocument,
+  identifier: string,
+  countryCode: string
+): NationalCapWarning | undefined {
+  const references = parseReferences(doc.references);
+  if (doc.msgType !== 'Cancel' || references.length === 0) {
+    return undefined;
+  }
+  return {
+    identifier,
+    status: doc.status,
+    msgType: doc.msgType,
+    references,
+    sent: doc.sent,
+    areaDesc: [],
+    polygons: [],
+    countryCode
+  };
+}
+
+/**
  * Flatten a parsed CAP document to a single-language-variant warning.
- * Returns `undefined` when there is no identifier or no info block — a
+ * Returns `undefined` when there is no identifier, or no usable info block
+ * and it is not an info-less `Cancel` (`lifecycleOnlyCancel`) — a
  * document-shape failure the caller must count as unavailable, not an
  * honest empty.
  *
@@ -582,13 +614,14 @@ export function flattenCapAlert(
   feed: Pick<NationalCapFeed, 'preferLanguage' | 'polygonSource'>,
   countryCode: string
 ): NationalCapWarning | undefined {
-  if (!doc.identifier || !doc.info || doc.info.length === 0) {
+  if (!doc.identifier) {
     return undefined;
   }
 
-  const info = selectPreferredInfo(doc.info, feed.preferLanguage);
+  const info =
+    doc.info && doc.info.length > 0 ? selectPreferredInfo(doc.info, feed.preferLanguage) : undefined;
   if (!info) {
-    return undefined;
+    return lifecycleOnlyCancel(doc, doc.identifier, countryCode);
   }
 
   const areaDesc = (info.area ?? [])
@@ -649,15 +682,16 @@ export function flattenCapAlert(
 
 /**
  * Read-time filter pipeline, in this exact order:
- *  1. drop `status` present and ≠ `'Actual'`;
- *  2. drop `msgType === 'Cancel'`;
- *  3. drop expired `expires` (unparseable/missing → keep);
- *  4. build the superseded set from every *surviving* `msgType === 'Update'`
- *     — including `AllClear` ones;
- *  5. drop superseded;
+ *  1-5. the shared CAP lifecycle core, `filterCapLifecycle`
+ *     (`src/utils/capActiveFilter.ts`): an `Actual` `Cancel` retires every
+ *     identifier it references, expired or not; then drop `status` present
+ *     and ≠ `'Actual'`, drop `msgType === 'Cancel'`, drop expired `expires`
+ *     (unparseable/missing → keep), build the superseded set from every
+ *     *surviving* `msgType === 'Update'` — including `AllClear` ones — and
+ *     drop superseded and cancelled;
  *  6. **last**, drop `responseType` containing `'AllClear'`.
  *
- * Steps 4-6 must run in this order: dropping AllClear before building the
+ * Supersession and step 6 must run in this order: dropping AllClear before building the
  * superseded set (step 4) would leave a PAGASA-cancelled-but-still-unexpired
  * advisory live — PAGASA's "Final" advisory is itself `msgType: 'Update'` +
  * `responseType: ['AllClear']`, and *it* is the message that retires the
@@ -665,36 +699,10 @@ export function flattenCapAlert(
  * SACHET republishes a warning under a new numeric identifier with
  * `references` pointing at the prior version, but that prior version was
  * never independently indexed, so steps 4-5 never have anything to match —
- * only step 3 (expiry) or step 6 (an explicit AllClear) retires a SACHET
- * warning.
+ * only expiry, an explicit AllClear (step 6) or a `Cancel` retires a SACHET
+ * warning. SACHET publishes its `Cancel` in the cancelled alert's own index
+ * slot, so the `Cancel` drop alone already removes it there.
  */
 export function filterActiveCapWarnings(warnings: NationalCapWarning[], now: Date): NationalCapWarning[] {
-  const current = warnings.filter(warning => {
-    if (warning.status !== undefined && warning.status !== 'Actual') {
-      return false;
-    }
-    if (warning.msgType === 'Cancel') {
-      return false;
-    }
-    if (warning.expires) {
-      const expires = new Date(warning.expires);
-      if (!isNaN(expires.getTime()) && expires.getTime() <= now.getTime()) {
-        return false;
-      }
-    }
-    return true;
-  });
-
-  const superseded = new Set<string>();
-  for (const warning of current) {
-    if (warning.msgType === 'Update') {
-      for (const identifier of warning.references) {
-        superseded.add(identifier);
-      }
-    }
-  }
-
-  const afterSupersession = current.filter(warning => !superseded.has(warning.identifier));
-
-  return afterSupersession.filter(warning => !(warning.responseType ?? []).includes('AllClear'));
+  return filterCapLifecycle(warnings, now).filter(warning => !(warning.responseType ?? []).includes('AllClear'));
 }

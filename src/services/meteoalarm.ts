@@ -45,6 +45,7 @@ import { Cache } from '../utils/cache.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
 import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import { CacheConfig } from '../config/cache.js';
+import { filterCapLifecycle } from '../utils/capActiveFilter.js';
 
 export interface MeteoAlarmServiceConfig {
   baseURL?: string;
@@ -166,44 +167,22 @@ export function parseReferences(references: string | undefined): string[] {
 }
 
 /**
- * Read-time filter pipeline, in order:
- *  1. drop non-`Actual` status and `Cancel` messages;
- *  2. drop warnings already expired at `now`;
- *  3. drop warnings whose identifier is referenced by a *surviving* `Update`
+ * Read-time filter pipeline — the shared CAP lifecycle core,
+ * `filterCapLifecycle` (`src/utils/capActiveFilter.ts`), in order:
+ *  1. an `Actual` `Cancel` retires every identifier it references, whether or
+ *     not the `Cancel` itself has expired;
+ *  2. drop non-`Actual` status and `Cancel` messages;
+ *  3. drop warnings already expired at `now`;
+ *  4. drop warnings whose identifier is referenced by a *surviving* `Update`
  *     (supersession — deliberately after expiry, so references held by
- *     expired Updates are inert).
+ *     expired Updates are inert), and drop the cancelled ones.
  *
  * Pure and exported for tests; `getWarnings` applies it on every return,
  * cached or fresh — a stale cache entry must never serve a warning that
  * expired after it was cached.
  */
 export function filterActiveWarnings(warnings: MeteoAlarmWarning[], now: Date): MeteoAlarmWarning[] {
-  const current = warnings.filter(warning => {
-    if (warning.status !== undefined && warning.status !== 'Actual') {
-      return false;
-    }
-    if (warning.msgType === 'Cancel') {
-      return false;
-    }
-    if (warning.expires) {
-      const expires = new Date(warning.expires);
-      if (!isNaN(expires.getTime()) && expires.getTime() <= now.getTime()) {
-        return false;
-      }
-    }
-    return true;
-  });
-
-  const superseded = new Set<string>();
-  for (const warning of current) {
-    if (warning.msgType === 'Update') {
-      for (const identifier of warning.references) {
-        superseded.add(identifier);
-      }
-    }
-  }
-
-  return current.filter(warning => !superseded.has(warning.identifier));
+  return filterCapLifecycle(warnings, now);
 }
 
 /**
@@ -403,8 +382,8 @@ type MeteoAlarmFeedEnvelope = MeteoAlarmFeedResponse & { warnings: MeteoAlarmFee
 
 /**
  * True for one `warnings[]` entry in the verified shape. `parseFeed` skips an
- * entry with no `alert`, no `identifier` or no `info`, so each of those may be
- * **absent**. When present it must be the verified type: `alert` an object,
+ * entry with no `alert` or no `identifier`, and one with no `info` unless it
+ * is a cancellation (see `parseFeed`), so each of those may be **absent**. When present it must be the verified type: `alert` an object,
  * `identifier` a string, `info` an array of objects. Otherwise a malformed entry
  * would be skipped like an empty one, and a feed of them would render the
  * all-clear (G4, one level down). All 3,612 entries of the 38 live feeds had the
@@ -440,8 +419,13 @@ function isMeteoAlarmFeed(data: unknown): data is MeteoAlarmFeedEnvelope {
 /**
  * Parse a country feed into flat single-language warnings. The envelope has
  * already passed `isMeteoAlarmFeed`, so a missing list is not tolerated here.
- * Object entries without an identifier or any `info` content are skipped
- * (nothing to render or track).
+ * Object entries without an identifier are skipped, and so are entries
+ * without any English-selectable `info` content (nothing to render or track)
+ * — except an info-less `Cancel` with references. CAP 1.2 lets a
+ * cancellation stand alone, and its `references` are what
+ * `filterActiveWarnings` retires, so it becomes a lifecycle-only record with
+ * no area. It never renders: the filter drops every `Cancel`. No status test
+ * here; the filter owns `Actual`/`Test`/`Exercise`.
  */
 function parseFeed(data: MeteoAlarmFeedEnvelope): MeteoAlarmWarning[] {
   const warnings: MeteoAlarmWarning[] = [];
@@ -454,6 +438,17 @@ function parseFeed(data: MeteoAlarmFeedEnvelope): MeteoAlarmWarning[] {
 
     const info = selectEnglishInfo(alert.info);
     if (!info) {
+      const references = parseReferences(alert.references);
+      if (alert.msgType === 'Cancel' && references.length > 0) {
+        warnings.push({
+          identifier: alert.identifier,
+          status: alert.status,
+          msgType: alert.msgType,
+          references,
+          areaDesc: [],
+          sent: alert.sent
+        });
+      }
       continue;
     }
 

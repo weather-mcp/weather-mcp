@@ -2,7 +2,8 @@
  * Handler for get_alerts tool.
  *
  * Routed by country (see .devdocs/archive/completed/international-alerts-plan.md D1):
- *   US → NOAA (the original path, byte-identical output),
+ *   US, Puerto Rico, Guam, the Northern Mariana Islands, the US Virgin Islands
+ *     and American Samoa → NOAA (the original path, byte-identical output),
  *   Canada → MSC GeoMet (Environment and Climate Change Canada),
  *   MeteoAlarm member countries → the country's MeteoAlarm feed,
  *   Philippines / Indonesia → their national CAP feeds (PAGASA, BMKG), matched
@@ -16,7 +17,7 @@
  *     `GOOGLE_WEATHER_API_KEY` is configured, else a clean not-covered
  *     message (see .devdocs/archive/completed/global-alerts-fallback-plan.md D1).
  *
- * The branch order is the invariant: a US, Canadian, MeteoAlarm-country,
+ * The branch order is the invariant: a US (including its territories), Canadian, MeteoAlarm-country,
  * national-CAP-country, or Japanese request never contacts Google, key or no
  * key — those
  * are jurisdictional authorities and stay first-choice. Without a key the
@@ -24,7 +25,7 @@
  *
  * Country resolution order: a `country_code` already carried by the resolved
  * location (saved location or geocoded city_name), else a cached
- * country-level Nominatim reverse lookup, else the `isInUS` bounding-box
+ * country-level Nominatim reverse lookup, else the `isInUS` / `isInNwsTerritory` bounding-box
  * fallback (which preserves NOAA marine alerts for US coastal waters, where
  * reverse geocoding returns no country). The reverse answer wins over
  * `isInUS` — the CONUS box deliberately overruns into Canada (Toronto,
@@ -65,7 +66,9 @@ import {
 } from '../utils/locationResolver.js';
 import { validateOptionalBoolean, validateDetail } from '../utils/validation.js';
 import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
-import { isInUS } from '../utils/geography.js';
+import { isInUS, isInNwsTerritory } from '../utils/geography.js';
+import { isNwsCountryCode } from '../utils/nwsJurisdiction.js';
+import { MAX_INDEX_ITEMS } from '../utils/capParse.js';
 import { logger, describeErrorForLogging } from '../utils/logger.js';
 
 interface AlertsArgs {
@@ -150,7 +153,8 @@ export async function handleGetAlerts(
   // 3. Route. The reverse answer wins over isInUS; "no country" (open
   //    water, absent service, or a failed lookup) falls back to the
   //    bounding boxes so US coastal waters keep their NOAA marine alerts.
-  if (countryCode === 'us') {
+  // No coordinate box on a territory code, unlike the banner: NOAA is the authority on what NOAA serves (nwsJurisdiction.ts).
+  if (countryCode !== null && isNwsCountryCode(countryCode)) {
     return handleNoaaAlerts(resolved, noaaService, active_only, detail);
   }
 
@@ -162,7 +166,7 @@ export async function handleGetAlerts(
     return handleMeteoAlarmAlerts(resolved, meteoAlarmService, countryCode, active_only, detail);
   }
 
-  if (!countryCode && isInUS(latitude, longitude)) {
+  if (!countryCode && (isInUS(latitude, longitude) || isInNwsTerritory(latitude, longitude))) {
     return handleNoaaAlerts(resolved, noaaService, active_only, detail);
   }
 
@@ -626,9 +630,24 @@ async function handleNationalCapAlerts(
     // nothing-loaded branch above avoids, one threshold further along.
     output += `ℹ️ **No alert covering your location among those that could be read.**\n\n`;
     output += `*Checked against ${publisher}'s public CAP feed — ${warnings.length} active warning${warnings.length > 1 ? 's' : ''} elsewhere in ${countryPhrase}. `;
-    output += `The ${unavailableCount} alert${unavailableCount > 1 ? 's' : ''} above could not be read, so this is not a full all-clear.*\n\n`;
+    // One closing sentence carries both reasons when the index was also
+    // trimmed, rather than two lines that restate each other.
+    output += indexTrimmed
+      ? `The ${unavailableCount} alert${unavailableCount > 1 ? 's' : ''} above could not be read and alerts beyond the first ${MAX_INDEX_ITEMS} in the feed were not checked, so this is not a full all-clear.*\n\n`
+      : `The ${unavailableCount} alert${unavailableCount > 1 ? 's' : ''} above could not be read, so this is not a full all-clear.*\n\n`;
+  } else if (matched.length === 0 && countryLevel.length === 0 && indexTrimmed) {
+    // A trimmed index with nothing covering this point. The alerts past the
+    // cut were never read, and unlike JMA's one-bulletin-per-office index a
+    // CAP index item is an independent alert — item 201 can be a live warning
+    // for this point. A trimmed set is never used for exclusion (G8), so no ✅.
+    // Its own sentence: the unavailable one above would print a zero count.
+    output += `ℹ️ **No alert covering your location among those checked — this is not an all-clear.**\n\n`;
+    output += warnings.length > 0
+      ? `*Checked against ${publisher}'s public CAP feed — ${warnings.length} active warning${warnings.length > 1 ? 's' : ''} elsewhere in ${countryPhrase}; alerts beyond the first ${MAX_INDEX_ITEMS} in the feed were not checked.*\n\n`
+      : `*Checked against ${publisher}'s public CAP feed — no active warnings among the first ${MAX_INDEX_ITEMS} alerts; the rest of the feed was not checked.*\n\n`;
   } else if (matched.length === 0 && countryLevel.length === 0) {
-    // Honest empty: the whole feed was read, nothing covers this point. The
+    // Honest empty: the whole feed was read (untrimmed, nothing unavailable),
+    // nothing covers this point. The
     // scope line says what was actually checked.
     output += `✅ **No active weather alerts for your location in ${countryPhrase}.**\n\n`;
     output += warnings.length > 0

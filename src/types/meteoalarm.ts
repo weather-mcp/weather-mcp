@@ -60,8 +60,9 @@ export interface MeteoAlarmCapAlert {
   msgType?: string;
   scope?: string;
   /**
-   * Present only on `msgType: "Update"` — a space-separated list of CAP
-   * `sender,identifier,sent` triples naming the warnings this one replaces.
+   * Present on `msgType: "Update"` or `"Cancel"` — a space-separated list of
+   * CAP `sender,identifier,sent` triples naming the warnings this one replaces
+   * or cancels.
    */
   references?: string;
   info?: MeteoAlarmCapInfo[];
@@ -86,7 +87,7 @@ export interface MeteoAlarmWarning {
   identifier: string;
   status?: string;
   msgType?: string;
-  /** Identifiers parsed out of the CAP `references` triples (Updates only). */
+  /** Identifiers parsed out of the CAP `references` triples (Updates or Cancellations). */
   references: string[];
   event?: string;
   /** CAP severity vocabulary: Minor / Moderate / Severe / Extreme. */

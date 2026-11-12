@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.13 (Production Ready)
+- **Version:** 1.35.14 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -76,6 +76,7 @@ src/
 │   ├── validation.ts        # Input validation (all user inputs go through here)
 │   ├── units.ts / unitPreferences.ts / unitFormat.ts / temperatureConversion.ts
 │   ├── criticalAlert.ts     # Life-threatening-alert gate, selection, banner copy (pure)
+│   ├── nwsJurisdiction.ts   # NWS alert-authority country codes: code-alone and code-plus-territory-box sets (pure)
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── nowcast.ts           # minutely_15 nowcast: model superset boxes, 3-state response classification, quarter bands, hourly-probability pick (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
@@ -98,6 +99,7 @@ src/
 │   ├── firePerimeter.ts     # NIFC perimeter distance: zero inside, nearest edge outside, even-odd over all rings (pure)
 │   ├── eaGauges.ts          # EA station filter, measure selection, level banding (pure)
 │   ├── capParse.ts / pointInPolygon.ts  # CAP 1.2 XML → records, active filter, feed-URL allowlist; ray-casting point-in-ring (pure)
+│   ├── capActiveFilter.ts   # CAP lifecycle filter shared by MeteoAlarm and national CAP: status, Cancel, expiry, Update supersession (pure)
 │   ├── jmaParse.ts          # JMA index + warning-document parsers; class10 level selection (pure)
 │   ├── metnoParse.ts        # met.no timeseries → daily across the 1 h/6 h seam; symbol gloss (pure, SI in/SI out)
 │   ├── jmaAreaResolver.ts   # Coordinate → class10 area (pure) + the artifact's one lazy load site
@@ -729,15 +731,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.13 — Production Ready ✅
-- **Test Coverage:** 5,020 tests, 100% pass rate
+- **Version:** 1.35.14 — Production Ready ✅
+- **Test Coverage:** 5,089 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.14:** US-territory alerts come from NOAA, and a cut-short or cancelled CAP alert list no longer shows a false all-clear
 - **New in v1.35.13:** US river gauge status is at most 30 minutes old, and an unpublished flood category no longer shows a green check
 - **New in v1.35.12:** US wildfire distances are measured to the fire's mapped perimeter, not its reported point of origin
-- **New in v1.35.11:** A lightning report after a healed feed outage no longer claims the whole window was watched
 
 ## Useful References
 
@@ -760,7 +762,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-11 (v1.35.13)
+**Last Updated:** 2026-11-11 (v1.35.14)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
