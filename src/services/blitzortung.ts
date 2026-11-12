@@ -173,6 +173,25 @@ async function loadMqtt(): Promise<MqttModule> {
  */
 const REJECT_WARN_INTERVAL_MS = 60_000;
 
+/**
+ * Broker schemes that are not plaintext. mqtt 5.16.1's Node branch maps ssl, tls
+ * and mqtts to TLS and wss to a secure WebSocket; wxs and alis are its
+ * browser-branch secure schemes (on Node they fail to connect, which is not a
+ * plaintext link).
+ */
+const ENCRYPTED_BROKER_SCHEMES: ReadonlySet<string> = new Set(['mqtts', 'wss', 'ssl', 'tls', 'wxs', 'alis']);
+
+/** True when the broker URL's scheme is one `mqtt` treats as secure. Never logs. */
+export function isEncryptedBrokerUrl(url: string): boolean {
+  let protocol: string;
+  try {
+    protocol = new URL(url).protocol;
+  } catch {
+    return false;
+  }
+  return ENCRYPTED_BROKER_SCHEMES.has(protocol.slice(0, -1).toLowerCase());
+}
+
 export class BlitzortungService {
   private client: MqttClient | null = null;
   // SECURITY WARNING: Default broker uses PLAINTEXT MQTT (port 1883)
@@ -296,8 +315,7 @@ export class BlitzortungService {
 
     try {
       // Security warning for plaintext connections
-      const isPlaintext = this.brokerUrl.startsWith('mqtt://') ||
-                         (!this.brokerUrl.startsWith('mqtts://') && !this.brokerUrl.startsWith('wss://'));
+      const isPlaintext = !isEncryptedBrokerUrl(this.brokerUrl);
 
       if (isPlaintext) {
         logger.warn('SECURITY: Using plaintext MQTT connection (unencrypted)', {
