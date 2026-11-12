@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - **A proxy's answer to `CONNECT` can no longer stand in for the upstream's HTTPS response.** With `HTTPS_PROXY` set, any answer other than `200` was handed to the request as the origin's own response, with no TLS. A `203` with a body was accepted as data, and a `302` was followed. A 4xx or 5xx now reaches the request as its status code alone, and any other status is a connection reset. (`src/utils/proxyTunnel.ts`)
+- **A `.env` in the working directory is no longer read.** Both entries loaded `./.env` from wherever the MCP client started them, so an opened project could set `HTTPS_PROXY`, `NODE_TLS_REJECT_UNAUTHORIZED` or `BLITZORTUNG_MQTT_URL` for the server. A `.env` is now read only from the path in `DOTENV_CONFIG_PATH`. If you relied on `./.env`, set that variable to its path. (`src/config/envFile.ts`)
 
 ## [1.35.14] - 2026-11-11
 

@@ -201,7 +201,7 @@ Restart your MCP client after upgrading. See [CHANGELOG.md](./CHANGELOG.md) for 
 
 **Most users need zero configuration.** Everything below is optional.
 
-Settings can go in a `.env` file (see [`.env.example`](./.env.example)) or directly in your MCP client config:
+Settings can go directly in your MCP client config, or in a `.env` file (see [`.env.example`](./.env.example)) whose path you set in `DOTENV_CONFIG_PATH`. A `.env` in the working directory is not read:
 
 ```json
 {
