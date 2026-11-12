@@ -18,8 +18,8 @@
  * stop this server the moment it booted.
  */
 
-// Load environment variables from .env file (for local development)
-import 'dotenv/config';
+// A .env is loaded only from the path DOTENV_CONFIG_PATH names, never from the working directory.
+import './config/envFile.js';
 
 import { createServer as createNodeHttpServer, type Server as NodeHttpServer } from 'node:http';
 import { createRemoteJWKSet } from 'jose';

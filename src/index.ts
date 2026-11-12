@@ -5,8 +5,8 @@
  * Provides weather data from NOAA API to AI systems via Model Context Protocol
  */
 
-// Load environment variables from .env file (for local development)
-import 'dotenv/config';
+// A .env is loaded only from the path DOTENV_CONFIG_PATH names, never from the working directory.
+import './config/envFile.js';
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { LocationStore } from './services/locationStore.js';

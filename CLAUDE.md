@@ -115,6 +115,7 @@ src/
 │   ├── defaultLocation.ts   # WEATHER_DEFAULT_LOCATION
 │   ├── http.ts              # WEATHER_HTTP_* / WEATHER_OAUTH_* parsing for the HTTP entry (pure; returns a result, never warns)
 │   ├── api.ts               # Optional API keys (NCEI, FIRMS, Google)
+│   ├── envFile.ts           # Opt-in .env: read only from the path in DOTENV_CONFIG_PATH, never from the working directory
 │   └── displayThresholds.ts # Display logic constants
 ├── analytics/               # Opt-in usage analytics client (ANALYTICS_ENABLED=true; off by default, no default endpoint)
 │   ├── config.ts            # Env parsing, endpoint validation; salt generated only at the detailed level
