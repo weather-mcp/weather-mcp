@@ -10,7 +10,7 @@ For experienced users, here's the recommended publishing workflow:
 2. **Prepare the release (automated)** → Run `./scripts/update-docs-for-release.sh <patch|minor|major|X.Y.Z> ["summary"]`. This bumps `package.json` + `server.json`, promotes the CHANGELOG `[Unreleased]` section (or seeds a draft from conventional commits since the last tag), maintains the CHANGELOG link-reference block (adds the new version's compare-link definition and re-points `[Unreleased]:` at it), updates version, test-count (including the README badge), and tool-count references in CLAUDE.md, README.md, docs/README.md, docs/TOOLS.md, package.json, server.json, and SECURITY.md, re-renders `.github/social-preview.png` if the tool count changed (re-upload it manually at GitHub → Settings → Social preview), and runs `check-doc-versions.sh` (which also fails on an unmapped `src/` module or directory and on a committed home path). Tip: write CHANGELOG notes under `[Unreleased]` as you develop — the script promotes them verbatim.
 3. **Review & edit** → `git diff` — especially CHANGELOG wording if it was seeded from commit subjects
 4. **Commit & push** → `git add -A && git commit -m "chore: Release vX.Y.Z" && git push origin main`
-5. **Build & test** → Run `npm run build` and `npm test` (CI re-runs these before publishing)
+5. **Build & test** → Run `npm run build` and `npm test`, the offline gate (CI and `publish.yml` re-run it). Run `npm run test:live` once, by hand, and triage any failure
 6. **Tag & create GitHub release** → `git tag vX.Y.Z && git push origin vX.Y.Z`, then `gh release create vX.Y.Z`
 7. **npm publish (automated)** → Pushing the `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which verifies versions match, builds, tests, audits the shipped dependency tree (`npm audit --omit=dev --audit-level=high`) after the tests and before publishing, and publishes to npm with provenance. A high or critical advisory in a shipped dependency stops the release. There is no bypass flag: a blocked publish is a decision to record in the open in the CHANGELOG's `### Security` section. Auth is via npm Trusted Publishing (OIDC) — configured on npmjs.com under the package's Settings → Trusted Publisher (repo `weather-mcp/weather-mcp`, workflow `publish.yml`); no token or secret needed. Manual fallback: `npm publish --access public`.
 8. **Publish to MCP registry (manual)** → Run `./mcp-publisher login github` then `./mcp-publisher publish`. This cannot be automated in CI: GitHub Actions OIDC authenticates the `io.github.weather-mcp/*` namespace (the repo owner), but this server is registered as `io.github.dgahagan/*`, which requires interactive login as the `dgahagan` GitHub user.
@@ -37,7 +37,8 @@ Before you begin:
 **Use this checklist for every release to ensure nothing is missed:**
 
 ### Pre-Release
-- [ ] All tests pass (`npm test`)
+- [ ] The offline gate passes (`npm test`: unit + integration)
+- [ ] The live tests were run once and any failure triaged (`npm run test:live`)
 - [ ] README.md is up to date
 - [ ] CHANGELOG.md is updated with release notes
 - [ ] All changes committed to main branch
@@ -205,7 +206,7 @@ Please run the code-reviewer and security-auditor agents in parallel to assess t
 6. **Verify All Fixes:**
    ```bash
    npm run build  # Must succeed
-   npm test       # All tests must pass
+   npm test       # Offline gate (unit + integration) must pass
    npm audit --omit=dev --audit-level=high  # The gate the publish workflow enforces
    ```
 
@@ -244,7 +245,7 @@ Once all CRITICAL and HIGH issues are addressed (and MEDIUM issues within reason
 1. Review test coverage gaps and recommendations
 2. Implement critical test additions (especially for new features)
 3. Apply recommended test improvements
-4. Run full test suite: `npm test`
+4. Run the offline gate: `npm test` (and `npm run test:live` if the change touches an upstream call)
 5. Verify coverage: `npm run test:coverage`
 6. Commit changes: `git commit -m "test: Enhance test coverage for vX.X.X release"`
 
@@ -259,8 +260,9 @@ git status  # Should be clean
 # 2. Run full build
 npm run build  # Must succeed with 0 errors
 
-# 3. Run complete test suite
-npm test  # All tests must pass
+# 3. Run the offline gate, then the live tests once
+npm test  # Unit + integration, offline; must pass
+npm run test:live  # Real upstreams; triage any failure, do not re-run to get green
 
 # 4. Check for vulnerabilities
 npm audit --omit=dev --audit-level=high  # The gate the publish workflow enforces; must exit 0
@@ -329,7 +331,7 @@ Current state:
 - package.json version: [current version]
 - New version: X.Y.Z
 - Release date: [YYYY-MM-DD]
-- Test count: [run npm test and get count]
+- Test count: [run scripts/lib/collect-test-count.sh]
 
 Please:
 1. Update CHANGELOG.md with new version entry (move from [Unreleased] if exists)
@@ -424,8 +426,8 @@ This will identify all version mismatches and issues.
 # Re-run version check - should pass with 0 errors
 ./scripts/check-doc-versions.sh
 
-# Verify test count matches
-npm test 2>&1 | grep "Tests"
+# Verify test count matches (collects every declared test, live included; runs none)
+scripts/lib/collect-test-count.sh
 
 # Check for broken links
 grep -oE '\[.*\]\(\./[^)]+\.md\)' README.md | while read link; do
@@ -465,7 +467,7 @@ You may skip full documentation workflow if:
 - **Solution:** Review output, fix each error manually, re-run check
 
 **Problem:** Test count doesn't match README
-- **Solution:** Run `npm test`, update all test count references
+- **Solution:** Run `scripts/lib/collect-test-count.sh`, then `node scripts/lib/derived-facts.mjs write-sites <count>`
 
 **Problem:** CHANGELOG has unreleased version entry
 - **Solution:** Ensure package.json version matches, or move entry to [Unreleased]
@@ -555,10 +557,11 @@ This should complete without errors.
 ### 1.2 Run Tests
 
 ```bash
-npm test
+npm test           # Offline gate (unit + integration)
+npm run test:live  # Live upstreams, once, by hand
 ```
 
-All tests must pass before publishing.
+The offline gate must pass before publishing. A live failure is triaged by a human, not gated.
 
 ### 1.3 Dry Run (Preview Package Contents)
 
@@ -1040,7 +1043,7 @@ npx @dangahagan/weather-mcp@latest
 **Check published documentation:**
 1. Visit https://github.com/weather-mcp/weather-mcp/blob/main/README.md
 2. Verify version badges show correct version (if present)
-3. Verify test counts are accurate (5,165 tests)
+3. Verify test counts are accurate (5,169 tests)
 4. Verify all documentation links work
 5. Check CHANGELOG.md shows new release at top
 
@@ -1174,7 +1177,7 @@ The complete publishing workflow:
 2. ✅ **Pre-release documentation update** - Update all documentation for new version (~30-45 min, or 10-15 min with Claude Code automation)
 3. ✅ Update `package.json` and `server.json` versions
 4. ✅ Commit and push version updates
-5. ✅ Build and test (`npm run build && npm test`)
+5. ✅ Build and test (`npm run build && npm test`), then `npm run test:live` once
 6. ✅ Publish to npm (`npm publish --access public`)
 7. ✅ Create GitHub release (`gh release create` or web UI)
 8. ✅ Publish to MCP Registry (`./mcp-publisher login github && ./mcp-publisher publish`)

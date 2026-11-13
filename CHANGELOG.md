@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`npm test` no longer reaches the internet** (contributors only; nothing a user runs changes). The 14 test files that call real weather services moved to `tests/live/` and run only with `npm run test:live`. `npm test`, CI and the publish workflow run the offline unit and integration tests, and an integration test that tries to reach a non-loopback host now fails with `ENONLOOPBACK`. The lightning tests run against a local MQTT broker, so they pin strike counting, distance and the safety level instead of depending on the weather; one live smoke test still checks the real broker. The release scripts count tests without running them, so a release prep runs the suite once instead of twice.
+
 ### Fixed
 - **Malformed, oversize and future-dated lightning feed messages are dropped before use.** A strike whose coordinate arrived as text could stop the lightning report with an error, and a strike dated hours ahead of the clock stayed "recent" until the clock caught up, so the report could show extreme danger from a strike that had not happened. Every feed message is now checked for size, shape, coordinate type and range, and time before it is kept. A wrong-typed polarity, amplitude or station count no longer drops the strike; that field reads as absent. Rejected messages are counted in one log warning a minute, which carries no message text. Thanks to MagicCactus42 for the field validation (#132).
 - **Lightning strikes on the equator and the prime meridian are no longer dropped.** A strike at latitude 0 or longitude 0 was discarded as incomplete, so a storm there could read as a clear sky.

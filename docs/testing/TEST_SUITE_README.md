@@ -8,38 +8,48 @@ Quick reference guide for the Weather MCP test suite.
 
 | Metric | Value |
 |--------|-------|
-| **Total Tests** | 5,165 |
-| **Pass Rate** | 99.6% - 99.9% |
-| **Execution Time (Unit)** | ~2 seconds |
-| **Execution Time (Full)** | ~4-5 minutes |
+| **Total Tests** | 5,169 |
+| **Execution Time (`npm test`, offline)** | ~20 seconds |
+| **Execution Time (live, `npm run test:live`)** | several minutes, network-bound |
+
+The total counts every declared test, live ones included. It is collected without
+running anything: `scripts/lib/collect-test-count.sh`.
 
 ---
 
 ## Running Tests
 
 ```bash
-# Run all tests (unit + integration)
+# The offline gate: unit + integration. CI and publish run this exact command.
 npm test
 
-# Run only unit tests (fast - ~2 seconds)
-# Unit tests refuse every outbound connection (EUNITNET); CI runs this exact command
+# Only unit tests. They refuse every outbound connection (EUNITNET).
 npx vitest run --project unit
 
-# Run only integration tests (~4 minutes)
-npm test tests/integration/
+# The live-network tests in tests/live/: real upstreams, run by hand, once per release.
+# Serial, retry 1, 120 s timeout. Never run by npm test, CI or publish.
+npm run test:live
 
-# Watch mode for development
+# Watch mode for development (unit + integration)
 npm run test:watch
 
-# Generate coverage report
+# Generate coverage report (unit + integration)
 npm run test:coverage
 
 # Run specific test file
-npm test tests/unit/cache.test.ts
+npx vitest run tests/unit/cache.test.ts
 
-# Interactive UI mode
-npm run test:ui
+# Count the declared tests without running any
+scripts/lib/collect-test-count.sh
 ```
+
+| Project | Directory | Guard | Network |
+|---|---|---|---|
+| `unit` | `tests/unit/` | `tests/setup/no-network.ts` | none (`EUNITNET`) |
+| `integration` | `tests/integration/` | `tests/setup/loopback-only.ts` | loopback only (`ENONLOOPBACK` otherwise) |
+| `live` | `tests/live/` | none | real upstreams |
+
+The `integration` guard is in-process. A child process a test spawns is not covered.
 
 ---
 
@@ -57,11 +67,17 @@ tests/
 │   ├── Services            ncei, rainviewer, retry-logic
 │   └── Version-specific    v1.6.1-fixes, bounds-checking, alert-sorting
 │
-├── integration/
+├── integration/             offline, loopback only
 │   ├── error-recovery.test.ts
+│   ├── http-app.test.ts, http-entry.test.ts, http-deadline-proxy.test.ts
+│   ├── stdio-shutdown.test.ts
+│   └── lightning-fixture-broker.test.ts   (in-process aedes MQTT broker)
+│
+├── live/                    real upstreams; npm run test:live only
 │   ├── great-lakes-marine.test.ts
-│   ├── visualization-lightning.test.ts
-│   └── safety-hazards.test.ts
+│   ├── safety-hazards.test.ts
+│   ├── imagery.test.ts
+│   └── lightning-broker-smoke.test.ts
 │
 └── helpers/                 (Future: shared utilities)
 ```
@@ -83,20 +99,13 @@ tests/
 
 ## Known Issues
 
-### Flaky Integration Tests
+### Flaky Live Tests
 
-**Affected Tests:** `tests/integration/safety-hazards.test.ts`
-- 1-4 tests may fail due to NOAA API timeouts
-- Root cause: External NOAA NWPS API slow/unavailable
-- Not a code issue - external service reliability
-
-**Workaround:**
-```bash
-# If integration tests fail, run unit tests only
-npm test tests/unit/
-```
-
-**Status:** Tracked in issue #XX, fix planned for v1.7.1
+The files in `tests/live/` call real upstreams, so they can fail for reasons outside
+this code: a slow or refusing API, or a broker that blocks your IP. `npm test` does not
+run them, so they cannot fail the gate, CI or a publish. A human reads the result of
+`npm run test:live` at release time. Every live smoke test rethrows anything that is not
+a transport failure (GOTCHAS G9), so a red live file is worth reading before re-running.
 
 ---
 
@@ -123,33 +132,34 @@ These tests verify the most important functionality:
 
 ## CI/CD Integration
 
-### On Every Commit
-- Unit tests run (~2 seconds)
-- Fast feedback on code changes
-
-### On Pull Request
-- Full test suite runs (~4-5 minutes)
-- Integration tests verify API compatibility
+### On Every Push and Pull Request (CI)
+- `npm test`: the offline unit + integration gate (~20 seconds)
+- No live test runs in CI
 
 ### On Release
-- Full test suite with coverage report
-- Performance benchmarks
+- `scripts/update-docs-for-release.sh` runs `npm test` once and refuses a red suite
+- `npm run test:live` runs once, by hand; a human triages any failure
+- `publish.yml` runs the same offline `npm test` before publishing
 - Security audit
 
 ---
 
 ## Troubleshooting
 
-### Tests Timing Out?
+### Live Tests Timing Out?
 ```bash
-# Increase timeout for slow networks
-API_TIMEOUT_MS=60000 npm test
+# Increase the per-request timeout for slow networks
+API_TIMEOUT_MS=60000 npm run test:live
 ```
 
-### Integration Tests Failing?
-1. Check NOAA service status: https://weather.gov
-2. Retry tests (may be transient)
-3. Run unit tests only: `npm test tests/unit/`
+### Live Tests Failing?
+1. Check the upstream's status (for NOAA: https://weather.gov)
+2. Read the failure: a transport skip logs and passes; anything red is a real result to triage
+3. `npm test` is offline, so a red `npm test` is never a network problem
+
+### Integration Test Fails With `ENONLOOPBACK`?
+The test tried to reach a non-loopback host. Move it to `tests/live/`, or point it at a
+local server.
 
 ### Coverage Report Not Generating?
 ```bash
@@ -237,10 +247,8 @@ describe('Feature Name', () => {
 ## Test Metrics & Goals
 
 ### Current Performance
-- ✅ 5,165 total tests
-- ✅ 99.6% pass rate
-- ✅ <2s unit test execution
-- ⚠️ ~4-5min full suite execution
+- ✅ 5,169 total tests
+- ✅ ~20s offline gate (`npm test`)
 
 ### Coverage Goals
 - ✅ Utilities: 100% (achieved)
@@ -249,8 +257,7 @@ describe('Feature Name', () => {
 - ❌ Analytics: 80% (currently 0%)
 
 ### Quality Targets
-- 100% pass rate on unit tests
-- 99%+ pass rate on integration tests
+- 100% pass rate on unit and integration tests (both offline)
 - <1% flaky test rate
 - 80%+ overall code coverage
 

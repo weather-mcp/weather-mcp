@@ -237,12 +237,12 @@ describe('DOC_SITES', () => {
     const [envMatch] = siteMatches(envSource, envRows[0]);
     expect(parseCount(envMatch.captured, envRows[0].format)).toBe(toolCount());
 
-    // docs/testing/TEST_SUITE_README.md — four "N tests" phrases the per-fact
-    // pattern reaches (a caveat and three dated history lines), none of which
-    // overlap either of this file's two rows (a table cell and a bullet).
+    // docs/testing/TEST_SUITE_README.md — three "N tests" phrases the per-fact
+    // pattern reaches (three dated history lines), none of which overlap
+    // either of this file's two rows (a table cell and a bullet).
     const suiteSource = readRepoFile('docs/testing/TEST_SUITE_README.md');
     const suiteTrap = [...suiteSource.matchAll(/\b[0-9][0-9,]* tests\b/g)];
-    expect(suiteTrap.length).toBe(4);
+    expect(suiteTrap.length).toBe(3);
     const suiteRows = DOC_SITES.filter((r) => r.file === 'docs/testing/TEST_SUITE_README.md');
     expect(suiteRows.length).toBe(2);
     const siteSpans = suiteRows.flatMap((row) => siteMatches(suiteSource, row));
