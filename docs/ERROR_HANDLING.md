@@ -403,6 +403,31 @@ the server is using. It never carries the username, password or query string of
 No action is usually needed. If every lightning query reports an outage, check outbound access to
 the broker on port 1883, or set `BLITZORTUNG_MQTT_URL` to a reachable one.
 
+#### Lightning feed message rejected
+
+**Nothing appears in the report.** A message from the broker that is malformed, larger than 4 KB,
+not a JSON object, has a wrong-typed or out-of-range coordinate, a missing or non-positive time, or
+a time more than 5 minutes ahead of the server's clock is dropped before it is buffered. The report
+carries no per-message note, so a dropped strike is indistinguishable there from a quiet sky. A
+wrong-typed polarity, amplitude or station count does not drop the strike; that field reads as absent.
+
+The stderr log carries at most one warning a minute:
+
+```
+Lightning feed messages rejected { rejected: { not_json: 3, future: 12 }, securityEvent: true }
+```
+
+It holds reason counts only — no topic, no message text, no parse error. The first reject warns at
+once; later ones are counted and reported with the next reject after the minute is up, so counts
+left when rejects stop are never printed.
+
+- **Repeated `future` counts** mean the server's clock is behind. A clock more than 5 minutes slow
+  rejects every real strike, and the report then reads as a quiet sky. Fix the host clock (NTP).
+- **Other reasons** point at the broker. Every message seen from the default public broker passes these checks. If you set
+  `BLITZORTUNG_MQTT_URL`, check that broker's message format.
+- **When reject counts make a report inconclusive**, consult official weather services — the NWS or
+  your national authority — rather than reading the report as an all-clear.
+
 ### Life-Threatening Alert Banner Failures
 
 The one failure on this page that renders **nothing at all**, deliberately.

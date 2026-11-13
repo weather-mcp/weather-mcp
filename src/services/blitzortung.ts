@@ -13,6 +13,8 @@ import { LightningStrike, LightningFeedFailure, LightningFeedFailureReason } fro
 import { calculateGeohashSubscriptions } from '../utils/geohash.js';
 import { MqttLoadFailedError, MqttUnavailableError } from '../errors/ApiError.js';
 import { remainingToolBudgetMs } from '../utils/toolBudget.js';
+import { parseStrike, StrikeBuffer } from '../utils/strikeBuffer.js';
+import type { StrikeRejectReason } from '../utils/strikeBuffer.js';
 
 /**
  * The `mqtt` package is an **optional** dependency: it is the only dependency
@@ -165,39 +167,29 @@ async function loadMqtt(): Promise<MqttModule> {
 }
 
 /**
- * Raw lightning strike data from MQTT
+ * At most one 'Lightning feed messages rejected' warn per this interval. The flush is lazy: the next
+ * reject after the interval carries the counts since the last warn. No timer, so nothing for the
+ * shutdown coordinator to know about; counts left when rejects stop are never printed.
  */
-interface MQTTLightningStrike {
-  lat: number;
-  lon: number;
-  time: number; // Unix timestamp in milliseconds
-  pol?: number; // Polarity
-  mcs?: number; // Amplitude (milli-coulomb-seconds, or kA)
-  stat?: number; // Number of stations that detected the strike
-}
+const REJECT_WARN_INTERVAL_MS = 60_000;
 
 /**
- * Calculate distance between two coordinates using Haversine formula
+ * Broker schemes that are not plaintext. mqtt 5.16.1's Node branch maps ssl, tls
+ * and mqtts to TLS and wss to a secure WebSocket; wxs and alis are its
+ * browser-branch secure schemes (on Node they fail to connect, which is not a
+ * plaintext link).
  */
-function calculateDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+const ENCRYPTED_BROKER_SCHEMES: ReadonlySet<string> = new Set(['mqtts', 'wss', 'ssl', 'tls', 'wxs', 'alis']);
 
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+/** True when the broker URL's scheme is one `mqtt` treats as secure. Never logs. */
+export function isEncryptedBrokerUrl(url: string): boolean {
+  let protocol: string;
+  try {
+    protocol = new URL(url).protocol;
+  } catch {
+    return false;
+  }
+  return ENCRYPTED_BROKER_SCHEMES.has(protocol.slice(0, -1).toLowerCase());
 }
 
 export class BlitzortungService {
@@ -222,10 +214,15 @@ export class BlitzortungService {
   private readonly reconnectPeriod = 5000; // 5 seconds
   private readonly connectTimeout = 30000; // 30 seconds
 
-  // Rolling buffer of recent strikes (last 2 hours)
-  private strikeBuffer: Map<string, LightningStrike> = new Map();
+  // Rolling buffer of recent strikes (last 2 hours). Only `parseStrike` output enters it
+  // (src/utils/strikeBuffer.ts states the invariant).
   private readonly bufferDuration = 120 * 60 * 1000; // 2 hours in milliseconds
   private readonly maxBufferSize = 10000; // Maximum strikes to buffer (safety limit)
+  private strikeBuffer = new StrikeBuffer({ maxSize: this.maxBufferSize, retentionMs: this.bufferDuration });
+
+  // Rejected feed messages, counted per reason since the last bounded warn.
+  private rejectCounts: Partial<Record<StrikeRejectReason, number>> = {};
+  private lastRejectWarnAt: number | null = null;
 
   // Subscription management with LRU tracking
   private subscribedGeohashes: Map<string, number> = new Map(); // geohash -> last access timestamp
@@ -318,8 +315,7 @@ export class BlitzortungService {
 
     try {
       // Security warning for plaintext connections
-      const isPlaintext = this.brokerUrl.startsWith('mqtt://') ||
-                         (!this.brokerUrl.startsWith('mqtts://') && !this.brokerUrl.startsWith('wss://'));
+      const isPlaintext = !isEncryptedBrokerUrl(this.brokerUrl);
 
       if (isPlaintext) {
         logger.warn('SECURITY: Using plaintext MQTT connection (unencrypted)', {
@@ -419,93 +415,56 @@ export class BlitzortungService {
   }
 
   /**
-   * Handle incoming MQTT message
+   * Handle incoming MQTT message. The payload is untrusted twice over (plaintext link, third-party
+   * broker): `parseStrike` validates it, and a reject is counted, never logged per message.
    */
   private handleMessage(topic: string, payload: Buffer): void {
-    try {
-      const payloadStr = payload.toString();
-      const data: MQTTLightningStrike = JSON.parse(payloadStr);
+    const parsed = parseStrike(payload, Date.now());
+    if (!parsed.ok) {
+      this.recordReject(parsed.reason);
+      return;
+    }
 
-      // Validate required fields
-      if (!data.lat || !data.lon || !data.time) {
-        logger.warn('Lightning strike missing required fields', {
-          topic,
-          hasLat: !!data.lat,
-          hasLon: !!data.lon,
-          hasTime: !!data.time
-        });
-        return;
-      }
-
-      // Convert timestamp - Blitzortung sends nanoseconds, convert to milliseconds
-      // Example: 1762715394083570200 nanoseconds -> 1731178800000 milliseconds
-      let timestampMs = data.time;
-      if (data.time > 10000000000000) {
-        // If timestamp is > year 2286 in milliseconds, it's probably in nanoseconds
-        timestampMs = Math.floor(data.time / 1000000);
-      }
-
-      // Convert to our LightningStrike format
-      const strike: LightningStrike = {
-        timestamp: new Date(timestampMs),
-        latitude: data.lat,
-        longitude: data.lon,
-        polarity: data.pol || 0,
-        amplitude: data.mcs || 0,
-        stationCount: data.stat,
-        distance: 0 // Will be calculated when filtering
-      };
-
-      // Validate timestamp
-      if (isNaN(strike.timestamp.getTime())) {
-        logger.warn('Invalid timestamp in lightning strike', {
-          topic,
-          time: data.time,
-          converted: timestampMs
-        });
-        return;
-      }
-
-      // Check buffer size limit before adding (safety bounds checking)
-      if (this.strikeBuffer.size >= this.maxBufferSize) {
-        logger.warn('Lightning strike buffer at capacity, removing oldest entries', {
-          currentSize: this.strikeBuffer.size,
-          maxSize: this.maxBufferSize,
-          securityEvent: true
-        });
-
-        // Remove oldest 10% of entries to make room
-        const entriesToRemove = Math.floor(this.maxBufferSize * 0.1);
-        const iterator = this.strikeBuffer.keys();
-        for (let i = 0; i < entriesToRemove; i++) {
-          const result = iterator.next();
-          if (!result.done) {
-            this.strikeBuffer.delete(result.value);
-          }
-        }
-      }
-
-      // Add to buffer with unique key
-      const key = `${data.time}_${data.lat}_${data.lon}`;
-      this.strikeBuffer.set(key, strike);
-
-      // Log strikes at DEBUG level with coordinate redaction for privacy
-      // Strike coordinates are rounded to ~1km precision to prevent tracking individual locations
-      const redacted = redactCoordinatesForLogging(strike.latitude, strike.longitude);
-      logger.debug('Lightning strike added to buffer', {
-        bufferSize: this.strikeBuffer.size,
-        strike: {
-          lat: redacted.lat,
-          lon: redacted.lon,
-          time: strike.timestamp.toISOString(),
-          topic
-        }
+    const before = this.strikeBuffer.size;
+    const { trimmed } = this.strikeBuffer.add(parsed.key, parsed.strike);
+    if (trimmed > 0) {
+      // Safety bounds: the oldest 10% by insertion order made room for this strike.
+      logger.warn('Lightning strike buffer at capacity, removing oldest entries', {
+        currentSize: before,
+        maxSize: this.maxBufferSize,
+        securityEvent: true
       });
-    } catch (error) {
-      logger.warn('Failed to parse lightning strike message', {
-        error: (error as Error).message,
+    }
+
+    // Log strikes at DEBUG level with coordinate redaction for privacy
+    // Strike coordinates are rounded to ~1km precision to prevent tracking individual locations
+    const strike = parsed.strike;
+    const redacted = redactCoordinatesForLogging(strike.latitude, strike.longitude);
+    logger.debug('Lightning strike added to buffer', {
+      bufferSize: this.strikeBuffer.size,
+      strike: {
+        lat: redacted.lat,
+        lon: redacted.lon,
+        time: strike.timestamp.toISOString(),
         topic
+      }
+    });
+  }
+
+  /**
+   * Count a rejected feed message, and warn at most once per REJECT_WARN_INTERVAL_MS. The warn
+   * carries reasons and counts only: no topic, no payload, no parse error text (all broker-shaped).
+   */
+  private recordReject(reason: StrikeRejectReason): void {
+    this.rejectCounts[reason] = (this.rejectCounts[reason] ?? 0) + 1;
+    const now = Date.now();
+    if (this.lastRejectWarnAt === null || now - this.lastRejectWarnAt >= REJECT_WARN_INTERVAL_MS) {
+      logger.warn('Lightning feed messages rejected', {
+        rejected: { ...this.rejectCounts },
+        securityEvent: true
       });
+      this.rejectCounts = {};
+      this.lastRejectWarnAt = now;
     }
   }
 
@@ -568,16 +527,18 @@ export class BlitzortungService {
 
     const now = Date.now();
 
-    // Check if we need to evict old subscriptions before adding new ones
+    // Check if we need to evict old subscriptions before adding new ones. No `await` may sit
+    // between this check and the stage loop below, on either path, or two concurrent callers both
+    // pass it and jointly overflow the cap (G20). The query path evicts synchronously for that reason.
     const potentialNewSubs = Array.from(geohashes).filter(g => !this.subscribedGeohashes.has(g));
-    if (this.subscribedGeohashes.size + potentialNewSubs.length > this.maxSubscriptions) {
+    const excess = this.subscribedGeohashes.size + potentialNewSubs.length - this.maxSubscriptions;
+    if (excess > 0) {
       if (prewarm) {
-        // Skip the whole location and stamp nothing. No `await` may sit between this check and
-        // the stage loop below, or two concurrent pre-warms both pass it and jointly overflow.
+        // Skip the whole location and stamp nothing.
         prewarm.outcome.status = 'skipped-capacity';
         return;
       }
-      await this.evictOldestSubscriptions(potentialNewSubs.length);
+      this.evictOldestSubscriptions(excess, geohashes);
     }
     if (prewarm && potentialNewSubs.length > 0) {
       logSubscribing();
@@ -653,19 +614,28 @@ export class BlitzortungService {
   }
 
   /**
-   * Evict oldest subscriptions to make room for new ones (LRU eviction)
+   * Evict the oldest subscriptions to make room for new ones (LRU eviction): exactly `excess` of
+   * them, never one the current request needs (`keep`), so the queried area keeps its coverage
+   * start and the map never ends above the cap.
+   *
+   * Synchronous on purpose (G20): the caller's capacity check, these deletes, the `unsubscribe`
+   * call and the caller's stage loop are one run, so a concurrent query cannot pass the same check.
+   * The UNSUBACK is not awaited. That is safe because the evicted set and the staged set are
+   * disjoint (`keep`), so no unsubscribe/re-subscribe pair of one topic exists to order, and mqtt
+   * sends packets in call order (the property `pruneStaleSubscriptions` relies on).
    */
-  private async evictOldestSubscriptions(slotsNeeded: number): Promise<void> {
-    if (!this.client || slotsNeeded <= 0) {
+  private evictOldestSubscriptions(excess: number, keep: ReadonlySet<string>): void {
+    if (!this.client || excess <= 0) {
       return;
     }
 
-    // Sort by access time (oldest first)
+    // Candidates: everything this request does not need, oldest access first
     const sorted = Array.from(this.subscribedGeohashes.entries())
+      .filter(([geohash]) => !keep.has(geohash))
       .sort((a, b) => a[1] - b[1]);
 
     // Evict oldest entries
-    const toEvict = sorted.slice(0, slotsNeeded);
+    const toEvict = sorted.slice(0, Math.min(excess, sorted.length));
     const topics = toEvict.map(([geohash]) => {
       const geohashPath = geohash.split('').join('/');
       return `${this.topicPrefix}/${geohashPath}/#`;
@@ -673,7 +643,7 @@ export class BlitzortungService {
 
     logger.info('Evicting old geohash subscriptions (LRU)', {
       count: toEvict.length,
-      slotsNeeded,
+      slotsNeeded: excess,
       currentSize: this.subscribedGeohashes.size,
       maxSubscriptions: this.maxSubscriptions,
       securityEvent: true
@@ -687,22 +657,28 @@ export class BlitzortungService {
       this.geohashFirstSubscribed.delete(geohash);
     }
 
-    // Unsubscribe from topics
-    await new Promise<void>((resolve) => {
-      this.client!.unsubscribe(topics, (error) => {
-        if (error) {
-          // Name and code only, as on the subscribe path: mqtt's errors carry the broker host
-          // and port in message and stack.
-          const failure = error as NodeJS.ErrnoException;
-          logger.warn('Failed to unsubscribe from topics', {
-            name: failure.name,
-            code: failure.code,
-            topics: topics.slice(0, 3) // Log first 3 for debugging
-          });
-        }
-        resolve(); // Always resolve to avoid blocking
+    // Name and code only, as on the subscribe path: mqtt's errors carry the broker host and port
+    // in message and stack.
+    const logUnsubscribeFailure = (error: unknown): void => {
+      const failure = error as NodeJS.ErrnoException;
+      logger.warn('Failed to unsubscribe from topics', {
+        name: failure.name,
+        code: failure.code,
+        topics: topics.slice(0, 3) // Log first 3 for debugging
       });
-    });
+    };
+
+    // Unsubscribe from topics. Not awaited (see above); a failure only logs, and the query
+    // continues, because the maps are already updated.
+    try {
+      this.client.unsubscribe(topics, (error) => {
+        if (error) {
+          logUnsubscribeFailure(error);
+        }
+      });
+    } catch (error) {
+      logUnsubscribeFailure(error);
+    }
 
     logger.debug('Eviction complete', {
       remainingSubscriptions: this.subscribedGeohashes.size
@@ -1086,53 +1062,14 @@ export class BlitzortungService {
     radiusKm: number,
     timeWindowMinutes: number
   ): LightningStrike[] {
-    const now = Date.now();
-    const cutoffTime = now - timeWindowMinutes * 60 * 1000;
-    const strikes: LightningStrike[] = [];
-
-    for (const strike of this.strikeBuffer.values()) {
-      // Check time window
-      if (strike.timestamp.getTime() < cutoffTime) {
-        continue;
-      }
-
-      // Calculate distance
-      const distance = calculateDistance(
-        centerLat,
-        centerLon,
-        strike.latitude,
-        strike.longitude
-      );
-
-      // Check if within radius
-      if (distance <= radiusKm) {
-        strikes.push({
-          ...strike,
-          distance
-        });
-      }
-    }
-
-    // Sort by distance (nearest first)
-    strikes.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-
-    return strikes;
+    return this.strikeBuffer.query(centerLat, centerLon, radiusKm, timeWindowMinutes, Date.now());
   }
 
   /**
    * Clean up old strikes from buffer
    */
   private cleanupBuffer(): void {
-    const now = Date.now();
-    const cutoffTime = now - this.bufferDuration;
-    let removedCount = 0;
-
-    for (const [key, strike] of this.strikeBuffer.entries()) {
-      if (strike.timestamp.getTime() < cutoffTime) {
-        this.strikeBuffer.delete(key);
-        removedCount++;
-      }
-    }
+    const removedCount = this.strikeBuffer.prune(Date.now());
 
     if (removedCount > 0) {
       logger.debug('Cleaned up old lightning strikes from buffer', {
