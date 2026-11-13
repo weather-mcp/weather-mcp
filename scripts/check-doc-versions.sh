@@ -130,32 +130,23 @@ else
 fi
 # --- Tree checks (end) ------------------------------------------------------------
 
-# Check test count consistency
+# --- Test count (collect-only) (begin) ---
+# The documented count is every declared test, live ones included. It comes
+# from a collect-only run (scripts/lib/collect-test-count.sh): every test is
+# skipped, so this check runs no test and makes no network call. A count that
+# cannot be collected is an error, because without one the 8 test-count rows
+# below would be skipped rather than checked.
 echo ""
 echo "🧪 Checking test count consistency..."
-# Vitest prints "Tests  1930 passed (1930)" when green, but
-# "Tests  1 failed | 1929 passed (1930)" when anything fails. The
-# parenthetical total is the count the docs quote in both cases, so anchor
-# on it — reading the first number in the line makes one flaky live-network
-# test report a suite of 1 and three phantom doc mismatches.
-# That parse is shared with the release writer through
-# scripts/lib/derived-facts.mjs, so the two scripts cannot disagree about how
-# many tests there are; this script keeps its own pick of the summary line.
-# `|| true` keeps a red suite from aborting the script under `set -e`.
-TEST_OUTPUT=$(npm test 2>&1 || true)
-TEST_SUMMARY=$(echo "$TEST_OUTPUT" | grep -E "Tests[[:space:]]+[0-9]" | tail -1)
-TEST_COUNT=$(node scripts/lib/derived-facts.mjs test-count "$TEST_SUMMARY" || true)
-if [ -n "$TEST_COUNT" ]; then
-  echo "📊 Actual test count: ${GREEN}${TEST_COUNT}${NC}"
-
-  # Documentation can be perfectly consistent while the suite is red — that
-  # is a test problem, not a doc problem, so say so without failing here.
-  if node scripts/lib/derived-facts.mjs is-red "$TEST_SUMMARY"; then
-    echo "⚠️  ${YELLOW}Test suite is not green${NC} — counts checked against the total; run 'npm test'"
-  fi
+TEST_COUNT=""
+if TEST_COUNT=$(scripts/lib/collect-test-count.sh); then
+  echo "📊 Declared test count (collect-only): ${GREEN}${TEST_COUNT}${NC}"
 else
-  echo "⚠️  Could not determine test count (npm test failed?)"
+  TEST_COUNT=""
+  echo "❌ Test count: ${RED}could not collect${NC} — see scripts/lib/collect-test-count.sh"
+  ERRORS=$((ERRORS+1))
 fi
+# --- Test count (collect-only) (end) ---
 
 # Check tool count consistency (source of truth: TOOL_NAMES in src/config/tools.ts,
 # read through scripts/lib/derived-facts.mjs — the same derivation the release
@@ -170,8 +161,8 @@ echo "📊 Tools declared in src/config/tools.ts: ${GREEN}${TOOL_COUNT}${NC}"
 # The checker cannot cover less ground than the writer because there is one
 # list; each row must match exactly once, so a reworded or duplicated site
 # fails here instead of escaping it. test-count rows are skipped, with a
-# warning, when the suite produced no count — tool counts are still checked
-# then.
+# warning, when no count was collected (already counted as an error above) —
+# tool counts are still checked then.
 echo ""
 echo "📋 Checking every doc count site..."
 SITES_RC=0

@@ -118,6 +118,35 @@ export function isRed(summaryLine) {
 }
 
 /**
+ * The declared test total from a collect-only Vitest JSON report, or null.
+ *
+ * scripts/lib/collect-test-count.sh runs every project with a `-t` filter that
+ * matches no test, so every test is `pending` and nothing executes. The total
+ * is returned only when the report proves that: nothing passed (a filter that
+ * matched a real test would have run it), nothing failed, no test file failed
+ * to load, and the total is above zero.
+ * @param {unknown} report the parsed `--reporter=json` output
+ * @returns {number|null}
+ */
+export function testCountFromReport(report) {
+  if (typeof report !== 'object' || report === null || Array.isArray(report)) {
+    return null;
+  }
+  const { numTotalTests, numPassedTests, numFailedTests, numFailedTestSuites } = report;
+  if (
+    numPassedTests !== 0
+    || numFailedTests !== 0
+    || numFailedTestSuites !== 0
+    || typeof numTotalTests !== 'number'
+    || !Number.isInteger(numTotalTests)
+    || numTotalTests <= 0
+  ) {
+    return null;
+  }
+  return numTotalTests;
+}
+
+/**
  * ---------------------------------------------------------------------------
  * DOC_SITES — the one list of doc count sites
  * ---------------------------------------------------------------------------
@@ -497,6 +526,26 @@ if (isMain) {
       process.exit(1);
     }
     process.stdout.write(String(total) + '\n');
+  } else if (fact === 'test-count-report') {
+    // Exit 2: no readable file. Exit 1: a report that is not provably collect-only.
+    let raw;
+    try {
+      raw = readFileSync(arg, 'utf8');
+    } catch {
+      process.stderr.write('test-count-report: cannot read the report file\n');
+      process.exit(2);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      process.exit(1);
+    }
+    const total = testCountFromReport(parsed);
+    if (total === null) {
+      process.exit(1);
+    }
+    process.stdout.write(String(total) + '\n');
   } else if (fact === 'is-red') {
     // grep -q polarity: exit 0 when red, 1 when not, so it reads naturally in `if`.
     process.exit(isRed(arg) ? 0 : 1);
@@ -579,6 +628,7 @@ if (isMain) {
   } else {
     process.stderr.write(
       'usage: node scripts/lib/derived-facts.mjs <tool-count|test-count <line>|is-red <line>\n'
+      + '       |test-count-report <vitest-json-file>\n'
       + '       |validate-sites|check-sites [<test-count>]|write-sites <test-count>>\n'
     );
     process.exit(2);

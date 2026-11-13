@@ -22,6 +22,7 @@ import {
   toolCount,
   testCount,
   isRed,
+  testCountFromReport,
   DOC_SITES,
   renderCount,
   parseCount,
@@ -445,5 +446,42 @@ describe('DOC_SITES', () => {
       expect(new Set(result.changed)).toEqual(new Set(files));
       expect(result.changed.length).toBe(11);
     });
+  });
+});
+
+describe('testCountFromReport', () => {
+  // The shape a collect-only run writes: every test pending, nothing executed.
+  const collectOnly = {
+    numTotalTests: 5163,
+    numPassedTests: 0,
+    numFailedTests: 0,
+    numPendingTests: 5163,
+    numFailedTestSuites: 0,
+  };
+
+  it('returns the total of an all-pending report', () => {
+    expect(testCountFromReport(collectOnly)).toBe(5163);
+  });
+
+  it('returns null when any test passed (the filter matched a real test)', () => {
+    expect(testCountFromReport({ ...collectOnly, numPassedTests: 1 })).toBeNull();
+  });
+
+  it('returns null when any test failed', () => {
+    expect(testCountFromReport({ ...collectOnly, numFailedTests: 1 })).toBeNull();
+  });
+
+  it('returns null when a test file failed to load', () => {
+    expect(testCountFromReport({ ...collectOnly, numFailedTestSuites: 1 })).toBeNull();
+  });
+
+  it('returns null for a zero total', () => {
+    expect(testCountFromReport({ ...collectOnly, numTotalTests: 0, numPendingTests: 0 })).toBeNull();
+  });
+
+  it('returns null for a non-object', () => {
+    expect(testCountFromReport(null)).toBeNull();
+    expect(testCountFromReport([])).toBeNull();
+    expect(testCountFromReport('5163')).toBeNull();
   });
 });
