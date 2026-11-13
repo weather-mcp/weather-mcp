@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A lightning query at the subscription limit no longer drops the area being queried.** When the server already followed 50 areas, a query for a new one could stop following part of its own area, restart that area's monitoring time, and leave more than 50 areas followed. Two queries at once could also pass the limit together. A query now stops following only as many of the oldest other areas as it needs.
 - **The plaintext-connection warning no longer fires for `ssl://`, `tls://`, `wxs://` and `alis://` brokers.** The `mqtt` client treats all four as encrypted: `ssl://` and `tls://` connect over TLS as `mqtts://` does, and `wxs://` and `alis://` are its secure WebSocket schemes for browsers. None of them is a plaintext link, and the connection log line now says `encrypted: true` for them. The scheme is read case-insensitively.
 
+### Security
+- **The HTTP entry's web-server libraries are updated past seven moderate advisories.** `hono` moves from 4.13.13 to 4.13.16 and `@hono/node-server` from 2.1.5 to 2.1.6, both reached through the MCP SDK. The advisories cover request-path parsing, middleware scoping and a crash on a reset WebSocket upgrade. The stdio entry does not load either library. If you install from npm, run a fresh install to pick up the fixed versions, because the lockfile does not ship.
+
 ## [1.35.14] - 2026-11-11
 
 Three alert answers could tell you less than the truth. A US territory such as Puerto Rico or Guam could be told that alerts were not available there, although NOAA issues them. A long national alert list from India, the Philippines or Indonesia could end in a green check when only part of it had been checked. And an alert that its issuer had cancelled stayed on the list until it expired. Each of these now gives the honest answer.
