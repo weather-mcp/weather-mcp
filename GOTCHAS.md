@@ -575,7 +575,7 @@ minutes that a harness does in under a second. Both scripts ran a full suite,
 live files included, until live-test-isolation (`ae94183`, `d51f1f4`, 2026-11-13).
 
 **Verify:** `grep -n 'npm test' scripts/check-doc-versions.sh` prints nothing (the checker
-collects, never runs), and `grep -n '^TEST_OUTPUT=$(npm test' scripts/update-docs-for-release.sh`
+collects, never runs), and `grep -nF 'TEST_OUTPUT=$(npm test' scripts/update-docs-for-release.sh`
 prints exactly one line. Any other executing `npm test` in either script is a regression.
 
 **Evidence:** 2026-08-24 (`eee2612`, `1aca484`, changelog-link-refs T1/T2) — the
@@ -6474,8 +6474,17 @@ process's own `process.env` is never mutated. The parent dead-proxy probe then s
 because each child overwrites its own proxy variables
 (`tests/integration/http-deadline-proxy.test.ts`).
 
-**Status:** active. Related: [G70] (the unit-level inert-mock probe this extends), [G64]/[G71]
-(why a `tests/integration/` file must never reach the internet).
+**Network-namespace variant** (2026-11-13, live-test-isolation T7, `d51f1f4`): `unshare -rn` is
+the stronger "no network" probe, but a fresh namespace has `lo` **down**, so every loopback test
+fails with it and the probe reads as a broken gate. The first offline release-prep run went red on
+61 of 5,094 tests for exactly this reason. Bring loopback up inside the namespace first:
+`unshare -rn bash -c 'ip link set lo up; <command>'`, and prove the network is really gone in the
+same shell (`curl -m 5 https://registry.npmjs.org` must fail). Then 5,094 of 5,094 passed.
+
+**Status:** active, **extended 2026-11-13** (network-namespace variant). Related: [G70] (the
+unit-level inert-mock probe this extends). Since live-test-isolation, `tests/integration/` runs
+under `tests/setup/loopback-only.ts`, so a non-loopback connect there fails with `ENONLOOPBACK`
+whatever the proxy variables say; the retired [G64]/[G71] record why that guard exists.
 
 ---
 
@@ -7407,6 +7416,34 @@ pinned to `4096` in `424666c`, after which that mutation goes red.
 
 **Status:** active. Lint candidate: flag a test that both imports an exported numeric constant and uses it in an
 arithmetic fixture expression. Related: [G65] (where mutation rows come from), [G45].
+
+---
+
+## G161 — A bare `vitest` entry point runs every configured project, opt-in ones included
+
+**Trigger:** adding an opt-in Vitest project (`live`, or anything that must not run by default)
+while any `package.json` script, workflow step or doc command still runs bare `vitest`,
+`vitest run`, `vitest --ui` or `vitest --coverage`.
+
+**Rule:** scope every non-opt-in entry point to the default projects by name
+(`--project unit --project integration`), and give the opt-in project its own named script
+(`test:live`). Enumerate **every** script that invokes `vitest`, not only `test`: watch and UI
+mode run an initial pass over the selected projects, so a scoped `test` beside a bare
+`test:watch` still sends live traffic from an ordinary developer command.
+
+**Why:** Vitest has no notion of a default-off project. A bare invocation selects all of them.
+The plan for live-test-isolation scoped `test` and `test:coverage` and deferred `test:watch` and
+`test:ui` on the claim that they "run nothing on their own"; the plan review caught it (codex-R1).
+
+**Verify:** `grep -n 'vitest' package.json` — every script except the opt-in one names its
+`--project`s. `npm run test:watch -- --run` prints only the default projects' files.
+
+**Evidence:** 2026-11-13, live-test-isolation plan review codex-R1, fixed in T1 (`ffcc939`).
+Side finding: `test:ui` cannot start at all here, because `@vitest/ui` is not installed; its
+scoping was checked by reading the script, not by running it.
+
+**Status:** active. Lint candidate: a unit test that reads `package.json` and fails on a `vitest`
+script with no `--project` other than `test:live`. Related: [G9].
 
 ---
 
