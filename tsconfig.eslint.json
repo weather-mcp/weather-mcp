@@ -5,6 +5,7 @@
     "src/**/*.ts",
     "tests/unit/**/*.ts",
     "tests/integration/**/*.ts",
+    "tests/live/**/*.ts",
     "tests/helpers/**/*.ts",
     "tests/setup/**/*.ts"
   ]
