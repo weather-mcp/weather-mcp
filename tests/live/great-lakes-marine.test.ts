@@ -71,7 +71,7 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
       expect(isNOAASource).toBe(true);
 
       console.log('Traverse City Marine Conditions:\n', text.substring(0, 500));
-    }, 15000); // 15 second timeout for API call
+    });
 
     it('should retrieve marine conditions for Duluth, MN (Lake Superior)', async () => {
       const args = {
@@ -95,7 +95,7 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
       expect(isGreatLakesData).toBe(true);
 
       console.log('Duluth Marine Conditions:\n', text.substring(0, 500));
-    }, 15000);
+    });
 
     it('should retrieve marine conditions for Cleveland, OH (Lake Erie)', async () => {
       const args = {
@@ -113,7 +113,7 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
       expect(text).toContain('Marine Conditions Report');
 
       console.log('Cleveland Marine Conditions:\n', text.substring(0, 500));
-    }, 15000);
+    });
   });
 
   describe('Open-Meteo Fallback for Ocean Locations', () => {
@@ -136,7 +136,7 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
       expect(text).not.toContain('NOAA National Weather Service');
 
       console.log('Atlantic Ocean Marine Conditions:\n', text.substring(0, 500));
-    }, 15000);
+    });
 
     it('should use Open-Meteo for Pacific Ocean location', async () => {
       const args = {
@@ -154,7 +154,7 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
       expect(text).toContain('Marine Conditions Report');
 
       console.log('Pacific Ocean Marine Conditions:\n', text.substring(0, 500));
-    }, 15000);
+    });
   });
 
   describe('Coastal Bay Detection', () => {
@@ -176,7 +176,7 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
       expect(result.content).toHaveLength(1);
 
       console.log('San Francisco Bay Marine Conditions:\n', result.content[0].text.substring(0, 500));
-    }, 15000);
+    });
 
     it('should detect Chesapeake Bay', async () => {
       const detection = shouldUseNOAAMarine(37.5, -76.3);
@@ -195,7 +195,7 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
       expect(result.content).toHaveLength(1);
 
       console.log('Chesapeake Bay Marine Conditions:\n', result.content[0].text.substring(0, 500));
-    }, 15000);
+    });
   });
 
   describe('Marine Data Format Validation', () => {
@@ -212,7 +212,7 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
       // Check for standard marine data fields
       expect(text).toContain('Wave');
       expect(text).toContain('Wind');
-    }, 15000);
+    });
 
     it('should include wind conditions in output', async () => {
       const args = {
@@ -226,7 +226,7 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
 
       // Wind data should be present
       expect(text).toContain('Wind');
-    }, 15000);
+    });
   });
 
   describe('Error Handling and Fallback', () => {
@@ -258,6 +258,6 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
       expect(result).toBeDefined();
       expect(result.content).toHaveLength(1);
       expect(result.content[0].text).toContain('Marine Conditions Report');
-    }, 15000);
+    });
   });
 });

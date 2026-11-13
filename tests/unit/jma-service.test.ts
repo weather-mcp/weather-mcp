@@ -430,10 +430,10 @@ describe('JmaService', () => {
   // ------------------------------------------------------------------
   // 21c: every socket-level code maps to the named connect failure
   //
-  // This file's live sibling (tests/integration/japan-alerts.test.ts) runs
-  // under `npm test`, which publish.yml runs — so a transport code that falls
-  // to the "Unknown error" residual is a failed publish after the tag exists
-  // (G64/G71). The mapping is what keeps that from happening quietly.
+  // This file's live sibling (tests/live/japan-alerts.test.ts) runs only
+  // under `npm run test:live`, not `npm test` or publish.yml. A transport code
+  // that falls to the "Unknown error" residual gives the user vague wording.
+  // The mapping keeps the wording specific.
   // ------------------------------------------------------------------
   it.each(['ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'EAI_AGAIN', 'EPIPE'])(
     'maps %s to the fixed connect-failure message',

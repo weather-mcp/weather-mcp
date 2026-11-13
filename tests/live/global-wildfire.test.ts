@@ -8,14 +8,14 @@
  * fetch in the second describe block) and belongs to the project's
  * flaky-tolerant live-network set — re-run before blaming your diff. See
  * the "Flaky live-network tests" project memory and the tolerant-live-test
- * convention used throughout tests/integration/ (almanac.test.ts,
+ * convention used throughout tests/live/ (almanac.test.ts,
  * global-rivers.test.ts, safety-hazards.test.ts).
  *
  * **Mock/live split — approach chosen:** Block 1 needs mocked HTTP; Block 2
  * needs the real network, in the same file. A module-level `vi.mock('axios')`
  * (the tests/unit/firms-service.test.ts style) would also swallow Block 2's
  * live call. Instead, this file follows the *other* established pattern in
- * this repo — tests/integration/almanac.test.ts's `AcisService` block, which
+ * this repo — tests/live/almanac.test.ts's `AcisService` block, which
  * `vi.spyOn`s the private axios `client` field of one real service instance
  * rather than mocking the `axios` module globally. Block 1 constructs real
  * `FIRMSService` instances and spies on each instance's own
@@ -211,7 +211,7 @@ describe('Global wildfire integration — mocked CSV shapes end-to-end (determin
 describe('Global wildfire integration — live keyless smoke test (tolerant of network flake)', () => {
   it('fetches real FIRMS keyless data for a small regional file (Vienna, Austria) through the real handler', async () => {
     // A completely unspied FIRMSService — real axios, real network, no
-    // FIRMS_MAP_KEY needed (keyless flat-file path, CI-safe with no secret).
+    // FIRMS_MAP_KEY needed (keyless flat-file path, no secret needed).
     const firmsService = new FIRMSService();
     const nominatimService = makeNominatimFake('at'); // Austria — avoids a live Nominatim dependency
 
@@ -250,5 +250,5 @@ describe('Global wildfire integration — live keyless smoke test (tolerant of n
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, 60000);
+  });
 });

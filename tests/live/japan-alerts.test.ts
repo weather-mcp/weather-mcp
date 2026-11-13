@@ -10,7 +10,7 @@
  * file goes red.
  *
  * **Tolerant-but-not-silent, and this is the whole point of the file**
- * (precedent: `tests/integration/national-cap-alerts.test.ts`). Every
+ * (precedent: `tests/live/national-cap-alerts.test.ts`). Every
  * `expect` sits *after* its `try/catch`, gated on the result being defined.
  * `isTransportFailure` decides, for each caught error, whether it is one of
  * `JmaService['toJmaError']`'s own fixed transport strings — timeout,
@@ -23,10 +23,9 @@
  * exists to prevent. Declaring an empty upstream explicitly, rather than
  * letting an all-items loop pass vacuously, follows the same file.
  *
- * **G64/G71: this file gates a future npm publish** (`publish.yml` runs bare
- * `npm test`, which includes `tests/integration/`, unlike `ci.yml`'s
- * unit-only run). So: strictly tolerant of transport failure, a generous
- * per-test timeout (the index is ~5.27 MB decompressed / ~271 KB on the
+ * **This file runs only under `npm run test:live`** (the `live` project),
+ * never in `npm test`, CI or publish. So: strictly tolerant of transport
+ * failure, the `live` project's timeout (the index is ~5.27 MB decompressed / ~271 KB on the
  * wire and took ~1.9 s cold from this machine on 2026-09-03 — a worse route
  * needs headroom), no build-time or CI fetch of JMA anywhere, and a single
  * shared `JmaService` instance across every test in this file so the whole
@@ -58,11 +57,10 @@ const service = new JmaService();
  * strings — see `src/services/jma.ts`: request timeout, unable to connect,
  * a 5xx server error, a rate limit, an oversize response, a non-5xx status,
  * or the unmapped-code residual, for either the "alert index" or the
- * "warning document". The last two are here because this file runs under
- * `npm test` in publish.yml, so anything it rethrows fails a publish *after*
- * the tag exists (G64/G71): a 403 is how an upstream refusing GitHub's runner
- * presents, and a transport code the service does not map reaches the
- * "Unknown error" string rather than a named one.
+ * "warning document". The last two are here because a 403 is how an upstream
+ * refusing a runner presents, and a transport code the service does not map
+ * reaches the "Unknown error" string rather than a named one. This file runs
+ * only under `npm run test:live`, never in `npm test`, CI or publish.
  *
  * Everything else — including the positive-control rejection "JMA alert index
  * carries no warning bulletins" or "JMA alert index is not in the expected
@@ -80,11 +78,10 @@ function isTransportFailure(err: unknown): boolean {
     message.includes('server error (status') ||
     message.includes('rate limit exceeded') ||
     message.includes('response too large') ||
-    // A 4xx from an upstream refusing GitHub's runner — a 403 is exactly how
+    // A 4xx from an upstream refusing a runner — a 403 is exactly how
     // that presents — and the residual bucket for any transport code the
-    // service does not map. Both are network conditions from CI's point of
-    // view, and rethrowing them fails `npm test` in publish.yml *after* the
-    // tag exists (G64/G71). A real regression still fails: every positive
+    // service does not map. Both are network conditions, so they are logged
+    // and skipped rather than rethrown. A real regression still fails: every positive
     // control in this file rejects with a shape message ("carries no warning
     // bulletins", "is not in the expected format"), and a Vitest assertion
     // error matches none of these.
@@ -140,7 +137,7 @@ describe('JMA alerts — live smoke (tolerant of network flake)', () => {
         expect(Array.isArray(result.document.areas)).toBe(true);
       }
     }
-  }, 30000);
+  });
 
   it('carries string class10 area codes in the Tokyo document, when one is present', async () => {
     let result: JmaWarningsResult | undefined;
@@ -185,7 +182,7 @@ describe('JMA alerts — live smoke (tolerant of network flake)', () => {
         }
       }
     }
-  }, 30000);
+  });
 
   it('resolves a second office (Fukui) and reports index trim/unparsed counts sanely', async () => {
     let result: JmaWarningsResult | undefined;
@@ -218,5 +215,5 @@ describe('JMA alerts — live smoke (tolerant of network flake)', () => {
       expect(typeof result.indexUnparsedEntries).toBe('number');
       expect(result.indexUnparsedEntries).toBeGreaterThanOrEqual(0);
     }
-  }, 30000);
+  });
 });

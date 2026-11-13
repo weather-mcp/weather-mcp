@@ -8,7 +8,7 @@
  * conditions fetch in the second describe block) and belongs to the
  * project's flaky-tolerant live-network set — re-run before blaming your
  * diff. See the "Flaky live-network tests" project memory and the
- * tolerant-live-test convention used throughout tests/integration/
+ * tolerant-live-test convention used throughout tests/live/
  * (almanac.test.ts, global-rivers.test.ts, global-wildfire.test.ts,
  * safety-hazards.test.ts).
  *
@@ -25,7 +25,7 @@
  * HTTP with no `vi.mock` hoisting concerns.
  *
  * Explicit `latitude`/`longitude` short-circuit `resolveLocationAsync`
- * (see tests/integration/global-rivers.test.ts), and an explicit
+ * (see tests/live/global-rivers.test.ts), and an explicit
  * `units: 'imperial'` argument pins the request to F/mph regardless of any
  * `WEATHER_UNITS` environment override, so the mocked fixtures (already
  * expressed in imperial units, mirroring what Open-Meteo would have
@@ -275,5 +275,5 @@ describe('Global fire weather integration — live keyless smoke test (tolerant 
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, 60000);
+  });
 });

@@ -35,7 +35,7 @@ describe('Weather Imagery (v1.5.0)', () => {
       }
 
       console.log(`New York precipitation radar: ${result.frames.length} frames available`);
-    }, 15000);
+    });
 
     it('should retrieve animated precipitation radar for London', async () => {
       const result = await getWeatherImagery({
@@ -60,7 +60,7 @@ describe('Weather Imagery (v1.5.0)', () => {
           );
         }
       }
-    }, 15000);
+    });
 
     it('should handle radar type (alias for precipitation)', async () => {
       const result = await getWeatherImagery({
@@ -73,7 +73,7 @@ describe('Weather Imagery (v1.5.0)', () => {
       expect(result).toBeDefined();
       expect(result.type).toBe('radar');
       expect(result.source).toBe('RainViewer');
-    }, 15000);
+    });
   });
 
   describe('Validation', () => {
@@ -163,7 +163,7 @@ describe('Lightning Activity (v1.5.0)', () => {
       console.log(`Miami lightning: ${result.strikes.length} strikes detected`);
       console.log(`Safety level: ${result.safety.level}`);
       console.log(`Active thunderstorm: ${result.safety.isActiveThunderstorm}`);
-    }, 15000);
+    });
 
     it('should use default radius and time window', async () => {
       const result = await getLightningActivity({
@@ -173,7 +173,7 @@ describe('Lightning Activity (v1.5.0)', () => {
 
       expect(result.searchRadius).toBe(100); // Default radius
       expect(result.timeWindow).toBe(60); // Default time window
-    }, 15000);
+    });
 
     it('should handle custom search parameters', async () => {
       const result = await getLightningActivity({
@@ -190,7 +190,7 @@ describe('Lightning Activity (v1.5.0)', () => {
       const durationMs = result.searchPeriod.end.getTime() - result.searchPeriod.start.getTime();
       const durationMinutes = durationMs / (1000 * 60);
       expect(durationMinutes).toBeCloseTo(30, 0);
-    }, 15000);
+    });
   });
 
   describe('Safety Assessment', () => {
@@ -210,7 +210,7 @@ describe('Lightning Activity (v1.5.0)', () => {
 
       console.log(`Tokyo lightning safety: ${result.safety.level}`);
       console.log(`Recommendations: ${result.safety.recommendations[0]}`);
-    }, 15000);
+    });
 
     it('should calculate statistics correctly', async () => {
       const result = await getLightningActivity({
@@ -236,7 +236,7 @@ describe('Lightning Activity (v1.5.0)', () => {
       }
 
       console.log(`Sydney lightning statistics:`, result.statistics);
-    }, 15000);
+    });
   });
 
   describe('Strike Details', () => {
@@ -266,7 +266,7 @@ describe('Lightning Activity (v1.5.0)', () => {
       } else {
         console.log('Austin: No strikes detected (normal if no active thunderstorms)');
       }
-    }, 15000);
+    });
   });
 
   describe('Validation', () => {

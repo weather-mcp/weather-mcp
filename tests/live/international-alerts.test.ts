@@ -8,9 +8,9 @@
  * and `GeoMetService` import the same `axios` module), each test creates a
  * real service instance and scopes a `vi.spyOn` to that one instance's
  * private axios `client.get`, mirroring the instance-scoped mocking
- * convention in `tests/integration/metar.test.ts` (itself mirroring
- * `tests/integration/almanac.test.ts`'s `AcisService` client.post spy and
- * `tests/integration/global-rivers.test.ts`'s `makeRequestToFlood` spy).
+ * convention in `tests/live/metar.test.ts` (itself mirroring
+ * `tests/live/almanac.test.ts`'s `AcisService` client.post spy and
+ * `tests/live/global-rivers.test.ts`'s `makeRequestToFlood` spy).
  * Country routing is driven through a hand-built fake `NominatimService`
  * (`{ reverseCountry: async () => <code> }` cast to the real type) so the
  * real `resolveLocationAsync` / country-routing logic in
@@ -25,8 +25,8 @@
  * Block 2 makes **live** network calls — a small MeteoAlarm country feed
  * (`gb`) and a live MSC GeoMet bbox query (Toronto) — with no mocking
  * applied at all, so it is unaffected by Block 1's instance-scoped spies.
- * It follows this project's tolerant-of-live-network-flake convention: a
- * generous per-test timeout, shape-only assertions (array-ness and element
+ * It follows this project's tolerant-of-live-network-flake convention: the
+ * `live` project's timeout governs, shape-only assertions (array-ness and element
  * field types — never a specific warning, count, or value), and the test
  * catches and logs a network error instead of failing the suite. This file
  * therefore belongs to the project's live-network integration set (see the
@@ -322,7 +322,7 @@ describe('International alerts — live smoke test (tolerant of network flake)',
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, 30000);
+  });
 
   it('fetches real MSC GeoMet alerts for a bbox with known coverage (Toronto)', async () => {
     const geoMetService = new GeoMetService();
@@ -344,5 +344,5 @@ describe('International alerts — live smoke test (tolerant of network flake)',
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, 30000);
+  });
 });

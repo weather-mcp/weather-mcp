@@ -8,23 +8,23 @@
  * independently of any diff in this repo (see the "Flaky live-network tests"
  * memory) — re-run before blaming a diff if only this file goes red.
  *
- * **Why SACHET and PAGASA are index-only here.** `vitest.config.ts` has no
- * `include` filter, so every file under `tests/integration/` — this one
- * included — runs on *every* `npm test`, paid for by every developer on
- * every gate run. SACHET's index alone carries close to `MAX_INDEX_ITEMS`
+ * **Why SACHET and PAGASA are index-only here.** This file runs only under
+ * `npm run test:live` (the `live` project), never in `npm test`, CI or
+ * publish. It still should not hammer the feeds.
+ * SACHET's index alone carries close to `MAX_INDEX_ITEMS`
  * (200) entries, and its per-alert document lives behind a separate polygon
  * document (`getWarnings('in')` is therefore roughly N document fetches plus
  * N polygon fetches — ~200 requests for a full refresh). PAGASA's index is
  * smaller but its document fan-out is still unbounded here. Driving either
  * feed's full `getWarnings` path live is T9's job (a scratch driver run on
- * demand), not something every `npm test` invocation should pay for. This
+ * demand), not something every live run should pay for. This
  * file therefore calls only the cheap, unbounded-request-free `getIndex`
  * for `in` and `ph`, and reserves the (cheap, rate-limited) `getWarnings`
  * document path for BMKG only, and only when its index is small enough that
  * paying for it stays well inside the test timeout (see
  * `BMKG_SMOKE_MAX_ENTRIES` below).
  *
- * **Tolerant-but-not-silent.** Unlike `tests/integration/international-alerts.test.ts`
+ * **Tolerant-but-not-silent.** Unlike `tests/live/international-alerts.test.ts`
  * (whose live smoke wraps its `expect` calls *inside* the tolerant
  * `try/catch`, so a shape regression would be swallowed and logged as a
  * network flake), every `expect` in this file sits *after* its catch block,
@@ -59,7 +59,7 @@ const FEED_CODES = ['in', 'ph', 'id'] as const;
  * its index has this many entries or fewer. At BMKG's declared 1
  * request/second limiter (`requestsPerMinute: 60` in `NATIONAL_CAP_FEEDS`),
  * this bounds the document fan-out to roughly 6 seconds of sequential
- * requests plus one retry — comfortably inside this test's 45s timeout.
+ * requests plus one retry — comfortably inside the `live` project's timeout.
  * BMKG's index carried 2 entries on 2026-08-23 — an observation, not a
  * bound the live feed is expected to respect going forward.
  */
@@ -173,7 +173,7 @@ describe('National CAP alerts — live index smoke (tolerant of network flake)',
 
         expect(typeof result.trimmed).toBe('boolean');
       }
-    }, 30000);
+    });
   }
 });
 
@@ -275,5 +275,5 @@ describe('National CAP alerts — BMKG document path (fan-out guarded, tolerant 
 
       expect(typeof result.indexTrimmed).toBe('boolean');
     }
-  }, 45000);
+  });
 });

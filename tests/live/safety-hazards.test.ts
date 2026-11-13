@@ -49,7 +49,7 @@ describe('River Conditions (v1.6.0)', () => {
 
       console.log('\n=== St. Louis River Conditions ===');
       console.log(text.substring(0, 500)); // Log first 500 chars
-    }, 60000); // Increased timeout for slow NOAA API
+    });
 
     it('should find river gauges near Houston, TX (near several rivers)', async () => {
       const result = await handleGetRiverConditions(
@@ -73,7 +73,7 @@ describe('River Conditions (v1.6.0)', () => {
 
       console.log('\n=== Houston River Conditions ===');
       console.log(text.substring(0, 500));
-    }, 60000); // Increased timeout for NOAA API calls
+    });
 
     it('should handle location with no nearby river gauges', async () => {
       // Remote desert location - Death Valley (very unlikely to have gauges)
@@ -99,7 +99,7 @@ describe('River Conditions (v1.6.0)', () => {
 
       console.log('\n=== Death Valley (Minimal Gauges) ===');
       console.log(text.substring(0, 300));
-    }, 60000); // Increased timeout for NOAA API calls
+    });
 
     it('should respect custom radius parameter', async () => {
       const result = await handleGetRiverConditions(
@@ -118,7 +118,7 @@ describe('River Conditions (v1.6.0)', () => {
       const text = result.content[0].text;
       expect(text).toContain('100 km');
       expect(text).toContain('62.1 miles');
-    }, 60000); // Increased timeout for NOAA API calls
+    });
   });
 
   describe('Validation', () => {
@@ -160,7 +160,7 @@ describe('River Conditions (v1.6.0)', () => {
       expect(result).toBeDefined();
       const text = result.content[0].text;
       expect(text).toContain('500 km');
-    }, 60000); // Increased timeout for NOAA API calls
+    });
   });
 });
 
@@ -194,7 +194,7 @@ describe('Wildfire Information (v1.6.0)', () => {
 
       console.log('\n=== Los Angeles Wildfire Info ===');
       console.log(text.substring(0, 600));
-    }, 60000); // Increased timeout for NOAA API calls
+    });
 
     it('should query wildfires near Denver, CO', async () => {
       const result = await handleGetWildfireInfo(
@@ -212,7 +212,7 @@ describe('Wildfire Information (v1.6.0)', () => {
 
       console.log('\n=== Denver Wildfire Info ===');
       console.log(text.substring(0, 600));
-    }, 60000); // Increased timeout for NOAA API calls
+    });
 
     it('should handle area with no active wildfires', async () => {
       // Query an area less likely to have fires (adjust seasonally if needed)
@@ -232,7 +232,7 @@ describe('Wildfire Information (v1.6.0)', () => {
 
       console.log('\n=== Boston Wildfire Info ===');
       console.log(text.substring(0, 400));
-    }, 60000); // Increased timeout for NOAA API calls
+    });
 
     it('should respect custom radius parameter', async () => {
       const result = await handleGetWildfireInfo(
@@ -248,7 +248,7 @@ describe('Wildfire Information (v1.6.0)', () => {
       const text = result.content[0].text;
       expect(text).toContain('200 km');
       expect(text).toContain('124.3 miles');
-    }, 60000); // Increased timeout for NOAA API calls
+    });
 
     it('should provide safety assessment when wildfires are found', async () => {
       // This test may vary based on current fire activity
@@ -281,7 +281,7 @@ describe('Wildfire Information (v1.6.0)', () => {
 
       console.log('\n=== Safety Assessment Test ===');
       console.log(text.substring(0, 800));
-    }, 60000); // Increased timeout for NOAA API calls
+    });
   });
 
   describe('Validation', () => {
@@ -317,7 +317,7 @@ describe('Wildfire Information (v1.6.0)', () => {
       expect(result).toBeDefined();
       const text = result.content[0].text;
       expect(text).toContain('1 km');
-    }, 60000); // Increased timeout for NOAA API calls
+    });
   });
 
   describe('NIFC Service Health', () => {
@@ -333,6 +333,6 @@ describe('Wildfire Information (v1.6.0)', () => {
       console.log(`Operational: ${status.operational}`);
       console.log(`Message: ${status.message}`);
       console.log(`Timestamp: ${status.timestamp}`);
-    }, 15000);
+    });
   });
 });

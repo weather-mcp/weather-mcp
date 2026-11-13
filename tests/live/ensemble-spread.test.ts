@@ -7,7 +7,7 @@
  * **This file makes live network calls** against the real Open-Meteo
  * Ensemble API (`https://ensemble-api.open-meteo.com/v1/ensemble`) and joins
  * the project's flaky-tolerant live-network set alongside
- * tests/integration/model-comparison.test.ts — a red result here may be
+ * tests/live/model-comparison.test.ts — a red result here may be
  * independent flake and should be re-run before suspecting a diff. See the
  * "Flaky live-network tests" project memory.
  *
@@ -89,5 +89,5 @@ describe('Ensemble spread integration — live smoke test (tolerant of network f
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, 60000);
+  });
 });
