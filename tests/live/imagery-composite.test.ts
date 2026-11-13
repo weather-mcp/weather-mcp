@@ -19,8 +19,8 @@
  * `rainViewerService`'s private axios client (the `/public/weather-maps.json`
  * feed), and `basemapService`'s private axios client (the GIBS tile
  * fetches) — via `vi.spyOn`, following the instance/method-scoped spy
- * convention in tests/integration/metar.test.ts and
- * tests/integration/global-rivers.test.ts rather than a module-level
+ * convention in tests/live/metar.test.ts and
+ * tests/live/global-rivers.test.ts rather than a module-level
  * `vi.mock('axios')`. A file-wide axios mock would also swallow the live
  * calls Block 2 needs to make, so this file scopes each spy to one
  * client/method instead, and restores all three (`afterEach`) before Block 2
@@ -69,8 +69,8 @@ import type { RainViewerResponse, ImageryContentBlock } from '../../src/types/im
  * Dummy LocationStore/GeocodingService — never touched when latitude and
  * longitude are supplied directly, since `resolveLocationAsync`'s
  * coordinate branch short-circuits before either is used (mirrors the
- * `UNUSED` convention in tests/integration/metar.test.ts and
- * tests/integration/global-rivers.test.ts).
+ * `UNUSED` convention in tests/live/metar.test.ts and
+ * tests/live/global-rivers.test.ts).
  */
 const UNUSED = {} as never;
 
@@ -301,8 +301,8 @@ describe('Composited weather imagery — live smoke test (tolerant of network fl
       );
     } catch (error) {
       // Tolerant of live-network flake: log and pass rather than fail the
-      // suite, matching tests/integration/metar.test.ts and
-      // tests/integration/global-rivers.test.ts.
+      // suite, matching tests/live/metar.test.ts and
+      // tests/live/global-rivers.test.ts.
       console.warn(
         '\n=== Live composite smoke test skipped (network error) ===\n',
         error instanceof Error ? error.message : String(error)
@@ -336,5 +336,5 @@ describe('Composited weather imagery — live smoke test (tolerant of network fl
 
     console.log('\n=== Live composite smoke test: Miami ===');
     console.log(`base64 image bytes: ${imageBlock.data.length}`);
-  }, 90000);
+  });
 });

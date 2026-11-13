@@ -9,7 +9,7 @@
  * flaky-tolerant live-network set — a red result here should be re-run
  * before suspecting a diff. See the "Flaky live-network tests" project
  * memory and the tolerant-live-test convention used throughout
- * tests/integration/ (almanac.test.ts, global-fire-weather.test.ts,
+ * tests/live/ (almanac.test.ts, global-fire-weather.test.ts,
  * global-rivers.test.ts, global-wildfire.test.ts, safety-hazards.test.ts).
  *
  * Tolerant of live-network flake by design: the live call is wrapped in a
@@ -90,5 +90,5 @@ describe('Model comparison integration — live smoke test (tolerant of network 
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, 60000);
+  });
 });

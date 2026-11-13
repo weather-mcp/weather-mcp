@@ -6,7 +6,7 @@
  * Block 1 is deterministic: only the HTTP-issuing method of a real
  * `AcisService` instance is stubbed via `vi.spyOn` on its private axios
  * `client.post`, mirroring the private-method-spy convention used in
- * tests/integration/global-rivers.test.ts (there it's
+ * tests/live/global-rivers.test.ts (there it's
  * `OpenMeteoService`'s `makeRequestToFlood`; here it's `AcisService`'s
  * axios client). This is a deliberate variant of the module-level
  * `vi.mock('axios')` pattern used in tests/unit/acis-records.test.ts: a
@@ -23,9 +23,9 @@
  * handler (real NOAAService/OpenMeteoService, live NOAA + Open-Meteo APIs)
  * — so this file makes live network calls. It follows the
  * tolerant-of-live-network convention used by
- * tests/integration/global-rivers.test.ts and
- * tests/integration/safety-hazards.test.ts: generous per-test timeouts,
- * shape-only assertions (not exact values), and each test catches and logs
+ * tests/live/global-rivers.test.ts and
+ * tests/live/safety-hazards.test.ts: the `live` project's timeout
+ * governs, shape-only assertions (not exact values), and each test catches and logs
  * network errors instead of letting them fail — this file never turns the
  * suite red on a flaky connection.
  *
@@ -266,7 +266,7 @@ describe('Almanac integration — live smoke tests (tolerant of network flake)',
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, 60000);
+  });
 
   it('renders Moon/Twilight/Next full moon lines for a live include_astronomy forecast call (Seattle)', async () => {
     const noaaService = new NOAAService();
@@ -307,5 +307,5 @@ describe('Almanac integration — live smoke tests (tolerant of network flake)',
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, 60000);
+  });
 });

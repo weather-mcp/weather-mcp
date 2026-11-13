@@ -266,8 +266,8 @@ trim but cannot log it, so the **service** must emit the `securityEvent`
 
 ## G9 — Live smoke tests must rethrow anything that is not a transport failure
 
-**Trigger:** writing or editing a test under `tests/integration/` that hits a
-live API.
+**Trigger:** writing or editing a test under `tests/live/` that hits a live
+API.
 
 **Rule:** classify the caught error. Skip (log and pass) **only** on the
 service's own fixed transport strings; **rethrow** everything else. Put every
@@ -275,14 +275,15 @@ service's own fixed transport strings; **rethrow** everything else. Put every
 an empty upstream explicitly rather than letting an all-items loop pass
 vacuously.
 
-**Why:** bare `vitest run` runs both projects in `vitest.config.ts` (`unit` and
-`integration`), so `tests/integration/` runs on every `npm test`. A catch-all that swallows assertion and shape errors turns a
-real upstream contract regression into a logged "network flake" that nobody
-investigates — and a vacuous loop over an empty feed makes a broken parser look
-healthy.
+**Why:** `tests/live/` runs only under `npm run test:live`, once per release, and
+a human reads the result. A catch-all that swallows assertion and shape errors
+turns a real upstream contract regression into a logged "network flake" that
+nobody investigates — and a vacuous loop over an empty feed makes a broken
+parser look healthy.
 
-**Verify:** `grep -n 'isTransportFailure\|throw' tests/integration/national-cap-alerts.test.ts`,
-and confirm no `catch` block in that file contains `expect(`.
+**Verify:** `grep -n 'isTransportFailure\|throw' tests/live/national-cap-alerts.test.ts`,
+and confirm no `catch` block in that file contains `expect(`. Same for
+`tests/live/lightning-broker-smoke.test.ts`.
 
 **Evidence:** 2026-08-23 (`2d564ef`) — the shape being avoided is
 `tests/integration/international-alerts.test.ts:299-325`, which puts its
@@ -550,7 +551,7 @@ to test.
 
 ---
 
-## G14 — Both release scripts run the full Vitest suite internally
+## G14 — `update-docs-for-release.sh` runs the Vitest suite internally
 
 **Trigger:** editing `scripts/check-doc-versions.sh` or
 `scripts/update-docs-for-release.sh`.
@@ -563,15 +564,19 @@ Run the real script only to confirm the pass and one deliberate failure.
 file and echo `$?` in the same command. There is no cheap second look, and
 re-running it only to find out whether it passed costs another full suite.
 
-**Why:** `check-doc-versions.sh` shells out to `npm test` to get the count it
-validates against (`:128` since the 2026-09-30 tree checks; was `:70`), so every invocation costs ~65 s. `update-docs-for-release.sh`
-runs the suite itself (`:163`) **and** then invokes the checker (`:277`), which
-runs it again — so a release dry run is ~2.5 minutes, and neither cost is
-visible from reading the script's top. A five-case truth table iterated against
-the real checker is half an hour that a harness does in under a second.
+**Why:** `update-docs-for-release.sh` runs the offline gate (`npm test`, unit +
+integration, about 20 s) once at step 4 (`:166`), then invokes the checker at
+step 9 (`:273`). The checker no longer runs the suite: it counts tests with a
+collect-only run (`scripts/lib/collect-test-count.sh`, about 8 s), so each
+checker invocation still costs seconds, not a sub-second edit loop. The release
+script also writes files before it can abort ([G42]), so every real run needs a
+throwaway worktree. A five-case truth table iterated against the real scripts is
+minutes that a harness does in under a second. Both scripts ran a full suite,
+live files included, until live-test-isolation (`ae94183`, `d51f1f4`, 2026-11-13).
 
-**Verify:** `grep -n 'npm test' scripts/check-doc-versions.sh scripts/update-docs-for-release.sh`
-— any hit means the script is suite-bound and needs the harness treatment.
+**Verify:** `grep -n 'npm test' scripts/check-doc-versions.sh` prints nothing (the checker
+collects, never runs), and `grep -nF 'TEST_OUTPUT=$(npm test' scripts/update-docs-for-release.sh`
+prints exactly one line. Any other executing `npm test` in either script is a regression.
 
 **Evidence:** 2026-08-24 (`eee2612`, `1aca484`, changelog-link-refs T1/T2) — the
 implementation plan carried this as a written warning to the builder before the
@@ -2352,20 +2357,21 @@ document rather than a check).
 ## G42 — `update-docs-for-release.sh` aborts on a red suite *after* writing four files, and its own guard then blocks the retry
 
 **Trigger:** `./scripts/update-docs-for-release.sh <bump> "<summary>"` exits with
-`❌ Test suite is red — refusing to prepare a release`. Almost always a flake:
-six files under `tests/integration/` make live network calls.
+`❌ Test suite is red — refusing to prepare a release`. The gate is offline
+(unit + integration, no live file) since live-test-isolation, so treat the red as
+a real failure until a captured log says otherwise.
 
 **Rule:** do **not** commit, and do **not** re-run the script. Revert the four
-files it already wrote, confirm the flake with a clean full run, then re-run the
-script from a clean tree:
+files it already wrote, fix the failing test, then re-run the script from a
+clean tree:
 
 ```bash
 git checkout -- CHANGELOG.md package.json package-lock.json server.json
-npm test                       # green ⇒ flake; red twice ⇒ real regression
+npm test 2>&1 | tee <scratch>/t.log   # read the failing name from the file
 ./scripts/update-docs-for-release.sh patch "<summary>"
 ```
 
-**Why:** the abort sits at step 4 (`:182`), but steps 1–3 have already run —
+**Why:** the abort sits at step 4 (`:177`), but steps 1–3 have already run —
 `npm version` has rewritten `package.json` and `package-lock.json` (`:48`),
 `server.json` is synced (`:53`), and `[Unreleased]` is already promoted into a
 dated `## [X.Y.Z]` section with its compare-link definition emitted (`:61-155`).
@@ -2420,7 +2426,7 @@ it is an argument about the diff rather than evidence from the run. **Redirect
 the first invocation**; there is no second chance at a name that was never
 printed to a file, and each retry costs another ~70 s suite.
 
-**Verify:** `sed -n '32,34p;157,187p' scripts/update-docs-for-release.sh` — the
+**Verify:** `sed -n '32,34p;157,189p' scripts/update-docs-for-release.sh` — the
 precondition guard and the red-suite abort, with steps 1–3 between them.
 
 **Status:** active, **second-order trap re-evidenced 2026-09-18**. Script
@@ -3850,87 +3856,6 @@ this is the build succeeding at its job), [G51] (widening a type does not make
 a value reachable; this is the mirror, narrowing making a comparison
 impossible).
 
-## G64 — `publish.yml` runs the live-network integration files, so an upstream refusing GitHub's runner fails the publish after the tag and release page already exist
-
-**Trigger:** a red `publish.yml` whose failing step is `Test`, on a file under
-`tests/integration/` that makes live calls (`safety-hazards`, `global-rivers`,
-`visualization-lightning`, `almanac`, `error-recovery`), while the local gate
-passed on the same commit.
-
-**Rule:** read which step went red before deciding anything. If `Test` failed
-and the `Publish to npm` step never ran, nothing is published — confirm with
-`npm view @dangahagan/weather-mcp version` — and `gh run rerun <id>` on the
-**same run** is the safe recovery: it re-executes the same tag, and the
-workflow's `Skip if version already published` guard makes a duplicate
-harmless. Do not bump the version and do not `npm publish` by hand. If instead
-`Publish to npm` ran, this is [G39]'s territory, not this entry's. Expect to
-rerun more than once: an upstream refusing the runner's address range does not
-clear in five minutes.
-
-**Why:** the local gate and the CI gate are the same `npm test`, but they run
-from different networks. NOAA NWPS answered this machine in 0.26 s while
-refusing the GitHub runner (`NOAA API is currently unavailable` →
-`falling back to full gauge catalog download (heavy path)`), and the heavy
-fallback alone outlasts the 60 s per-test budget. The tag push is the publish
-trigger and `gh release create` had already run, so the visible artefacts of a
-release existed before the package did — the half-published state `/release`
-step 7 warns about.
-
-**Update 2026-11-10** (`34ec78d`, river-gauge-staleness T1): the NWPS heavy
-fallback named in **Why** is removed. A refused bounding-box request now fails
-at once as the river error result (`isError: true`) instead of starting a 13 MB
-download, so on `safety-hazards.test.ts` the symptom should change from a 60 s
-timeout to a fast assertion failure. The log line `NWPS bounding box query
-failed` no longer exists; grep for `currently unavailable` or `Rate limit`.
-
-**Verify:** `gh run view <id> --log-failed | grep -E 'NWPS bounding box query
-failed|currently unavailable'` names the upstream; `npm view
-@dangahagan/weather-mcp version` still reports the previous version.
-
-**Evidence:** 2026-09-02, v1.25.17 (run `33589180098`). Attempts at 04:00Z and
-04:06Z both timed out at `tests/integration/safety-hazards.test.ts:146`
-(`should clamp radius to valid range`, a live St. Louis NWPS query) after the
-bbox call was refused; the third rerun at ~04:09Z passed and published
-`1.25.17` at 04:11:40Z. The release's diff touched neither
-`riverConditionsHandler.ts` nor `noaa.ts`.
-
-**Evidence (second occurrence):** 2026-09-18, v1.31.2 (run `35372699372`). The
-first attempt failed at `tests/integration/visualization-lightning.test.ts:215`
-(`Test timed out in 15000ms`, a live Blitzortung MQTT query for Tokyo); one
-`gh run rerun --failed` published `1.31.2` cleanly. Two things make this the
-cleanest confirmation of the entry so far: the **CI run on the identical commit
-passed** while the publish run failed, minutes apart — so the two gates ran the
-same code over different networks and disagreed — and the release's diff
-changed **no** file under `tests/integration/` at all. A different upstream and
-a different file from the 2026-09-02 case, so the trap is the live-network
-files as a class, not NWPS specifically.
-
-**Evidence (third occurrence):** 2026-09-19, v1.31.3 (run `35440419782`). The
-first attempt failed at `tests/integration/safety-hazards.test.ts:146` again —
-the *same* file, test and 60 s budget as 2026-09-02 — and one
-`gh run rerun --failed` published `1.31.3` cleanly. The full-suite gate had
-passed **twice locally** on the same tree minutes earlier (150 files, 3,582
-tests, once on the branch and once on the merge commit `780c6cd`), and the `CI`
-run on that identical commit was green, so for the second release running the
-two gates disagreed over nothing but the network. The release's diff touched a
-schema literal, a comment, a new unit test and docs: no path whatsoever to
-river conditions. **The recurrence rate is now the finding.** Three occurrences
-across 17 releases, two of them in the last two days, and the step order is the
-same every time — `Test` red, `Skip if version already published` /
-`Publish to npm` / `Verify publication` all **skipped**, `npm view` still on the
-previous version. That the recovery is reliable is not an argument for leaving
-it: every occurrence spends a release's tag and release page before the package
-exists.
-
-**Status:** active, **extended 2026-09-19 (third occurrence)**. The structural fix — running the live-network files in a
-separate non-blocking job, or excluding them from the publish gate — is a
-`publish.yml` change, not a test change; still not planned, and now carrying three occurrences (one of them twice-repeated) against it. Related: [G39] (red
-*after* a successful publish — the opposite half), [G9] (live smoke tests
-classify transport failures and skip; the river integration file does not,
-which is why a refusal becomes a timeout instead of a skip).
-
----
-
 ## G65 — The mutation set comes from the design's *rejected alternatives*, so a clause the design settled below its decision boundary gets no mutation row and no lock
 
 **Trigger:** building the mutation table for a plan whose design plan declares a
@@ -4302,59 +4227,6 @@ in `tests/integration/`, which the guard deliberately does not reach.
 check that exposes it), [G21] (the other way a mock is not the thing you think
 it is), [G13] (a fixture that cannot discriminate — this is its mock-shaped
 sibling), and the project's determinism rule — anything mockable is mocked.
-
----
-
-## G71 — `publish.yml` gates the npm publish on the *whole* suite, so a third-party outage fails a release that CI just certified green
-
-**Trigger:** pushing a `vX.Y.Z` tag and finding `publish.yml` red at the **Test**
-step, on a commit whose CI run passed.
-
-**Rule:** a red publish run is not evidence the diff is bad. Read *which step*
-failed, then check what that step actually runs. `ci.yml:33` runs
-`npx vitest run tests/unit` — 110 deterministic files. `publish.yml:54` runs
-`npm test`, which is bare `vitest run` and therefore includes
-`tests/integration/`, where several files open real network connections. The two
-gates are **not the same gate**, so "CI is green" says nothing about whether the
-publish will pass. Before reacting, confirm from the registry whether anything
-published ([G39], [G55]): if `latest` is still the previous version, nothing
-shipped and re-running the failed job is the correct recovery — `publish.yml`
-carries a `Skip if version already published` step, so a re-run after a *real*
-publish is refused rather than duplicating one.
-
-**Why:** the publish is gated on a GitHub runner completing a live MQTT
-connection to a third-party broker — `mqtt://blitzortung.ha.sed.pl:1883` — and
-receiving traffic inside a 15-second vitest timeout. Nothing about that is under
-this project's control, it is unrelated to whatever the release changes, and it
-gets a veto over shipping. The asymmetry is the trap: the workflow that decides
-whether code is correct is strictly weaker than the workflow that decides
-whether it ships, so the stronger gate is the one nobody watches until a release
-stalls on it.
-
-**Verify:** `grep -n 'run:' .github/workflows/ci.yml .github/workflows/publish.yml`
-and compare the two Test steps. They differ.
-
-**Evidence:** v1.26.0, 2026-09-03. Run 33698838722 failed at **Test** with two
-timeouts in `tests/integration/visualization-lightning.test.ts` (`:145`, `:168`),
-both `Error: Test timed out in 15000ms` after
-`Connecting to Blitzortung MQTT broker`. The CI run on the identical commit
-(`d2b0242`, 33698801825) had passed minutes earlier because it runs unit tests
-only. The merge commit's tree hash was byte-identical to the already-green branch
-tip (`30781b6d`), and `git diff v1.25.18..main` over
-`visualization-lightning.test.ts`, `lightningHandler.ts` and `blitzortung.ts` was
-**empty** — the release did not touch the lightning path at all. Locally the same
-suite ran green twice and red twice against that same tree. `npm view` confirmed
-`latest` was still `1.25.18`, so nothing had published; re-running the failed job
-alone published cleanly in 3m20s with no code change. `publish.yml` has failed
-this way before — v1.25.12, 2026-08-29.
-
-**Status:** active. The obvious fix — gate the publish on `tests/unit` like CI
-does, or mark the live-network integration files as non-gating — was deliberately
-**not** taken during the v1.26.0 release, because changing the release machinery
-mid-release is the kind of scope expansion `/release` forbids. Related: [G39] and
-the retired [G55] (both about reading a red publish run correctly, in the
-opposite direction — a *successful* publish reported red), and the standing
-flaky-live-network note in the test suite.
 
 ---
 
@@ -5168,7 +5040,8 @@ is why these probes belong in a throwaway worktree at all).
 one of them **temporarily** edits and restores a live test file — a G41 control,
 a mutation probe, a "prove the pin is load-bearing" step — while the other runs
 the full suite, or runs a script that runs the full suite
-(`scripts/check-doc-versions.sh:70` shells out to `npm test`).
+(`scripts/update-docs-for-release.sh:166` runs `npm test`; the checker only
+collects since `ae94183`).
 
 **Rule:** decide `parallel-safe` on the **read set at acceptance**, not on the
 declared write sets. A suite discovers tests tree-wide, so every task whose
@@ -6601,8 +6474,17 @@ process's own `process.env` is never mutated. The parent dead-proxy probe then s
 because each child overwrites its own proxy variables
 (`tests/integration/http-deadline-proxy.test.ts`).
 
-**Status:** active. Related: [G70] (the unit-level inert-mock probe this extends), [G64]/[G71]
-(why a `tests/integration/` file must never reach the internet).
+**Network-namespace variant** (2026-11-13, live-test-isolation T7, `d51f1f4`): `unshare -rn` is
+the stronger "no network" probe, but a fresh namespace has `lo` **down**, so every loopback test
+fails with it and the probe reads as a broken gate. The first offline release-prep run went red on
+61 of 5,094 tests for exactly this reason. Bring loopback up inside the namespace first:
+`unshare -rn bash -c 'ip link set lo up; <command>'`, and prove the network is really gone in the
+same shell (`curl -m 5 https://registry.npmjs.org` must fail). Then 5,094 of 5,094 passed.
+
+**Status:** active, **extended 2026-11-13** (network-namespace variant). Related: [G70] (the
+unit-level inert-mock probe this extends). Since live-test-isolation, `tests/integration/` runs
+under `tests/setup/loopback-only.ts`, so a non-loopback connect there fails with `ENONLOOPBACK`
+whatever the proxy variables say; the retired [G64]/[G71] record why that guard exists.
 
 ---
 
@@ -7537,10 +7419,170 @@ arithmetic fixture expression. Related: [G65] (where mutation rows come from), [
 
 ---
 
+## G161 — A bare `vitest` entry point runs every configured project, opt-in ones included
+
+**Trigger:** adding an opt-in Vitest project (`live`, or anything that must not run by default)
+while any `package.json` script, workflow step or doc command still runs bare `vitest`,
+`vitest run`, `vitest --ui` or `vitest --coverage`.
+
+**Rule:** scope every non-opt-in entry point to the default projects by name
+(`--project unit --project integration`), and give the opt-in project its own named script
+(`test:live`). Enumerate **every** script that invokes `vitest`, not only `test`: watch and UI
+mode run an initial pass over the selected projects, so a scoped `test` beside a bare
+`test:watch` still sends live traffic from an ordinary developer command.
+
+**Why:** Vitest has no notion of a default-off project. A bare invocation selects all of them.
+The plan for live-test-isolation scoped `test` and `test:coverage` and deferred `test:watch` and
+`test:ui` on the claim that they "run nothing on their own"; the plan review caught it (codex-R1).
+
+**Verify:** `grep -n 'vitest' package.json` — every script except the opt-in one names its
+`--project`s. `npm run test:watch -- --run` prints only the default projects' files.
+
+**Evidence:** 2026-11-13, live-test-isolation plan review codex-R1, fixed in T1 (`ffcc939`).
+Side finding: `test:ui` cannot start at all here, because `@vitest/ui` is not installed; its
+scoping was checked by reading the script, not by running it.
+
+**Status:** active. Lint candidate: a unit test that reads `package.json` and fails on a `vitest`
+script with no `--project` other than `test:live`. Related: [G9].
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
 commit that removed it — never delete, never renumber.)*
+
+## G64 — `publish.yml` runs the live-network integration files, so an upstream refusing GitHub's runner fails the publish after the tag and release page already exist
+
+**Retired:** 2026-11-13, by live-test-isolation (`9bfcc76`, with the file move in T1). `publish.yml`'s `npm test` is now the offline unit + integration gate, and the live-network files moved to `tests/live/`, which no workflow runs. An upstream refusing the runner can no longer fail the publish. **Successor rule:** the recovery still holds for any red `Test` step — read which step failed, confirm with `npm view` that nothing published, then `gh run rerun` the same run. A red `Test` in `publish.yml` is now a real failure, or an offline integration file that misbehaves on a GitHub runner.
+
+**Trigger:** a red `publish.yml` whose failing step is `Test`, on a file under
+`tests/integration/` that makes live calls (`safety-hazards`, `global-rivers`,
+`visualization-lightning`, `almanac`, `error-recovery`), while the local gate
+passed on the same commit.
+
+**Rule:** read which step went red before deciding anything. If `Test` failed
+and the `Publish to npm` step never ran, nothing is published — confirm with
+`npm view @dangahagan/weather-mcp version` — and `gh run rerun <id>` on the
+**same run** is the safe recovery: it re-executes the same tag, and the
+workflow's `Skip if version already published` guard makes a duplicate
+harmless. Do not bump the version and do not `npm publish` by hand. If instead
+`Publish to npm` ran, this is [G39]'s territory, not this entry's. Expect to
+rerun more than once: an upstream refusing the runner's address range does not
+clear in five minutes.
+
+**Why:** the local gate and the CI gate are the same `npm test`, but they run
+from different networks. NOAA NWPS answered this machine in 0.26 s while
+refusing the GitHub runner (`NOAA API is currently unavailable` →
+`falling back to full gauge catalog download (heavy path)`), and the heavy
+fallback alone outlasts the 60 s per-test budget. The tag push is the publish
+trigger and `gh release create` had already run, so the visible artefacts of a
+release existed before the package did — the half-published state `/release`
+step 7 warns about.
+
+**Update 2026-11-10** (`34ec78d`, river-gauge-staleness T1): the NWPS heavy
+fallback named in **Why** is removed. A refused bounding-box request now fails
+at once as the river error result (`isError: true`) instead of starting a 13 MB
+download, so on `safety-hazards.test.ts` the symptom should change from a 60 s
+timeout to a fast assertion failure. The log line `NWPS bounding box query
+failed` no longer exists; grep for `currently unavailable` or `Rate limit`.
+
+**Verify:** `gh run view <id> --log-failed | grep -E 'NWPS bounding box query
+failed|currently unavailable'` names the upstream; `npm view
+@dangahagan/weather-mcp version` still reports the previous version.
+
+**Evidence:** 2026-09-02, v1.25.17 (run `33589180098`). Attempts at 04:00Z and
+04:06Z both timed out at `tests/integration/safety-hazards.test.ts:146`
+(`should clamp radius to valid range`, a live St. Louis NWPS query) after the
+bbox call was refused; the third rerun at ~04:09Z passed and published
+`1.25.17` at 04:11:40Z. The release's diff touched neither
+`riverConditionsHandler.ts` nor `noaa.ts`.
+
+**Evidence (second occurrence):** 2026-09-18, v1.31.2 (run `35372699372`). The
+first attempt failed at `tests/integration/visualization-lightning.test.ts:215`
+(`Test timed out in 15000ms`, a live Blitzortung MQTT query for Tokyo); one
+`gh run rerun --failed` published `1.31.2` cleanly. Two things make this the
+cleanest confirmation of the entry so far: the **CI run on the identical commit
+passed** while the publish run failed, minutes apart — so the two gates ran the
+same code over different networks and disagreed — and the release's diff
+changed **no** file under `tests/integration/` at all. A different upstream and
+a different file from the 2026-09-02 case, so the trap is the live-network
+files as a class, not NWPS specifically.
+
+**Evidence (third occurrence):** 2026-09-19, v1.31.3 (run `35440419782`). The
+first attempt failed at `tests/integration/safety-hazards.test.ts:146` again —
+the *same* file, test and 60 s budget as 2026-09-02 — and one
+`gh run rerun --failed` published `1.31.3` cleanly. The full-suite gate had
+passed **twice locally** on the same tree minutes earlier (150 files, 3,582
+tests, once on the branch and once on the merge commit `780c6cd`), and the `CI`
+run on that identical commit was green, so for the second release running the
+two gates disagreed over nothing but the network. The release's diff touched a
+schema literal, a comment, a new unit test and docs: no path whatsoever to
+river conditions. **The recurrence rate is now the finding.** Three occurrences
+across 17 releases, two of them in the last two days, and the step order is the
+same every time — `Test` red, `Skip if version already published` /
+`Publish to npm` / `Verify publication` all **skipped**, `npm view` still on the
+previous version. That the recovery is reliable is not an argument for leaving
+it: every occurrence spends a release's tag and release page before the package
+exists.
+
+**Status:** retired 2026-11-13 (see above). The structural fix it asked for —
+excluding the live-network files from the publish gate — is what retired it.
+Related: [G39] (red *after* a successful publish — the opposite half), [G9].
+
+---
+
+## G71 — `publish.yml` gates the npm publish on the *whole* suite, so a third-party outage fails a release that CI just certified green
+
+**Retired:** 2026-11-13, by live-test-isolation (`9bfcc76`). CI and `publish.yml` now run the same `npm test` (unit + integration, offline), so the publish gate is no longer stronger than the CI gate, and no third-party broker has a veto over shipping. **Successor rule:** the two Test steps still must not drift apart — `grep -n 'run:' .github/workflows/ci.yml .github/workflows/publish.yml` should show `npm test` in both.
+
+**Trigger:** pushing a `vX.Y.Z` tag and finding `publish.yml` red at the **Test**
+step, on a commit whose CI run passed.
+
+**Rule:** a red publish run is not evidence the diff is bad. Read *which step*
+failed, then check what that step actually runs. `ci.yml:33` runs
+`npx vitest run tests/unit` — 110 deterministic files. `publish.yml:54` runs
+`npm test`, which is bare `vitest run` and therefore includes
+`tests/integration/`, where several files open real network connections. The two
+gates are **not the same gate**, so "CI is green" says nothing about whether the
+publish will pass. Before reacting, confirm from the registry whether anything
+published ([G39], [G55]): if `latest` is still the previous version, nothing
+shipped and re-running the failed job is the correct recovery — `publish.yml`
+carries a `Skip if version already published` step, so a re-run after a *real*
+publish is refused rather than duplicating one.
+
+**Why:** the publish is gated on a GitHub runner completing a live MQTT
+connection to a third-party broker — `mqtt://blitzortung.ha.sed.pl:1883` — and
+receiving traffic inside a 15-second vitest timeout. Nothing about that is under
+this project's control, it is unrelated to whatever the release changes, and it
+gets a veto over shipping. The asymmetry is the trap: the workflow that decides
+whether code is correct is strictly weaker than the workflow that decides
+whether it ships, so the stronger gate is the one nobody watches until a release
+stalls on it.
+
+**Verify:** `grep -n 'run:' .github/workflows/ci.yml .github/workflows/publish.yml`
+and compare the two Test steps. They differ.
+
+**Evidence:** v1.26.0, 2026-09-03. Run 33698838722 failed at **Test** with two
+timeouts in `tests/integration/visualization-lightning.test.ts` (`:145`, `:168`),
+both `Error: Test timed out in 15000ms` after
+`Connecting to Blitzortung MQTT broker`. The CI run on the identical commit
+(`d2b0242`, 33698801825) had passed minutes earlier because it runs unit tests
+only. The merge commit's tree hash was byte-identical to the already-green branch
+tip (`30781b6d`), and `git diff v1.25.18..main` over
+`visualization-lightning.test.ts`, `lightningHandler.ts` and `blitzortung.ts` was
+**empty** — the release did not touch the lightning path at all. Locally the same
+suite ran green twice and red twice against that same tree. `npm view` confirmed
+`latest` was still `1.25.18`, so nothing had published; re-running the failed job
+alone published cleanly in 3m20s with no code change. `publish.yml` has failed
+this way before — v1.25.12, 2026-08-29.
+
+**Status:** retired 2026-11-13 (see above). The fix it named — gate the publish
+on the same offline set as CI — is what retired it. Related: [G39] and the
+retired [G55] (both about reading a red publish run correctly, in the opposite
+direction — a *successful* publish reported red).
+
+---
 
 ## G150 — Aborting an axios request behind a silent CONNECT proxy settles it but leaks the proxy socket
 

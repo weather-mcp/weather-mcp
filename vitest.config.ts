@@ -9,10 +9,15 @@ export default defineConfig({
     // the suite, and the test count is pinned in the README badge, the README
     // body, and CLAUDE.md, and checked against the live count by
     // ./scripts/check-doc-versions.sh.
-    // Bare `vitest run` runs both projects, so tests/integration/ stays in the
-    // default run. `--project unit` is the guarded, offline set: every unit
-    // file runs under tests/setup/no-network.ts, which refuses every outbound
-    // socket. That is what CI runs.
+    // Three projects. `unit` runs under tests/setup/no-network.ts, which refuses
+    // every outbound socket. `integration` is offline too: it may open loopback
+    // servers, and nothing else. `live` is the only project that reaches real
+    // upstreams; it runs serially, with one retry and a timeout above the 55 s
+    // tool budget plus the 10 s lightning window.
+    //
+    // `npm test` (and CI, and publish.yml) runs `--project unit --project
+    // integration`. `npm run test:live` runs `--project live`. A bare
+    // `vitest run` runs all three, live included, so use the npm scripts.
     projects: [
       {
         test: {
@@ -29,6 +34,19 @@ export default defineConfig({
           globals: true,
           environment: 'node',
           include: ['tests/integration/**/*.test.ts'],
+          setupFiles: ['tests/setup/loopback-only.ts'],
+        },
+      },
+      {
+        test: {
+          name: 'live',
+          globals: true,
+          environment: 'node',
+          include: ['tests/live/**/*.test.ts'],
+          testTimeout: 120_000,
+          hookTimeout: 120_000,
+          fileParallelism: false,
+          retry: 1,
         },
       },
     ],

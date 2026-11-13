@@ -5,8 +5,8 @@
  * Block 1 is deterministic: only the HTTP-issuing method of a real
  * `AviationWeatherService` instance is stubbed via `vi.spyOn` on its private
  * axios `client.get`, mirroring the private-method-spy convention used in
- * tests/integration/almanac.test.ts (`AcisService`'s axios `client.post`) and
- * tests/integration/global-rivers.test.ts (`OpenMeteoService`'s
+ * tests/live/almanac.test.ts (`AcisService`'s axios `client.post`) and
+ * tests/live/global-rivers.test.ts (`OpenMeteoService`'s
  * `makeRequestToFlood`). This is a deliberate variant of the module-level
  * `vi.mock('axios')` pattern used in tests/unit/metar-service.test.ts: a
  * file-wide axios mock would also swallow the live call Block 2 needs to
@@ -30,8 +30,8 @@
  * `AviationWeatherService` instance with no mocking applied at all, so it is
  * unaffected by Block 1's instance-scoped spies — so this file makes live
  * network calls. It follows the tolerant-of-live-network convention used by
- * tests/integration/global-rivers.test.ts and tests/integration/almanac.test.ts:
- * a generous per-test timeout, shape-only assertions (never a specific
+ * tests/live/global-rivers.test.ts and tests/live/almanac.test.ts:
+ * the `live` project's timeout governs, shape-only assertions (never a specific
  * temperature or station), and the test catches and logs a network error
  * instead of letting it fail — this file never turns the suite red on a
  * flaky connection. The endpoint is known to be flaky: a sustained burst
@@ -39,7 +39,7 @@
  * contract" section of docs/metar-plan.md and
  * src/services/aviationWeather.ts's header comment).
  *
- * This is now the **sixth** live-network integration file in the project —
+ * This is now the **sixth** live-network file in the project —
  * joining visualization-lightning.test.ts (Blitzortung MQTT),
  * safety-hazards.test.ts (live NOAA/USGS), global-rivers.test.ts (live Flood
  * API), almanac.test.ts (live ACIS), and error-recovery.test.ts (live
@@ -497,5 +497,5 @@ describe('METAR current conditions — live smoke test (tolerant of network flak
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, 60000);
+  });
 });

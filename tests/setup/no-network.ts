@@ -12,7 +12,9 @@
  * same path it takes for a real connection failure.
  *
  * There is no loopback exemption: no unit test opens a local server. A test
- * that must reach a real socket belongs in tests/integration/.
+ * that opens a loopback server belongs in tests/integration/ (guarded by
+ * tests/setup/loopback-only.ts); one that reaches a real upstream belongs in
+ * tests/live/.
  */
 
 import net from 'node:net';

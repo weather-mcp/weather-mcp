@@ -14,8 +14,8 @@
  * Block 2 makes a **live** call to the real Flood API
  * (https://flood-api.open-meteo.com/v1/flood), so this file makes live
  * network calls. It follows the tolerant-of-live-network convention used by
- * tests/integration/safety-hazards.test.ts (generous timeout, shape-only
- * assertions, not exact values) and goes one step further: the live block
+ * tests/live/safety-hazards.test.ts (the `live` project's timeout governs,
+ * shape-only assertions, not exact values) and goes one step further: the live block
  * catches and logs any network error instead of letting it fail, so this
  * file never turns the suite red on a flaky connection.
  *
@@ -309,5 +309,5 @@ describe('Global river conditions — Open-Meteo Flood API (live smoke test)', (
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, 60000);
+  });
 });

@@ -50,6 +50,7 @@ jobs:
       - name: Build
         run: npm run build
 
+      # `npm test` is the offline gate (unit + integration). It runs no tests/live/ file.
       - name: Test
         run: npm test
 

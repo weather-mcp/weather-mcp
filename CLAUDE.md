@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.14 (Production Ready)
+- **Version:** 1.35.15 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -297,10 +297,18 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 ```
 tests/
-├── unit/          # ~80 files; fast, no I/O. Fixture-based handler/service tests plus pure-module tests.
+├── unit/          # ~210 files; fast, no I/O. Fixture-based handler/service tests plus pure-module tests.
 │                  #   Run under tests/setup/no-network.ts, which refuses every outbound socket
-└── integration/   # ~13 files; some make live network calls and can flake — re-run before blaming a diff
+├── integration/   # 8 files; offline, loopback only. Run under tests/setup/loopback-only.ts, which
+│                  #   refuses every non-loopback connect (local servers, child processes, a fixture MQTT broker)
+└── live/          # 15 files; real upstreams. Never in `npm test`, CI or publish — run by hand with
+                   #   `npm run test:live` (serial, retry 1, 120 s timeout); some can flake
 ```
+
+`npm test` runs the `unit` and `integration` projects and makes no non-loopback connection. The
+`integration` guard is in-process: a child that a test spawns is not covered, so give it loopback-only
+targets. The documented test count is every declared test, `live` included, collected without running
+any (`scripts/lib/collect-test-count.sh`).
 
 Named by subject (`<feature>-handler.test.ts`, `<util>.test.ts`, `<feature>-routing.test.ts`). When a change must leave an existing path untouched, the existing test file for that path is the **lock** — it should pass unedited; if you have to edit it, the path changed.
 
@@ -308,17 +316,18 @@ Named by subject (`<feature>-handler.test.ts`, `<util>.test.ts`, `<feature>-rout
 
 - **Framework:** Vitest (configured in `package.json`)
 - **Coverage Target:** 100% on critical utilities (cache, validation, units, errors)
-- **Performance:** Unit tests are fast; the full suite currently takes ~1 minute. Keep new unit tests I/O-free. The rule is enforced: a unit test that opens a socket fails with `EUNITNET`. Anything that must reach a network belongs in `tests/integration/`
+- **Performance:** `npm test` takes about 20 s. Keep new unit tests I/O-free. The rule is enforced: a unit test that opens a socket fails with `EUNITNET`. A test that opens a loopback server goes in `tests/integration/`, where any other connect fails with `ENONLOOPBACK`. A test that must reach a real upstream belongs in `tests/live/`
 - **No Flakiness:** Unit tests must be deterministic (pin percentile methods, clustering order, time zones)
 
 ### Running Tests
 
 ```bash
-npm test                    # Run all tests
-npm run test:watch         # Watch mode
-npm run test:coverage      # With coverage report
+npm test                    # Offline gate: unit + integration (what CI and publish run)
+npm run test:live          # Live upstreams: tests/live/ only, by hand (once per /release)
+npm run test:watch         # Watch mode (unit + integration)
+npm run test:coverage      # With coverage report (unit + integration)
 npx vitest run tests/unit/cache.test.ts   # One file
-npx vitest run --project unit             # Unit tests only, offline-guarded (what CI runs)
+npx vitest run --project unit             # Unit tests only, offline-guarded
 ```
 
 ### Writing Tests
@@ -652,7 +661,7 @@ tools use to skip the reverse-geocode lookup.
    `tests/unit/tool-name-parity.test.ts` pins the registry and the dispatch to it. That test reads
    the dispatch **as text**, so write the arm as `case 'your_tool':` on one line, single-quoted:
    a reformatted label fails it (deliberately — a `switch` has no runtime representation to enumerate)
-5. Write tests: `tests/unit/` and `tests/integration/`
+5. Write tests: `tests/unit/` and `tests/integration/` (offline, loopback only); a check against the real upstream goes in `tests/live/`
 6. Update documentation: `docs/TOOLS.md`, `README.md`, `CHANGELOG.md`
 
 ### Adding External API Integration
@@ -733,15 +742,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.14 — Production Ready ✅
-- **Test Coverage:** 5,165 tests, 100% pass rate
+- **Version:** 1.35.15 — Production Ready ✅
+- **Test Coverage:** 5,169 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.15:** Lightning reports drop malformed and future-dated feed messages, and strikes on the equator and prime meridian count again
 - **New in v1.35.14:** US-territory alerts come from NOAA, and a cut-short or cancelled CAP alert list no longer shows a false all-clear
 - **New in v1.35.13:** US river gauge status is at most 30 minutes old, and an unpublished flood category no longer shows a green check
-- **New in v1.35.12:** US wildfire distances are measured to the fire's mapped perimeter, not its reported point of origin
 
 ## Useful References
 
@@ -764,7 +773,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-11 (v1.35.14)
+**Last Updated:** 2026-11-13 (v1.35.15)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
