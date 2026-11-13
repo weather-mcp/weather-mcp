@@ -104,8 +104,14 @@ tests/
 The files in `tests/live/` call real upstreams, so they can fail for reasons outside
 this code: a slow or refusing API, or a broker that blocks your IP. `npm test` does not
 run them, so they cannot fail the gate, CI or a publish. A human reads the result of
-`npm run test:live` at release time. Every live smoke test rethrows anything that is not
-a transport failure (GOTCHAS G9), so a red live file is worth reading before re-running.
+`npm run test:live` at release time.
+
+Three live files classify their errors (GOTCHAS G9): `lightning-broker-smoke`,
+`japan-alerts` and `national-cap-alerts` skip only on a transport failure and rethrow
+anything else, so a red result there is worth reading before re-running. The other live
+files still have tolerant catches that log any error, assertion failures included, as a
+network skip. A green result from one of them does not prove the upstream answered the
+expected shape. Read its log output.
 
 ---
 
