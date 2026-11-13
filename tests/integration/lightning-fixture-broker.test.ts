@@ -131,4 +131,35 @@ describe('get_lightning_activity against a fixture broker', () => {
     expect(result.statistics.totalStrikes).toBe(1);
     expect(result.safety.level).toBe('elevated');
   }, 30_000);
+
+  describe('Validation', () => {
+    it('should reject invalid radius', async () => {
+      await expect(
+        handler.getLightningActivity({
+          latitude: 40.7128,
+          longitude: -74.006,
+          radius: 600 // Exceeds max
+        })
+      ).rejects.toThrow();
+    });
+
+    it('should reject invalid time window', async () => {
+      await expect(
+        handler.getLightningActivity({
+          latitude: 40.7128,
+          longitude: -74.006,
+          timeWindow: 200 // Exceeds max
+        })
+      ).rejects.toThrow();
+    });
+
+    it('should reject invalid coordinates', async () => {
+      await expect(
+        handler.getLightningActivity({
+          latitude: -95, // Invalid
+          longitude: -74.006
+        })
+      ).rejects.toThrow();
+    });
+  });
 });
