@@ -154,43 +154,39 @@ console.log(`🔗 CHANGELOG: linked [${version}] against ${lastTag || 'its relea
 fs.writeFileSync('CHANGELOG.md', text);
 EOF
 
-# --- 4. Test count (also confirms the suite passes) ---------------------------
-echo "🧪 Running tests to get current count..."
+# --- 4. Gate run, then test count ---------------------------------------------
+# One real run of the offline gate (`npm test` = unit + integration; no live
+# test), then the documented count from a collect-only run across all three
+# projects (scripts/lib/collect-test-count.sh), which runs nothing.
+echo "🧪 Running the offline test suite..."
 # The trailing `|| true` guards against `set -o pipefail` + `head -1` closing
 # the pipe early (SIGPIPE makes the pipeline "fail" and silently killed the
-# script here during v1.14.0 prep). The empty-count check below still catches
-# a genuinely failed test run.
+# script here during v1.14.0 prep). The empty-summary check below still
+# catches a genuinely failed test run.
 TEST_OUTPUT=$(npm test 2>&1 || true)
 TEST_SUMMARY=$(printf '%s\n' "$TEST_OUTPUT" | grep -E "^[[:space:]]*Tests[[:space:]]+[0-9]" | tail -1 || true)
 if [ -z "$TEST_SUMMARY" ]; then
-  echo "❌ Could not determine test count — did npm test fail?"
+  echo "❌ Could not read a test summary — did npm test fail?"
   exit 1
 fi
 # A red suite must stop the release. Before v1.23.0 prep this block only
-# checked for an *empty* count, so a single failing test sailed through — and
-# because the summary then reads "Tests  1 failed | 2273 passed (2274)", the
-# old "first number on the line" extraction wrote the **failure count** into
-# the README badge and CLAUDE.md ("1 tests, 100% pass rate"). Both halves are
-# fixed here: abort on failures, and read a number that survives that shape.
-# Both parses now live in scripts/lib/derived-facts.mjs, shared with
-# check-doc-versions.sh, and read the **parenthetical total** rather than the
-# "passed" figure. On every input this script accepts — a green suite — the two
-# are the same number. They differ only on a green suite with skipped tests,
-# where the total is what the checker validates and what the docs quote, so it
-# is the right one to write.
+# checked for an *empty* count, so a single failing test sailed through and the
+# failure count was written into the README badge. The red check is shared with
+# check-doc-versions.sh through scripts/lib/derived-facts.mjs.
 if node scripts/lib/derived-facts.mjs is-red "$TEST_SUMMARY"; then
   echo "❌ Test suite is red — refusing to prepare a release:"
   echo "   ${TEST_SUMMARY}"
-  echo "   (Six files under tests/integration/ make live network calls and flake."
-  echo "    Re-run npm test to tell a flake from a real regression.)"
+  echo "   The gate is offline, so a red suite is a real failure."
   exit 1
 fi
-TEST_COUNT=$(node scripts/lib/derived-facts.mjs test-count "$TEST_SUMMARY" || true)
-if [ -z "$TEST_COUNT" ]; then
-  echo "❌ Could not parse a test count from: ${TEST_SUMMARY}"
+echo "   ${TEST_SUMMARY}"
+# The documented count is every declared test, live ones included, so it does
+# not depend on the network. Collected, not run.
+TEST_COUNT=$(scripts/lib/collect-test-count.sh) || {
+  echo "❌ Could not collect a test count — see scripts/lib/collect-test-count.sh"
   exit 1
-fi
-echo "   ${TEST_COUNT} tests passing"
+}
+echo "   ${TEST_COUNT} tests declared (collect-only)"
 
 # --- 5. Tool count (from TOOL_NAMES in src/config/tools.ts, via scripts/lib/derived-facts.mjs) ---
 TOOL_COUNT=$(node scripts/lib/derived-facts.mjs tool-count) || {
