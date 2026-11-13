@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.15] - 2026-11-13
+
+The lightning report trusted every message the feed sent. A malformed message could stop the report with an error, a strike dated in the future could show extreme danger from a storm that had not happened, and a strike on the equator or the prime meridian was thrown away, so a storm there could read as a clear sky. Every feed message is now checked before it counts. This release also moves the HTTP entry's web-server libraries past seven moderate advisories.
+
 ### Changed
 - **`npm test` no longer reaches the internet** (contributors only; nothing a user runs changes). The 14 test files that call real weather services moved to `tests/live/` and run only with `npm run test:live`. `npm test`, CI and the publish workflow run the offline unit and integration tests, and an integration test that tries to reach a non-loopback host now fails with `ENONLOOPBACK`. The lightning tests run against a local MQTT broker, so they pin strike counting, distance and the safety level instead of depending on the weather; one live smoke test still checks the real broker. The release scripts count tests without running them, so a release prep runs the suite once instead of twice.
 
@@ -2341,7 +2345,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.14...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.15...HEAD
+[1.35.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.14...v1.35.15
 [1.35.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.13...v1.35.14
 [1.35.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.12...v1.35.13
 [1.35.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.11...v1.35.12
