@@ -159,23 +159,24 @@ EOF
 # test), then the documented count from a collect-only run across all three
 # projects (scripts/lib/collect-test-count.sh), which runs nothing.
 echo "🧪 Running the offline test suite..."
-# The trailing `|| true` guards against `set -o pipefail` + `head -1` closing
-# the pipe early (SIGPIPE makes the pipeline "fail" and silently killed the
-# script here during v1.14.0 prep). The empty-summary check below still
-# catches a genuinely failed test run.
-TEST_OUTPUT=$(npm test 2>&1 || true)
+# The suite's exit status is the verdict, not its summary line: a hook that
+# throws (beforeAll, a setup file) can leave a summary with no "failed" in it,
+# e.g. "Tests  1 skipped (1)", while vitest exits non-zero. `set +e` around the
+# capture keeps a red run from killing the script before it can say why.
+set +e
+TEST_OUTPUT=$(npm test 2>&1)
+TEST_RC=$?
+set -e
+# The summary is for the message only. `|| true`: grep finds nothing on a run
+# that died before printing one, and pipefail would otherwise end the script.
 TEST_SUMMARY=$(printf '%s\n' "$TEST_OUTPUT" | grep -E "^[[:space:]]*Tests[[:space:]]+[0-9]" | tail -1 || true)
-if [ -z "$TEST_SUMMARY" ]; then
-  echo "❌ Could not read a test summary — did npm test fail?"
-  exit 1
-fi
 # A red suite must stop the release. Before v1.23.0 prep this block only
 # checked for an *empty* count, so a single failing test sailed through and the
-# failure count was written into the README badge. The red check is shared with
-# check-doc-versions.sh through scripts/lib/derived-facts.mjs.
-if node scripts/lib/derived-facts.mjs is-red "$TEST_SUMMARY"; then
-  echo "❌ Test suite is red — refusing to prepare a release:"
-  echo "   ${TEST_SUMMARY}"
+# failure count was written into the README badge. The summary's red check
+# (shared with derived-facts.mjs) stays as a second signal.
+if [ "$TEST_RC" -ne 0 ] || [ -z "$TEST_SUMMARY" ] || node scripts/lib/derived-facts.mjs is-red "$TEST_SUMMARY"; then
+  echo "❌ Test suite is red — refusing to prepare a release (npm test exit ${TEST_RC}):"
+  echo "   ${TEST_SUMMARY:-no test summary was printed}"
   echo "   The gate is offline, so a red suite is a real failure."
   exit 1
 fi
