@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Radar imagery at the poles and at longitude 180 now points at a real map tile.** A point north of about 85°N or south of about 85°S, or on the 180° meridian, used to produce a radar link to a tile outside the map, and `composite: true` near the North Pole failed instead of drawing a map. Those points now get the nearest edge tile.
+
 ## [1.35.16] - 2026-11-13
 
 When the server reaches the internet through a proxy (`HTTPS_PROXY`), the proxy is meant only to open a connection to the weather service. Everything after that is protected by the service's own HTTPS certificate. Before this release, if the proxy refused that connection, the server read the proxy's refusal as the weather service's answer, with no certificate behind it. A misbehaving proxy, or anyone able to tamper with the link to it, could hand the server data that looked like a real forecast or alert. This only affects setups that use a proxy.
