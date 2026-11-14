@@ -42,9 +42,9 @@ async function run(open: () => Promise<unknown>): Promise<unknown> {
 }
 
 const TYPED: Array<[string, () => ApiError]> = [
-  ['RateLimitError', () => new RateLimitError('Open-Meteo', 60)],
-  ['ServiceUnavailableError', () => new ServiceUnavailableError('Open-Meteo', 'down')],
-  ['DataNotFoundError', () => new DataNotFoundError('Open-Meteo', 'no archive for that range')],
+  ['RateLimitError', () => new RateLimitError('OpenMeteo', 60)],
+  ['ServiceUnavailableError', () => new ServiceUnavailableError('OpenMeteo', 'down')],
+  ['DataNotFoundError', () => new DataNotFoundError('OpenMeteo', 'no archive for that range')],
 ];
 
 describe('historical Open-Meteo error class', () => {
@@ -57,7 +57,14 @@ describe('historical Open-Meteo error class', () => {
   it.each(TYPED)('%s renders its own user message', async (_n, make) => {
     const err = make();
     const caught = await run(() => Promise.reject(err));
-    expect(formatErrorForUser(caught as Error)).toBe(err.toUserMessage());
+    expect(err.service).toBe('OpenMeteo');
+    const rendered = formatErrorForUser(caught as Error);
+    expect(rendered).toBe(err.toUserMessage());
+    // A real ApiServiceName renders the display name, not `undefined API Error`.
+    expect(rendered.startsWith('Open-Meteo API Error: ')).toBe(true);
+    if (err.helpLinks.length > 0) {
+      expect(rendered).toContain('https://open-meteo.com/');
+    }
   });
 
   it('wraps a plain Error with the historical prefix', async () => {
