@@ -21,6 +21,7 @@ import {
 } from '../utils/unitFormat.js';
 import { ApiConstants, FormatConstants, DisplayThresholds } from '../config/displayThresholds.js';
 import { isInUS } from '../utils/geography.js';
+import { formatWallClockDate, formatWallClockDateTime } from '../utils/timezone.js';
 import { DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 
@@ -129,14 +130,16 @@ export async function handleGetHistoricalWeather(
         let output = `# Historical Weather Observations (Hourly)\n\n`;
         // Use the requested date strings directly; constructing a Date and calling
         // toLocaleDateString() would shift the displayed day in non-UTC server zones.
+        // The same holds for the per-observation headings below: Open-Meteo's
+        // archive times are naive wall-clock strings, so they print through
+        // formatWallClockDateTime / formatWallClockDate, never `new Date(s)`.
         output += `**Period:** ${start_date.split('T')[0]} to ${end_date.split('T')[0]}\n`;
         output += `**Location:** ${formatCoordinates(weatherData.latitude, weatherData.longitude)} (${formatElevationFromM(weatherData.elevation, prefs)} elevation)\n`;
         output += `**Number of observations:** ${maxObservations}${maxObservations < weatherData.hourly.time.length ? ` (of ${weatherData.hourly.time.length} available)` : ''}\n`;
         output += `**Data source:** Open-Meteo Historical Weather API (Reanalysis)\n\n`;
 
         for (let i = 0; i < maxObservations; i++) {
-          const time = new Date(weatherData.hourly.time[i]);
-          output += `## ${time.toLocaleString()}\n`;
+          output += `## ${formatWallClockDateTime(weatherData.hourly.time[i])}\n`;
 
           const temperature = weatherData.hourly.temperature_2m?.[i];
           if (temperature != null) {
@@ -209,8 +212,7 @@ export async function handleGetHistoricalWeather(
         output += `**Data source:** Open-Meteo Historical Weather API (Reanalysis)\n\n`;
 
         for (let i = 0; i < weatherData.daily.time.length; i++) {
-          const date = new Date(weatherData.daily.time[i]);
-          output += `## ${date.toLocaleDateString()}\n`;
+          output += `## ${formatWallClockDate(weatherData.daily.time[i])}\n`;
 
           const highTemp = weatherData.daily.temperature_2m_max?.[i];
           if (highTemp != null) {
