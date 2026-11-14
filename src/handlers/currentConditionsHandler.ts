@@ -804,9 +804,10 @@ async function formatNOAACurrentConditions(
   }
 
   // Climate Normals section (optional)
-  if (includeNormals) {
-    // Get date components from observation timestamp
-    const { month, day } = getDateComponents(props.timestamp);
+  // The observation's calendar day in the station's zone, not the server's.
+  const normalsDay = includeNormals ? getDateComponents(props.timestamp, timezone) : null;
+  if (normalsDay) {
+    const { month, day } = normalsDay;
 
     // currentTemps must be in the caller's units to match the rendered normals.
     const toPref = (f: number): number =>
@@ -1118,8 +1119,9 @@ async function formatOpenMeteoCurrentConditions(
   }
 
   // Climate Normals section (optional)
-  if (includeNormals) {
-    const { month, day } = getDateComponents(current.time);
+  const normalsDay = includeNormals ? getDateComponents(current.time, timezone) : null;
+  if (normalsDay) {
+    const { month, day } = normalsDay;
 
     // Daily values are already in the caller's units — no conversion needed.
     const currentTemps = {
@@ -1485,8 +1487,10 @@ async function formatMetarCurrentConditions(
 
   // Climate normals (optional) — supported here exactly as on the other two
   // paths (D7): they need only the coordinates and the date.
-  if (includeNormals) {
-    const { month, day } = getDateComponents(observedIso);
+  // The observation's calendar day at the station, not on the server.
+  const normalsDay = includeNormals ? getDateComponents(observedIso, timezone) : null;
+  if (normalsDay) {
+    const { month, day } = normalsDay;
 
     // No comparable station high/low on this path — normals render on their own.
     output += await renderNormalsSection(

@@ -27,6 +27,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { DateTime } from 'luxon';
+import { guessTimezoneFromCoords } from '../../src/utils/timezone.js';
 import { handleGetCurrentConditions } from '../../src/handlers/currentConditionsHandler.js';
 import { dayOfYearIndex } from '../../src/services/acis.js';
 import { SEARCH_TIERS } from '../../src/utils/metarStation.js';
@@ -559,14 +561,13 @@ describe('handleGetCurrentConditions — include_normals on the METAR path', () 
     const aviation = buildAviationFake([observation]);
     // The observation's obsTime is relative to "now" (see obsTimeMinutesAgo),
     // so the records slot must be built for the observation's month/day, not a
-    // fixed date. It must come from the OBSERVATION rather than from `now`:
-    // the handler derives the slot from `observedIso`
-    // (`new Date(obs.obsTime * 1000)`, currentConditionsHandler.ts:1081) and
-    // `getDateComponents` reads it in the local zone, so a run inside the first
-    // `ageMinutes` after local midnight puts "now" and the observation on
-    // different calendar dates and the slot lookup misses.
-    const observed = new Date(observation.obsTime * 1000);
-    const records = buildDailyRecords(observed.getMonth() + 1, observed.getDate(), {
+    // fixed date. It is the observation's calendar day IN THE STATION'S ZONE:
+    // the handler reads `observedIso` through `getDateComponents` in the zone
+    // `guessTimezoneFromCoords` gives the station, never the server's zone.
+    const observed = DateTime.fromMillis(observation.obsTime * 1000, {
+      zone: guessTimezoneFromCoords(observation.lat, observation.lon),
+    });
+    const records = buildDailyRecords(observed.month, observed.day, {
       high: { value: 96, year: 1977 },
       low: { value: 49, year: 1953 },
     });

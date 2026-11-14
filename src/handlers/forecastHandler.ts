@@ -897,8 +897,12 @@ async function formatNOAAForecast(
   if (include_normals && granularity === 'daily') {
     // Get the first forecast day to determine the date
     const firstPeriod = periods[0];
-    if (firstPeriod && firstPeriod.startTime) {
-      const { month, day } = getDateComponents(firstPeriod.startTime);
+    // The period's local day at the point, not the server's day.
+    const normalsDay = firstPeriod && firstPeriod.startTime
+      ? getDateComponents(firstPeriod.startTime, timezone)
+      : null;
+    if (normalsDay) {
+      const { month, day } = normalsDay;
 
       // Get forecasted high/low for comparison (first day)
       let forecastHigh: number | undefined;
@@ -1268,8 +1272,10 @@ async function formatOpenMeteoForecast(
   if (include_normals && granularity === 'daily' && forecast.daily) {
     // Get the first forecast day
     const firstDay = forecast.daily.time[0];
-    if (firstDay) {
-      const { month, day } = getDateComponents(firstDay);
+    // A date-only string names the location's day; read it in that zone.
+    const normalsDay = firstDay ? getDateComponents(firstDay, forecast.timezone) : null;
+    if (normalsDay) {
+      const { month, day } = normalsDay;
 
       // Get forecasted high/low for comparison (first day)
       const firstDayHigh = forecast.daily.temperature_2m_max?.[0];

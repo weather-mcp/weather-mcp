@@ -9,6 +9,7 @@
  * 2. Fall back to Open-Meteo (global, no token) computed normals
  */
 
+import { DateTime } from 'luxon';
 import type { OpenMeteoHistoricalResponse, ClimateNormals } from '../types/openmeteo.js';
 import { celsiusToFahrenheit } from './units.js';
 import { UnitPreferences, IMPERIAL_PREFERENCES } from '../config/units.js';
@@ -365,17 +366,21 @@ export async function renderNormalsSection(
 }
 
 /**
- * Get date components from Date object or ISO string
+ * The location's calendar day for an ISO string, read in the location's zone —
+ * never the server's.
  *
- * @param date - Date object or ISO string
- * @returns Object with month (1-12) and day (1-31)
+ * A date-only (`YYYY-MM-DD`) or naive (`YYYY-MM-DDTHH:MM`) string is wall clock
+ * in `timeZone`, so its literal date wins. A string carrying an offset or `Z`
+ * names an instant and converts to the day it is in `timeZone`.
+ *
+ * @param iso - ISO 8601 date or date-time string
+ * @param timeZone - IANA zone of the location
+ * @returns month (1-12) and day (1-31), or null when the string or zone is unparseable
  */
-export function getDateComponents(date: Date | string): { month: number; day: number } {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return {
-    month: d.getMonth() + 1, // JavaScript months are 0-indexed
-    day: d.getDate()
-  };
+export function getDateComponents(iso: string, timeZone: string): { month: number; day: number } | null {
+  const dt = DateTime.fromISO(iso, { zone: timeZone });
+  if (!dt.isValid) return null;
+  return { month: dt.month, day: dt.day };
 }
 
 /**
