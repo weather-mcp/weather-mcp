@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.18] - 2026-11-14
+
 Some dates and times came out one day, or one hour, off depending on the time zone of the computer running the server, not the place you asked about. On a server in the Americas, every daily heading in a historical weather lookup was one day early. And wherever the server was, a "compare with normal" view could measure today's weather against the wrong day's averages. Dates now follow the location's own calendar, whatever zone the server is in.
 
 ### Fixed
@@ -2371,7 +2373,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.17...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.18...HEAD
+[1.35.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.17...v1.35.18
 [1.35.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.16...v1.35.17
 [1.35.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.15...v1.35.16
 [1.35.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.14...v1.35.15
