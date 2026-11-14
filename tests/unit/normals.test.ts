@@ -2,7 +2,7 @@
  * Unit tests for climate normals utilities
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   calculateDeparture,
   formatNormals,
@@ -191,37 +191,36 @@ describe('Climate Normals Utilities', () => {
   });
 
   describe('getDateComponents', () => {
-    it('should extract date components from Date object', () => {
-      const date = new Date('2025-06-15T12:00:00Z');
-      const { month, day } = getDateComponents(date);
-
-      expect(month).toBe(6);
-      expect(day).toBe(15);
+    // The location's calendar day, read in the location's zone. Every row runs
+    // under three process zones and must not move (RF-25).
+    const ORIGINAL_TZ = process.env.TZ;
+    afterEach(() => {
+      if (ORIGINAL_TZ === undefined) delete process.env.TZ; else process.env.TZ = ORIGINAL_TZ;
     });
 
-    it('should extract date components from ISO string', () => {
-      // Note: Uses local timezone, not UTC
-      const testDate = '2025-06-15T12:00:00';  // Use local time, not UTC
-      const { month, day } = getDateComponents(testDate);
+    const ROWS: Array<[string, string, { month: number; day: number } | null]> = [
+      ['2024-03-05', 'America/New_York', { month: 3, day: 5 }],
+      ['2024-03-10T02:30', 'America/New_York', { month: 3, day: 10 }], // DST gap
+      ['2024-07-14T18:00:00-07:00', 'America/Los_Angeles', { month: 7, day: 14 }], // NOAA period; UTC date is 7/15
+      ['2024-07-15T03:00:00Z', 'America/Los_Angeles', { month: 7, day: 14 }], // Seattle evening
+      ['2024-07-14T13:00:00Z', 'Pacific/Auckland', { month: 7, day: 15 }],
+      ['2025-12-31T23:59:59Z', 'UTC', { month: 12, day: 31 }],
+      ['2024-02-29T12:00:00Z', 'UTC', { month: 2, day: 29 }],
+      ['not-a-date', 'UTC', null],
+      ['2024-03-05', 'Not/AZone', null],
+    ];
 
-      expect(month).toBe(6);
-      expect(day).toBe(15);
-    });
-
-    it('should handle December 31st', () => {
-      const { month, day } = getDateComponents('2025-12-31T23:59:59Z');
-
-      expect(month).toBe(12);
-      expect(day).toBe(31);
-    });
-
-    it('should handle leap day', () => {
-      const { month, day } = getDateComponents('2024-02-29T12:00:00Z');
-
-      expect(month).toBe(2);
-      expect(day).toBe(29);
-    });
+    for (const processZone of ['UTC', 'America/New_York', 'Pacific/Auckland']) {
+      it.each(ROWS)(`under TZ=${processZone}: %s in %s`, (iso, zone, expected) => {
+        process.env.TZ = processZone;
+        if (processZone === 'America/New_York') {
+          expect(new Date('2024-03-05').getDate()).toBe(4); // the switch took (G41)
+        }
+        expect(getDateComponents(iso, zone)).toEqual(expected);
+      });
+    }
   });
+
 
   describe('computeNormalsTable', () => {
     it('computes a slot mean from hand-computed fixtures (exact float)', () => {

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.18] - 2026-11-14
+
+Some dates and times came out one day, or one hour, off depending on the time zone of the computer running the server, not the place you asked about. On a server in the Americas, every daily heading in a historical weather lookup was one day early. And wherever the server was, a "compare with normal" view could measure today's weather against the wrong day's averages. Dates now follow the location's own calendar, whatever zone the server is in.
+
+### Fixed
+- **Historical daily headings, the air-quality observation time and the climate-normals day no longer shift with the server's time zone.** `get_historical_weather` printed each daily heading one day early on servers west of UTC, and printed the spring-forward hour twice. `get_air_quality` (and its `get_weather_summary` section) printed the wrong hour during the server's spring-forward hour. With `include_normals`, the Open-Meteo forecast compared against the previous day's normals on servers west of UTC.
+- **The climate normals and US records day now follows the location's calendar on every path.** An evening observation in the Americas no longer gets tomorrow's normals on a UTC server, and a morning observation in Asia–Pacific no longer gets yesterday's. The normal high and low you see can therefore differ by a degree from before, when the location's date and the server's date differ.
+
+### Changed
+- **`get_historical_weather` now reports an Open-Meteo failure the same way every other tool does**, with the service's own message and help link, instead of a generic "Unable to retrieve historical data" line. Other failures on this path keep the old wording.
+
 ## [1.35.17] - 2026-11-14
 
 Asking for radar imagery very close to either pole, or exactly on the 180° meridian, gave a tile address one step past the edge of the map. Near the North Pole, a request for a finished radar map (`composite: true`) failed outright and fell back to links only. Everywhere else, radar and satellite imagery is unchanged.
@@ -2362,7 +2373,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.17...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.18...HEAD
+[1.35.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.17...v1.35.18
 [1.35.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.16...v1.35.17
 [1.35.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.15...v1.35.16
 [1.35.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.14...v1.35.15

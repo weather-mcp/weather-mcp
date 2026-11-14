@@ -230,3 +230,16 @@ export function isValidTimezone(timezone: string): boolean {
     return false;
   }
 }
+
+/** Format an Open-Meteo `YYYY-MM-DD` as a calendar date. The string names a wall-clock day,
+ *  not an instant, so it is read and printed in UTC and the process zone cannot move it.
+ *  Output equals `new Date(date).toLocaleDateString()` on a UTC server. */
+export function formatWallClockDate(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' });
+}
+
+/** Format an Open-Meteo naive `YYYY-MM-DDTHH:MM` (no offset) the same way. Precondition: no offset
+ *  or `Z` in the input. Output equals `new Date(dateTime).toLocaleString()` on a UTC server. */
+export function formatWallClockDateTime(dateTime: string): string {
+  return new Date(`${dateTime}Z`).toLocaleString(undefined, { timeZone: 'UTC' });
+}

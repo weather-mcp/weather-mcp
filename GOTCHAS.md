@@ -7447,6 +7447,49 @@ script with no `--project` other than `test:live`. Related: [G9].
 
 ---
 
+## G162 — A wall-clock string through `new Date` is read in the server's zone
+
+**Trigger:** rendering a date or time from, or taking a calendar day from, a string that names a
+**wall clock** rather than an instant: an Open-Meteo `daily.time[]` (`YYYY-MM-DD`), `hourly.time[]`
+or scalar `current.time` (`YYYY-MM-DDTHH:MM`, no offset, `timezone: 'auto'`), or any other
+date-only string. The shapes are `new Date(s).toLocaleDateString()`, `.toLocaleString()`,
+`.getMonth()`, `.getDate()`. When you **survey** for this class, include the scalar
+`current.time` renderers, not only the `daily`/`hourly` arrays.
+
+**Rule:** a wall-clock string never meets a process-zone read. To display one, use
+`formatWallClockDate` / `formatWallClockDateTime` (`src/utils/timezone.ts`). They read the string
+as UTC and print with `timeZone: 'UTC'`, so the output equals today's UTC-server output. To take
+the location's calendar day, use `getDateComponents(iso, timeZone)` (`src/utils/normals.ts`) with
+the location's zone. An *instant* (an offset or `Z`) needs the location's zone too, never the
+server's (`formatInTimezone`). A test pins this by switching `process.env.TZ` at runtime (Node
+honours it in-process). Restore it by `delete` when it was unset, because assigning `undefined`
+sets the string `"undefined"`. Assert a New York sentinel (`new Date('2024-03-05').getDate() === 4`)
+so a switch that silently failed cannot make the zone rows vacuous.
+
+**Why:** `new Date('2024-03-05')` is UTC midnight, so west of UTC it prints `3/4/2024`. A naive
+`'2024-03-10T02:00'` parses as server-local, and in the server's spring-forward hour it prints
+`3:00:00 AM`, colliding with the next sample. Every test machine and CI runner sits in one zone,
+so the defect is invisible to a suite that never switches zone: it shipped in
+`get_historical_weather` headings, the normals day on five paths, and the air-quality observation
+time. The design survey of RF-25 searched the `daily`/`hourly` arrays and missed the scalar
+`current.time` site in `airQualityHandler.ts`. The plan review caught it (codex-R1).
+
+**Verify:** `for z in UTC America/New_York; do TZ=$z node -e "console.log(new Date('2024-03-05').toLocaleDateString())"; done`
+prints `3/5/2024` then `3/4/2024`. `grep -rnE "new Date\((weatherData|data|response|forecast)?\.?(daily|hourly|current)" src/`
+should find no display or calendar read.
+
+**Evidence:** 2026-11-14, plan-date-only-zone-shift (RF-25): T1 `2d122aa` (display helpers, historical
+and air-quality sites), T2 `242f592` (`getDateComponents` with a required zone). Live: on `main`
+under `TZ=America/New_York`, every historical daily heading was one day early on 8 of 8 probes. The
+branch was byte-identical across three zones (`qa-date-only-zone-shift.md`). Out of scope and filed
+separately: NOAA-path instants still print in the server's zone (`historicalWeatherHandler.ts:304`,
+`:334`; `snow.ts`), and the fire-season month (`fireWeather.ts:217-218`, run-order row 81).
+
+**Status:** active. Lint candidate: an ESLint `no-restricted-syntax` on `new Date(<member>.time…)`
+followed by a `toLocale*`/local-getter call in `src/handlers/`. Related: [G75].
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the

@@ -26,6 +26,7 @@ import type { GooglePollenService } from '../services/googlePollen.js';
 import { GooglePollenKeyRejectedError } from '../services/googlePollen.js';
 import type { GooglePollenDailyInfo } from '../types/googlePollen.js';
 import { logger } from '../utils/logger.js';
+import { formatWallClockDateTime } from '../utils/timezone.js';
 
 interface AirQualityArgs {
   latitude?: number;
@@ -186,8 +187,7 @@ function formatAirQuality(
   }
 
   const current = data.current;
-  const currentTime = new Date(current.time);
-  output += `**Observation Time:** ${currentTime.toLocaleString()}\n\n`;
+  output += `**Observation Time:** ${formatWallClockDateTime(current.time)}\n\n`;
 
   // Display primary AQI with health information
   if (useUSAQI && current.us_aqi != null) {
