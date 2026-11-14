@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.16] - 2026-11-13
+
+When the server reaches the internet through a proxy (`HTTPS_PROXY`), the proxy is meant only to open a connection to the weather service. Everything after that is protected by the service's own HTTPS certificate. Before this release, if the proxy refused that connection, the server read the proxy's refusal as the weather service's answer, with no certificate behind it. A misbehaving proxy, or anyone able to tamper with the link to it, could hand the server data that looked like a real forecast or alert. This only affects setups that use a proxy.
+
+### Security
+- **A proxy's refusal can no longer pass as the weather service's answer.** Previously any reply other than "connected" was handed on as if the weather service had sent it. A reply with a body was read as weather data, and a redirect was followed. Now a 4xx or 5xx refusal reaches the server as its status code only; the proxy's headers and body are discarded. Proxy authentication (407) is reported as before. Any other reply is treated as a dropped connection. Thanks to MagicCactus42 for the report and the fix (#131).
+
+### Changed
+- **A proxy that answers oddly now shows as "service temporarily unavailable".** A proxy reply that is neither "connected" nor a 4xx/5xx refusal is now handled as a dropped connection. That kind of failure is retried, so the error takes a few seconds longer to appear. Without a proxy, and through a proxy that works, output is unchanged.
+
 ## [1.35.15] - 2026-11-13
 
 The lightning report trusted every message the feed sent. A malformed message could stop the report with an error, a strike dated in the future could show extreme danger from a storm that had not happened, and a strike on the equator or the prime meridian was thrown away, so a storm there could read as a clear sky. Every feed message is now checked before it counts. This release also moves the HTTP entry's web-server libraries past seven moderate advisories.
@@ -2345,7 +2355,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.15...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.16...HEAD
+[1.35.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.15...v1.35.16
 [1.35.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.14...v1.35.15
 [1.35.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.13...v1.35.14
 [1.35.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.12...v1.35.13

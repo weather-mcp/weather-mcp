@@ -6,6 +6,7 @@ import tls from 'node:tls';
 import type { Duplex } from 'node:stream';
 import {
   buildConnectRequest,
+  buildRefusalResponse,
   createTunnelAgent,
   parseConnectResponse,
   tunnelProxyFor
@@ -291,5 +292,64 @@ describe('(h) the origin TLS servername falls back on an empty value', () => {
     expect(options.servername).toBe('203.0.113.5');
     expect(options.socket).toBe(proxySocket);
     expect(options).not.toHaveProperty('host');
+  });
+});
+
+describe('(i) a CONNECT answer other than 200 is never replayed', () => {
+  /** Dial through a stub, stash a stand-in request, and feed the proxy's answer. */
+  function answerWith(text: string): {
+    request: EventEmitter;
+    proxySocket: StubSocket;
+    settled: Promise<Settled>;
+  } {
+    const proxySocket = new StubSocket();
+    vi.spyOn(net, 'connect').mockImplementation(() => proxySocket as unknown as net.Socket);
+    const agent = createTunnelAgent(
+      new URL('http://proxy.example.invalid:3128'),
+      new AbortController().signal
+    );
+    const request = new EventEmitter();
+    (agent as unknown as { request: EventEmitter }).request = request;
+    const { cb, settled } = capture();
+    agent.createConnection({ host: 'origin.invalid', port: 443 }, cb);
+    proxySocket.emit('connect');
+    proxySocket.feed(text);
+    return { request, proxySocket, settled };
+  }
+
+  it.each([101, 201, 203, 204, 302, 307])(
+    '%i → ECONNRESET, and nothing reaches the request',
+    async (status) => {
+      const { request, proxySocket, settled } = answerWith(
+        `HTTP/1.1 ${status} OK\r\nLocation: http://10.0.0.1/\r\nContent-Length: 13\r\n\r\n{"forged":1}\n`
+      );
+      const { err } = await settled;
+      expect(err?.code).toBe('ECONNRESET');
+      expect(err?.message).toBe('proxy sent an unexpected CONNECT status');
+      expect(proxySocket.destroyed).toBe(true);
+      expect(request.listenerCount('socket')).toBe(0);
+    }
+  );
+
+  it('407 → the status alone, in a response built here', async () => {
+    const { request, proxySocket, settled } = answerWith(
+      'HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm="t"\r\n' +
+        'Location: http://10.0.0.1/\r\nContent-Length: 6\r\n\r\nforged'
+    );
+    const { err, stream } = await settled;
+    expect(err).toBeNull();
+    expect(stream).toBeDefined();
+    expect(proxySocket.destroyed).toBe(true);
+    const pushed: Array<Buffer | null> = [];
+    request.emit('socket', { push: (chunk: Buffer | null) => pushed.push(chunk) });
+    expect(pushed).toHaveLength(2);
+    expect(pushed[0]).toEqual(buildRefusalResponse(407));
+    expect(pushed[1]).toBeNull();
+  });
+
+  it('buildRefusalResponse carries the status and nothing else', () => {
+    expect(buildRefusalResponse(502).toString('latin1')).toBe(
+      'HTTP/1.1 502 Proxy refused CONNECT\r\nContent-Length: 0\r\nConnection: close\r\n\r\n'
+    );
   });
 });

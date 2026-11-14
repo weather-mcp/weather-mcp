@@ -12,11 +12,14 @@
  *   `Agent.createSocket` accepts a returned socket or the callback, so its request bookkeeping is
  *   unchanged. Every path settles the callback exactly once.
  * - A 200 answer is upgraded to TLS to the origin, as https-proxy-agent 5 does
- *   (`dist/agent.js:118-128`). Any other answer is replayed to the request as that HTTP response,
- *   on a fake socket, after the proxy socket is destroyed — hpa 5's replay (`agent.js:130-152`),
- *   so a 407 reaches every service's error mapper as `response.status` 407, and no origin request
- *   byte reaches the proxy. A proxy that closes before answering is `ECONNRESET`; a socket error
- *   keeps its own code (G138) under a fixed message, because Node's names the proxy endpoint.
+ *   (`dist/agent.js:118-128`). No other answer is replayed: the CONNECT leg is not authenticated,
+ *   and hpa 5's replay (`agent.js:130-152`) hands the proxy's bytes to the request as the origin's
+ *   HTTPS response, so a `203` with a body would be an accepted answer that no TLS ever covered.
+ *   A 4xx or 5xx reaches the request as a response built here from the status code alone, so a 407
+ *   still reaches every service's error mapper as `response.status` 407. Any other status is
+ *   `ECONNRESET`. No origin request byte reaches the proxy on either path. A proxy that closes
+ *   before answering is `ECONNRESET`; a socket error keeps its own code (G138) under a fixed
+ *   message, because Node's names the proxy endpoint.
  * - No pooling: `keepAlive: false`. The tunnel it replaces sent `Connection: close` too.
  * - It logs nothing and never stringifies the proxy URL, which can carry credentials. No error it
  *   produces names the proxy host, port or userinfo.
@@ -96,6 +99,17 @@ export function parseConnectResponse(
   return { statusCode: match ? Number(match[1]) : 0, headerEnd };
 }
 
+/**
+ * The whole response a refused CONNECT hands to the request: the proxy's status code under a fixed
+ * reason, with no header and no body. Nothing the proxy wrote is copied.
+ */
+export function buildRefusalResponse(statusCode: number): Buffer {
+  return Buffer.from(
+    `HTTP/1.1 ${statusCode} Proxy refused CONNECT\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`,
+    'latin1'
+  );
+}
+
 function abortError(): Error {
   return Object.assign(new Error('proxy CONNECT aborted'), { code: 'ECONNABORTED' });
 }
@@ -117,7 +131,7 @@ class TunnelAgent extends https.Agent {
     super({ keepAlive: false, maxSockets: Infinity });
   }
 
-  /** Stash the request: a non-200 answer is replayed onto it, and `createConnection` never sees it. */
+  /** Stash the request: a refusal's status is delivered onto it, and `createConnection` never sees it. */
   addRequest(req: ClientRequest, ...rest: unknown[]): void {
     this.request = req;
     (https.Agent.prototype as unknown as { addRequest: AddRequest }).addRequest.call(
@@ -228,15 +242,21 @@ class TunnelAgent extends https.Agent {
         return;
       }
 
-      // Any other answer: destroy the proxy socket before a request byte is written, then replay
-      // the proxy's own response to the request so its status reaches axios.
+      // Any other answer: destroy the proxy socket before a request byte is written.
       socket.on('error', () => undefined);
       socket.destroy();
       if (req === undefined) {
         settle(resetError('proxy refused CONNECT'));
         return;
       }
-      const response = buffered;
+      // Only a 4xx or 5xx is a refusal. A 1xx, another 2xx or a 3xx delivered to the request would
+      // be read as the origin's own answer (a success, or a redirect to follow) with no TLS.
+      if (answer.statusCode < 400 || answer.statusCode > 599) {
+        settle(resetError('proxy sent an unexpected CONNECT status'));
+        return;
+      }
+      // The status reaches axios; the proxy's headers and body do not.
+      const response = buildRefusalResponse(answer.statusCode);
       const fake = new net.Socket({ writable: false });
       fake.readable = true;
       req.once('socket', (s: net.Socket) => {
