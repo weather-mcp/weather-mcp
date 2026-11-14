@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Historical daily headings, the air-quality observation time and the climate-normals day no longer shift with the server's time zone.** `get_historical_weather` printed each daily heading one day early on servers west of UTC, and printed the spring-forward hour twice. `get_air_quality` (and its `get_weather_summary` section) printed the wrong hour in the server's spring-forward hour. `include_normals` on the Open-Meteo forecast compared against the previous day's normals. The normals day now follows the location's calendar, not the server's, on every path, so an evening observation in the Americas no longer gets tomorrow's normals on a UTC server.
+- **`get_historical_weather` now reports an Open-Meteo failure the same way every other tool does**, with the service's own message and help link, instead of a generic "Unable to retrieve historical data" line.
+
 ## [1.35.17] - 2026-11-14
 
 Asking for radar imagery very close to either pole, or exactly on the 180° meridian, gave a tile address one step past the edge of the map. Near the North Pole, a request for a finished radar map (`composite: true`) failed outright and fell back to links only. Everywhere else, radar and satellite imagery is unchanged.
