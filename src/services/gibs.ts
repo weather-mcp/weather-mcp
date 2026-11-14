@@ -17,6 +17,7 @@
  */
 
 import { ImageryFrame } from '../types/imagery.js';
+import { webMercatorTileIndex } from '../utils/webMercator.js';
 
 /** WMTS REST base for EPSG:3857 "best" imagery. */
 const GIBS_BASE = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best';
@@ -28,9 +29,6 @@ const MAX_ZOOM = 7;
 /** Regional default zoom for a satellite view centered on the coordinate. */
 const DEFAULT_ZOOM = 5;
 
-/** Web Mercator projection latitude limit. */
-const MAX_LATITUDE = 85.05112878;
-
 export class GibsService {
   /**
    * Choose the GOES satellite whose disk best covers the longitude.
@@ -41,26 +39,13 @@ export class GibsService {
     return longitude <= -115 ? 'GOES-West_ABI_GeoColor' : 'GOES-East_ABI_GeoColor';
   }
 
-  /** Convert lat/lon to WMTS tile column/row at a zoom level (Web Mercator). */
-  private tileColRow(latitude: number, longitude: number, zoom: number): { x: number; y: number } {
-    const lat = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latitude));
-    const n = 2 ** zoom;
-    const latRad = (lat * Math.PI) / 180;
-    const xRaw = Math.floor(((longitude + 180) / 360) * n);
-    const yRaw = Math.floor(
-      ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
-    );
-    const clamp = (v: number) => Math.max(0, Math.min(n - 1, v));
-    return { x: clamp(xRaw), y: clamp(yRaw) };
-  }
-
   /**
    * Build a WMTS tile URL for the latest available frame (WMTS "default" time).
    * WMTS REST order is {z}/{row=y}/{col=x}.
    */
   buildTileUrl(layer: string, latitude: number, longitude: number, zoom: number): string {
     const z = Math.max(0, Math.min(MAX_ZOOM, zoom));
-    const { x, y } = this.tileColRow(latitude, longitude, z);
+    const { x, y } = webMercatorTileIndex(latitude, longitude, z);
     return `${GIBS_BASE}/${layer}/default/${TILE_MATRIX_SET}/${z}/${y}/${x}.png`;
   }
 

@@ -105,6 +105,7 @@ src/
 │   ├── jmaAreaResolver.ts   # Coordinate → class10 area (pure) + the artifact's one lazy load site
 │   ├── jmaWarningNames.ts   # JMA warning-name English gloss and tier classification (pure)
 │   ├── composite.ts         # PNG stitch/blend/marker/encode (pure)
+│   ├── webMercator.ts       # Web-Mercator tile index + clamp latitude, shared by RainViewer and GIBS tile URLs (pure)
 │   ├── airQuality.ts / marine.ts / snow.ts / distance.ts / geohash.ts
 │   ├── strikeBuffer.ts      # Blitzortung message parser (size, JSON, typed coordinates/time, future skew) and the bounded strike buffer (pure)
 │   └── version.ts

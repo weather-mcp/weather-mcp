@@ -36,6 +36,7 @@
  */
 
 import { PNG } from 'pngjs';
+import { WEB_MERCATOR_MAX_LATITUDE } from './webMercator.js';
 
 export { PNG };
 
@@ -289,11 +290,10 @@ export function worldPixelSize(z: number): number {
  * top-left corner.
  *
  * Latitude is clamped to the Mercator-valid range, matching
- * `rainviewer.ts`'s own clamp — the projection is undefined at the poles.
+ * the shared `WEB_MERCATOR_MAX_LATITUDE` (`webMercator.ts`) — the projection is undefined at the poles.
  */
 export function latLonToGlobalPixel(lat: number, lon: number, z: number): { gx: number; gy: number } {
-  const MAX_LATITUDE = 85.05112878;
-  const clampedLat = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, lat));
+  const clampedLat = Math.max(-WEB_MERCATOR_MAX_LATITUDE, Math.min(WEB_MERCATOR_MAX_LATITUDE, lat));
   const latRad = (clampedLat * Math.PI) / 180;
   const world = worldPixelSize(z);
 
