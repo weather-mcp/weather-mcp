@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.16] - 2026-11-13
+
+When the server reaches the internet through a proxy (`HTTPS_PROXY`), the proxy is meant only to open a connection to the weather service. Everything after that is protected by the service's own HTTPS certificate. Before this release, if the proxy refused that connection, the server read the proxy's refusal as the weather service's answer, with no certificate behind it. A misbehaving proxy, or anyone able to tamper with the link to it, could hand the server data that looked like a real forecast or alert. This only affects setups that use a proxy.
+
 ### Security
-- **A proxy's answer to `CONNECT` can no longer stand in for the upstream's HTTPS response.** With `HTTPS_PROXY` set, any answer other than `200` was handed to the request as the origin's own response, with no TLS. A `203` with a body was accepted as data, and a `302` was followed. A 4xx or 5xx now reaches the request as its status code alone, and any other status is a connection reset. Thanks to MagicCactus42 for the report and fix (#131). (`src/utils/proxyTunnel.ts`)
+- **A proxy's refusal can no longer pass as the weather service's answer.** Previously any reply other than "connected" was handed on as if the weather service had sent it. A reply with a body was read as weather data, and a redirect was followed. Now a 4xx or 5xx refusal reaches the server as its status code only; the proxy's headers and body are discarded. Proxy authentication (407) is reported as before. Any other reply is treated as a dropped connection. Thanks to MagicCactus42 for the report and the fix (#131).
+
+### Changed
+- **A proxy that answers oddly now shows as "service temporarily unavailable".** A proxy reply that is neither "connected" nor a 4xx/5xx refusal is now handled as a dropped connection. That kind of failure is retried, so the error takes a few seconds longer to appear. Without a proxy, and through a proxy that works, output is unchanged.
 
 ## [1.35.15] - 2026-11-13
 
@@ -2348,7 +2355,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.15...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.16...HEAD
+[1.35.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.15...v1.35.16
 [1.35.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.14...v1.35.15
 [1.35.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.13...v1.35.14
 [1.35.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.12...v1.35.13
