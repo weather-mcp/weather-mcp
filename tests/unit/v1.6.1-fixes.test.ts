@@ -62,55 +62,6 @@ describe('v1.6.1 Security & Quality Fixes', () => {
     });
   });
 
-  describe('RainViewer Polar Coordinate Clamping', () => {
-    /**
-     * Test Web Mercator latitude clamping
-     * Simulates the fix in buildCoordinateTileUrl
-     */
-    function clampLatitudeForWebMercator(lat: number): number {
-      const MAX_LATITUDE = 85.05112878;
-      return Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, lat));
-    }
-
-    it('should clamp north pole latitude', () => {
-      const clamped = clampLatitudeForWebMercator(90);
-      expect(clamped).toBe(85.05112878);
-      expect(clamped).toBeLessThan(90);
-    });
-
-    it('should clamp south pole latitude', () => {
-      const clamped = clampLatitudeForWebMercator(-90);
-      expect(clamped).toBe(-85.05112878);
-      expect(clamped).toBeGreaterThan(-90);
-    });
-
-    it('should not clamp valid latitudes', () => {
-      expect(clampLatitudeForWebMercator(40.7128)).toBe(40.7128);
-      expect(clampLatitudeForWebMercator(-33.8688)).toBe(-33.8688);
-      expect(clampLatitudeForWebMercator(0)).toBe(0);
-    });
-
-    it('should prevent NaN in tile calculations', () => {
-      const lat = 90; // Would cause division by zero
-      const clamped = clampLatitudeForWebMercator(lat);
-
-      // Test that clamped value works in Web Mercator formula
-      const radLat = (clamped * Math.PI) / 180;
-      const mercatorY = Math.log(Math.tan(radLat) + 1 / Math.cos(radLat));
-
-      expect(isNaN(mercatorY)).toBe(false);
-      expect(isFinite(mercatorY)).toBe(true);
-    });
-
-    it('should handle near-polar latitudes safely', () => {
-      const nearNorth = clampLatitudeForWebMercator(89.9);
-      const nearSouth = clampLatitudeForWebMercator(-89.9);
-
-      expect(nearNorth).toBeLessThanOrEqual(85.05112878);
-      expect(nearSouth).toBeGreaterThanOrEqual(-85.05112878);
-    });
-  });
-
   describe('Timezone resolution (international accuracy)', () => {
     // The original v1.6.1 fix avoided returning the *server* timezone for
     // international queries (it fell back to UTC). That guarantee still holds,

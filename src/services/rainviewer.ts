@@ -8,6 +8,7 @@ import axios, { AxiosInstance } from 'axios';
 import { logger, redactCoordinatesForLogging, describeErrorForLogging } from '../utils/logger.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
 import { isConnectionFailureCode } from '../utils/connectionFailure.js';
+import { WEB_MERCATOR_MAX_LATITUDE, webMercatorTileIndex } from '../utils/webMercator.js';
 import { RainViewerResponse, RainViewerFrame, ImageryFrame } from '../types/imagery.js';
 import { ServiceUnavailableError } from '../errors/ApiError.js';
 
@@ -184,7 +185,8 @@ export class RainViewerService {
 
   /**
    * Build tile URL for a specific coordinate
-   * Clamps latitude to Web Mercator projection range to prevent NaN tile coordinates
+   * Clamps latitude to Web Mercator projection range to prevent NaN tile coordinates,
+   * and keeps the x/y tile indices on the grid (0 to 2 ** zoom - 1)
    */
   buildCoordinateTileUrl(
     frame: RainViewerFrame,
@@ -194,23 +196,21 @@ export class RainViewerService {
   ): string {
     // Web Mercator projection is undefined at the poles
     // Clamp latitude to safe range (±85.05112878°) to avoid division by zero
-    const MAX_LATITUDE = 85.05112878;
-    const clampedLat = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latitude));
+    const clampedLat = Math.max(
+      -WEB_MERCATOR_MAX_LATITUDE,
+      Math.min(WEB_MERCATOR_MAX_LATITUDE, latitude)
+    );
 
     if (clampedLat !== latitude) {
       logger.warn('Latitude clamped to Web Mercator safe range', {
         original: redactCoordinatesForLogging(latitude, longitude).lat,
         clamped: clampedLat,
-        maxLatitude: MAX_LATITUDE
+        maxLatitude: WEB_MERCATOR_MAX_LATITUDE
       });
     }
 
-    // Convert lat/lon to tile coordinates
-    const x = Math.floor(((longitude + 180) / 360) * 2 ** zoom);
-    const y = Math.floor(
-      ((1 - Math.log(Math.tan((clampedLat * Math.PI) / 180) + 1 / Math.cos((clampedLat * Math.PI) / 180)) / Math.PI) / 2) *
-        2 ** zoom
-    );
+    // Convert lat/lon to tile coordinates; the helper also keeps both on the grid
+    const { x, y } = webMercatorTileIndex(latitude, longitude, zoom);
 
     return `${this.tileHost}${frame.path}/512/${zoom}/${x}/${y}/4/1_1.png`;
   }
