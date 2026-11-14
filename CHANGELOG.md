@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.17] - 2026-11-14
+
+Asking for radar imagery very close to either pole, or exactly on the 180° meridian, gave a tile address one step past the edge of the map. Near the North Pole, a request for a finished radar map (`composite: true`) failed outright and fell back to links only. Everywhere else, radar and satellite imagery is unchanged.
+
 ### Fixed
 - **Radar imagery at the poles and at longitude 180 now points at a real map tile.** A point north of about 85°N or south of about 85°S, or on the 180° meridian, used to produce a radar link to a tile outside the map, and `composite: true` near the North Pole failed instead of drawing a map. Those points now get the nearest edge tile.
 
@@ -2358,7 +2362,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.16...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.17...HEAD
+[1.35.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.16...v1.35.17
 [1.35.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.15...v1.35.16
 [1.35.15]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.14...v1.35.15
 [1.35.14]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.13...v1.35.14
