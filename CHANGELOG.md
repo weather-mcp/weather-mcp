@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Some dates and times came out one day, or one hour, off depending on the time zone of the computer running the server, not the place you asked about. On a server in the Americas, every daily heading in a historical weather lookup was one day early. And wherever the server was, a "compare with normal" view could measure today's weather against the wrong day's averages. Dates now follow the location's own calendar, whatever zone the server is in.
+
 ### Fixed
-- **Historical daily headings, the air-quality observation time and the climate-normals day no longer shift with the server's time zone.** `get_historical_weather` printed each daily heading one day early on servers west of UTC, and printed the spring-forward hour twice. `get_air_quality` (and its `get_weather_summary` section) printed the wrong hour in the server's spring-forward hour. `include_normals` on the Open-Meteo forecast compared against the previous day's normals. The normals day now follows the location's calendar, not the server's, on every path, so an evening observation in the Americas no longer gets tomorrow's normals on a UTC server.
-- **`get_historical_weather` now reports an Open-Meteo failure the same way every other tool does**, with the service's own message and help link, instead of a generic "Unable to retrieve historical data" line.
+- **Historical daily headings, the air-quality observation time and the climate-normals day no longer shift with the server's time zone.** `get_historical_weather` printed each daily heading one day early on servers west of UTC, and printed the spring-forward hour twice. `get_air_quality` (and its `get_weather_summary` section) printed the wrong hour during the server's spring-forward hour. With `include_normals`, the Open-Meteo forecast compared against the previous day's normals on servers west of UTC.
+- **The climate normals and US records day now follows the location's calendar on every path.** An evening observation in the Americas no longer gets tomorrow's normals on a UTC server, and a morning observation in Asia–Pacific no longer gets yesterday's. The normal high and low you see can therefore differ by a degree from before, when the location's date and the server's date differ.
+
+### Changed
+- **`get_historical_weather` now reports an Open-Meteo failure the same way every other tool does**, with the service's own message and help link, instead of a generic "Unable to retrieve historical data" line. Other failures on this path keep the old wording.
 
 ## [1.35.17] - 2026-11-14
 
