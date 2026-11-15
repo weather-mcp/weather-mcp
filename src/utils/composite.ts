@@ -47,12 +47,31 @@ export const BASEMAP_TILE_MAX_BYTES = 1024 * 1024;
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
+/** Chunk type codes, compared as one big-endian 32-bit integer — exactly as pngjs does. */
+const CHUNK_IHDR = 0x49484452;
+const CHUNK_IEND = 0x49454e44;
+
+/** The fixed refusal for every tile check. Its only variable is our own tile size. */
+function tileRefusal(tileSize: number): Error {
+  return new Error(`Tile is not a ${tileSize}px non-interlaced PNG`);
+}
+
 /**
- * Refuse a tile whose PNG header does not declare a `tileSize`×`tileSize`,
- * non-interlaced image. Reads only the first 33 bytes (signature plus the
- * complete IHDR chunk), so a tiny buffer that declares enormous dimensions is
- * refused before `PNG.sync.read` allocates for them. The CRC is not checked:
- * pngjs verifies it on decode and the bound does not depend on it.
+ * Refuse a tile unless it is a `tileSize`×`tileSize`, non-interlaced PNG with
+ * **exactly one** IHDR chunk.
+ *
+ * First it checks the signature and the first IHDR's dimensions and interlace
+ * byte (bytes 0-32), so a tiny buffer that declares enormous dimensions is
+ * refused before `PNG.sync.read` allocates for them. Then it walks the chunk
+ * framing from the next chunk to IEND and refuses any second IHDR: pngjs
+ * honours the **last** IHDR (its sync parser overwrites the metadata on each
+ * one), so a check of the first alone does not bound the decode.
+ *
+ * Invariant: one IHDR per tile. The walk mirrors pngjs's framing and judges
+ * nothing else — a truncated chunk, a length past the end or a missing IEND
+ * simply ends it, and pngjs raises its own error at decode. No chunk data is
+ * read and no CRC is checked: pngjs verifies the CRC on decode and the bound
+ * does not depend on it.
  *
  * The message is fixed. It never echoes the declared dimensions or any byte.
  */
@@ -66,7 +85,22 @@ export function assertTileHeader(buffer: Buffer, tileSize: number): void {
     buffer.readUInt32BE(20) === tileSize &&
     buffer[28] === 0;
   if (!ok) {
-    throw new Error(`Tile is not a ${tileSize}px non-interlaced PNG`);
+    throw tileRefusal(tileSize);
+  }
+
+  // The first chunk is proven to be IHDR and ends at byte 33. A buffer that
+  // ends there (or leaves fewer than 8 bytes) has nothing more to walk.
+  let offset = 33;
+  while (offset + 8 <= buffer.length) {
+    const type = buffer.readUInt32BE(offset + 4);
+    if (type === CHUNK_IHDR) {
+      throw tileRefusal(tileSize);
+    }
+    if (type === CHUNK_IEND) {
+      break;
+    }
+    // length + type + data + CRC. A length past the end ends the loop; at most ~4.3e9, a safe integer.
+    offset += 12 + buffer.readUInt32BE(offset);
   }
 }
 
@@ -101,6 +135,12 @@ export function assembleTiles(
 
   for (let i = 0; i < tileBuffers.length; i++) {
     const tile = PNG.sync.read(tileBuffers[i]);
+    // Invariant: decoded size equals tileSize. Second layer behind assertTileHeader's walk: it runs
+    // after the allocation, so it does not bound memory. It catches any route where the decoder and
+    // the header check disagree, which the copy loop below would otherwise render as a silent hole.
+    if (tile.width !== tileSize || tile.height !== tileSize) {
+      throw tileRefusal(tileSize);
+    }
     const ox = (i % cols) * tileSize;
     const oy = Math.floor(i / cols) * tileSize;
 
