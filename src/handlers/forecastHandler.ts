@@ -34,6 +34,7 @@ import {
   formatPrecipFromMm,
 } from '../utils/unitFormat.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { maxOverlapping, GRIDPOINT_MAX_ENTRIES } from '../utils/gridpointSeries.js';
 import {
   extractSnowfallForecast,
   extractIceAccumulation,
@@ -144,43 +145,15 @@ function hourlyEntryCap(detail: DetailLevel, days: number): number {
 }
 
 /**
- * Extract maximum value from gridpoint data series for the next 24-48 hours
+ * Maximum value among gridpoint intervals overlapping the next 48 h
+ * (the interval in progress counts; the module owns the bound and warn)
  * @param series - The gridpoint data series to process
  * @param hours - Number of hours to look ahead (default: 48)
- * @param maxEntries - Maximum number of entries to process for defense-in-depth (default: 500 ~ 1 week hourly data)
+ * @param maxEntries - Maximum number of entries to process for defense-in-depth (default: GRIDPOINT_MAX_ENTRIES, 500 ~ 1 week hourly data)
  */
-function getMaxProbabilityFromSeries(series: GridpointDataSeries | undefined, hours: number = 48, maxEntries: number = 500): number {
-  if (!series || !series.values || series.values.length === 0) {
-    return 0;
-  }
-
-  // Defense-in-depth: Add bounds checking to prevent resource exhaustion
-  // IMPORTANT: Work on a local copy to avoid mutating cached data
-  let valuesToProcess = series.values;
-  if (series.values.length > maxEntries) {
-    logger.warn('Gridpoint series exceeds max entries', {
-      length: series.values.length,
-      maxEntries,
-      securityEvent: true
-    });
-    // Create a local copy with limited entries - do not mutate the original
-    valuesToProcess = series.values.slice(0, maxEntries);
-  }
-
-  const now = new Date();
-  const futureTime = new Date(now.getTime() + hours * 60 * 60 * 1000);
-
-  let maxValue = 0;
-  for (const entry of valuesToProcess) {
-    // Parse ISO 8601 interval (e.g., "2025-11-06T15:00:00+00:00/PT1H")
-    const validTimeStart = new Date(entry.validTime.split('/')[0]);
-
-    if (validTimeStart >= now && validTimeStart <= futureTime && entry.value !== null) {
-      maxValue = Math.max(maxValue, entry.value);
-    }
-  }
-
-  return maxValue;
+function getMaxProbabilityFromSeries(series: GridpointDataSeries | undefined, hours: number = 48, maxEntries: number = GRIDPOINT_MAX_ENTRIES): number {
+  const nowMs = Date.now();
+  return maxOverlapping(series, nowMs, nowMs + hours * 3_600_000, maxEntries) ?? 0;
 }
 
 /**
@@ -234,14 +207,12 @@ function formatSevereWeather(properties: GridpointProperties): string | null {
   }
 
   // Lightning activity
-  if (properties.lightningActivityLevel && properties.lightningActivityLevel.values && properties.lightningActivityLevel.values.length > 0) {
-    const lightningLevels = properties.lightningActivityLevel.values.filter(v => v.value !== null && v.value > 0);
-    if (lightningLevels.length > 0) {
-      hasData = true;
-      const maxLevel = Math.max(...lightningLevels.map(v => v.value || 0));
-      const levelDesc = maxLevel >= 4 ? 'Very High' : maxLevel >= 3 ? 'High' : maxLevel >= 2 ? 'Moderate' : 'Low';
-      output += `⚡ **Lightning Activity:** ${levelDesc} (Level ${maxLevel})\n`;
-    }
+  const lightningNowMs = Date.now();
+  const maxLevel = maxOverlapping(properties.lightningActivityLevel, lightningNowMs, lightningNowMs + 48 * 3_600_000) ?? 0;
+  if (maxLevel > 0) {
+    hasData = true;
+    const levelDesc = maxLevel >= 4 ? 'Very High' : maxLevel >= 3 ? 'High' : maxLevel >= 2 ? 'Moderate' : 'Low';
+    output += `⚡ **Lightning Activity:** ${levelDesc} (Level ${maxLevel})\n`;
   }
 
   if (!hasData) {
