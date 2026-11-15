@@ -80,6 +80,7 @@ src/
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── nowcast.ts           # minutely_15 nowcast: model superset boxes, 3-state response classification, quarter bands, hourly-probability pick (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
+│   ├── gridpointSeries.ts   # NWS gridpoint validTime → interval; value at an instant; max over a window; bounded with a securityEvent warn (pure)
 │   ├── connectionFailure.ts # Transport codes meaning "connection failed before any answer"; shared by the alert-feed services, NOAA and Open-Meteo (pure)
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
 │   ├── httpDeadline.ts      # withRequestDeadline — one wall-clock deadline per axios request (proxy included), emitted as axios's own ECONNABORTED; every axios.create passes it; hands a tunnelled https request proxy: false and a per-request TunnelAgent on its own signal
