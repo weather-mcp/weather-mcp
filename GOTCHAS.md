@@ -461,6 +461,14 @@ warms a GIBS cache for the second; that is not proven. **When an A/B probe of a 
 order before reading anything into it, and probe the upstream directly under both
 configurations.** A difference that follows the position rather than the build is the upstream.
 
+**Still flaking on 2026-11-15, and a retry inside one process converges** (imagery-ihdr-cache-bounds live
+pass, branch `bc11c82`). Denver and London `composite: true` degraded on `main` and branch alike; `curl` of
+the exact `Reference_Features_15m` tiles answered 500 or 200 at random, with and without the server's own
+request header. A composite needs several feature tiles, so one 500 drops the whole map. Base tiles that
+succeed stay in `BasemapService`'s 24 h cache, so retrying pass 1 **in the same process** converged in 4
+(Denver) and 7 (London) attempts, after which the repeat call was measurable. A fresh process per attempt
+never converges.
+
 ---
 
 ## G11 — Read the rendered output, not just the assertions
@@ -7524,6 +7532,32 @@ T4 `967a82b` (severe-weather window). Live: nine offices on 2026-11-14 and the T
 
 **Status:** active. Lint candidate: `no-restricted-syntax` on `.values[0]` of a `GridpointDataSeries`. Related:
 [G162], [G69], [G56].
+
+---
+
+## G164 — A live driver that wraps `require('axios')` patches the CJS instance; the ESM dist uses another
+
+**Trigger:** a throwaway driver under `.claude/scratch/` that imports the built `dist/` (ESM) and wraps or
+counts `axios.get` / `axios.create` to prove a request was or was not made.
+
+**Rule:** import axios the way the dist does — the ESM entry,
+`(await import(<repo>/node_modules/axios/index.js)).default` — never `createRequire(...)('axios')`. Then
+prove the counter is live: the run that must make requests has to show a non-zero count before a zero
+anywhere else means anything.
+
+**Why:** axios is a dual package (`exports['.']`: `require` → `dist/node/axios.cjs`, `default` →
+`index.js`). Node loads the two as separate module instances with separate default objects, so a patch
+on the CJS one never sees a request the ESM dist makes. The counter reads 0 on every call, which looks
+exactly like "served from cache" — the claim the driver was written to prove.
+
+**Verify:** run the driver's request-making pass and confirm the count is above zero.
+
+**Evidence:** 2026-11-15, imagery-ihdr-cache-bounds live pass (`bc11c82`). The `createRequire` wrapper
+reported `radar tile GETs 0` on pass 1, which fetched four radar tiles. Switched to the ESM entry, pass 1
+read 4 and the cached repeat 0.
+
+**Status:** active. Same family as [G70] (a mock on the wrong seam is inert), one layer out: the driver,
+not the test.
 
 ---
 
