@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.19] - 2026-11-14
+
+Two fire-weather readings for US locations were wrong. The mixing height was about three times too low and the transport wind about one and a half times too high, and both could be hours out of date, so the smoke-dispersion ratings beside them were wrong too. After this update both numbers will look noticeably different: they are now the current values, in feet and mph. The 48-hour severe-weather section of the forecast also now counts the period already in progress.
+
 ### Fixed
 
 - **Fire-weather mixing height and transport wind now show the current value, in the right units.** With `include_fire_weather` on a US point, `get_current_conditions` read both from the start of the National Weather Service forecast period, and printed the raw numbers with the wrong unit names: the mixing height is published in metres and was shown as feet, so it read about 3.3 times too low, and the transport wind is published in km/h and was shown as mph, so it read about 1.6 times too high. The dispersion and transport ratings were computed from those wrong numbers. Both now come from the forecast hour that contains the time of the request, are converted to feet and mph, and are rated on the number shown. If the weather service ever publishes either in another unit, that line is left out rather than guessed. The seasonal fire-risk note now uses the month at the location, not on the server.
@@ -2378,7 +2382,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.18...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.19...HEAD
+[1.35.19]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.18...v1.35.19
 [1.35.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.17...v1.35.18
 [1.35.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.16...v1.35.17
 [1.35.16]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.15...v1.35.16
