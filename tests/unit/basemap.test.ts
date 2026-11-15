@@ -397,3 +397,148 @@ describe('BasemapService', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// fetchTile cache admission (appended; nothing above this line was changed).
+// ---------------------------------------------------------------------------
+
+import { BASEMAP_TILE_CACHE_MAX_BYTES } from '../../src/utils/composite.js';
+
+const ADMISSION_CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(buf: Buffer): number {
+  let c = 0xffffffff;
+  for (const byte of buf) c = ADMISSION_CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/** length | type | data | crc */
+function chunk(type: string, data: Buffer): Buffer {
+  const out = Buffer.alloc(12 + data.length);
+  out.writeUInt32BE(data.length, 0);
+  out.write(type, 4, 'latin1');
+  data.copy(out, 8);
+  out.writeUInt32BE(crc32(out.subarray(4, 8 + data.length)), 8 + data.length);
+  return out;
+}
+
+/** A valid 256 px tile of exactly `totalBytes`, padded by an ancillary pAdd chunk after IHDR (offset 33). */
+function tileOfExactSize(totalBytes: number): Buffer {
+  const base = makeSolidTileBuffer(256, BLUE);
+  const padLength = totalBytes - base.length - 12;
+  if (padLength < 0) throw new Error('target smaller than the base tile');
+  const out = Buffer.concat([
+    base.subarray(0, 33),
+    chunk('pAdd', Buffer.alloc(padLength)),
+    base.subarray(33),
+  ]);
+  expect(out.length).toBe(totalBytes);
+  return out;
+}
+
+function tileWithSecondIhdr(): Buffer {
+  const base = makeSolidTileBuffer(256, BLUE);
+  const data = Buffer.alloc(13);
+  data.writeUInt32BE(4096, 0);
+  data.writeUInt32BE(4096, 4);
+  data[8] = 8;
+  data[9] = 6;
+  return Buffer.concat([base.subarray(0, 33), chunk('IHDR', data), base.subarray(33)]);
+}
+
+/** Every address of the 2x2 window answers `buffer` (both layers). */
+function uniformMap(buffer: Buffer): Map<string, Buffer> {
+  const map = new Map<string, Buffer>();
+  for (const [cx, cy] of CHILDREN_2X2) {
+    map.set(tileUrl(BASE_LAYER_NAME, BASE_MATRIX_SET, CHILD_Z, cx, cy), buffer);
+    map.set(tileUrl(FEATURES_LAYER_NAME, FEATURES_MATRIX_SET, CHILD_Z, cx, cy), buffer);
+  }
+  return map;
+}
+
+function requestCount(url: string): number {
+  return mockGet.mock.calls.filter((call) => call[0] === url).length;
+}
+
+describe('fetchTile cache admission', () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+    mockCreate.mockClear();
+  });
+
+  const [tlX, tlY] = CHILDREN_2X2[0];
+  const baseTl = tileUrl(BASE_LAYER_NAME, BASE_MATRIX_SET, CHILD_Z, tlX, tlY);
+  const featuresTl = tileUrl(FEATURES_LAYER_NAME, FEATURES_MATRIX_SET, CHILD_Z, tlX, tlY);
+
+  it('pins the cache-admission size at the literal 32,768 bytes', () => {
+    expect(BASEMAP_TILE_CACHE_MAX_BYTES).toBe(32_768);
+  });
+
+  it('caches a tile of exactly 32,768 bytes: one request per address across two calls', async () => {
+    mockGetFromMap(uniformMap(tileOfExactSize(32_768)));
+    const service = new BasemapService();
+
+    await service.getBaseWindow(Z, WINDOW_2X2.gx0, WINDOW_2X2.gy0, WINDOW_2X2.size);
+    await service.getBaseWindow(Z, WINDOW_2X2.gx0, WINDOW_2X2.gy0, WINDOW_2X2.size);
+
+    expect(mockGet).toHaveBeenCalledTimes(8);
+    expect(requestCount(baseTl)).toBe(1);
+    expect(requestCount(featuresTl)).toBe(1);
+  });
+
+  it('uses but does not cache a tile of 32,769 bytes: a second call requests every address again', async () => {
+    mockGetFromMap(uniformMap(tileOfExactSize(32_769)));
+    const service = new BasemapService();
+
+    const first = await service.getBaseWindow(Z, WINDOW_2X2.gx0, WINDOW_2X2.gy0, WINDOW_2X2.size);
+    expect(first.width).toBe(512);
+    const second = await service.getBaseWindow(Z, WINDOW_2X2.gx0, WINDOW_2X2.gy0, WINDOW_2X2.size);
+    expect(second.width).toBe(512);
+
+    expect(mockGet).toHaveBeenCalledTimes(16);
+    expect(requestCount(baseTl)).toBe(2);
+    expect(requestCount(featuresTl)).toBe(2);
+  });
+
+  it('never caches a tile with a second IHDR: it is refused and requested again', async () => {
+    const map = uniformMap(makeSolidTileBuffer(256, BLUE));
+    map.set(baseTl, tileWithSecondIhdr());
+    mockGetFromMap(map);
+    const service = new BasemapService();
+
+    await expect(
+      service.getBaseWindow(Z, WINDOW_2X2.gx0, WINDOW_2X2.gy0, WINDOW_2X2.size)
+    ).rejects.toThrow('Tile is not a 256px non-interlaced PNG');
+    await expect(
+      service.getBaseWindow(Z, WINDOW_2X2.gx0, WINDOW_2X2.gy0, WINDOW_2X2.size)
+    ).rejects.toThrow('Tile is not a 256px non-interlaced PNG');
+
+    expect(requestCount(baseTl)).toBe(2);
+  });
+
+  it('still caches the optional-layer 404 placeholder: no new request for that address', async () => {
+    const map = uniformMap(makeSolidTileBuffer(256, BLUE));
+    mockGet.mockImplementation((url: string) => {
+      if (url === featuresTl) return Promise.reject(axiosStatusError(404));
+      const buf = map.get(url);
+      return buf
+        ? Promise.resolve({ data: buf })
+        : Promise.reject(new Error(`unexpected tile URL requested in test: ${url}`));
+    });
+    const service = new BasemapService();
+
+    await service.getBaseWindow(Z, WINDOW_2X2.gx0, WINDOW_2X2.gy0, WINDOW_2X2.size);
+    await service.getBaseWindow(Z, WINDOW_2X2.gx0, WINDOW_2X2.gy0, WINDOW_2X2.size);
+
+    expect(requestCount(featuresTl)).toBe(1);
+    expect(mockGet).toHaveBeenCalledTimes(8);
+  });
+});
