@@ -44,6 +44,8 @@ export { PNG };
 export const RADAR_TILE_MAX_BYTES = 2 * 1024 * 1024;
 // Live tile sizes: GIBS 206-3,592 B. Ceiling is one raw 256x256 RGBA tile (256^2 * 4 = 256 KiB) with headroom.
 export const BASEMAP_TILE_MAX_BYTES = 1024 * 1024;
+// Cache-admission size, 9x the largest live tile. A larger valid tile is used but not cached, so the base-map cache is bounded at CACHE_MAX_SIZE x 32 KiB.
+export const BASEMAP_TILE_CACHE_MAX_BYTES = 32 * 1024;
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -473,3 +475,7 @@ export function encodePng(png: PNG): Buffer {
  * returned as an MCP image content block.
  */
 export const MAX_COMPOSITE_BYTES = 1_000_000;
+// Every cached composite is at most MAX_COMPOSITE_BYTES, so this count is a byte bound of 32 MB.
+// Fixed on purpose, independent of CACHE_MAX_SIZE.
+export const COMPOSITE_CACHE_BYTE_BUDGET = 32_000_000;
+export const COMPOSITE_CACHE_MAX_ENTRIES = Math.floor(COMPOSITE_CACHE_BYTE_BUDGET / MAX_COMPOSITE_BYTES);

@@ -51,7 +51,8 @@ import {
   encodePng,
   planTileWindow,
   assertTileHeader,
-  BASEMAP_TILE_MAX_BYTES
+  BASEMAP_TILE_MAX_BYTES,
+  BASEMAP_TILE_CACHE_MAX_BYTES
 } from '../utils/composite.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
 
@@ -135,7 +136,8 @@ export class BasemapService {
    * Fetch one raw tile buffer, serving from cache when available. Any
    * network/HTTP failure is rethrown as a plain `Error` (garnish precedent —
    * see module doc comment); there is no retry ladder. Every tile's PNG
-   * header is checked before it is cached, so a bad tile is never held.
+   * header is checked before it is cached, so a bad tile is never held. Tiles above
+   * `BASEMAP_TILE_CACHE_MAX_BYTES` are used but not cached.
    * @private
    */
   private async fetchTile(layer: GibsLayer, z: number, x: number, y: number): Promise<Buffer> {
@@ -167,7 +169,7 @@ export class BasemapService {
     // Outside the catch above, so the optional-layer 404 tolerance never swallows it.
     assertTileHeader(buffer, BASE_TILE_PIXELS);
 
-    if (CacheConfig.enabled) {
+    if (CacheConfig.enabled && buffer.length <= BASEMAP_TILE_CACHE_MAX_BYTES) {
       this.cache.set(cacheKey, buffer, CacheConfig.ttl.basemapTiles);
     }
 
