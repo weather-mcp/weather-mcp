@@ -13,7 +13,7 @@
  * the handler first, then checked against the arithmetic (G36).
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { handleGetCurrentConditions } from '../../src/handlers/currentConditionsHandler.js';
 import type { NOAAService } from '../../src/services/noaa.js';
 import type { OpenMeteoService } from '../../src/services/openmeteo.js';
@@ -120,7 +120,7 @@ const TRANSPORT_LONG_INTERVAL: Series = {
 };
 
 describe('get_current_conditions — NOAA mixing height and transport wind', () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: MockInstance<typeof logger.warn>;
 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
