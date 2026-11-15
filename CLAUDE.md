@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.19 (Production Ready)
+- **Version:** 1.35.20 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -745,15 +745,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.19 — Production Ready ✅
-- **Test Coverage:** 5,370 tests, 100% pass rate
+- **Version:** 1.35.20 — Production Ready ✅
+- **Test Coverage:** 5,400 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.20:** A crafted radar tile can no longer make the composite map use gigabytes of memory, and the map caches are bounded in bytes
 - **New in v1.35.19:** Fire-weather mixing height and transport wind show the current value in feet and mph
 - **New in v1.35.18:** Dates and the climate-normals day follow the location's calendar, not the server's time zone
-- **New in v1.35.17:** Radar tiles at the poles and on the 180° meridian stay on the map grid, and a composite map near the North Pole renders again
 
 ## Useful References
 
@@ -776,7 +776,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-14 (v1.35.19)
+**Last Updated:** 2026-11-15 (v1.35.20)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

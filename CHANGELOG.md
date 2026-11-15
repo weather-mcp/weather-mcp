@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.20] - 2026-11-15
+
 A specially crafted radar or base-map tile could make the finished radar map (`get_weather_imagery` with `composite: true`) use gigabytes of memory, and the cache of finished maps could grow to about 1 GB at the default settings. This release closes both. Maps from the real tile servers look the same as before; a repeated request is still served from the cache.
 
 ### Security
@@ -2387,7 +2389,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.19...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.20...HEAD
+[1.35.20]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.19...v1.35.20
 [1.35.19]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.18...v1.35.19
 [1.35.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.17...v1.35.18
 [1.35.17]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.16...v1.35.17
