@@ -37,6 +37,7 @@ import {
   drawMarker,
   encodePng,
   MAX_COMPOSITE_BYTES,
+  COMPOSITE_CACHE_MAX_ENTRIES,
   RADAR_TILE_MAX_BYTES
 } from '../utils/composite.js';
 
@@ -56,9 +57,10 @@ interface WeatherImageryArgs {
  * three things that fully determine the output image. Radar frames are
  * immutable once published under their timestamp, so a repeat call inside the
  * feed cycle is looking at the identical picture
- * (`CacheConfig.ttl.compositeImage`).
+ * (`CacheConfig.ttl.compositeImage`). The entry count is fixed, so the cache
+ * holds at most `COMPOSITE_CACHE_BYTE_BUDGET` bytes whatever `CACHE_MAX_SIZE` is.
  */
-const compositeCache = new Cache<Buffer>(CacheConfig.maxSize);
+const compositeCache = new Cache<Buffer>(COMPOSITE_CACHE_MAX_ENTRIES);
 
 /** Descriptive User-Agent for overlay tile fetches, matching the basemap service. */
 const COMPOSITE_USER_AGENT = `weather-mcp/${VERSION} (+https://github.com/weather-mcp/weather-mcp)`;

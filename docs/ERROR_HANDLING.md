@@ -495,7 +495,8 @@ error's message and stack only under `LOG_PII`.
 
 **A composite tile that fails a check is dropped quietly.** With `composite: true`, every radar and
 base-map tile must come from its expected host, follow no redirects, stay under its size cap, and carry
-a PNG header of the exact tile size with no interlacing. If any tile fails, the composite image is left
+exactly one PNG header (IHDR) of the exact tile size with no interlacing, and it must decode to that
+size. If any tile fails, the composite image is left
 out and the response is the normal URL-based text plus the one-line note *Composite map unavailable for
 this request*. The tool call itself succeeds. The reason is logged to stderr, without the tile URL.
 
