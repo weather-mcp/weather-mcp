@@ -7414,6 +7414,13 @@ assertion on the constant. A curation read of the same file found the identical 
 `STRIKE_PAYLOAD_MAX_BYTES`: the oversize rows build from the constant, and a cap of 100000 passed them all. It was
 pinned to `4096` in `424666c`, after which that mutation goes red.
 
+**Second shape — a caller's own literal default.** When a caller keeps a literal default for a value the
+module now owns (`maxEntries: number = 500` in the handler, `GRIDPOINT_MAX_ENTRIES` in the module), mutating the
+module constant never reaches that path: the caller passes its own `500`, and the lock stays green. Default the
+parameter to the exported constant, so the cap has one source. Evidence: 2026-11-14, fire-weather-units-interval
+T4 (`967a82b`): M8 (`GRIDPOINT_MAX_ENTRIES = 499`) survived `forecast-severe-weather-probability.test.ts` until
+`getMaxProbabilityFromSeries` defaulted to the constant.
+
 **Status:** active. Lint candidate: flag a test that both imports an exported numeric constant and uses it in an
 arithmetic fixture expression. Related: [G65] (where mutation rows come from), [G45].
 
@@ -7487,6 +7494,36 @@ separately: NOAA-path instants still print in the server's zone (`historicalWeat
 
 **Status:** active. Lint candidate: an ESLint `no-restricted-syntax` on `new Date(<member>.time…)`
 followed by a `toLocale*`/local-getter call in `src/handlers/`. Related: [G75].
+
+---
+
+## G163 — An NWS gridpoint series starts at the forecast period, not now, and carries its own units
+
+**Trigger:** reading any series under `forecastGridData` `properties` (`mixingHeight`, `transportWindSpeed`,
+`probabilityOf*`, `waveHeight`, `windSpeed`, `snowfallAmount`, …): taking "the current value", filtering by a
+window, or printing a value with a unit name.
+
+**Rule:** a series is a list of `start/duration` intervals. Read it through `src/utils/gridpointSeries.ts`:
+`valueAt(series, nowMs)` for the value now, `maxOverlapping(series, from, to)` for a window. Never `values[0]`,
+never the first non-null entry, and never a filter on the start alone. Convert from the series' own `uom`. An
+unexpected `uom` leaves the line out rather than printing a guessed unit.
+
+**Why:** the first interval is the start of the grid's `validTimes`, 7 to 18 hours before the request at every
+office read on 2026-11-14 and 15. So `values[0]` is stale on every call, not in a rare sample. Durations run
+from `PT1H` to `P8DT6H`, so a start-only filter drops a period already in progress. NWS publishes heights in
+metres and speeds in km/h. A comment that asserted "already in feet" was wrong for the life of the feature, and
+the printed mixing height was 3.3 times too low.
+
+**Verify:** `grep -rnE "for \(const entry of series\.values\)|= entry\.validTime\.split\('/'\)" src/`
+names the readers that still select by position or by start. On 2026-11-14 it prints `src/utils/marine.ts:30`
+(filed, F1) and `src/utils/snow.ts:91`, `:142` (accumulation, a different question), and nothing else.
+
+**Evidence:** 2026-11-14, fire-weather-units-interval: T1 `633276d` (the module), T2 `aad79ca` (fire weather),
+T4 `967a82b` (severe-weather window). Live: nine offices on 2026-11-14 and the T6 read
+(`qa-fire-weather-units-interval.md`). Boulder printed `150 ft` where the current interval was about 2,400 ft.
+
+**Status:** active. Lint candidate: `no-restricted-syntax` on `.values[0]` of a `GridpointDataSeries`. Related:
+[G162], [G69], [G56].
 
 ---
 
