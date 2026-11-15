@@ -94,6 +94,13 @@ export function assertTileHeader(buffer: Buffer, tileSize: number): void {
   // ends there (or leaves fewer than 8 bytes) has nothing more to walk.
   let offset = 33;
   while (offset + 8 <= buffer.length) {
+    // length + type + data + CRC; at most ~4.3e9, a safe integer. A chunk that
+    // does not fit ends the walk before its type is read, so a truncated chunk
+    // is pngjs's to reject, whatever its type bytes spell.
+    const chunkEnd = offset + 12 + buffer.readUInt32BE(offset);
+    if (chunkEnd > buffer.length) {
+      break;
+    }
     const type = buffer.readUInt32BE(offset + 4);
     if (type === CHUNK_IHDR) {
       throw tileRefusal(tileSize);
@@ -101,8 +108,7 @@ export function assertTileHeader(buffer: Buffer, tileSize: number): void {
     if (type === CHUNK_IEND) {
       break;
     }
-    // length + type + data + CRC. A length past the end ends the loop; at most ~4.3e9, a safe integer.
-    offset += 12 + buffer.readUInt32BE(offset);
+    offset = chunkEnd;
   }
 }
 

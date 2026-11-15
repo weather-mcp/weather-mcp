@@ -318,6 +318,9 @@ describe('assertTileHeader: truncation is left to pngjs', () => {
   const cases: Array<[string, Buffer]> = [
     ['cut 5 bytes into the IDAT chunk', base.subarray(0, 33 + 8 + 5)],
     ['with no IEND', base.subarray(0, base.length - 12)],
+    // A complete 8-byte `len=13 | IHDR` prefix whose body and CRC are missing:
+    // the walk must see that the chunk does not fit before it reads the type.
+    ['ending in a second IHDR prefix with no body or CRC', Buffer.concat([base.subarray(0, 33), ihdrChunk(256, 256).subarray(0, 8)])],
   ];
 
   for (const [name, buf] of cases) {
