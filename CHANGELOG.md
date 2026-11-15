@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **A finished radar map can no longer be made to use gigabytes of memory.** A PNG tile may carry a second size header, and the image library uses the last one, while the server checked only the first. So a tile that passed the size check could still decode at any size: a 261 KB tile measured 770 MiB, and a smaller second header left a silent transparent hole in the map. Every tile must now carry exactly one header and decode to the expected size, or the map is left out and the links are returned as before. The finished-map cache is also bounded in bytes: it holds 32 maps instead of up to `CACHE_MAX_SIZE` (about 1 GB at the default), and base-map tiles above 32 KiB are used but not cached (the base-map worst case falls from 1 GiB to 32 MiB). This closes a gap in the tile check added in 1.33.12. It is hardening: nothing was exploited, and the image half needs control of the tile bytes from RainViewer or NASA GIBS. (`src/utils/composite.ts`, `src/services/basemap.ts`, `src/handlers/weatherImageryHandler.ts`)
+
 ## [1.35.19] - 2026-11-14
 
 Two fire-weather readings for US locations were wrong. The mixing height was about three times too low and the transport wind about one and a half times too high, and both could be hours out of date, so the smoke-dispersion ratings beside them were wrong too. After this update both numbers will look noticeably different: they are now the current values, in feet and mph. The 48-hour severe-weather section of the forecast also now counts the period already in progress.

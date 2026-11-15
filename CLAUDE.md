@@ -415,7 +415,8 @@ if (series.values.length > maxEntries) {
 ```bash
 # Cache Configuration
 CACHE_ENABLED=true              # Enable/disable caching (default: true)
-CACHE_MAX_SIZE=1000            # Max cache entries (100-10000, default: 1000)
+CACHE_MAX_SIZE=1000            # Max entries per cache (100-10000, default: 1000); the composite-map
+                               # cache is fixed at 32 entries, and base-map tiles above 32 KiB are not cached
 
 # API Configuration
 API_TIMEOUT_MS=30000           # API timeout in milliseconds (5000-120000, default: 30000) — the requests of one tool call share max(API_TIMEOUT_MS, 55 s)
