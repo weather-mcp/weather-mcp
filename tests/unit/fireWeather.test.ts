@@ -395,83 +395,102 @@ describe('Fire Weather Utilities', () => {
   });
 
   describe('getCurrentFireWeatherValue', () => {
+    // Live-shaped NWS intervals: `<start with offset>/<duration>`.
+    const NOW = Date.parse('2024-01-15T13:30:00Z');
+
     describe('Valid data series', () => {
-      it('should return first value from data series', () => {
+      it('should return the interval containing now, not an earlier stale first entry', () => {
         const dataSeries = {
           values: [
-            { validTime: '2024-01-15T12:00:00Z', value: 5 },
-            { validTime: '2024-01-15T13:00:00Z', value: 6 },
-            { validTime: '2024-01-15T14:00:00Z', value: 7 }
+            { validTime: '2024-01-15T05:00:00+00:00/PT8H', value: 5 },
+            { validTime: '2024-01-15T13:00:00+00:00/PT1H', value: 6 },
+            { validTime: '2024-01-15T14:00:00+00:00/PT1H', value: 7 }
           ]
         };
-        const result = getCurrentFireWeatherValue(dataSeries);
-        expect(result).toBe(5);
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
+        expect(result).toBe(6);
       });
 
-      it('should return value when series has single entry', () => {
+      it('should return value when a single entry contains now', () => {
         const dataSeries = {
-          values: [{ validTime: '2024-01-15T12:00:00Z', value: 42 }]
+          values: [{ validTime: '2024-01-15T12:00:00+00:00/PT2H', value: 42 }]
         };
-        const result = getCurrentFireWeatherValue(dataSeries);
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
         expect(result).toBe(42);
       });
 
       it('should handle zero value', () => {
         const dataSeries = {
-          values: [{ validTime: '2024-01-15T12:00:00Z', value: 0 }]
+          values: [{ validTime: '2024-01-15T12:00:00+00:00/PT2H', value: 0 }]
         };
-        const result = getCurrentFireWeatherValue(dataSeries);
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
         expect(result).toBe(0);
       });
 
       it('should handle negative value', () => {
         const dataSeries = {
-          values: [{ validTime: '2024-01-15T12:00:00Z', value: -5 }]
+          values: [{ validTime: '2024-01-15T12:00:00+00:00/PT2H', value: -5 }]
         };
-        const result = getCurrentFireWeatherValue(dataSeries);
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
         expect(result).toBe(-5);
       });
     });
 
     describe('Invalid data series', () => {
       it('should return null for undefined data series', () => {
-        const result = getCurrentFireWeatherValue(undefined);
+        const result = getCurrentFireWeatherValue(undefined, NOW);
         expect(result).toBeNull();
       });
 
       it('should return null for empty values array', () => {
         const dataSeries = { values: [] };
-        const result = getCurrentFireWeatherValue(dataSeries);
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
         expect(result).toBeNull();
       });
 
       it('should return null for missing values property', () => {
         const dataSeries = {} as any;
-        const result = getCurrentFireWeatherValue(dataSeries);
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
         expect(result).toBeNull();
       });
 
-      it('should return null when first value is missing value property', () => {
+      it('should return null when the containing entry is missing its value property', () => {
         const dataSeries = {
-          values: [{ validTime: '2024-01-15T12:00:00Z' } as any]
+          values: [{ validTime: '2024-01-15T12:00:00+00:00/PT2H' } as any]
         };
-        const result = getCurrentFireWeatherValue(dataSeries);
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
         expect(result).toBeNull();
       });
 
-      it('should return null when first entry has undefined value', () => {
+      it('should return null when the containing entry has undefined value', () => {
         const dataSeries = {
-          values: [{ validTime: '2024-01-15T12:00:00Z', value: undefined as any }]
+          values: [{ validTime: '2024-01-15T12:00:00+00:00/PT2H', value: undefined as any }]
         };
-        const result = getCurrentFireWeatherValue(dataSeries);
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
         expect(result).toBeNull();
       });
 
-      it('should return null when first entry has null value', () => {
+      it('should return null when the containing entry has null value', () => {
         const dataSeries = {
-          values: [{ validTime: '2024-01-15T12:00:00Z', value: null as any }]
+          values: [{ validTime: '2024-01-15T12:00:00+00:00/PT2H', value: null as any }]
         };
-        const result = getCurrentFireWeatherValue(dataSeries);
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
+        expect(result).toBeNull();
+      });
+
+      it('should return null for a validTime with no duration (was: first value taken as current)', () => {
+        const dataSeries = {
+          values: [{ validTime: '2024-01-15T12:00:00Z', value: 5 }]
+        };
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
+        expect(result).toBeNull();
+      });
+
+      it('should return null when now is after the last interval', () => {
+        const dataSeries = {
+          values: [{ validTime: '2024-01-15T10:00:00+00:00/PT2H', value: 5 }]
+        };
+        const result = getCurrentFireWeatherValue(dataSeries, NOW);
         expect(result).toBeNull();
       });
     });

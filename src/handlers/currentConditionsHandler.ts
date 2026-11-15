@@ -50,7 +50,8 @@ import {
   kphToMph,
   mpsToMph,
   knotsToMph,
-  metersToMiles
+  metersToMiles,
+  metersToFeet
 } from '../utils/units.js';
 import {
   calculateWindChillF,
@@ -708,12 +709,29 @@ async function formatNOAACurrentConditions(
       const gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude, 0);
       const fireProps = gridpointData.properties;
 
-      // Check if any fire weather data is available
-      const hainesValue = getCurrentFireWeatherValue(fireProps.hainesIndex);
-      const grasslandValue = getCurrentFireWeatherValue(fireProps.grasslandFireDangerIndex);
-      const redFlagValue = getCurrentFireWeatherValue(fireProps.redFlagThreatIndex);
-      const mixingHeightValue = getCurrentFireWeatherValue(fireProps.mixingHeight);
-      const transportWindValue = getCurrentFireWeatherValue(fireProps.transportWindSpeed);
+      // Each series is a list of start/duration intervals; read the one that
+      // contains the request time (not the observation time: a cached grid
+      // must still select by the wall clock).
+      const nowMs = Date.now();
+      const hainesValue = getCurrentFireWeatherValue(fireProps.hainesIndex, nowMs);
+      const grasslandValue = getCurrentFireWeatherValue(fireProps.grasslandFireDangerIndex, nowMs);
+      const redFlagValue = getCurrentFireWeatherValue(fireProps.redFlagThreatIndex, nowMs);
+      // NWS publishes mixing height in metres and transport wind in km/h. The
+      // display stays feet and mph for every caller, by policy (docs/TOOLS.md).
+      const mixingHeightFt = gridpointToDisplayUnit(
+        'mixingHeight',
+        fireProps.mixingHeight?.uom,
+        getCurrentFireWeatherValue(fireProps.mixingHeight, nowMs),
+        'wmoUnit:m',
+        metersToFeet
+      );
+      const transportWindMph = gridpointToDisplayUnit(
+        'transportWindSpeed',
+        fireProps.transportWindSpeed?.uom,
+        getCurrentFireWeatherValue(fireProps.transportWindSpeed, nowMs),
+        'wmoUnit:km_h-1',
+        kphToMph
+      );
 
       // Get fire weather context
       const context = getFireWeatherContext(
@@ -773,20 +791,19 @@ async function formatNOAACurrentConditions(
       }
 
       // Atmospheric monitoring (always show if available)
-      if (mixingHeightValue !== null || transportWindValue !== null) {
+      if (mixingHeightFt !== null || transportWindMph !== null) {
         if (!context.hasIndices) {
           output += `**Atmospheric Monitoring:**\n`;
         }
 
         // Mixing Height (important for smoke dispersion)
-        if (mixingHeightValue !== null) {
-          const mixingHeightFt = mixingHeightValue; // Already in feet from API
+        if (mixingHeightFt !== null) {
           output += `**Mixing Height:** ${formatMixingHeight(mixingHeightFt)}\n`;
         }
 
         // Transport Wind Speed (smoke transport)
-        if (transportWindValue !== null) {
-          output += `**Transport Wind:** ${interpretTransportWind(transportWindValue)}\n`;
+        if (transportWindMph !== null) {
+          output += `**Transport Wind:** ${interpretTransportWind(transportWindMph)}\n`;
         }
 
         if (!context.hasIndices) {
@@ -895,6 +912,30 @@ function formatFosbergIndexLines(ffwi: number): string {
     `**${emoji} Fosberg Fire Weather Index:** ${index} (${category.level})\n` +
     `Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.\n\n`
   );
+}
+
+/**
+ * Convert a current NWS gridpoint value from its published unit to the
+ * display unit. A null value (no interval contains now) stays null with no
+ * warn: an absent or stale series is not a unit problem. A value in any unit
+ * other than the expected one, including none, is null, so the line is left
+ * out rather than printed under a guessed unit; that case warns once.
+ */
+function gridpointToDisplayUnit(
+  field: string,
+  uom: string | undefined,
+  value: number | null,
+  expectedUom: string,
+  convert: (v: number) => number
+): number | null {
+  if (value === null) {
+    return null;
+  }
+  if (uom !== expectedUom) {
+    logger.warn('Unrecognised gridpoint unit; line omitted', { field, uom: uom ?? null });
+    return null;
+  }
+  return convert(value);
 }
 
 /**

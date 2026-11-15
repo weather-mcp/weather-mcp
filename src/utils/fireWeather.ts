@@ -2,6 +2,8 @@
  * Fire weather utility functions for interpreting fire danger indices
  */
 
+import { valueAt } from './gridpointSeries.js';
+
 /**
  * Haines Index category information
  * The Haines Index measures atmospheric stability and dryness that affect fire growth potential
@@ -134,17 +136,17 @@ export function getRedFlagCategory(value: number): {
 }
 
 /**
- * Get current fire weather value from gridpoint data series
- * Returns the value for the current time period
+ * Get the current fire weather value from a gridpoint data series: the value
+ * of the interval that contains `nowMs`, or null when no interval does.
+ *
+ * The first entry of a series is the start of the forecast period, hours
+ * before the present, so it is never taken as current.
  */
-export function getCurrentFireWeatherValue(dataSeries: { values: Array<{ validTime: string; value: number }> } | undefined): number | null {
-  if (!dataSeries || !dataSeries.values || dataSeries.values.length === 0) {
-    return null;
-  }
-
-  // Get the first value (most recent/current)
-  // NOAA gridpoint data is ordered with current/near-future values first
-  return dataSeries.values[0]?.value ?? null;
+export function getCurrentFireWeatherValue(
+  dataSeries: { values: Array<{ validTime: string; value: number }> } | undefined,
+  nowMs: number
+): number | null {
+  return valueAt(dataSeries, nowMs);
 }
 
 /**
@@ -157,14 +159,16 @@ export function formatMixingHeight(heightFt: number | null): string {
     return 'N/A';
   }
 
-  if (heightFt < 1000) {
-    return `${Math.round(heightFt)} ft (very poor dispersion)`;
-  } else if (heightFt < 3000) {
-    return `${Math.round(heightFt)} ft (poor dispersion)`;
-  } else if (heightFt < 6000) {
-    return `${Math.round(heightFt)} ft (moderate dispersion)`;
+  // Band on the number printed, so the two can never disagree (G69).
+  const shown = Math.round(heightFt);
+  if (shown < 1000) {
+    return `${shown} ft (very poor dispersion)`;
+  } else if (shown < 3000) {
+    return `${shown} ft (poor dispersion)`;
+  } else if (shown < 6000) {
+    return `${shown} ft (moderate dispersion)`;
   } else {
-    return `${Math.round(heightFt)} ft (good dispersion)`;
+    return `${shown} ft (good dispersion)`;
   }
 }
 
@@ -177,14 +181,16 @@ export function interpretTransportWind(speedMph: number | null): string {
     return 'N/A';
   }
 
-  if (speedMph < 5) {
-    return `${Math.round(speedMph)} mph (light - poor smoke transport)`;
-  } else if (speedMph < 15) {
-    return `${Math.round(speedMph)} mph (moderate smoke transport)`;
-  } else if (speedMph < 25) {
-    return `${Math.round(speedMph)} mph (good smoke transport)`;
+  // Band on the number printed, so the two can never disagree (G69).
+  const shown = Math.round(speedMph);
+  if (shown < 5) {
+    return `${shown} mph (light - poor smoke transport)`;
+  } else if (shown < 15) {
+    return `${shown} mph (moderate smoke transport)`;
+  } else if (shown < 25) {
+    return `${shown} mph (good smoke transport)`;
   } else {
-    return `${Math.round(speedMph)} mph (strong - rapid fire spread potential)`;
+    return `${shown} mph (strong - rapid fire spread potential)`;
   }
 }
 
