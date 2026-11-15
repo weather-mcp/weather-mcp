@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Fire-weather mixing height and transport wind now show the current value, in the right units.** With `include_fire_weather` on a US point, `get_current_conditions` read both from the start of the National Weather Service forecast period, and printed the raw numbers with the wrong unit names: the mixing height is published in metres and was shown as feet, so it read about 3.3 times too low, and the transport wind is published in km/h and was shown as mph, so it read about 1.6 times too high. The dispersion and transport ratings were computed from those wrong numbers. Both now come from the forecast hour that contains the time of the request, are converted to feet and mph, and are rated on the number shown. If the weather service ever publishes either in another unit, that line is left out rather than guessed. The seasonal fire-risk note now uses the month at the location, not on the server.
+- **The severe-weather section of `get_forecast` now includes the period already in progress, and its lightning line covers only the next 48 hours.** A thunderstorm or wind-gust chance whose forecast period started before the request was left out, and the lightning level was the highest of the whole forecast, up to eight days ahead, under a heading that says 48 hours.
+
 ## [1.35.18] - 2026-11-14
 
 Some dates and times came out one day, or one hour, off depending on the time zone of the computer running the server, not the place you asked about. On a server in the Americas, every daily heading in a historical weather lookup was one day early. And wherever the server was, a "compare with normal" view could measure today's weather against the wrong day's averages. Dates now follow the location's own calendar, whatever zone the server is in.
