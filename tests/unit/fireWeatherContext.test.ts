@@ -7,6 +7,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         40.0, -105.0, // Colorado
         '2025-11-07T12:00:00Z',
+        'UTC',
         null, null, null
       );
       expect(context.seasonalRisk).toBe('Low');
@@ -17,6 +18,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         34.05, -118.24, // Los Angeles
         '2025-11-07T12:00:00Z',
+        'UTC',
         null, null, null
       );
       expect(context.seasonalRisk).toBe('Low');
@@ -27,6 +29,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         25.76, -80.19, // Miami
         '2025-11-07T12:00:00Z',
+        'UTC',
         null, null, null
       );
       expect(context.seasonalRisk).toBe('Low');
@@ -38,6 +41,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77, // Clare, MI
         '2025-11-07T12:00:00Z',
+        'UTC',
         null, null, null,
         72 // high humidity
       );
@@ -51,6 +55,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-11-07T12:00:00Z', // November
+        'UTC',
         null, null, null
       );
       expect(context.reason).toBe('Winter/low fire season');
@@ -61,6 +66,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-12-15T12:00:00Z', // December
+        'UTC',
         null, null, null
       );
       expect(context.reason).toBe('Winter/low fire season');
@@ -70,6 +76,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-01-15T12:00:00Z', // January
+        'UTC',
         null, null, null
       );
       expect(context.reason).toBe('Winter/low fire season');
@@ -79,6 +86,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-07-15T12:00:00Z', // July
+        'UTC',
         null, null, null,
         45 // moderate humidity
       );
@@ -90,6 +98,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-07-15T12:00:00Z', // July
+        'UTC',
         null, null, null,
         85 // high humidity
       );
@@ -103,6 +112,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         34.05, -118.24,
         '2025-11-07T12:00:00Z',
+        'UTC',
         3, // Haines Index
         null, null
       );
@@ -115,6 +125,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         34.05, -118.24,
         '2025-07-15T12:00:00Z',
+        'UTC',
         null,
         2, // Grassland Fire Danger
         null
@@ -127,6 +138,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         34.05, -118.24,
         '2025-07-15T12:00:00Z',
+        'UTC',
         null, null,
         45 // Red Flag Threat
       );
@@ -138,6 +150,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         34.05, -118.24,
         '2025-07-15T12:00:00Z',
+        'UTC',
         4, 2, 50 // All indices
       );
       expect(context.hasIndices).toBe(true);
@@ -151,6 +164,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         33.45, -112.07, // Phoenix
         '2025-07-15T12:00:00Z',
+        'UTC',
         null, null, null,
         25 // low humidity
       );
@@ -163,6 +177,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         40.71, -74.01, // New York
         '2025-07-15T12:00:00Z',
+        'UTC',
         null, null, null,
         55
       );
@@ -176,6 +191,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         33.45, -112.07,
         '2025-07-15T12:00:00Z',
+        'UTC',
         null, null, null,
         75 // high humidity
       );
@@ -187,6 +203,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         33.45, -112.07,
         '2025-07-15T12:00:00Z',
+        'UTC',
         null, null, null,
         null // no humidity data
       );
@@ -197,6 +214,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         33.45, -112.07,
         '2025-07-15T12:00:00Z',
+        'UTC',
         null, null, null
         // humidity not provided
       );
@@ -209,6 +227,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-03-31T12:00:00Z',
+        'UTC',
         null, null, null
       );
       expect(context.reason).toBe('Winter/low fire season');
@@ -218,6 +237,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-04-01T12:00:00Z',
+        'UTC',
         null, null, null,
         60
       );
@@ -228,6 +248,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-10-31T12:00:00Z',
+        'UTC',
         null, null, null,
         65
       );
@@ -238,6 +259,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-03-15T12:00:00Z',
+        'UTC',
         null, null, null
       );
       expect(context.seasonalRisk).toBe('Low');
@@ -249,6 +271,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         34.05, -118.24, // LA
         '2025-11-15T12:00:00Z',
+        'UTC',
         null, null, null
       );
       expect(context.explanatoryText).toContain('Santa Ana');
@@ -258,6 +281,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         34.05, -118.24,
         '2025-08-15T12:00:00Z',
+        'UTC',
         null, null, null,
         30
       );
@@ -270,6 +294,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-11-07T12:00:00Z',
+        'UTC',
         null, null, null
       );
       expect(context.explanatoryText).toContain('Fire danger indices are calculated');
@@ -280,6 +305,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         34.05, -118.24,
         '2025-11-07T12:00:00Z',
+        'UTC',
         3, null, null
       );
       expect(context.explanatoryText).toContain('atmospheric conditions');
@@ -292,6 +318,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-11-07T12:00:00Z',
+        'UTC',
         null, null, null
       );
       expect(context.hasIndices).toBe(false);
@@ -301,6 +328,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-11-07T12:00:00Z',
+        'UTC',
         3, null, null
       );
       expect(context.hasIndices).toBe(true);
@@ -310,6 +338,7 @@ describe('getFireWeatherContext', () => {
       const context = getFireWeatherContext(
         43.82, -84.77,
         '2025-11-07T12:00:00Z',
+        'UTC',
         0, null, null // Zero is a valid index value
       );
       expect(context.hasIndices).toBe(true);

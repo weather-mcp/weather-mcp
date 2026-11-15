@@ -3,6 +3,7 @@
  */
 
 import { valueAt } from './gridpointSeries.js';
+import { getDateComponents } from './normals.js';
 
 /**
  * Haines Index category information
@@ -212,6 +213,7 @@ export function getFireWeatherContext(
   latitude: number,
   longitude: number,
   timestamp: string,
+  timeZone: string,
   hainesValue: number | null,
   grasslandValue: number | null,
   redFlagValue: number | null,
@@ -219,9 +221,9 @@ export function getFireWeatherContext(
 ): FireWeatherContext {
   const hasIndices = hainesValue !== null || grasslandValue !== null || redFlagValue !== null;
 
-  // Parse month from timestamp
-  const date = new Date(timestamp);
-  const month = date.getMonth() + 1; // 1-12
+  // The location's calendar month (1-12), never the server's. NaN (unparseable
+  // timestamp) fails both season tests and lands in the shoulder-season branch.
+  const month = getDateComponents(timestamp, timeZone)?.month ?? NaN;
 
   // Determine geographic region
   const isWestern = longitude < -100; // Western US (higher fire risk regions)

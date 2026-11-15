@@ -738,6 +738,7 @@ async function formatNOAACurrentConditions(
         latitude,
         longitude,
         props.timestamp,
+        timezone,
         hainesValue,
         grasslandValue,
         redFlagValue,
