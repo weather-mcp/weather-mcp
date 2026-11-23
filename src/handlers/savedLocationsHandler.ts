@@ -478,9 +478,11 @@ export async function handleGetSavedLocation(
   }
 
   const alias = getArgs.alias.toLowerCase().trim();
+  // Absent means no own key. A present value that is not an object (a hand-edited
+  // `null`, `0`, `""`, `false`) reaches the describer below and is named, not hidden.
   const location = locationStore.get(alias);
 
-  if (!location) {
+  if (location === undefined) {
     const available = Object.keys(locationStore.getAll());
     throw new Error(
       `Location "${alias}" not found.\n\n` +

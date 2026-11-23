@@ -25,6 +25,7 @@ import {
   type PrewarmOutcome
 } from '../services/blitzortung.js';
 import { logger } from '../utils/logger.js';
+import { readStoredCoordinates } from '../utils/savedLocationShape.js';
 
 export interface PrewarmScheduler {
   setInterval(fn: () => void, ms: number): ReturnType<typeof setInterval>;
@@ -36,8 +37,10 @@ export interface LightningPrewarmDeps {
   toolEnabled: boolean;
   /** The raw `WEATHER_LIGHTNING_PREWARM` value; `'false'` opts out. */
   optOutValue: string | undefined;
-  /** Synchronous store read. May throw when the file is unreadable. */
-  readSavedLocations: () => Array<{ latitude: number; longitude: number }>;
+  /** Synchronous store read. May throw when the file is unreadable. The values are the
+   *  raw contents of a hand-editable file, so they are `unknown`: an entry without usable
+   *  coordinates is skipped, never dereferenced. */
+  readSavedLocations: () => readonly unknown[];
   prewarmLocation: (
     latitude: number,
     longitude: number,
@@ -84,13 +87,20 @@ export function startLightningPrewarm(deps: LightningPrewarmDeps): LightningPrew
     }
     unreadable = false;
 
-    if (startup && savedLocations.length > 0) {
+    // Only entries with usable coordinates are pre-warmed, and the count logged is the
+    // count subscribed. A skipped entry is not logged: it would name nothing useful and
+    // the tools that read it refuse it by alias.
+    const usable = savedLocations
+      .map(readStoredCoordinates)
+      .filter((coordinates) => coordinates !== undefined);
+
+    if (startup && usable.length > 0) {
       logger.info('Pre-warming lightning monitoring for saved locations', {
-        count: savedLocations.length
+        count: usable.length
       });
     } else if (!startup) {
       logger.debug('Refreshing lightning pre-warm for saved locations', {
-        count: savedLocations.length
+        count: usable.length
       });
     }
 
@@ -99,7 +109,7 @@ export function startLightningPrewarm(deps: LightningPrewarmDeps): LightningPrew
     // concurrent entry. Each call gets its own outcome object.
     const outcomes: PrewarmOutcome[] = [];
     const pending: Promise<void>[] = [];
-    for (const location of savedLocations) {
+    for (const location of usable) {
       const outcome: PrewarmOutcome = {};
       outcomes.push(outcome);
       pending.push(deps.prewarmLocation(location.latitude, location.longitude, undefined, outcome));
