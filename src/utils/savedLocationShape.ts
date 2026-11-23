@@ -5,9 +5,13 @@
  * hand-editable JSON file — both are untrusted `unknown` at the boundary.
  * This module is the single place that decides what a well-formed
  * `SavedLocation` looks like, so the write side (`validateSavedLocationInput`)
- * and the read side (`describeSavedLocationDefect`) can never disagree about
- * which field is checked first or what "wrong" means for it. Both share the
+ * and the read side (`describeSavedLocationDefect`) agree on **shape**: which
+ * field is checked first and what "wrong" means for it. Both share the
  * same field-order constants below for exactly that reason.
+ *
+ * The size limits below are **write-only**. The two writers apply them
+ * (`findSavedLocationLimitViolation`); the describer does not, so an
+ * oversize record already on disk is well-formed and still readable.
  *
  * Pure and zero-I/O: no upstream call, no file access, no logging.
  */
@@ -37,7 +41,7 @@ const ARRAY_FIELDS = ['alternateNames', 'activities'] as const;
  * look at field-by-field. `typeof null === 'object'` and arrays are objects
  * too, so both are excluded explicitly rather than relying on `typeof` alone.
  */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isSavedLocationEntry(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -75,7 +79,7 @@ function isStringArray(value: unknown): value is string[] {
 export function validateSavedLocationInput(
   input: unknown
 ): Omit<SavedLocation, 'saved_at' | 'updated_at'> {
-  if (!isPlainObject(input)) {
+  if (!isSavedLocationEntry(input)) {
     throw new Error('Saved location must be an object');
   }
 
@@ -129,7 +133,7 @@ export function validateSavedLocationInput(
 export function describeSavedLocationDefect(
   entry: unknown
 ): { field: string; problem: string } | undefined {
-  if (!isPlainObject(entry)) {
+  if (!isSavedLocationEntry(entry)) {
     return { field: 'entry', problem: 'is not an object' };
   }
 
@@ -168,4 +172,149 @@ export function describeSavedLocationDefect(
   }
 
   return undefined;
+}
+
+/**
+ * Read the eight optional metadata fields of a stored entry by shape only.
+ * `undefined` is absent (in neither list). A well-typed value is copied into
+ * `fields`. Anything else, `null` included, is named in `dropped`, in field
+ * order. No length check: oversize is not malformed. A non-entry yields
+ * nothing; the whole-entry case belongs to the caller.
+ */
+export function readStoredMetadata(entry: unknown): {
+  fields: Partial<
+    Pick<
+      SavedLocation,
+      | 'timezone'
+      | 'country_code'
+      | 'admin1'
+      | 'admin2'
+      | 'description'
+      | 'notes'
+      | 'alternateNames'
+      | 'activities'
+    >
+  >;
+  dropped: string[];
+} {
+  const fields: Record<string, string | string[]> = {};
+  const dropped: string[] = [];
+  if (!isSavedLocationEntry(entry)) {
+    return { fields: {}, dropped };
+  }
+  for (const field of STRING_FIELDS) {
+    const value = entry[field];
+    if (value === undefined) continue;
+    if (typeof value === 'string') {
+      fields[field] = value;
+    } else {
+      dropped.push(field);
+    }
+  }
+  for (const field of ARRAY_FIELDS) {
+    const value = entry[field];
+    if (value === undefined) continue;
+    if (isStringArray(value)) {
+      fields[field] = value;
+    } else {
+      dropped.push(field);
+    }
+  }
+  return { fields, dropped };
+}
+
+/**
+ * The coordinates of a stored entry, or `undefined` when the entry is not an
+ * object or either coordinate fails validation. Never throws. A bad `name`
+ * does not matter here: it does not stop a weather tool.
+ */
+export function readStoredCoordinates(
+  entry: unknown
+): { latitude: number; longitude: number } | undefined {
+  if (!isSavedLocationEntry(entry)) {
+    return undefined;
+  }
+  try {
+    const { latitude, longitude } = entry;
+    validateLatitude(latitude);
+    validateLongitude(longitude);
+    return { latitude, longitude };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Per-field text length limits (String.length), write side only. */
+export const SAVED_LOCATION_TEXT_LIMITS = {
+  name: 500,
+  description: 500,
+  notes: 2000,
+  timezone: 200,
+  country_code: 200,
+  admin1: 200,
+  admin2: 200,
+} as const;
+
+/** Per-list entry-count and per-entry length limits, write side only. */
+export const SAVED_LOCATION_LIST_LIMITS = {
+  alternateNames: { entries: 20, length: 100 },
+  activities: { entries: 20, length: 50 },
+} as const;
+
+/** The most aliases the store accepts. */
+export const MAX_SAVED_LOCATIONS = 100;
+
+export type LimitViolation = {
+  field: string;
+  kind: 'length' | 'entries' | 'entry-length';
+  limit: number;
+  actual: number;
+};
+
+/**
+ * The first limit a record breaks, or `undefined`. Text fields in
+ * `SAVED_LOCATION_TEXT_LIMITS` key order, then each list (count, then each
+ * element). A field that is absent or of the wrong type is skipped: shape is
+ * the other function's job.
+ */
+export function findSavedLocationLimitViolation(
+  record: Record<string, unknown>
+): LimitViolation | undefined {
+  for (const field of Object.keys(SAVED_LOCATION_TEXT_LIMITS) as Array<
+    keyof typeof SAVED_LOCATION_TEXT_LIMITS
+  >) {
+    const value = record[field];
+    const limit = SAVED_LOCATION_TEXT_LIMITS[field];
+    if (typeof value === 'string' && value.length > limit) {
+      return { field, kind: 'length', limit, actual: value.length };
+    }
+  }
+  for (const field of Object.keys(SAVED_LOCATION_LIST_LIMITS) as Array<
+    keyof typeof SAVED_LOCATION_LIST_LIMITS
+  >) {
+    const value = record[field];
+    const limits = SAVED_LOCATION_LIST_LIMITS[field];
+    if (!isStringArray(value)) continue;
+    if (value.length > limits.entries) {
+      return { field, kind: 'entries', limit: limits.entries, actual: value.length };
+    }
+    for (const item of value) {
+      if (item.length > limits.length) {
+        return { field, kind: 'entry-length', limit: limits.length, actual: item.length };
+      }
+    }
+  }
+  return undefined;
+}
+
+/** The one fixed message family for a limit violation. */
+export function formatLimitViolation(v: LimitViolation): string {
+  switch (v.kind) {
+    case 'length':
+      return `${v.field} must be ${v.limit} characters or less`;
+    case 'entries':
+      return `${v.field} must have ${v.limit} entries or fewer`;
+    case 'entry-length':
+      return `Each entry in ${v.field} must be ${v.limit} characters or less`;
+  }
 }
