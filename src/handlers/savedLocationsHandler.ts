@@ -89,7 +89,7 @@ function describeStoredOversize(v: LimitViolation): string {
   const remedy =
     v.field === 'name'
       ? 'Pass a shorter name with the name parameter.'
-      : v.field in SAVED_LOCATION_LIST_LIMITS || v.field === 'description' || v.field === 'notes'
+      : v.kind !== 'length' || v.field === 'description' || v.field === 'notes'
         ? 'Shorten it or clear it in this call.'
         : REPLACE_REMEDY;
   return `Stored ${v.field} ${size}. ${remedy}`;
