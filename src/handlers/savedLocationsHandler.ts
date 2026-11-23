@@ -134,14 +134,16 @@ export async function handleSaveLocation(
       if (typeof activity !== 'string') {
         throw new Error('Each activity must be a string');
       }
-      const trimmed = activity.trim();
-      if (trimmed.length === 0) {
+      // Lowercase before measuring: some characters expand under toLowerCase()
+      // ("İ" → 2 code units), and the store measures the stored, lowercased value.
+      const normalized = activity.trim().toLowerCase();
+      if (normalized.length === 0) {
         continue; // Skip empty strings
       }
-      if (trimmed.length > 50) {
+      if (normalized.length > 50) {
         throw new Error('Each activity must be 50 characters or less');
       }
-      validatedActivities.push(trimmed.toLowerCase());
+      validatedActivities.push(normalized);
     }
 
     if (validatedActivities.length > SAVED_LOCATION_LIST_LIMITS.activities.entries) {
