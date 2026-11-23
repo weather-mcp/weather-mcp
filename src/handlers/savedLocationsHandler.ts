@@ -5,7 +5,16 @@
 import { LocationStore } from '../services/locationStore.js';
 import { NominatimService } from '../services/nominatim.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
-import { describeSavedLocationDefect } from '../utils/savedLocationShape.js';
+import {
+  SAVED_LOCATION_LIST_LIMITS,
+  SAVED_LOCATION_TEXT_LIMITS,
+  describeSavedLocationDefect,
+  findSavedLocationLimitViolation,
+  formatLimitViolation,
+  isSavedLocationEntry,
+  readStoredMetadata,
+  type LimitViolation
+} from '../utils/savedLocationShape.js';
 
 interface SaveLocationArgs {
   alias?: string;
@@ -50,6 +59,42 @@ function escapeMarkdown(text: string): string {
     .replace(/\r/g, '');
 }
 
+/** The stored fields a save carries forward when the call does not supply them, in render order. */
+const CARRIED_FIELD_ORDER = [
+  'timezone',
+  'country_code',
+  'admin1',
+  'admin2',
+  'description',
+  'notes',
+  'alternateNames',
+  'activities'
+] as const;
+
+/** The remedy when a save must replace the stored location details, not reuse them. */
+const REPLACE_REMEDY = 'Provide location_query, or latitude + longitude + name, to replace it.';
+
+/**
+ * The refusal for a stored field this call would carry forward although it is over its
+ * limit. Oversize is not malformed, so the field is never dropped: the caller decides.
+ * The remedy depends on whether a parameter exists that can shorten the field.
+ */
+function describeStoredOversize(v: LimitViolation): string {
+  const size =
+    v.kind === 'length'
+      ? `is ${v.actual} characters, over the ${v.limit}-character limit`
+      : v.kind === 'entries'
+        ? `has ${v.actual} entries, over the ${v.limit}-entry limit`
+        : `has an entry of ${v.actual} characters, over the ${v.limit}-character limit`;
+  const remedy =
+    v.field === 'name'
+      ? 'Pass a shorter name with the name parameter.'
+      : v.kind !== 'length' || v.field === 'description' || v.field === 'notes'
+        ? 'Shorten it or clear it in this call.'
+        : REPLACE_REMEDY;
+  return `Stored ${v.field} ${size}. ${remedy}`;
+}
+
 /**
  * Save a location for future use
  */
@@ -89,14 +134,25 @@ export async function handleSaveLocation(
       if (typeof activity !== 'string') {
         throw new Error('Each activity must be a string');
       }
-      const trimmed = activity.trim();
-      if (trimmed.length === 0) {
+      // Lowercase before measuring: some characters expand under toLowerCase()
+      // ("İ" → 2 code units), and the store measures the stored, lowercased value.
+      const normalized = activity.trim().toLowerCase();
+      if (normalized.length === 0) {
         continue; // Skip empty strings
       }
-      if (trimmed.length > 50) {
+      if (normalized.length > 50) {
         throw new Error('Each activity must be 50 characters or less');
       }
-      validatedActivities.push(trimmed.toLowerCase());
+      validatedActivities.push(normalized);
+    }
+
+    if (validatedActivities.length > SAVED_LOCATION_LIST_LIMITS.activities.entries) {
+      throw new Error(formatLimitViolation({
+        field: 'activities',
+        kind: 'entries',
+        limit: SAVED_LOCATION_LIST_LIMITS.activities.entries,
+        actual: validatedActivities.length
+      }));
     }
 
     // Only set activities if there are valid ones
@@ -115,6 +171,14 @@ export async function handleSaveLocation(
       throw new Error('description must be a string');
     }
     const trimmed = saveArgs.description.trim();
+    if (trimmed.length > SAVED_LOCATION_TEXT_LIMITS.description) {
+      throw new Error(formatLimitViolation({
+        field: 'description',
+        kind: 'length',
+        limit: SAVED_LOCATION_TEXT_LIMITS.description,
+        actual: trimmed.length
+      }));
+    }
     // If empty string provided, description stays undefined but descriptionProvided is true
     description = trimmed.length > 0 ? trimmed : undefined;
   }
@@ -137,7 +201,21 @@ export async function handleSaveLocation(
       if (trimmed.length === 0) {
         continue; // Skip empty strings
       }
+      if (trimmed.length > SAVED_LOCATION_LIST_LIMITS.alternateNames.length) {
+        throw new Error(
+          `Each alternate name must be ${SAVED_LOCATION_LIST_LIMITS.alternateNames.length} characters or less`
+        );
+      }
       validatedAlternateNames.push(trimmed);
+    }
+
+    if (validatedAlternateNames.length > SAVED_LOCATION_LIST_LIMITS.alternateNames.entries) {
+      throw new Error(formatLimitViolation({
+        field: 'alternateNames',
+        kind: 'entries',
+        limit: SAVED_LOCATION_LIST_LIMITS.alternateNames.entries,
+        actual: validatedAlternateNames.length
+      }));
     }
 
     // If empty array provided (or all entries were empty), alternateNames stays
@@ -154,6 +232,14 @@ export async function handleSaveLocation(
       throw new Error('notes must be a string');
     }
     const trimmed = saveArgs.notes.trim();
+    if (trimmed.length > SAVED_LOCATION_TEXT_LIMITS.notes) {
+      throw new Error(formatLimitViolation({
+        field: 'notes',
+        kind: 'length',
+        limit: SAVED_LOCATION_TEXT_LIMITS.notes,
+        actual: trimmed.length
+      }));
+    }
     // If empty string provided, notes stays undefined but notesProvided is true
     notes = trimmed.length > 0 ? trimmed : undefined;
   }
@@ -165,12 +251,36 @@ export async function handleSaveLocation(
     throw new Error('name must be a string');
   }
   const providedName = saveArgs.name?.trim() || undefined;
+  if (providedName !== undefined && providedName.length > SAVED_LOCATION_TEXT_LIMITS.name) {
+    throw new Error(formatLimitViolation({
+      field: 'name',
+      kind: 'length',
+      limit: SAVED_LOCATION_TEXT_LIMITS.name,
+      actual: providedName.length
+    }));
+  }
 
-  // Check for partial update mode (updating existing location without re-specifying coordinates)
+  // Check for partial update mode (updating existing location without re-specifying coordinates).
+  // The file is hand-editable, so the stored value is read as `unknown`. Only a stored
+  // object can be a partial update's base. A stored value that is not an object is absent
+  // for a write: location details replace it, and a metadata-only save over it is refused
+  // by name, because there is no location to keep.
   const hasLocationDetails = saveArgs.location_query ||
     (typeof saveArgs.latitude === 'number' && typeof saveArgs.longitude === 'number');
-  const existingLocation = locationStore.get(alias);
-  const isPartialUpdate = existingLocation && !hasLocationDetails;
+  const existing: unknown = locationStore.get(alias);
+  const existingIsEntry = isSavedLocationEntry(existing);
+  const isPartialUpdate = existingIsEntry && !hasLocationDetails;
+
+  if (existing !== undefined && !existingIsEntry && !hasLocationDetails) {
+    throw new Error(
+      `Saved location "${alias}" cannot be read: the entry is not an object. ${REPLACE_REMEDY}`
+    );
+  }
+
+  // The stored fields this call carries forward, and the names of those it could not
+  // because they are malformed on disk (reported in the response, never written).
+  const carried: Record<string, unknown> = {};
+  const notKept = new Set<string>();
 
   let latitude: number;
   let longitude: number;
@@ -181,14 +291,32 @@ export async function handleSaveLocation(
   let admin2: string | undefined;
 
   if (isPartialUpdate) {
-    // Partial update: preserve existing location data, only update specified fields
-    latitude = existingLocation.latitude;
-    longitude = existingLocation.longitude;
-    name = providedName ?? existingLocation.name;
-    timezone = existingLocation.timezone;
-    country_code = existingLocation.country_code;
-    admin1 = existingLocation.admin1;
-    admin2 = existingLocation.admin2;
+    // Partial update: preserve existing location data, only update specified fields.
+    // The base needs a usable name and coordinates; the describer checks those three
+    // first, so any other first defect means they are well-formed.
+    const defect = describeSavedLocationDefect(existing);
+    if (defect && (defect.field === 'name' || defect.field === 'latitude' || defect.field === 'longitude')) {
+      throw new Error(
+        `Saved location "${alias}" has an unusable stored ${defect.field}. ${REPLACE_REMEDY}`
+      );
+    }
+    const base = existing as { name: string; latitude: number; longitude: number };
+    latitude = base.latitude;
+    longitude = base.longitude;
+    name = providedName ?? base.name;
+    if (providedName === undefined) {
+      carried.name = base.name;
+    }
+
+    // A malformed stored geo field is not carried forward.
+    const storedGeo = readStoredMetadata(existing);
+    ({ timezone, country_code, admin1, admin2 } = storedGeo.fields);
+    for (const field of ['timezone', 'country_code', 'admin1', 'admin2'] as const) {
+      carried[field] = storedGeo.fields[field];
+      if (storedGeo.dropped.includes(field)) {
+        notKept.add(field);
+      }
+    }
   } else if (saveArgs.location_query && typeof saveArgs.location_query === 'string') {
     // Geocode the query
     const query = saveArgs.location_query.trim();
@@ -204,6 +332,12 @@ export async function handleSaveLocation(
     }
 
     const location = results.results[0];
+    if (providedName === undefined && location.name.length > SAVED_LOCATION_TEXT_LIMITS.name) {
+      throw new Error(
+        `The geocoded name is ${location.name.length} characters, over the ` +
+        `${SAVED_LOCATION_TEXT_LIMITS.name}-character limit. Pass a shorter name with the name parameter.`
+      );
+    }
     latitude = location.latitude;
     longitude = location.longitude;
     name = providedName ?? location.name;
@@ -246,33 +380,58 @@ export async function handleSaveLocation(
   // There must be no await between this read and locationStore.set() below, so
   // the read-modify-write stays one synchronous run (G20) — that is the whole
   // reason this store needs no lockfile.
-  const mergeBase = locationStore.get(alias);
+  const mergeRaw: unknown = locationStore.get(alias);
+  const mergeIsEntry = isSavedLocationEntry(mergeRaw);
 
   // Preserve description/alternateNames/notes/activities when omitted on ANY
   // update to an existing alias (partial update OR full re-save with new
   // coordinates). Omitted (undefined) -> keep the stored value. Explicitly
   // cleared ("" / []) was already normalized to undefined above by the
-  // *Provided validation blocks. A mergeBase of undefined means the alias was
+  // *Provided validation blocks. A merge base of undefined means the alias was
   // removed mid-flight: the metadata is gone, not preserved, and the entry is
-  // recreated from what this call supplied.
-  if (mergeBase) {
+  // recreated from what this call supplied. A merge base that is not an object
+  // has no metadata to keep. A stored field of the wrong type is not carried
+  // forward: it is left out of the record and named in the response.
+  const stored = readStoredMetadata(mergeRaw);
+  if (mergeIsEntry) {
+    const keep = (field: 'description' | 'alternateNames' | 'notes' | 'activities'): void => {
+      carried[field] = stored.fields[field];
+      if (stored.dropped.includes(field)) {
+        notKept.add(field);
+      }
+    };
     if (!descriptionProvided) {
-      description = mergeBase.description;
+      description = stored.fields.description;
+      keep('description');
     }
     if (!alternateNamesProvided) {
-      alternateNames = mergeBase.alternateNames;
+      alternateNames = stored.fields.alternateNames;
+      keep('alternateNames');
     }
     if (!notesProvided) {
-      notes = mergeBase.notes;
+      notes = stored.fields.notes;
+      keep('notes');
     }
     if (!activitiesProvided) {
-      activities = mergeBase.activities;
+      activities = stored.fields.activities;
+      keep('activities');
     }
   }
 
+  // A carried-forward field that is over its limit is refused here, by name, with its
+  // current length. The store would refuse the record too, but with a message that
+  // reads as if the caller had sent the field. There is no exemption for a field that
+  // is unchanged: the caller shortens or clears it in the same call.
+  const storedOversize = findSavedLocationLimitViolation(carried);
+  if (storedOversize) {
+    throw new Error(describeStoredOversize(storedOversize));
+  }
+
   // Check if this is an update or new location — from the same late read, not a
-  // third trip to the store.
-  const isUpdate = mergeBase !== undefined;
+  // third trip to the store. Replacing a stored value that is not an object is a
+  // save, not an update: nothing of it survives.
+  const isUpdate = mergeRaw !== undefined && mergeIsEntry;
+  const replacedUnreadable = mergeRaw !== undefined && !mergeIsEntry;
 
   // Save the location
   locationStore.set(alias, {
@@ -328,6 +487,16 @@ export async function handleSaveLocation(
 
   if (activities && activities.length > 0) {
     output += `**Activities:** ${activities.map(a => escapeMarkdown(a)).join(', ')}\n`;
+  }
+
+  if (replacedUnreadable) {
+    output += `⚠️ Replaced a saved entry that could not be read.\n`;
+  }
+
+  const notKeptFields = CARRIED_FIELD_ORDER.filter((field) => notKept.has(field));
+  if (notKeptFields.length > 0) {
+    output += `⚠️ Not kept from the stored entry because it was malformed: ` +
+      `${notKeptFields.map((field) => `\`${field}\``).join(', ')}.\n`;
   }
 
   output += `\n`;
@@ -478,9 +647,11 @@ export async function handleGetSavedLocation(
   }
 
   const alias = getArgs.alias.toLowerCase().trim();
+  // Absent means no own key. A present value that is not an object (a hand-edited
+  // `null`, `0`, `""`, `false`) reaches the describer below and is named, not hidden.
   const location = locationStore.get(alias);
 
-  if (!location) {
+  if (location === undefined) {
     const available = Object.keys(locationStore.getAll());
     throw new Error(
       `Location "${alias}" not found.\n\n` +

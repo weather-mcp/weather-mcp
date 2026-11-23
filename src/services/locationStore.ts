@@ -23,7 +23,13 @@ import { homedir } from 'os';
 import { join, dirname, basename, resolve, isAbsolute } from 'path';
 import type { SavedLocation, SavedLocationsStore } from '../types/savedLocations.js';
 import { logger, isPiiLoggingEnabled } from '../utils/logger.js';
-import { validateSavedLocationInput } from '../utils/savedLocationShape.js';
+import {
+  MAX_SAVED_LOCATIONS,
+  findSavedLocationLimitViolation,
+  formatLimitViolation,
+  isSavedLocationEntry,
+  validateSavedLocationInput
+} from '../utils/savedLocationShape.js';
 
 /**
  * Thrown when `~/.weather-mcp/locations.json` exists but cannot be read, parsed,
@@ -333,13 +339,38 @@ export class LocationStore {
     // record from any writer is refused and the file is left untouched.
     const validated = validateSavedLocationInput(location);
 
+    // The size limits bind the whole record, every field of it, whatever the file holds
+    // already: there is no exemption for a field that equals the stored copy. Checked
+    // before the read, so a refused record leaves the file untouched.
+    const violation = findSavedLocationLimitViolation(validated);
+    if (violation) {
+      throw new Error(formatLimitViolation(violation));
+    }
+
     const locations = this.load();
     const isUpdate = LocationStore.owns(locations, normalized);
     const now = new Date().toISOString();
 
+    // The count limit binds creation only. An update, a replace of an unreadable entry
+    // and a remove always work, so a file hand-edited past the limit can be repaired.
+    // No await between the read above and the write below (G20).
+    if (!isUpdate && Object.keys(locations).length >= MAX_SAVED_LOCATIONS) {
+      throw new Error(
+        `Cannot save more than ${MAX_SAVED_LOCATIONS} locations. ` +
+        'Remove one with remove_saved_location, then save again.'
+      );
+    }
+
+    // The file is hand-editable: the stored value may be anything. `saved_at` is carried
+    // over only from an entry that has one as text; otherwise the record is stamped now,
+    // so every written record has both timestamps.
+    const previous: unknown = isUpdate ? locations[normalized] : undefined;
     const savedLocation: SavedLocation = {
       ...validated,
-      saved_at: isUpdate ? locations[normalized].saved_at : now,
+      saved_at:
+        isSavedLocationEntry(previous) && typeof previous.saved_at === 'string'
+          ? previous.saved_at
+          : now,
       updated_at: now
     };
 

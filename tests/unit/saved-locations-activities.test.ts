@@ -223,6 +223,59 @@ describe('Saved Locations - Activities Feature', () => {
       const savedLocation = locationStore.get('test');
       expect(savedLocation?.activities).toEqual([fiftyCharActivity]);
     });
+
+    // "İ" (U+0130) lowercases to two code units, so the handler must measure the
+    // lowercased value — the one the store measures and writes (diff review codex-B1).
+    it('measures the lowercased value: 25 × "İ" lowercases to 50 and is accepted', async () => {
+      expect('İ'.toLowerCase().length).toBe(2);
+      await handleSaveLocation(
+        {
+          alias: 'test',
+          latitude: 40.0,
+          longitude: -105.0,
+          name: 'Test Location',
+          activities: ['İ'.repeat(25)]
+        },
+        locationStore,
+        nominatimService
+      );
+
+      const saved = locationStore.get('test');
+      expect(saved?.activities?.[0]).toHaveLength(50);
+    });
+
+    it('measures the lowercased value: 26 × "İ" lowercases to 52 and the handler refuses it', async () => {
+      await expect(
+        handleSaveLocation(
+          {
+            alias: 'test',
+            latitude: 40.0,
+            longitude: -105.0,
+            name: 'Test Location',
+            activities: ['İ'.repeat(26)]
+          },
+          locationStore,
+          nominatimService
+        )
+      ).rejects.toThrow(/^Each activity must be 50 characters or less$/);
+    });
+
+    it('refuses 50 × "İ" in the handler, not in the store', async () => {
+      await expect(
+        handleSaveLocation(
+          {
+            alias: 'test',
+            latitude: 40.0,
+            longitude: -105.0,
+            name: 'Test Location',
+            activities: ['İ'.repeat(50)]
+          },
+          locationStore,
+          nominatimService
+        )
+      ).rejects.toThrow(/^Each activity must be 50 characters or less$/);
+      expect(locationStore.has('test')).toBe(false);
+    });
   });
 
   describe('List and get with activities', () => {

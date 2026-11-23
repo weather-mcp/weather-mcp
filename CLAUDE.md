@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.21 (Production Ready)
+- **Version:** 1.35.22 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -86,7 +86,7 @@ src/
 │   ├── httpDeadline.ts      # withRequestDeadline — one wall-clock deadline per axios request (proxy included), emitted as axios's own ECONNABORTED; every axios.create passes it; hands a tunnelled https request proxy: false and a per-request TunnelAgent on its own signal
 │   ├── toolBudget.ts        # Per-tool-call wall-clock budget (max(API_TIMEOUT_MS, 55 s)) carried in an AsyncLocalStorage; read by httpDeadline at the seam and by the lightning query, written by the dispatch; arms no timer (pure)
 │   ├── proxyTunnel.ts       # Per-request CONNECT tunnel agent hooked on the deadline's signal; tunnelProxyFor mirrors axios's proxy-from-env selection (no logging)
-│   ├── savedLocationShape.ts  # Saved-location record-shape contract — write-side validator and read-side describer (pure)
+│   ├── savedLocationShape.ts  # Saved-location record-shape contract — entry predicate, write-side validator, read-side describer and stored-field readers; the write-only size limits (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
 │   ├── serviceStatusProbe.ts     # check_service_status probe outcome type + 200/429/other classification; both probes import it (pure)
 │   ├── logger.ts            # Structured logging to stderr; LOG_LEVEL parsing; log redaction (coordinates, URLs, error text)
@@ -639,7 +639,25 @@ tools use to skip the reverse-geocode lookup.
   being one synchronous run. Do not make these methods `async`, and do not put an `await` between
   a caller's read and its `set` — `savedLocationsHandler.ts` re-reads its merge base *after* the
   geocoder await for exactly this reason
-- **Activities (optional)**: array of strings, lowercased/trimmed, ≤ 50 chars each, empties dropped; helps the AI tailor weather context
+- **A stored alias that is not an object is present and broken on read, and absent on write.**
+  The file is hand-editable, so an entry can be `null`, `0`, `""`, `false`, a string or an array.
+  On every read it is refused by name and never treated as absent: the resolver throws
+  `SavedLocationCoordinateError` (so `WEATHER_DEFAULT_LOCATION` is never geocoded instead),
+  `get_saved_location` names it, the alternate-name scan and the lightning pre-warm skip it. On a
+  write it is absent: `save_location` with location details replaces it, and a metadata-only save
+  over it is refused. Presence is the own key, never truthiness. `isSavedLocationEntry`
+  (`src/utils/savedLocationShape.ts`) is the one definition; no site writes its own `typeof` test
+- **A malformed stored field is not carried forward.** A save reads stored optional fields through
+  `readStoredMetadata`; a field of the wrong type is left out of the written record and named in
+  the response, unless the call supplies it
+- **Size limits are write-only constants in `savedLocationShape.ts`**
+  (`SAVED_LOCATION_TEXT_LIMITS`, `SAVED_LOCATION_LIST_LIMITS`, `MAX_SAVED_LOCATIONS`), enforced by
+  the handler (message names the parameter) and again by `LocationStore.set()` before the file is
+  read. The describer applies none of them, so an oversize entry still lists, shows and resolves.
+  The 100-location count binds **creation only**: an update, a replace and a remove work at any
+  count. There is **no exemption for an unchanged field**: a write to an alias whose stored field
+  is over its limit is refused until the same call shortens or clears it
+- **Activities (optional)**: array of strings, lowercased/trimmed, ≤ 50 chars each, at most 20, empties dropped; helps the AI tailor weather context
 - **Smart Updates**: if the alias exists and no location details are provided, only the specified fields change (`description`/`alternateNames`/`notes` preserved when omitted, cleared when explicitly `""`/`[]`); new locations still need `location_query` or lat/long — `name` cannot be cleared; empty means omitted
 
 ### Currently Supported Tools
@@ -745,15 +763,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.21 — Production Ready ✅
-- **Test Coverage:** 5,373 tests, 100% pass rate
+- **Version:** 1.35.22 — Production Ready ✅
+- **Test Coverage:** 5,558 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.22:** A broken saved-location entry is named instead of crashing the server, save_location can replace it, and saved locations have size limits
 - **New in v1.35.21:** check_service_status no longer lists USGS, which this server never contacts
 - **New in v1.35.20:** A crafted radar tile can no longer make the composite map use gigabytes of memory, and the map caches are bounded in bytes
-- **New in v1.35.19:** Fire-weather mixing height and transport wind show the current value in feet and mph
 
 ## Useful References
 
@@ -776,7 +794,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-23 (v1.35.21)
+**Last Updated:** 2026-11-23 (v1.35.22)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

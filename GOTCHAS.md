@@ -1643,6 +1643,23 @@ mutation go red in "both variants" of a two-part guard has usually mis-specified
 its own acceptance** — report which variant discriminates and why, rather than
 manufacturing a red for the variant that is redundantly covered.
 
+**The limit case of the fourth way, found 2026-11-23** (`c2d80f5`, `0ca76fe`,
+saved-location-null-entry-bounds T3 and T6): **when the second half covers
+everything, the red set is empty, and that is still not a coverage gap.** Two of
+seventeen planned rows came back with zero red. Removing the alternate-name
+scan's `isSavedLocationEntry` skip changed nothing, because the helper it then
+calls (`readStoredMetadata`) opens with the same guard. Widening the
+partial-update selector to admit a non-entry changed nothing, because the
+refusal for exactly that case sits on the next line. The plan predicted a
+`TypeError` for the first and a changed message for the second. **Prove the
+rows have teeth with the compound mutation — remove both halves — and record
+that red set** (scan skip plus helper guard: the `null`-before-the-match row and
+the `null` miss row, both `TypeError`; selector plus refusal: all six
+metadata-only rows). Do not delete the "redundant" half to make the row
+killable until you have checked what else it does: the scan's guard also
+narrows the type for the assignment below it. When a plan writes a mutation row
+for a guard, grep the callee and the next statement for a second guard first.
+
 **A fifth way, found 2026-09-01** (`f48eda3`, openmeteo-nullable-scalar-types T6):
 **the discriminator can be the compiler, not the suite.** Removing the
 `?? undefined` normalisation on `getSafetyAssessment`'s four arguments
@@ -5676,6 +5693,13 @@ had written its own revisit trigger for precisely this ("any `await` appearing
 between the store's read and its write") and then did not apply it to the one
 handler that already had one.
 
+**Verify line run clean, 2026-11-23** (`68bdd5d`, `0ca76fe`,
+saved-location-null-entry-bounds T5/T6). The merge base was renamed `mergeRaw` and
+is now read as `unknown` through `readStoredMetadata`; it is still the one
+post-`await` read. Moving it above the geocoder `await` turns exactly the two
+contract-9 cases red and nothing in the new handler test file, so
+`saved-locations-metadata.test.ts` remains the only lock for this rule.
+
 **Status:** active. The caller-level sibling of [G20], which is the same
 mechanism one layer down — there an `await` between a boolean guard and the
 check that reads it, here an `await` between a read and the write that depends
@@ -6345,6 +6369,12 @@ bad-coordinate case goes red: it resolves through the geocoder stub instead
 **Evidence:** 2026-09-28, saved-location-metadata-validation. The codex plan
 review (R1) found it before the run. It was fixed in `bcc60dd` and pinned in
 `22b9011`. M10 reddened exactly that one case.
+2026-11-23, saved-location-null-entry-bounds (`fbc09ea`): the class now also carries
+"the entry is not an object". A hand-edited `null`, `0`, `""` or `false` under the
+default alias used to fail the resolver's truthiness test, read as absent and fall
+through to the geocoder. The Verify line was re-run on that branch: the original
+case goes red, and so do the six `is refused and never geocoded` rows in
+`tests/unit/saved-location-non-object-read.test.ts`.
 2026-09-30, geocoding-error-attribution: the rule was applied one layer down.
 `GeocodingService.geocode` now tells a provider that answered (empty or declined)
 apart from one that failed, and `resolveDefaultLocation` branches by

@@ -715,22 +715,104 @@ numbers is refused with its alias named, rather than sent to a weather service:
 Error: Saved location "lake_cabin" has an invalid coordinate: Invalid latitude: must be a finite number, received string. Repair or remove it.
 ```
 
+An entry that is not an object at all — a hand-edited `null`, a number, a string, a list — is
+refused the same way, by alias. It is never treated as "not saved":
+
+```
+Error: Saved location "lake_cabin" cannot be used: the entry is not an object. Replace it with save_location, or remove it with remove_saved_location.
+```
+
+`get_saved_location` names it as `cannot be shown: entry is not an object`, and the lightning
+pre-warm at startup skips it.
+
 A default location in that state is **never** geocoded as a place name instead — that would
 return the weather for wherever the geocoder puts the word "home". Any other malformed field does
 not stop a weather tool: a bad `name` is never read on that path, and a country code that is not
 text is ignored and looked up from the coordinates.
 
-**The file is never modified.** Nothing is dropped, repaired or rewritten on your behalf. Every
-other alias keeps working.
+**Reading never modifies the file.** No tool that lists, shows or uses a saved location drops,
+repairs or rewrites anything. Every other alias keeps working.
 
-**Two remedies:** `remove_saved_location(alias="…")` — it never reads the broken field, so it
-always works — then save the location again; or repair the value in the file by hand. No restart
-is needed.
+**Three remedies.** No restart is needed for any of them.
+
+- `save_location` to the same alias **with location details** (`location_query`, or `latitude` +
+  `longitude` + `name`). It writes a fresh record over the broken one. Over an entry that was not
+  an object, the response adds:
+
+  ```
+  ⚠️ Replaced a saved entry that could not be read.
+  ```
+
+  Over an object entry with an optional field of the wrong type, that field is left out of the new
+  record and named, unless the same call supplies it:
+
+  ```
+  ⚠️ Not kept from the stored entry because it was malformed: `country_code`, `alternateNames`.
+  ```
+
+- `remove_saved_location(alias="…")` — it never reads the broken field, so it always works — then
+  save the location again.
+- Repair the value in the file by hand.
+
+A save **without** location details keeps the stored name and coordinates, so it cannot repair an
+entry that has none. It is refused, and nothing is written:
+
+```
+Error: Saved location "lake_cabin" cannot be read: the entry is not an object. Provide location_query, or latitude + longitude + name, to replace it.
+```
+
+```
+Error: Saved location "lake_cabin" has an unusable stored latitude. Provide location_query, or latitude + longitude + name, to replace it.
+```
 
 A wrong-typed value sent to `save_location` itself is refused before anything is written:
 
 ```
 Error: name must be a string
+```
+
+### Saved Location Limits
+
+Every saved-location field has a size limit, and one file holds at most 100 locations
+([the table](./TOOLS.md#14-save_location)). A save over a limit is refused before anything is
+written. The message names the field and the limit:
+
+```
+Error: notes must be 2000 characters or less
+```
+
+```
+Error: alternateNames must have 20 entries or fewer
+```
+
+```
+Error: Each alternate name must be 100 characters or less
+```
+
+**The 100-location limit applies to a new alias only.** An update, a replacement and a remove
+always work, at any count:
+
+```
+Error: Cannot save more than 100 locations. Remove one with remove_saved_location, then save again.
+```
+
+**A stored field that is already over its limit blocks the next save to that alias.** This happens
+only to an entry written before the limits existed, or edited by hand. The entry still lists, shows
+and works in every weather tool. A save that would carry the field forward unchanged is refused,
+naming the field, its length and what to do:
+
+```
+Error: Stored notes is 2001 characters, over the 2000-character limit. Shorten it or clear it in this call.
+```
+
+Pass the field in the same call, shortened or as `""` / `[]` to clear it. For a stored `name` the
+message asks for a shorter `name`. For a stored timezone, country or region — which have no
+parameter — it asks for a full save with location details.
+
+A geocoded place name longer than 500 characters is refused the same way:
+
+```
+Error: The geocoded name is 501 characters, over the 500-character limit. Pass a shorter name with the name parameter.
 ```
 
 ### Location Lookup Errors

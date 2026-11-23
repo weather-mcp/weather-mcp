@@ -5,6 +5,7 @@
 import { LocationStore, LocationStoreUnreadableError } from '../services/locationStore.js';
 import { GeocodingService, GeocodingServiceUnavailableError } from '../services/geocoding.js';
 import { validateLatitude, validateLongitude } from './validation.js';
+import { isSavedLocationEntry, readStoredMetadata } from './savedLocationShape.js';
 import { Cache } from './cache.js';
 import { CacheConfig } from '../config/cache.js';
 import { getDefaultLocation } from '../config/defaultLocation.js';
@@ -188,24 +189,37 @@ export function resolveLocation(
       throw new Error('location_name cannot be empty');
     }
 
-    // Try exact alias match first
-    let savedLocation = locationStore.get(locationName);
+    // Try exact alias match first. The file is hand-editable, so the stored value
+    // is read as `unknown`: presence is the own key, not truthiness.
+    const exact: unknown = locationStore.get(locationName);
+
+    // A saved alias whose value is not an object is present and broken, never
+    // absent. Refusing it here, by name, keeps WEATHER_DEFAULT_LOCATION from
+    // geocoding the alias as a place name (resolveDefaultLocation rethrows this class).
+    if (exact !== undefined && !isSavedLocationEntry(exact)) {
+      throw new SavedLocationCoordinateError(
+        `Saved location "${locationName}" cannot be used: the entry is not an object. ` +
+        `Replace it with save_location, or remove it with remove_saved_location.`
+      );
+    }
+
+    let savedLocation: Record<string, unknown> | undefined = exact;
     let matchedAlias = locationName;
 
     // If not found, try matching against alternate names
-    if (!savedLocation) {
-      const allLocations = locationStore.getAll();
+    if (savedLocation === undefined) {
+      const allLocations: Record<string, unknown> = locationStore.getAll();
 
       for (const [alias, location] of Object.entries(allLocations)) {
-        // Check if query matches any alternate names. A hand-edited neighbour
-        // whose alternateNames is not a list of strings is skipped, so it
-        // cannot break every lookup that misses an exact alias.
-        if (
-          Array.isArray(location.alternateNames) &&
-          location.alternateNames.every((n: unknown) => typeof n === 'string') &&
-          location.alternateNames.length > 0
-        ) {
-          const normalizedAlternates = location.alternateNames.map(name =>
+        // A hand-edited neighbour that is not an object, or whose alternateNames
+        // is not a list of strings, is skipped, so it cannot break every lookup
+        // that misses an exact alias.
+        if (!isSavedLocationEntry(location)) {
+          continue;
+        }
+        const alternateNames = readStoredMetadata(location).fields.alternateNames;
+        if (alternateNames !== undefined && alternateNames.length > 0) {
+          const normalizedAlternates = alternateNames.map(name =>
             name.toLowerCase().trim()
           );
 
@@ -218,7 +232,7 @@ export function resolveLocation(
       }
     }
 
-    if (!savedLocation) {
+    if (savedLocation === undefined) {
       const available = Object.keys(locationStore.getAll());
       throw new Error(
         `Saved location "${locationName}" not found.\n\n` +
@@ -232,9 +246,10 @@ export function resolveLocation(
     // The file is hand-editable: refuse a stored coordinate that is not usable
     // rather than send it upstream. Only the coordinates are checked — a bad
     // name does not stop a weather tool, because nothing here reads it.
+    const { latitude, longitude } = savedLocation;
     try {
-      validateLatitude(savedLocation.latitude);
-      validateLongitude(savedLocation.longitude);
+      validateLatitude(latitude);
+      validateLongitude(longitude);
     } catch (error) {
       throw new SavedLocationCoordinateError(
         `Saved location "${matchedAlias}" has an invalid coordinate: ` +
@@ -243,8 +258,8 @@ export function resolveLocation(
     }
 
     return {
-      latitude: savedLocation.latitude,
-      longitude: savedLocation.longitude,
+      latitude,
+      longitude,
       source: 'saved_location',
       location_name: matchedAlias,
       // An unusable optional country code is dropped, not refused: the caller
