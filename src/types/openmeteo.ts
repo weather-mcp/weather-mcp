@@ -122,40 +122,6 @@ export interface OpenMeteoErrorResponse {
 }
 
 /**
- * Location result from Open-Meteo Geocoding API
- */
-export interface GeocodingLocation {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  elevation?: number | null;
-  feature_code?: string;
-  country_code?: string;
-  country?: string;
-  country_id?: number | null;
-  timezone?: string;
-  population?: number | null;
-  postcodes?: string[];
-  admin1?: string;
-  admin2?: string;
-  admin3?: string;
-  admin4?: string;
-  admin1_id?: number | null;
-  admin2_id?: number | null;
-  admin3_id?: number | null;
-  admin4_id?: number | null;
-}
-
-/**
- * Response from Open-Meteo Geocoding API
- */
-export interface GeocodingResponse {
-  results?: GeocodingLocation[];
-  generationtime_ms?: number | null;
-}
-
-/**
  * Hourly forecast data from Open-Meteo Forecast API
  */
 export interface OpenMeteoForecastHourlyData {
