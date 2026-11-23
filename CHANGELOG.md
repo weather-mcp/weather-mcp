@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `check_service_status` no longer lists USGS under "Not checked by this tool". This server never contacts USGS; the unused client behind the entry is removed.
+
+### Removed
+
+- The legacy hand-run scripts under `tests/` (`tests/test_*.ts` and others, and `tests/archived-cdo-tests/`) and the two root analytics scripts, `test-mcp-with-analytics.ts` and `test-mcp-analytics.sh`. No gate ran them and most could no longer start. Use `npm test` for the offline suite and `npm run test:live` for checks against the real upstream APIs.
+
 ## [1.35.20] - 2026-11-15
 
 A specially crafted radar or base-map tile could make the finished radar map (`get_weather_imagery` with `composite: true`) use gigabytes of memory, and the cache of finished maps could grow to about 1 GB at the default settings. This release closes both. Maps from the real tile servers look the same as before; a repeated request is still served from the cache.

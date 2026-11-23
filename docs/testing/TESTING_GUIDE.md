@@ -4,22 +4,27 @@ This guide covers testing the Weather MCP Server.
 
 ## Automated Testing
 
-### NOAA API Connectivity Test
+### Test suite
 
-Run the test script to verify NOAA API is working:
+Run the offline suite (unit and integration tests):
 
 ```bash
-npx tsx tests/test_noaa_api.ts
+npm test
 ```
 
-This will test:
-- Point data retrieval (coordinate to grid conversion)
-- Forecast fetching
-- Station discovery
-- Current conditions
-- Historical observations
+It makes no connection outside the loopback interface. HTTP is mocked, so it runs the same with
+or without network access. CI and the publish workflow run this command.
 
-Expected output: All 5 tests should pass with ✅ marks.
+### Live upstream tests
+
+To check the server against the real upstream APIs, run:
+
+```bash
+npm run test:live
+```
+
+These tests call NOAA, Open-Meteo and the other providers directly. They are slower, they run
+serially, and some can flake when an upstream is slow. They never run in CI.
 
 ## Manual Testing with Claude Code
 
@@ -163,7 +168,7 @@ npm run dev
 - Check for port conflicts
 
 **NOAA API errors**:
-- Run `npx tsx tests/test_noaa_api.ts` to verify API access
+- Call the `check_service_status` tool, which probes NOAA and Open-Meteo directly
 - Check internet connection
 - Verify rate limits haven't been exceeded (wait 5 seconds and retry)
 
@@ -196,7 +201,7 @@ NOAA enforces rate limits. If you hit the limit:
 ## Test Coverage Checklist
 
 - [ ] Server starts without errors
-- [ ] Automated tests pass (test_noaa_api.ts)
+- [ ] npm test passes
 - [ ] Can get forecast for valid coordinates
 - [ ] Can get current conditions for valid coordinates
 - [ ] Can get historical weather for valid date range

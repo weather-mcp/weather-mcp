@@ -57,11 +57,11 @@ check_service_status({})
 ````markdown
 # Weather API Service Status
 
-**Check Time:** 9/25/2026, 1:43:38 AM
+**Check Time:** 11/23/2026, 9:13:11 AM
 
 ## Server Version
 
-**Installed Version:** 1.33.0
+**Installed Version:** 1.35.20
 **Latest Release:** https://github.com/weather-mcp/weather-mcp/releases/latest
 **Changelog:** https://github.com/weather-mcp/weather-mcp/blob/main/CHANGELOG.md
 **Upgrade Instructions:** See README.md "Upgrading to Latest Version" section
@@ -110,7 +110,7 @@ check_service_status({})
 
 Both checked services answered. This confirms they are reachable; it does not confirm that every request will succeed.
 
-**Not checked by this tool:** NOAA river gauges (NWPS); USGS; NOAA NCEI; Aviation Weather Center METAR; Open-Meteo (forecast, air quality, marine, flood, ensemble and geocoding hosts); Census.gov geocoder; Nominatim (OpenStreetMap); MET Norway; MeteoAlarm; MSC GeoMet; JMA; NDMA SACHET, PAGASA and BMKG; Google Weather; Google Pollen; Environment Agency; NIFC; NASA FIRMS; NASA GIBS; RainViewer; Blitzortung; RCC ACIS. A failure in one of these is not diagnosable here.
+**Not checked by this tool:** NOAA river gauges (NWPS); NOAA NCEI; Aviation Weather Center METAR; Open-Meteo (forecast, air quality, marine, flood, ensemble and geocoding hosts); Census.gov geocoder; Nominatim (OpenStreetMap); MET Norway; MeteoAlarm; MSC GeoMet; JMA; NDMA SACHET, PAGASA and BMKG; Google Weather; Google Pollen; Environment Agency; NIFC; NASA FIRMS; NASA GIBS; RainViewer; Blitzortung; RCC ACIS. A failure in one of these is not diagnosable here.
 ````
 
 </details>
@@ -129,5 +129,5 @@ npm run build && npm run examples
 **About the Japanese alerts capture:** Japan Meteorological Agency warnings render with their Japanese name and English gloss only while something is in force. If Tokyo is quiet when you regenerate, the script prints a `⚠️` warning and still counts the capture as a success, because a quiet day is a true answer. Re-run on another day, or rewrite the trip example's alerts answer to say that nothing was in force.
 
 <!-- capture-stamp -->
-*Captured 2026-09-25 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-11-23 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->
