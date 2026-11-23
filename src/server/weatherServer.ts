@@ -721,28 +721,35 @@ export const TOOL_DEFINITIONS = {
         },
         name: {
           type: 'string' as const,
-          description: 'Display name for the location (required when using latitude/longitude). E.g., "My Home in Seattle"'
+          description: 'Display name for the location (required when using latitude/longitude). E.g., "My Home in Seattle"',
+          maxLength: 500
         },
         description: {
           type: 'string' as const,
-          description: 'Short description for natural language matching (e.g., "My sister\'s house", "The lake house"). Helps Claude understand contextual references.'
+          description: 'Short description for natural language matching (e.g., "My sister\'s house", "The lake house"). Helps Claude understand contextual references.',
+          maxLength: 500
         },
         alternateNames: {
           type: 'array' as const,
           description: 'Alternate names/aliases for this location (e.g., ["sister\'s place", "Jane\'s house"]). Enables more natural language queries.',
           items: {
-            type: 'string' as const
-          }
+            type: 'string' as const,
+            maxLength: 100
+          },
+          maxItems: 20
         },
         notes: {
           type: 'string' as const,
-          description: 'Freeform notes about this location for future reference'
+          description: 'Freeform notes about this location for future reference',
+          maxLength: 2000
         },
         activities: {
           type: 'array' as const,
           items: {
-            type: 'string' as const
+            type: 'string' as const,
+            maxLength: 50
           },
+          maxItems: 20,
           description: 'Optional activities you do at this location (e.g., ["boating", "fishing"], ["hiking", "camping"]). Helps AI provide relevant weather information. Each activity max 50 characters.'
         }
       },
