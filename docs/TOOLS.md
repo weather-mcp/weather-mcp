@@ -1012,9 +1012,27 @@ Saves a location to persistent storage (`~/.weather-mcp/locations.json`) for eas
 
 **Shared across your MCP clients.** `~/.weather-mcp/locations.json` is one file per machine, and every client you have configured reads and writes it. A save made in one client is visible to the others on their very next call — the file is read on every operation, so nothing needs restarting. Two saves made at the same moment resolve last-writer-wins on that one update; the file always stays valid. The server creates the file so that only your account can read it. If the file already existed, it keeps the permissions it had.
 
+**Limits.** A save that would go over a limit is refused before anything is written, and the message names the field and the limit. Lengths count characters.
+
+| Field | Limit |
+|---|---|
+| `alias` | 50 characters |
+| `name`, `description` | 500 characters each |
+| `notes` | 2,000 characters |
+| `alternateNames` | 20 entries, 100 characters each |
+| `activities` | 20 entries, 50 characters each |
+| Geocoded `timezone`, country, region and county | 200 characters each |
+| Saved locations | 100 |
+
+The 100-location limit applies to a **new** alias only. An update, a replacement and `remove_saved_location` work at any count, so a file edited by hand past 100 can still be repaired and trimmed. If a geocoded name is longer than 500 characters, pass a shorter `name`.
+
+A file written before these limits existed, or edited by hand, can hold a field that is over its limit. That entry still lists, shows and works in every weather tool. The next `save_location` to that alias is refused, naming the stored field, its limit and its current length, until the same call shortens or clears the field. There is no exemption for a field the call does not change.
+
 **An unreadable file is refused, never replaced.** If `locations.json` exists but cannot be read or parsed, every saved-locations tool reports the error and names the path, and the file is left exactly as it is — not renamed, not copied, not overwritten. A file that does not exist yet is simply an empty store. See [ERROR_HANDLING.md](./ERROR_HANDLING.md#saved-locations-file-unreadable).
 
-**A malformed entry is named, never dropped.** If a hand edit leaves one entry with a value the server cannot show, `list_saved_locations` and `get_saved_location` name that alias and the field at fault, and every other alias keeps working. `remove_saved_location` or a repair in the file clears it. A saved alias whose coordinates are not numbers is refused by every weather tool with a message naming the alias — including when it is `WEATHER_DEFAULT_LOCATION`, which is never geocoded as a place name instead. See [ERROR_HANDLING.md](./ERROR_HANDLING.md#saved-location-entry-malformed).
+**A malformed entry is named, never dropped.** If a hand edit leaves one entry with a value the server cannot show, `list_saved_locations` and `get_saved_location` name that alias and the field at fault, and every other alias keeps working. `remove_saved_location` or a repair in the file clears it. A saved alias whose coordinates are not numbers, or whose whole entry is not an object (a hand-edited `null`, number or string), is refused by every weather tool with a message naming the alias — including when it is `WEATHER_DEFAULT_LOCATION`, which is never geocoded as a place name instead.
+
+**`save_location` replaces an entry the server cannot read.** Saving to that alias with location details (`location_query`, or `latitude` + `longitude` + `name`) writes a fresh record. If the stored entry was not an object, the response says `Replaced a saved entry that could not be read.` If it was an object with one optional field of the wrong type, that field is left out of the new record and the response names it (``Not kept from the stored entry because it was malformed: `alternateNames`.``); a field you supply in the same call is written as usual. A save with no location details cannot repair an entry that has no usable name or coordinates, so it is refused with a message asking for them. See [ERROR_HANDLING.md](./ERROR_HANDLING.md#saved-location-entry-malformed).
 
 **Examples:**
 ```

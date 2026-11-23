@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+A saved-locations file edited by hand could hold an entry that is not a record, such as `"home": null`. One such entry stopped the server from starting when lightning was enabled, broke lookups of other saved locations, and could not be fixed with `save_location`. This release makes every tool name the broken entry and lets `save_location` replace it. Saved locations also gain size limits.
+
+### Fixed
+
+- **The server starts with a broken saved-location entry.** With `get_lightning_activity` enabled, a `null` entry in `locations.json` made the server exit at startup with "Application failed to start". The lightning pre-warm now skips any entry without usable coordinates.
+- **A broken entry no longer breaks other lookups.** A `null` entry made a weather tool fail with an internal `TypeError` whenever a saved-location name did not match an alias exactly. Weather tools now refuse a non-record entry by its alias, and they still find the other saved locations by alias or alternate name. A `WEATHER_DEFAULT_LOCATION` that names such an entry is refused. It is never looked up as a place name.
+- **`get_saved_location` names a broken entry.** It reported "not found" for an entry that exists and that `list_saved_locations` shows.
+- **`save_location` replaces an entry the server cannot read.** Saving with a location over a non-record entry failed, or wrote a record with no `saved_at`. It now writes a complete record and says it replaced an unreadable entry. A save with no location details over such an entry is refused with a message that asks for them.
+- **A full re-save over an entry with one bad field works.** If a stored optional field had the wrong type, saving that alias again failed with a message about a parameter you did not send. The bad field is now left out of the new record and named in the response.
+
+### Changed
+
+- **Saved locations have size limits.** `name` and `description` hold 500 characters, `notes` 2,000, `alternateNames` and `activities` 20 entries each, and one file holds 100 locations. A save over a limit is refused and names the field. The 100-location limit applies to a new alias only: you can always update, replace or remove. See [docs/TOOLS.md](./docs/TOOLS.md#14-save_location).
+- **An entry that is already over a limit blocks the next save to it.** The entry still lists, shows and works in weather tools. A save to that alias is refused, naming the field and its length, until the same call shortens or clears that field.
+- `save_location`'s input schema states the limits (`maxLength`, `maxItems`).
+
 ## [1.35.21] - 2026-11-23
 
 `check_service_status` listed USGS as one of the services this server uses but does not check. The server never contacts USGS: US river gauges come from NOAA's NWPS. Such an entry could send you looking for a USGS outage that could not affect your results. This release removes it, along with code and old hand-run test scripts that nothing used. No other tool output changes.
