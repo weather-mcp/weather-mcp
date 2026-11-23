@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.22] - 2026-11-23
+
 A saved-locations file edited by hand could hold an entry that is not a record, such as `"home": null`. One such entry stopped the server from starting when lightning was enabled, broke lookups of other saved locations, and could not be fixed with `save_location`. This release makes every tool name the broken entry and lets `save_location` replace it. Saved locations also gain size limits.
 
 ### Fixed
@@ -2417,7 +2419,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.21...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.22...HEAD
+[1.35.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.21...v1.35.22
 [1.35.21]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.20...v1.35.21
 [1.35.20]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.19...v1.35.20
 [1.35.19]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.18...v1.35.19
