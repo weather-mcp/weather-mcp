@@ -449,5 +449,84 @@ describe('GoogleWeatherService', () => {
         expect(serialized).not.toContain(FAKE_KEY);
       }
     });
+
+    it('never includes the API key or body text in a thrown message or a log on a wrong-shaped 200', async () => {
+      const bodies: unknown[] = [
+        `<html>key=${FAKE_KEY} BODY-SENTINEL</html>`,
+        { error: { message: `BODY-SENTINEL ${FAKE_KEY}` } },
+        { weatherAlerts: ['BODY-SENTINEL'] }
+      ];
+
+      for (const body of bodies) {
+        mockGet.mockImplementation(() => jsonResponse(body));
+        const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
+
+        let thrown: Error | undefined;
+        try {
+          await service.getPublicAlerts(0, 0);
+        } catch (error) {
+          thrown = error as Error;
+        }
+
+        expect(thrown).toBeDefined();
+        for (const text of [thrown!.message, thrown!.stack ?? '']) {
+          expect(text).not.toContain(FAKE_KEY);
+          expect(text).not.toContain('BODY-SENTINEL');
+        }
+      }
+
+      const allLoggerCalls = [
+        ...loggerSpies.debug.mock.calls,
+        ...loggerSpies.info.mock.calls,
+        ...loggerSpies.warn.mock.calls,
+        ...loggerSpies.error.mock.calls
+      ];
+      for (const args of allLoggerCalls) {
+        const serialized = JSON.stringify(args);
+        expect(serialized).not.toContain(FAKE_KEY);
+        expect(serialized).not.toContain('BODY-SENTINEL');
+      }
+    });
+  });
+
+  describe('wrong-shaped 200 body', () => {
+    const REFUSAL = 'Google Weather API returned an unexpected response.';
+    const rows: Array<[string, unknown]> = [
+      ['HTML page', '<html><body>Maintenance</body></html>'],
+      ['empty body', ''],
+      ['JSON null', null],
+      ['empty object', {}],
+      ['gateway error object', { error: { code: 502, message: 'Bad gateway' } }],
+      ['region code only', { regionCode: 'AU' }],
+      ['region code and empty token', { regionCode: 'AU', nextPageToken: '' }],
+      ['list is null', { weatherAlerts: null }],
+      ['list is a string', { weatherAlerts: 'x' }],
+      ['list is an object', { weatherAlerts: {} }],
+      ['bare array', []],
+      ['null element', { weatherAlerts: [null] }],
+      ['string element', { weatherAlerts: ['x'] }],
+      ['array element', { weatherAlerts: [[]] }],
+      ['one good, one bad element', { weatherAlerts: [{ alertId: 'a' }, null] }]
+    ];
+
+    it.each(rows)('refuses %s: exact message, one request, warn not error, nothing cached', async (_name, body) => {
+      mockGet.mockImplementation(() => jsonResponse(body));
+      const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
+
+      await expect(service.getPublicAlerts(10, 10)).rejects.toThrow(
+        new RegExp(`^${REFUSAL.replace(/\./g, '\\.')}$`)
+      );
+
+      expect(mockGet).toHaveBeenCalledTimes(1);
+      expect(loggerSpies.error).not.toHaveBeenCalled();
+      expect(loggerSpies.warn).toHaveBeenCalledTimes(1);
+      expect(loggerSpies.warn.mock.calls[0][1]).toMatchObject({ securityEvent: true });
+
+      mockGet.mockImplementation(() => jsonResponse({ weatherAlerts: [], regionCode: 'AU' }));
+      const second = await service.getPublicAlerts(10, 10);
+
+      expect(second).toEqual({ alerts: [], covered: true });
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
   });
 });
