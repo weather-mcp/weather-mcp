@@ -110,6 +110,39 @@ const KEY_REJECTION_MARKERS = ['API_KEY_INVALID', 'API key not valid', 'PERMISSI
 // was found the same way at that feature's live-verification task.)
 const LOCATION_UNSUPPORTED_MARKER = 'Information is not supported for this location';
 
+/**
+ * The one message for a 200 whose body is not the alerts envelope. Fixed text:
+ * nothing from the body, the URL or the key ever reaches it.
+ */
+const UNEXPECTED_RESPONSE_MESSAGE = 'Google Weather API returned an unexpected response.';
+
+/**
+ * What the transport learned: the region is uncovered (the live-verified 404),
+ * or Google answered 200 with a body not yet read. Kept apart from the body so
+ * a `null` or `''` body can never be mistaken for "uncovered".
+ */
+type PublicAlertsAnswer = { covered: false } | { covered: true; body: unknown };
+
+/** A JSON object — not `null`, not an array, not a string (G4, G111: `''` is the real empty body). */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The verified alerts envelope: a plain object whose `weatherAlerts` is an
+ * array of plain objects. A quiet covered point sends `weatherAlerts: []`
+ * (live-verified 2026-08-18 and 2026-11-23), so a `regionCode`-only body is
+ * refused rather than read as quiet. **Revisit trigger:** a live 200 from
+ * `publicAlerts:lookup` that carries `regionCode` and no `weatherAlerts`.
+ */
+function isPublicAlertsEnvelope(
+  body: unknown
+): body is GoogleWeatherAlertsResponse & { weatherAlerts: GoogleWeatherAlert[] } {
+  return isPlainObject(body)
+    && Array.isArray(body.weatherAlerts)
+    && body.weatherAlerts.every(isPlainObject);
+}
+
 export class GoogleWeatherService {
   private client: AxiosInstance;
   private cache: Cache<PublicAlertsResult>;
@@ -165,10 +198,14 @@ export class GoogleWeatherService {
    *   - a region Google does not cover → HTTP 404 `NOT_FOUND` (not the
    *     `regionCode`-only 200 the documentation implied)
    *     → `{ alerts: [], covered: false }`.
+   *   - any other 200 body (an HTML page, a gateway's error object, `''`,
+   *     `null`, no `weatherAlerts` array, or an element that is not an object)
+   *     throws `UNEXPECTED_RESPONSE_MESSAGE` and is **not** cached.
    * **No retries.**
    *
    * @throws {GoogleWeatherKeyRejectedError} the configured key was rejected
-   * @throws {Error} no key configured, invalid coordinates, or any other failure
+   * @throws {Error} no key configured, invalid coordinates, a 200 body that is
+   *   not the alerts envelope, or any other failure
    */
   async getPublicAlerts(latitude: number, longitude: number): Promise<PublicAlertsResult> {
     validateLatitude(latitude);
@@ -201,15 +238,55 @@ export class GoogleWeatherService {
   }
 
   private async fetchPublicAlerts(latitude: number, longitude: number): Promise<PublicAlertsResult> {
+    const redacted = redactCoordinatesForLogging(latitude, longitude);
+    logger.info('Querying Google Weather public alerts', { lat: redacted.lat, lon: redacted.lon });
+
+    const answer = await this.requestPublicAlerts(latitude, longitude);
+    if (!answer.covered) {
+      return { alerts: [], covered: false };
+    }
+
+    // A 200 whose body is not the verified envelope is an error, never an
+    // empty list (G4): printing "no alerts" for a shape this code has never
+    // seen is a fabricated all-clear on safety data. It is thrown here,
+    // outside the request's `catch`, so it is never mapped to the generic
+    // failure text, never retried and never cached. Nothing from the body is
+    // logged.
+    if (!isPublicAlertsEnvelope(answer.body)) {
+      logger.warn('Google Weather API returned an unexpected response', {
+        lat: redacted.lat,
+        lon: redacted.lon,
+        securityEvent: true
+      });
+      throw new Error(UNEXPECTED_RESPONSE_MESSAGE);
+    }
+
+    if (answer.body.weatherAlerts.length === 0) {
+      // A 200 with an empty list means Google served this location — it simply
+      // has nothing active. That is a real all-clear, unlike the 404 below.
+      logger.info('Google Weather API returned no active alerts for this location');
+      return { alerts: [], covered: true };
+    }
+
+    return { alerts: answer.body.weatherAlerts, covered: true };
+  }
+
+  /**
+   * The request alone: resolves the 200 body unread, resolves the
+   * uncovered-region 404 to `{ covered: false }`, and maps every other failure
+   * to a fixed message. The body is checked by the caller, outside this
+   * `catch`.
+   */
+  private async requestPublicAlerts(latitude: number, longitude: number): Promise<PublicAlertsAnswer> {
     // The key rides in the request params, not the logged metadata below —
     // never log or throw this value (see module doc comment).
     const key = this.apiKey as string; // isKeyAvailable() already checked by the caller
 
-    const redacted = redactCoordinatesForLogging(latitude, longitude);
-    logger.info('Querying Google Weather public alerts', { lat: redacted.lat, lon: redacted.lon });
-
     try {
-      const response = await this.client.get<GoogleWeatherAlertsResponse>(PUBLIC_ALERTS_URL, {
+      // **Live-verified 2026-08-18:** the array field is `weatherAlerts`, not
+      // the `alerts` the design plan's web-verified shape claimed. Reading the
+      // documented name returned an empty array for every location on Earth.
+      const response = await this.client.get<unknown>(PUBLIC_ALERTS_URL, {
         params: {
           key,
           'location.latitude': latitude,
@@ -217,19 +294,7 @@ export class GoogleWeatherService {
           languageCode: 'en'
         }
       });
-
-      // **Live-verified 2026-08-18:** the array field is `weatherAlerts`, not
-      // the `alerts` the design plan's web-verified shape claimed. Reading the
-      // documented name returned an empty array for every location on Earth.
-      const alerts = response.data?.weatherAlerts;
-      if (!alerts || alerts.length === 0) {
-        // A 200 means Google served this location — it simply has nothing
-        // active. That is a real all-clear, unlike the 404 below.
-        logger.info('Google Weather API returned no active alerts for this location');
-        return { alerts: [], covered: true };
-      }
-
-      return { alerts, covered: true };
+      return { covered: true, body: response.data };
     } catch (error) {
       // Deliberately do not pass the raw axios error object to the logger —
       // it carries the request config (including the key in `params`). Only
@@ -241,7 +306,7 @@ export class GoogleWeatherService {
       // so the caller caches it and stops re-probing.
       if (isLocationUnsupported(error)) {
         logger.info('Google Weather has no alert coverage for this location', { status });
-        return { alerts: [], covered: false };
+        return { covered: false };
       }
 
       logger.error('Google Weather API request failed', undefined, { status, code });

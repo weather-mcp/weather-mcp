@@ -50,7 +50,7 @@ import type { GoogleWeatherAlertsResponse } from '../../src/types/googleWeather.
 
 const FAKE_KEY = 'SUPER-SECRET-TEST-KEY-abc123';
 
-function jsonResponse(data: GoogleWeatherAlertsResponse) {
+function jsonResponse(data: unknown) {
   return Promise.resolve({ data, status: 200 });
 }
 
@@ -141,28 +141,34 @@ describe('GoogleWeatherService', () => {
       expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
-    it('regionCode-only body resolves to a covered-but-empty result and is cached', async () => {
+    it('a regionCode-only body is refused, not read as quiet, and is not cached', async () => {
       mockGet.mockImplementation(() => jsonResponse({ regionCode: 'AU' }));
       const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
 
-      const first = await service.getPublicAlerts(0, -160);
+      await expect(service.getPublicAlerts(0, -160)).rejects.toThrow(
+        'Google Weather API returned an unexpected response.'
+      );
+
+      mockGet.mockImplementation(() => jsonResponse({ weatherAlerts: [], regionCode: 'AU' }));
       const second = await service.getPublicAlerts(0, -160);
 
-      expect(first).toEqual({ alerts: [], covered: true });
       expect(second).toEqual({ alerts: [], covered: true });
-      expect(mockGet).toHaveBeenCalledTimes(1);
+      expect(mockGet).toHaveBeenCalledTimes(2);
     });
 
-    it('caches an absent weatherAlerts field (empty body) as covered-empty and does not re-probe', async () => {
+    it('an empty object body is refused and is not cached', async () => {
       mockGet.mockImplementation(() => jsonResponse({}));
       const service = new GoogleWeatherService({ apiKey: FAKE_KEY });
 
-      const first = await service.getPublicAlerts(10, 10);
+      await expect(service.getPublicAlerts(10, 10)).rejects.toThrow(
+        'Google Weather API returned an unexpected response.'
+      );
+
+      mockGet.mockImplementation(() => jsonResponse({ weatherAlerts: [], regionCode: 'AU' }));
       const second = await service.getPublicAlerts(10, 10);
 
-      expect(first).toEqual({ alerts: [], covered: true });
       expect(second).toEqual({ alerts: [], covered: true });
-      expect(mockGet).toHaveBeenCalledTimes(1);
+      expect(mockGet).toHaveBeenCalledTimes(2);
     });
 
     it('caches an empty weatherAlerts array as covered-empty and does not re-probe', async () => {
