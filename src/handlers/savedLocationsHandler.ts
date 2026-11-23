@@ -609,4 +609,3 @@ export async function handleRemoveSavedLocation(
     ]
   };
 }
-

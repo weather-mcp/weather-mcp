@@ -243,4 +243,3 @@ export function calculateGeohashSubscriptions(
 
   return result;
 }
-
