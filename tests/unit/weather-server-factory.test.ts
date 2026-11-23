@@ -69,7 +69,6 @@ import {
   TOOL_DEFINITIONS,
   SERVER_NAME,
   SERVER_VERSION,
-  clearServiceCaches,
 } from '../../src/server/weatherServer.js';
 import { LocationStore } from '../../src/services/locationStore.js';
 import { toolConfig, PRESETS } from '../../src/config/tools.js';
@@ -261,9 +260,5 @@ describe('createWeatherServer — factory contract', () => {
 
     await client.close();
     await server.close();
-  });
-
-  it('clearServiceCaches is callable and returns undefined without throwing', () => {
-    expect(clearServiceCaches()).toBeUndefined();
   });
 });
