@@ -176,6 +176,9 @@ key is unrestricted or restricted to the Weather API — a key restricted to the
 Pollen API will not work here.
 ```
 
+An answer from Google that is not the alerts list is reported as
+`Google Weather API returned an unexpected response.`, never as "no alerts".
+
 Quota exhaustion, timeouts, and network failures surface the same way. This is
 deliberate: pollen is a garnish on an air-quality answer and degrades silently,
 but alerts *are* the answer, and a silent "✅ no alerts" produced by a failed

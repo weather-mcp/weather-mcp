@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A broken Google Weather alerts answer no longer reads as "no alerts".** With `GOOGLE_WEATHER_API_KEY` set, `get_alerts` and the alerts section of `get_weather_summary` printed the green all-clear when Google answered with a maintenance page, a gateway error, an empty body or an answer with no alert list, and served it for five minutes. An alert that was not a record caused an internal error. Both now report `Google Weather API returned an unexpected response.` and cache nothing.
+
 ## [1.35.22] - 2026-11-23
 
 A saved-locations file edited by hand could hold an entry that is not a record, such as `"home": null`. One such entry stopped the server from starting when lightning was enabled, broke lookups of other saved locations, and could not be fixed with `save_location`. This release makes every tool name the broken entry and lets `save_location` replace it. Saved locations also gain size limits.

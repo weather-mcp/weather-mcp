@@ -280,6 +280,34 @@ MeteoAlarm feed returned an unexpected shape
 this one as `## alerts (unavailable)` with the same message. Alerts are safety data, so a failed
 or unrecognised fetch is always an error and never an empty "no alerts" answer.
 
+### Google Weather (Elsewhere) Errors
+
+With `GOOGLE_WEATHER_API_KEY` set, `get_alerts` for a point outside the keyless authorities, and
+the alerts section of `get_weather_summary` there, read the Google Weather API. No call is retried.
+A place Google does not cover is not an error: it renders "No alert coverage for this location",
+which says it is not an all-clear. A 200 answer that is not the alerts list (a maintenance page, a
+gateway's error object, an empty body, an answer with a region code and no alert list, or an alert
+that is not a record) is an error, never an empty answer. Every message is fixed text written by
+this server. Text from Google, or from a gateway in front of it, is never shown, and the key never
+appears.
+
+```
+Invalid query parameters for Google Weather API.
+Google Weather API quota exceeded. Please try again later.
+Google Weather API request timed out. The service may be temporarily unavailable.
+Google Weather API returned an error response.
+Failed to reach Google Weather API. Please check your network connection.
+Failed to fetch weather alerts from Google Weather API.
+Google Weather API returned an unexpected response.
+```
+
+A rejected key has its own message, given in
+[`GOOGLE_WEATHER_KEY_SETUP.md`](./GOOGLE_WEATHER_KEY_SETUP.md#verifying-it-works).
+
+`get_alerts` fails with the message. `get_weather_summary` keeps its other sections and renders
+this one as `## alerts (unavailable)` with the same message. Alerts are safety data, so a failed
+or unrecognised answer is always an error and never an empty "no alerts" answer.
+
 ### AviationWeather (METAR) Errors
 
 Only `get_current_conditions` with `source="metar"` reads NOAA's Aviation Weather Center;
