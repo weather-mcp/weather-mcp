@@ -244,37 +244,3 @@ export function calculateGeohashSubscriptions(
   return result;
 }
 
-/**
- * Check if a point is within a radius of a center point
- * Uses Haversine formula for great-circle distance
- *
- * @param centerLat Center latitude
- * @param centerLon Center longitude
- * @param pointLat Point latitude
- * @param pointLon Point longitude
- * @param radiusKm Radius in kilometers
- * @returns true if point is within radius
- */
-export function isWithinRadius(
-  centerLat: number,
-  centerLon: number,
-  pointLat: number,
-  pointLon: number,
-  radiusKm: number
-): boolean {
-  const R = 6371; // Earth's radius in km
-  const dLat = ((pointLat - centerLat) * Math.PI) / 180;
-  const dLon = ((pointLon - centerLon) * Math.PI) / 180;
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((centerLat * Math.PI) / 180) *
-      Math.cos((pointLat * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-
-  return distance <= radiusKm;
-}

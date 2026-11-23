@@ -8,8 +8,7 @@ import {
   calculateBoundingBox,
   getGeohashNeighbors,
   computeGeohashTiles,
-  calculateGeohashSubscriptions,
-  isWithinRadius
+  calculateGeohashSubscriptions
 } from '../../src/utils/geohash.js';
 
 describe('Geohash Utilities', () => {
@@ -287,100 +286,6 @@ describe('Geohash Utilities', () => {
 
       expect(result1.size).toBe(result2.size);
       expect(Array.from(result1).sort()).toEqual(Array.from(result2).sort());
-    });
-  });
-
-  describe('isWithinRadius', () => {
-    it('should return true for same point', () => {
-      const result = isWithinRadius(40.7128, -74.006, 40.7128, -74.006, 1);
-
-      expect(result).toBe(true);
-    });
-
-    it('should return false for distant point', () => {
-      // New York to Los Angeles (~4000 km)
-      const result = isWithinRadius(40.7128, -74.006, 34.0522, -118.2437, 1000);
-
-      expect(result).toBe(false);
-    });
-
-    it('should return true for nearby point', () => {
-      // Two points ~10km apart in NYC
-      const result = isWithinRadius(40.7128, -74.006, 40.7589, -73.9851, 20);
-
-      expect(result).toBe(true);
-    });
-
-    it('should handle exact boundary (just inside)', () => {
-      // Calculate a point exactly ~100km away using approximate lat/lon math
-      const lat2 = 40.7128 + (100 * 360) / 40000;
-      const result = isWithinRadius(40.7128, -74.006, lat2, -74.006, 100.1);
-
-      expect(result).toBe(true);
-    });
-
-    it('should handle exact boundary (just outside)', () => {
-      const lat2 = 40.7128 + (100 * 360) / 40000;
-      const result = isWithinRadius(40.7128, -74.006, lat2, -74.006, 99.9);
-
-      expect(result).toBe(false);
-    });
-
-    it('should handle equator crossing', () => {
-      const result = isWithinRadius(1, 0, -1, 0, 250);
-
-      expect(result).toBe(true);
-    });
-
-    it('should handle date line crossing', () => {
-      const result = isWithinRadius(0, 179, 0, -179, 250);
-
-      expect(result).toBe(true);
-    });
-
-    it('should handle polar region', () => {
-      // At 85° latitude, longitude lines converge significantly
-      // 90° longitude difference at 85° lat ≈ 873 km apart
-      // Using realistic radius for this distance
-      const result = isWithinRadius(85, 0, 85, 90, 900);
-
-      expect(result).toBe(true);
-    });
-
-    it('should handle negative coordinates', () => {
-      // Sydney to Melbourne (~700km)
-      const result = isWithinRadius(-33.8688, 151.2093, -37.8136, 144.9631, 800);
-
-      expect(result).toBe(true);
-    });
-
-    it('should calculate accurate distance', () => {
-      // Use Haversine formula to verify approximate distance
-      // NYC to Boston is ~300km
-      const result = isWithinRadius(40.7128, -74.006, 42.3601, -71.0589, 350);
-
-      expect(result).toBe(true);
-    });
-
-    it('should handle zero radius', () => {
-      const result = isWithinRadius(40.7128, -74.006, 40.7128, -74.006, 0);
-
-      // Same point should be within 0 radius (distance = 0)
-      expect(result).toBe(true);
-    });
-
-    it('should handle very large radius', () => {
-      // Opposite sides of Earth
-      const result = isWithinRadius(0, 0, 0, 180, 25000);
-
-      expect(result).toBe(true);
-    });
-
-    it('should return false for antipodal points with small radius', () => {
-      // Opposite sides of Earth (~20000km apart)
-      const result = isWithinRadius(0, 0, 0, 180, 10000);
-
-      expect(result).toBe(false);
     });
   });
 
