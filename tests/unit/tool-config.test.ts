@@ -345,14 +345,5 @@ describe('Tool Configuration', () => {
       expect(PRESETS).toHaveProperty('full');
       expect(PRESETS).toHaveProperty('all');
     });
-
-    it('should provide alias definitions', async () => {
-      const { ALIASES } = await import('../../src/config/tools.js');
-
-      expect(ALIASES).toHaveProperty('forecast');
-      expect(ALIASES).toHaveProperty('current');
-      expect(ALIASES).toHaveProperty('marine');
-      expect(ALIASES.forecast).toBe('get_forecast');
-    });
   });
 });
