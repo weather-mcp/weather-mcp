@@ -328,7 +328,7 @@ describe('Distance Calculation Utilities', () => {
   });
 
   describe('Consistency Across Implementations', () => {
-    it('should match geohash.ts isWithinRadius implementation', () => {
+    it('should compute the haversine distance used by the geohash tile search', () => {
       // Test that calculateDistance matches the Haversine in geohash.ts
       // Both should use Earth radius = 6371 km
 
@@ -339,7 +339,6 @@ describe('Distance Calculation Utilities', () => {
 
       const distance = calculateDistance(lat1, lon1, lat2, lon2);
 
-      // Should be same as geohash.isWithinRadius calculation
       expect(distance).toBeGreaterThan(3900);
       expect(distance).toBeLessThan(4000);
     });

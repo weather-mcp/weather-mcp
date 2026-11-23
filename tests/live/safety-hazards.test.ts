@@ -319,20 +319,4 @@ describe('Wildfire Information (v1.6.0)', () => {
       expect(text).toContain('1 km');
     });
   });
-
-  describe('NIFC Service Health', () => {
-    it('should verify NIFC service is operational', async () => {
-      const status = await nifcService.checkServiceStatus();
-
-      expect(status).toBeDefined();
-      expect(status.operational).toBeDefined();
-      expect(status.message).toBeDefined();
-      expect(status.timestamp).toBeDefined();
-
-      console.log('\n=== NIFC Service Status ===');
-      console.log(`Operational: ${status.operational}`);
-      console.log(`Message: ${status.message}`);
-      console.log(`Timestamp: ${status.timestamp}`);
-    });
-  });
 });

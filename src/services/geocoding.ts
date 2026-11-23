@@ -566,15 +566,4 @@ export class GeocodingService {
       `- Try providing coordinates directly (latitude, longitude)`
     );
   }
-
-  /**
-   * Get service information for debugging
-   */
-  getServiceInfo(): string {
-    return `Multi-Service Geocoding:\n` +
-           `- Census.gov (US locations, high accuracy)\n` +
-           `- Nominatim/OpenStreetMap (worldwide, 1 req/sec limit)\n` +
-           `- Open-Meteo (worldwide fallback)\n` +
-           `Automatic fallback strategy based on query characteristics`;
-  }
 }

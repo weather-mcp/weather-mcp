@@ -171,19 +171,6 @@ export class RainViewerService {
   }
 
   /**
-   * Build tile URL for a specific frame
-   * RainViewer uses tile-based system (similar to web maps)
-   */
-  buildTileUrl(frame: RainViewerFrame, size: number = 512, zoom: number = 4): string {
-    // For global view, we use zoom 4 and tile coordinates for coverage
-    // Format: {host}/v2/radar/{timestamp}/{size}/{zoom}/{x}/{y}/tile.png
-    const centerX = Math.floor(2 ** (zoom - 1));
-    const centerY = Math.floor(2 ** (zoom - 1));
-
-    return `${this.tileHost}${frame.path}/${size}/${zoom}/${centerX}/${centerY}/4/1_1.png`;
-  }
-
-  /**
    * Build tile URL for a specific coordinate
    * Clamps latitude to Web Mercator projection range to prevent NaN tile coordinates,
    * and keeps the x/y tile indices on the grid (0 to 2 ** zoom - 1)

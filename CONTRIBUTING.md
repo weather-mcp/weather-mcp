@@ -52,7 +52,7 @@ npm run build
 
 4. Run tests:
 ```bash
-npx tsx tests/test_noaa_api.ts
+npm test
 ```
 
 ## Coding Standards
@@ -104,9 +104,9 @@ weather-mcp/
 │   └── utils/
 │       └── units.ts       # Unit conversion utilities
 ├── tests/                 # Test files
-│   ├── test_noaa_api.ts   # NOAA API test script
-│   ├── test_openmeteo.ts  # Open-Meteo API test script
-│   └── test_historical_mcp.ts  # Historical weather MCP test
+│   ├── unit/              # Fast, offline; HTTP mocked (npm test)
+│   ├── integration/       # Offline, loopback only (npm test)
+│   └── live/              # Real upstreams, run by hand (npm run test:live)
 ├── docs/                  # User-facing documentation
 │   ├── TOOLS.md           # Per-tool reference
 │   ├── CLIENT_SETUP.md    # Setup for 8 MCP clients
@@ -128,17 +128,21 @@ npm run build
 npm run lint
 ```
 
-3. Test with the NOAA API:
+3. Run the test suite (unit and integration, offline):
 ```bash
-npx tsx tests/test_noaa_api.ts
+npm test
 ```
+
+   To check against the real upstream APIs, run `npm run test:live`. It is slower and some
+   tests can flake.
 
 4. Test manually with Claude Code (if possible)
 
 ### Adding Tests
 
 When adding new features:
-- Add test cases to `tests/test_noaa_api.ts` for new service methods
+- Add tests under `tests/unit/` for new service methods. They run offline; mock HTTP the way the
+  existing tests in that directory do
 - Update `docs/testing/TESTING_GUIDE.md` with new manual test scenarios
 - Ensure all existing tests still pass
 

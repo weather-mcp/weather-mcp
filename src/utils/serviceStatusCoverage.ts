@@ -25,7 +25,6 @@ const entry = (provider: string, sources: string[], hosts: string[]): NotChecked
 
 export const STATUS_NOT_CHECKED: readonly NotCheckedUpstream[] = Object.freeze([
   entry('NOAA river gauges (NWPS)', ['noaa.ts'], ['api.water.noaa.gov']),
-  entry('USGS', ['noaa.ts'], ['waterservices.usgs.gov']),
   entry('NOAA NCEI', ['ncei.ts'], ['www.ncei.noaa.gov']),
   entry('Aviation Weather Center METAR', ['aviationWeather.ts'], ['aviationweather.gov']),
   entry(

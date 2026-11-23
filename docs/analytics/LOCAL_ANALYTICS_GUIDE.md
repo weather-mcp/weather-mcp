@@ -59,22 +59,7 @@ unset, nothing is sent and the server logs `Analytics disabled by user preferenc
 
 ## Testing Analytics Integration
 
-### Option 1: Quick Test Script
-
-Run the provided test script to verify analytics are working:
-
-```bash
-npx tsx test-mcp-with-analytics.ts
-```
-
-This will:
-- Run 3 sample MCP tool calls (check_service_status, 2x get_forecast)
-- Track analytics events with detailed metadata
-- Buffer events in memory
-- Flush events to the local analytics server
-- Display results and next steps
-
-### Option 2: Using the MCP Server Directly
+### Using the MCP Server Directly
 
 1. **Build the server:**
    ```bash

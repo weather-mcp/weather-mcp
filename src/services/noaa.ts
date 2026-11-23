@@ -13,8 +13,7 @@ import type {
   NOAAErrorResponse,
   NWPSGauge,
   NWPSGaugesResponse,
-  NWPSStageFlowResponse,
-  USGSIVResponse
+  NWPSStageFlowResponse
 } from '../types/noaa.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig, getHistoricalDataTTL } from '../config/cache.js';
@@ -88,7 +87,6 @@ export interface NOAAServiceConfig {
   userAgent?: string;
   baseURL?: string;
   nwpsBaseURL?: string;
-  usgsBaseURL?: string;
   timeout?: number;
   maxRetries?: number;
 }
@@ -112,7 +110,6 @@ function isTransientFailure(error: unknown): boolean {
 export class NOAAService {
   private client: AxiosInstance;
   private nwpsClient: AxiosInstance; // For NOAA water/river data
-  private usgsClient: AxiosInstance; // For USGS streamflow data
   private maxRetries: number;
   private cache: Cache;
 
@@ -121,7 +118,6 @@ export class NOAAService {
       userAgent = '(weather-mcp, contact@example.com)',
       baseURL = 'https://api.weather.gov',
       nwpsBaseURL = 'https://api.water.noaa.gov/nwps/v1',
-      usgsBaseURL = 'https://waterservices.usgs.gov',
       timeout = CacheConfig.apiTimeoutMs,
       maxRetries = 3
     } = config;
@@ -151,16 +147,6 @@ export class NOAAService {
       adapter: withRequestDeadline(),
     });
 
-    // USGS Water Services client for streamflow data
-    this.usgsClient = axios.create({
-      baseURL: usgsBaseURL,
-      timeout,
-      headers: {
-        'User-Agent': userAgent
-      },
-      adapter: withRequestDeadline(),
-    });
-
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       response => response,
@@ -168,11 +154,6 @@ export class NOAAService {
     );
 
     this.nwpsClient.interceptors.response.use(
-      response => response,
-      error => this.handleError(error)
-    );
-
-    this.usgsClient.interceptors.response.use(
       response => response,
       error => this.handleError(error)
     );
@@ -424,26 +405,6 @@ export class NOAAService {
   }
 
   /**
-   * Get forecast for a location using lat/lon (convenience method)
-   * This combines getPointData and getForecast
-   */
-  async getForecastByCoordinates(latitude: number, longitude: number, units: 'us' | 'si' = 'us'): Promise<ForecastResponse> {
-    const pointData = await this.getPointData(latitude, longitude);
-    const { gridId, gridX, gridY } = pointData.properties;
-    return this.getForecast(gridId, gridX, gridY, units);
-  }
-
-  /**
-   * Get hourly forecast for a location using lat/lon (convenience method)
-   * This combines getPointData and getHourlyForecast
-   */
-  async getHourlyForecastByCoordinates(latitude: number, longitude: number, units: 'us' | 'si' = 'us'): Promise<ForecastResponse> {
-    const pointData = await this.getPointData(latitude, longitude);
-    const { gridId, gridX, gridY } = pointData.properties;
-    return this.getHourlyForecast(gridId, gridX, gridY, units);
-  }
-
-  /**
    * Get gridpoint data for a location using grid coordinates
    * Contains detailed forecast data including fire weather indices
    */
@@ -587,31 +548,6 @@ export class NOAAService {
     }
 
     return this.makeRequest<ObservationCollectionResponse>(url);
-  }
-
-  /**
-   * Get current conditions for a location (convenience method)
-   * This combines getStations and getLatestObservation
-   */
-  async getCurrentConditions(latitude: number, longitude: number): Promise<ObservationResponse> {
-    const stations = await this.getStations(latitude, longitude);
-
-    if (!stations.features || stations.features.length === 0) {
-      throw new Error('No weather stations found near the specified location.');
-    }
-
-    // Try the first station, fallback to others if it fails
-    for (const station of stations.features) {
-      try {
-        const stationId = station.properties.stationIdentifier;
-        return await this.getLatestObservation(stationId);
-      } catch {
-        // Try next station
-        continue;
-      }
-    }
-
-    throw new Error('Unable to retrieve current conditions from nearby stations.');
   }
 
   /**
@@ -816,94 +752,5 @@ export class NOAAService {
     }
 
     return result;
-  }
-
-  /**
-   * USGS Water Services Methods for Streamflow Data
-   */
-
-  /**
-   * Get real-time streamflow data for sites within a bounding box
-   * @param west Western longitude boundary
-   * @param south Southern latitude boundary
-   * @param east Eastern longitude boundary
-   * @param north Northern latitude boundary
-   * @returns USGS instantaneous values response with streamflow data
-   */
-  async getUSGSStreamflow(
-    west: number,
-    south: number,
-    east: number,
-    north: number
-  ): Promise<USGSIVResponse> {
-    // Validate bounding box
-    validateLongitude(west);
-    validateLongitude(east);
-    validateLatitude(south);
-    validateLatitude(north);
-
-    if (west >= east) {
-      throw new Error('Invalid bounding box: west longitude must be less than east longitude');
-    }
-    if (south >= north) {
-      throw new Error('Invalid bounding box: south latitude must be less than north latitude');
-    }
-
-    // USGS API limits: product of lat/lon range cannot exceed 25 degrees
-    const latRange = north - south;
-    const lonRange = east - west;
-    if (latRange * lonRange > 25) {
-      throw new Error('Bounding box too large: product of latitude and longitude ranges cannot exceed 25 degrees');
-    }
-
-    // Check cache first (if enabled)
-    const bboxKey = `${west},${south},${east},${north}`;
-    if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('usgs-streamflow', bboxKey);
-      const cached = this.cache.get(cacheKey);
-      if (cached) {
-        return cached as USGSIVResponse;
-      }
-
-      const url = `/nwis/iv/?format=json&bBox=${bboxKey}&parameterCd=00060&siteStatus=active`;
-      const response = await this.usgsClient.get<USGSIVResponse>(url);
-      const result = response.data;
-
-      // Cache for 15 minutes (current data)
-      this.cache.set(cacheKey, result, 900000);
-      return result;
-    }
-
-    const url = `/nwis/iv/?format=json&bBox=${bboxKey}&parameterCd=00060&siteStatus=active`;
-    const response = await this.usgsClient.get<USGSIVResponse>(url);
-    return response.data;
-  }
-
-  /**
-   * Get real-time streamflow data for a specific USGS site
-   * @param siteNumber USGS site number (e.g., "01646500")
-   * @returns USGS instantaneous values response with streamflow data
-   */
-  async getUSGSStreamflowForSite(siteNumber: string): Promise<USGSIVResponse> {
-    // Check cache first (if enabled)
-    if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('usgs-site-streamflow', siteNumber);
-      const cached = this.cache.get(cacheKey);
-      if (cached) {
-        return cached as USGSIVResponse;
-      }
-
-      const url = `/nwis/iv/?format=json&sites=${siteNumber}&parameterCd=00060&siteStatus=active`;
-      const response = await this.usgsClient.get<USGSIVResponse>(url);
-      const result = response.data;
-
-      // Cache for 15 minutes (current data)
-      this.cache.set(cacheKey, result, 900000);
-      return result;
-    }
-
-    const url = `/nwis/iv/?format=json&sites=${siteNumber}&parameterCd=00060&siteStatus=active`;
-    const response = await this.usgsClient.get<USGSIVResponse>(url);
-    return response.data;
   }
 }

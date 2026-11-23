@@ -5953,7 +5953,7 @@ one of them.
 and a deletion is a deliberate edit that a diff review sees. 2026-09-26: the same
 deletion now goes red naming `api.water.noaa.gov` and `waterservices.usgs.gov`.
 
-**Status:** fixed in `9fbd091` (T2, plan-service-status-host-inventory). Related: [G45] (the check cannot reach the missing
+**Status:** fixed in `9fbd091` (T2, plan-service-status-host-inventory). The USGS entry this evidence names was removed with its client on 2026-11-23 (`608fddd`); the guard required both to leave in one commit, as this entry predicts. Related: [G45] (the check cannot reach the missing
 atomic fact), [G96] (an assertion satisfied by the wrong neighbour), [G32]
 (mutate the plausible failure shape).
 
@@ -6815,7 +6815,7 @@ Know what the zero does not cover, too. Measured 2026-10-03 (diff review M1, rep
 
 **Evidence:** 2026-10-02, eslint-toolchain design rev 1 versus the rev 2 probe; mutation proofs at T2 (`5fdc37b`) and on the finished tree at T8 (`.devdocs/archive/completed/qa-eslint-toolchain.md` §2). Also observed: ESLint 10 dropped the `unix` formatter from core, so `eslint -f unix` errors — use `-f json`.
 
-**Typed rules in a throwaway config (2026-10-11, `7f67a51`; plan-review gemini R1):** a scratch flat config that names `@typescript-eslint/no-misused-promises` must `extends: [tseslint.configs.base]` — that registers the plugin and the parser. `parserOptions.projectService` alone leaves Espree as the parser and ESLint exits 2 on config, which is loud but easy to misread as "the rule failed". Run it with `--no-config-lookup -c <file>`. Expect two "unused eslint-disable" reports in `src/services/geocoding.ts` from such a run: their directives name rules the scratch config does not enable, so they are config artefacts, not findings. The committed config's positive control (2026-10-15, eslint-typed-rules `92cf6d8`): a bare promise call and a `setInterval(async () => …)` appended to `src/utils/finiteSample.ts` fire `no-floating-promises` and `no-misused-promises`; an un-awaited `expect(…).rejects` in `tests/unit/cache.test.ts` fires `no-floating-promises`; a `.ts` file in a new `tests/<dir>/` is a parse error ("not found in any of the provided project(s)"), the control that `tsconfig.eslint.json`'s include list cannot drift silently. Restore by `cp` ([G27]). Record: `.devdocs/archive/completed/qa-eslint-typed-rules.md` §2. A `--no-config-lookup` scratch probe also drops the repo config's `ignores`, so pointing it at bare `tests` parse-errors on the legacy `tests/*.ts` drivers and `tests/archived-cdo-tests/` (32 errors, none a finding): name the four included directories instead, or copy the ignores.
+**Typed rules in a throwaway config (2026-10-11, `7f67a51`; plan-review gemini R1):** a scratch flat config that names `@typescript-eslint/no-misused-promises` must `extends: [tseslint.configs.base]` — that registers the plugin and the parser. `parserOptions.projectService` alone leaves Espree as the parser and ESLint exits 2 on config, which is loud but easy to misread as "the rule failed". Run it with `--no-config-lookup -c <file>`. Expect two "unused eslint-disable" reports in `src/services/geocoding.ts` from such a run: their directives name rules the scratch config does not enable, so they are config artefacts, not findings. The committed config's positive control (2026-10-15, eslint-typed-rules `92cf6d8`): a bare promise call and a `setInterval(async () => …)` appended to `src/utils/finiteSample.ts` fire `no-floating-promises` and `no-misused-promises`; an un-awaited `expect(…).rejects` in `tests/unit/cache.test.ts` fires `no-floating-promises`; a `.ts` file in a new `tests/<dir>/` is a parse error ("not found in any of the provided project(s)"), the control that `tsconfig.eslint.json`'s include list cannot drift silently. Restore by `cp` ([G27]). Record: `.devdocs/archive/completed/qa-eslint-typed-rules.md` §2. A `--no-config-lookup` scratch probe also drops the repo config's `ignores`; that once parse-errored bare `tests` on the legacy `tests/*.ts` drivers and `tests/archived-cdo-tests/`. Both were deleted, with their ignores, on 2026-11-23 (dead-code-ungated-files `55afdcd`), so `tests/` now holds only included directories. The committed config's control for that door: a planted `tests/zz-ungated-probe.ts` fails lint with `The file was not found in any of the provided project(s)`.
 
 **Status:** active.
 
@@ -7363,7 +7363,7 @@ it names only NOAA and Open-Meteo, this entry holds.
 `CACHE_ENABLED=false` made the file pass under `--sequence.shuffle` and narrowed the mutation's red
 rows to exactly the two it reaches.
 
-**Status:** active. Fix candidate: make `clearServiceCaches()` clear every factory service. That is a
+**Status:** active. Since 2026-11-23 (`438c00d`) the function's own docstring states this limit and that it has no production caller. Fix candidate: make `clearServiceCaches()` clear every factory service. That is a
 `src/` change with its own plan. Related: [G70] (stub at the factory's prototype), [G45].
 
 ---
@@ -7558,6 +7558,22 @@ read 4 and the cached repeat 0.
 
 **Status:** active. Same family as [G70] (a mock on the wrong seam is inert), one layer out: the driver,
 not the test.
+
+---
+
+## G165 — Deleting code can trip a source-scanning test's non-vacuity floor
+
+**Trigger:** a plan deletes a call site that a source-scanning guard counts. Today that is `tests/unit/http-deadline-wiring.test.ts`, which requires `axios.create` sites `>=` a literal. The same shape fits any test that scans `src/` and pins a minimum count to prove the scan ran.
+
+**Rule:** when a plan deletes a client, a request site or another scanned construct, grep `tests/` for `toBeGreaterThanOrEqual(` beside a "non-vacuity" comment before you call the task "deletion only". Lower the floor by the number of sites removed, in the same commit, and change nothing else in that test. Name the change in the commit body, because it is an F12 edit (a modified assertion in an existing test).
+
+**Why:** the floor is a lower bound written for growth. Adding a site never trips it, so no earlier plan met it. Removing one does. The recon and the cross-vendor plan review both enumerated callers of the deleted symbols, and neither looked for counters of the construct.
+
+**Verify:** `git grep -n -B2 'toBeGreaterThanOrEqual(' -- tests/unit | grep -i -A2 'non-vacuity'` lists the floors. Delete one `axios.create` call in a scratch copy of a service and run `npx vitest run tests/unit/http-deadline-wiring.test.ts`: it fails `expected N-1 to be greater than or equal to N`.
+
+**Evidence:** 2026-11-23, dead-code-ungated-files. T1 (`608fddd`) removed the USGS client: `expected 28 to be greater than or equal to 29`, so the floor became 28. T5 (`1af3447`) removed Open-Meteo's `geocodingClient`, so the floor became 27. The plan's F12 ledger did not list either edit.
+
+**Status:** active. Lint candidate: a plan-authoring check could list every non-vacuity floor whose scanned construct appears in a task's deletion list. Related: [G41] (a check that cannot fail), [G105] (the other guard a deletion meets).
 
 ---
 

@@ -45,13 +45,6 @@ export class Logger {
   }
 
   /**
-   * Create a child logger with a specific context
-   */
-  child(context: string): Logger {
-    return new Logger(this.level, context);
-  }
-
-  /**
    * Set the logging level
    */
   setLevel(level: LogLevel): void {
@@ -127,36 +120,6 @@ export class Logger {
     this.log(LogLevel.ERROR, message, metadata, error);
   }
 
-  /**
-   * Log API request
-   */
-  logApiRequest(service: string, endpoint: string, metadata?: Record<string, unknown>): void {
-    this.debug(`API request to ${service}`, {
-      service,
-      endpoint,
-      ...metadata,
-    });
-  }
-
-  /**
-   * Log API response
-   */
-  logApiResponse(service: string, endpoint: string, success: boolean, duration?: number): void {
-    const level = success ? LogLevel.DEBUG : LogLevel.WARN;
-    this.log(level, `API response from ${service}`, {
-      service,
-      endpoint,
-      success,
-      duration,
-    });
-  }
-
-  /**
-   * Log cache operation
-   */
-  logCacheOperation(operation: 'hit' | 'miss' | 'set' | 'evict', key: string): void {
-    this.debug(`Cache ${operation}`, { operation, key });
-  }
 }
 
 /**

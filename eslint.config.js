@@ -12,9 +12,6 @@ import globals from 'globals';
 export default tseslint.config(
   // Flat config reads no .gitignore and does not skip dot-directories, so everything a
   // workstation holds that CI does not is listed here, and both lint the same tree.
-  // tests/*.ts are the legacy hand-run drivers and tests/archived-cdo-tests/ is dead code;
-  // nothing in the gate runs either. Revisit when they are deleted or moved under
-  // tests/integration/.
   {
     ignores: [
       'dist/',
@@ -26,8 +23,6 @@ export default tseslint.config(
       '.devdocs/',
       'saved-forecasts/',
       'logs/',
-      'tests/*.ts',
-      'tests/archived-cdo-tests/',
     ],
   },
 

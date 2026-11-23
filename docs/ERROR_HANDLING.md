@@ -34,7 +34,7 @@ before you see one of the messages below. A timeout is not retried: it has used
 either its own timeout (`API_TIMEOUT_MS`) or what remained of the tool call's
 budget. The critical-alert banner, fire-weather, severe/winter-weather and
 timezone lookups make one attempt only, since they never fail a response. The
-river-gauge lookups for `get_river_conditions` (NOAA NWPS and USGS) also make one
+river-gauge lookups for `get_river_conditions` (NOAA NWPS) also make one
 attempt.
 
 All the requests of one tool call share one budget of `max(API_TIMEOUT_MS, 55 s)`,
@@ -939,14 +939,14 @@ The `check_service_status` tool in `src/server/weatherServer.ts`:
 
 ## Testing
 
-Run the comprehensive test suite:
+Run the test suite:
 
 ```bash
-# Test service status checking and error handling
-npx tsx tests/test_service_status.ts
+# Unit and integration tests, offline (includes status checking and error handling)
+npm test
 
-# Test the MCP tool directly
-npx tsx tests/test_mcp_status_tool.ts
+# The check_service_status tool alone
+npx vitest run tests/unit/status-handler.test.ts
 ```
 
 ## Benefits

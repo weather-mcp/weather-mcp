@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.21] - 2026-11-23
+
+`check_service_status` listed USGS as one of the services this server uses but does not check. The server never contacts USGS: US river gauges come from NOAA's NWPS. Such an entry could send you looking for a USGS outage that could not affect your results. This release removes it, along with code and old hand-run test scripts that nothing used. No other tool output changes.
+
+### Fixed
+
+- `check_service_status` no longer lists USGS under "Not checked by this tool". This server never contacts USGS; the unused client behind the entry is removed.
+
+### Removed
+
+- The legacy hand-run scripts under `tests/` (`tests/test_*.ts` and others, and `tests/archived-cdo-tests/`) and the two root analytics scripts, `test-mcp-with-analytics.ts` and `test-mcp-analytics.sh`. No gate ran them and most could no longer start. Use `npm test` for the offline suite and `npm run test:live` for checks against the real upstream APIs.
+
 ## [1.35.20] - 2026-11-15
 
 A specially crafted radar or base-map tile could make the finished radar map (`get_weather_imagery` with `composite: true`) use gigabytes of memory, and the cache of finished maps could grow to about 1 GB at the default settings. This release closes both. Maps from the real tile servers look the same as before; a repeated request is still served from the cache.
@@ -2389,7 +2401,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.20...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.21...HEAD
+[1.35.21]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.20...v1.35.21
 [1.35.20]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.19...v1.35.20
 [1.35.19]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.18...v1.35.19
 [1.35.18]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.17...v1.35.18

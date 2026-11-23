@@ -14,83 +14,6 @@ describe('RainViewer Service', () => {
     service = new RainViewerService();
   });
 
-  describe('buildTileUrl', () => {
-    it('should build valid tile URL with default parameters', () => {
-      const frame: RainViewerFrame = {
-        time: 1699999999,
-        path: '/v2/radar/1699999999'
-      };
-
-      const url = service.buildTileUrl(frame);
-
-      expect(url).toContain('tilecache.rainviewer.com');
-      expect(url).toContain('/v2/radar/1699999999');
-      expect(url).toContain('/512/4/'); // Default size and zoom
-      expect(url).toContain('4/1_1.png'); // Color scheme and format
-    });
-
-    it('should build tile URL with custom size', () => {
-      const frame: RainViewerFrame = {
-        time: 1699999999,
-        path: '/v2/radar/1699999999'
-      };
-
-      const url = service.buildTileUrl(frame, 256);
-
-      expect(url).toContain('/256/');
-    });
-
-    it('should build tile URL with custom zoom', () => {
-      const frame: RainViewerFrame = {
-        time: 1699999999,
-        path: '/v2/radar/1699999999'
-      };
-
-      const url = service.buildTileUrl(frame, 512, 6);
-
-      expect(url).toContain('/512/6/');
-      // Tile coordinates should change with zoom
-      const centerX = Math.floor(2 ** (6 - 1));
-      const centerY = Math.floor(2 ** (6 - 1));
-      expect(url).toContain(`/${centerX}/${centerY}/`);
-    });
-
-    it('should calculate center tile coordinates correctly for zoom 4', () => {
-      const frame: RainViewerFrame = {
-        time: 1699999999,
-        path: '/v2/radar/1699999999'
-      };
-
-      const url = service.buildTileUrl(frame, 512, 4);
-
-      // For zoom 4, center should be 2^(4-1) = 8
-      expect(url).toContain('/8/8/');
-    });
-
-    it('should calculate center tile coordinates correctly for zoom 1', () => {
-      const frame: RainViewerFrame = {
-        time: 1699999999,
-        path: '/v2/radar/1699999999'
-      };
-
-      const url = service.buildTileUrl(frame, 512, 1);
-
-      // For zoom 1, center should be 2^(1-1) = 1
-      expect(url).toContain('/1/1/');
-    });
-
-    it('should handle different frame paths', () => {
-      const frame: RainViewerFrame = {
-        time: 1234567890,
-        path: '/v2/radar/1234567890'
-      };
-
-      const url = service.buildTileUrl(frame);
-
-      expect(url).toContain('/v2/radar/1234567890');
-    });
-  });
-
   describe('buildCoordinateTileUrl', () => {
     it('should build tile URL for New York coordinates', () => {
       const frame: RainViewerFrame = {
@@ -358,20 +281,6 @@ describe('RainViewer Service', () => {
   });
 
   describe('URL Format Validation', () => {
-    it('should produce URLs with correct structure', () => {
-      const frame: RainViewerFrame = {
-        time: 1699999999,
-        path: '/v2/radar/1699999999'
-      };
-
-      const url = service.buildTileUrl(frame, 512, 4);
-
-      // Should match pattern: host + path + size + zoom + x + y + scheme + format
-      expect(url).toMatch(
-        /^https:\/\/tilecache\.rainviewer\.com\/v2\/radar\/\d+\/\d+\/\d+\/\d+\/\d+\/4\/1_1\.png$/
-      );
-    });
-
     it('should include all required URL components', () => {
       const frame: RainViewerFrame = {
         time: 1699999999,
@@ -385,19 +294,6 @@ describe('RainViewer Service', () => {
       expect(url).toContain('/512/'); // Size
       expect(url).toContain('/6/'); // Zoom
       expect(url).toContain('/4/1_1.png'); // Color scheme and format
-    });
-
-    it('should handle frame paths with different formats', () => {
-      const frames = [
-        { time: 1699999999, path: '/v2/radar/1699999999' },
-        { time: 1699999999, path: '/radar/1699999999' },
-        { time: 1699999999, path: '/v3/radar/1699999999' }
-      ];
-
-      frames.forEach(frame => {
-        const url = service.buildTileUrl(frame);
-        expect(url).toContain(frame.path);
-      });
     });
   });
 

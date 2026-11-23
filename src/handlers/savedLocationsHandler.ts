@@ -609,30 +609,3 @@ export async function handleRemoveSavedLocation(
     ]
   };
 }
-
-/**
- * Resolve a location_name to coordinates
- * This is a helper function used by weather tools
- */
-export function resolveLocationName(
-  locationName: string,
-  locationStore: LocationStore
-): { latitude: number; longitude: number } {
-  const location = locationStore.get(locationName);
-
-  if (!location) {
-    const available = Object.keys(locationStore.getAll());
-    throw new Error(
-      `Saved location "${locationName}" not found.\n\n` +
-      (available.length > 0
-        ? `Available locations: ${available.join(', ')}\n\n`
-        : 'No saved locations yet. Use save_location to create one.\n\n') +
-      `Use list_saved_locations to see all saved locations.`
-    );
-  }
-
-  return {
-    latitude: location.latitude,
-    longitude: location.longitude
-  };
-}

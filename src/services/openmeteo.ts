@@ -12,7 +12,6 @@ import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 import type {
   OpenMeteoHistoricalResponse,
   OpenMeteoErrorResponse,
-  GeocodingResponse,
   OpenMeteoForecastResponse,
   OpenMeteoAirQualityResponse,
   OpenMeteoMarineResponse,
@@ -111,7 +110,6 @@ function isTransientFailure(error: unknown): boolean {
 
 export interface OpenMeteoServiceConfig {
   baseURL?: string;
-  geocodingURL?: string;
   forecastURL?: string;
   airQualityURL?: string;
   marineURL?: string;
@@ -123,7 +121,6 @@ export interface OpenMeteoServiceConfig {
 
 export class OpenMeteoService {
   private client: AxiosInstance;
-  private geocodingClient: AxiosInstance;
   private forecastClient: AxiosInstance;
   private airQualityClient: AxiosInstance;
   private marineClient: AxiosInstance;
@@ -149,7 +146,6 @@ export class OpenMeteoService {
   constructor(config: OpenMeteoServiceConfig = {}) {
     const {
       baseURL = 'https://archive-api.open-meteo.com/v1',
-      geocodingURL = 'https://geocoding-api.open-meteo.com/v1',
       forecastURL = 'https://api.open-meteo.com/v1',
       airQualityURL = 'https://air-quality-api.open-meteo.com/v1',
       marineURL = 'https://marine-api.open-meteo.com/v1',
@@ -169,17 +165,6 @@ export class OpenMeteoService {
     // Historical weather client
     this.client = axios.create({
       baseURL,
-      timeout,
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': getUserAgent()
-      },
-      adapter: withRequestDeadline(),
-    });
-
-    // Geocoding client
-    this.geocodingClient = axios.create({
-      baseURL: geocodingURL,
       timeout,
       headers: {
         'Accept': 'application/json',
@@ -245,11 +230,6 @@ export class OpenMeteoService {
 
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
-      response => response,
-      error => this.handleError(error)
-    );
-
-    this.geocodingClient.interceptors.response.use(
       response => response,
       error => this.handleError(error)
     );
@@ -646,77 +626,6 @@ export class OpenMeteoService {
     };
 
     return weatherCodes[code] || `Unknown (code: ${code})`;
-  }
-
-  /**
-   * Search for locations by name using the Open-Meteo Geocoding API
-   *
-   * @param query - Location name to search for (e.g., "Paris", "New York, NY", "Tokyo")
-   * @param limit - Maximum number of results to return (default: 5, max: 100)
-   * @param language - Language for results (default: 'en')
-   * @returns Geocoding results with coordinates and metadata
-   */
-  async searchLocation(
-    query: string,
-    limit: number = 5,
-    language: string = 'en'
-  ): Promise<GeocodingResponse> {
-    if (!query || query.trim().length === 0) {
-      throw new InvalidLocationError(
-        'OpenMeteo',
-        'Search query cannot be empty'
-      );
-    }
-
-    if (query.trim().length === 1) {
-      throw new InvalidLocationError(
-        'OpenMeteo',
-        'Search query must be at least 2 characters long'
-      );
-    }
-
-    // Validate limit
-    if (limit < 1 || limit > 100) {
-      throw new InvalidLocationError(
-        'OpenMeteo',
-        'Limit must be between 1 and 100'
-      );
-    }
-
-    // Check cache first (locations don't move, so cache indefinitely)
-    if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('openmeteo-geocoding', query, limit, language);
-      const cached = this.cache.get(cacheKey);
-      if (cached) {
-        return cached as GeocodingResponse;
-      }
-
-      const params = {
-        name: query.trim(),
-        count: limit,
-        language,
-        format: 'json'
-      };
-
-      const response = await this.geocodingClient.get<GeocodingResponse>('/search', { params });
-
-      // Cache indefinitely (locations don't change)
-      // Using 30 days as TTL to keep cache from growing unbounded
-      this.cache.set(cacheKey, response.data, 30 * 24 * 60 * 60 * 1000);
-
-      return response.data;
-    }
-
-    // No caching
-    const params = {
-      name: query.trim(),
-      count: limit,
-      language,
-      format: 'json'
-    };
-
-    const response = await this.geocodingClient.get<GeocodingResponse>('/search', { params });
-    return response.data;
   }
 
   /**

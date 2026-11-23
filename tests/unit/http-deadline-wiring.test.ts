@@ -132,7 +132,7 @@ describe('http deadline wiring', () => {
     }
     expect(missing).toEqual([]);
     // Non-vacuity: the scan found the sites the tree had when this was written.
-    expect(total).toBeGreaterThanOrEqual(29);
+    expect(total).toBeGreaterThanOrEqual(27);
   });
 
   it('every direct axios.<method> call passes a config constant that carries the deadline adapter', () => {

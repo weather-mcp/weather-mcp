@@ -295,20 +295,6 @@ class ToolConfig {
   getEnabledTools(): ToolName[] {
     return Array.from(this.enabledTools);
   }
-
-  /**
-   * Get available presets
-   */
-  static getPresets(): Record<string, ToolName[]> {
-    return { ...TOOL_PRESETS };
-  }
-
-  /**
-   * Get available tool aliases
-   */
-  static getAliases(): Record<string, ToolName> {
-    return { ...TOOL_ALIASES };
-  }
 }
 
 // Export singleton instance
@@ -316,7 +302,6 @@ export const toolConfig = new ToolConfig();
 
 // Export preset definitions for documentation
 export const PRESETS = TOOL_PRESETS;
-export const ALIASES = TOOL_ALIASES;
 
 /**
  * Ceiling on the JSON size of the `tools/list` result, per preset, in bytes.

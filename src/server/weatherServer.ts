@@ -988,12 +988,12 @@ export function createWeatherServer(options: WeatherServerOptions): Server {
 }
 
 /**
- * Clear the upstream caches the entry point's shutdown path has always cleared.
+ * Cache-reset seam for tests. No production code calls it; shutdown no longer does.
  *
- * Two of the sixteen services, in the same order src/index.ts used before this
- * module existed: NOAA and Open-Meteo are the only ones whose caches shutdown
- * ever touched. Exposed as one named function rather than by exporting the two
- * singletons, so callers get a seam and not a mutable handle.
+ * It clears only the NOAA and Open-Meteo singletons (GOTCHAS G158). A test that
+ * stubs any other service must isolate that service's cache itself. Exposed as
+ * one named function rather than by exporting the two singletons, so callers
+ * get a seam and not a mutable handle.
  */
 export function clearServiceCaches(): void {
   noaaService.clearCache();

@@ -77,12 +77,6 @@ export async function handleSearchLocation(
     // before embedding — external text can otherwise alter Markdown rendering.
     output += `## ${i + 1}. ${escapeMarkdown(location.name)}\n\n`;
 
-    // Build location description
-    const parts: string[] = [location.name];
-    if (location.admin1) parts.push(location.admin1);
-    if (location.admin2 && location.admin2 !== location.admin1) parts.push(location.admin2);
-    if (location.country) parts.push(location.country);
-
     output += `**Full Name:** ${escapeMarkdown(location.display_name)}\n`;
     output += `**Coordinates:** ${location.latitude.toFixed(4)}°, ${location.longitude.toFixed(4)}°\n`;
 

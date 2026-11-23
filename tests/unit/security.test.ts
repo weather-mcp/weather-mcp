@@ -58,56 +58,6 @@ describe('Security Features - v1.0.0', () => {
   });
 
   describe('Input Sanitization', () => {
-    it('should handle special characters in location queries safely', async () => {
-      const service = new OpenMeteoService();
-      const recorded = stubAdapter(
-        (service as unknown as { geocodingClient: AxiosInstance })['geocodingClient'],
-        { status: 200, data: { results: [] } }
-      );
-
-      // Test that special characters don't cause issues
-      const queries = [
-        "Paris",
-        "New York",
-        "Saint-Denis",
-        "São Paulo",
-      ];
-
-      for (const query of queries) {
-        // Should not throw on special characters, and the query goes out verbatim
-        await expect(service.searchLocation(query)).resolves.toBeDefined();
-        const sent = recorded[recorded.length - 1];
-        expect(sent.params?.name).toBe(query);
-        expect(sent.params?.format).toBe('json');
-      }
-    });
-
-    it('should reject empty or invalid search queries', async () => {
-      const service = new OpenMeteoService();
-
-      // Empty query
-      await expect(service.searchLocation('')).rejects.toThrow('cannot be empty');
-
-      // Whitespace only
-      await expect(service.searchLocation('   ')).rejects.toThrow('cannot be empty');
-
-      // Single character
-      await expect(service.searchLocation('a')).rejects.toThrow('at least 2 characters');
-    });
-
-    it('should enforce limit bounds on search results', async () => {
-      const service = new OpenMeteoService();
-
-      // Too low
-      await expect(service.searchLocation('Paris', 0)).rejects.toThrow('between 1 and 100');
-
-      // Too high
-      await expect(service.searchLocation('Paris', 101)).rejects.toThrow('between 1 and 100');
-
-      // Negative
-      await expect(service.searchLocation('Paris', -1)).rejects.toThrow('between 1 and 100');
-    });
-
     it('should validate date ranges for historical queries', async () => {
       const service = new NOAAService();
 

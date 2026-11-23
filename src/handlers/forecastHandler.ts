@@ -926,9 +926,6 @@ async function formatNOAAForecast(
 }
 
 /**
- * Format Open-Meteo forecast data for display
- */
-/**
  * Render a MET Norway forecast, for the Open-Meteo outage fallback only.
  *
  * **This never routes through `formatOpenMeteoForecast`**, which hard-codes
