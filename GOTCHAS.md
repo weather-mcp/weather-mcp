@@ -124,7 +124,9 @@ object, so the check must be `isPlainObject`, not truthiness.
 **Verify:** `parseCapIndex`'s envelope checks and the corresponding cases in
 `tests/unit/cap-parse.test.ts` / `tests/unit/national-cap-service.test.ts`; for the
 JSON feeds, the `wrong-shaped 200 body` blocks in `tests/unit/meteoalarm.test.ts` /
-`tests/unit/geomet.test.ts` and `tests/integration/alert-feed-body-shape.test.ts`.
+`tests/unit/geomet.test.ts` and `tests/integration/alert-feed-body-shape.test.ts`; for Google
+Weather, the `wrong-shaped 200 body` block in `tests/unit/google-weather-service.test.ts` and
+`tests/unit/google-alerts-envelope-dispatch.test.ts`.
 
 **Evidence:** 2026-08-23 (`f1b757e`) — raised as a blocker in the Codex plan
 review (codex-R2) before implementation. 2026-11-10, alert-feed-body-shape
@@ -135,6 +137,18 @@ Both now guard the JSON envelope with `isPlainObject` + `Array.isArray` before
 outer check is an *equivalent* mutant for JSON (G45): no JSON value is truthy, not a
 plain object, and carries an array-valued key. Keep `isPlainObject` anyway; it is
 what states the contract.
+
+**Third JSON alert service, 2026-11-23** (google-alerts-envelope, `89e96ad`):
+`GoogleWeatherService` read `response.data?.weatherAlerts` and treated a missing list as
+an empty one, so an HTML page, a gateway object, `''`, `null` or `{}` rendered the
+all-clear and was cached for 5 min; a `null` element was a raw `TypeError` in the
+handler sort. It now requires a plain object whose `weatherAlerts` is an array of plain
+objects. A `regionCode`-only body is **refused** too: two live passes (2026-08-18,
+2026-11-23) saw a quiet covered point send `weatherAlerts: []`, never omit it.
+**Revisit trigger:** a live 200 from `publicAlerts:lookup` carrying `regionCode` and no
+`weatherAlerts`. The check runs outside the request `catch` (a private
+`requestPublicAlerts` holds the request), so the refusal is never re-mapped to the
+generic failure text. Every JSON alert service now guards its envelope.
 
 **Extended 2026-11-10** (`a5fb0bb`, alert-feed-body-shape diff review codex-C1) —
 **check every level the parser skips on, not only the list members.** The first guard
@@ -7604,6 +7618,36 @@ not the test.
 **Evidence:** 2026-11-23, dead-code-ungated-files. T1 (`608fddd`) removed the USGS client: `expected 28 to be greater than or equal to 29`, so the floor became 28. T5 (`1af3447`) removed Open-Meteo's `geocodingClient`, so the floor became 27. The plan's F12 ledger did not list either edit.
 
 **Status:** active. Lint candidate: a plan-authoring check could list every non-vacuity floor whose scanned construct appears in a task's deletion list. Related: [G41] (a check that cannot fail), [G105] (the other guard a deletion meets).
+
+---
+
+## G166 — A QA driver that reuses one service instance across bodies gets the first body's cached answer
+
+**Trigger:** a live-verification or positive-control driver (G108) that replaces a
+service's transport with a fake and feeds it several bodies in turn, on a service with a
+per-instance cache keyed on the coordinates.
+
+**Rule:** construct a **fresh service and a fresh fake per (dist × body) case**, and assert
+the fake was called exactly once. A driver that cannot show the fake's call count has not
+shown that the body under test reached the parser.
+
+**Why:** the cache is per instance and keyed on 2-dp coordinates, and the base often
+*caches* the very answer under test — the lenient read stored `''` as covered-empty. The
+next case at the same point is then served from the cache, its fake is never called, and
+the render repeats the first case's ✅. The record shows the wrong render with nothing
+marking it as a cache hit, and a reader takes it as the base's answer to the second body.
+
+**Verify:** in a scratch driver, feed one `GoogleWeatherService` on the base dist `''`
+then `{ weatherAlerts: [null] }` at the same point: the second render is ✅ and the second
+fake's call count is 0. With a fresh instance per case, the second render is the
+`TypeError`.
+
+**Evidence:** 2026-11-23, google-alerts-envelope. Predicted by the plan review (codex-R2)
+against T4 step 4's "repeat with" wording; T4 followed the rule and recorded each fake
+called once (`.devdocs/archive/completed/qa-google-alerts-envelope.md`).
+
+**Status:** active. Related: G108 (run the repro on the base), G158
+(`clearServiceCaches()` does not reach every service's cache).
 
 ---
 
