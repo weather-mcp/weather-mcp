@@ -405,26 +405,6 @@ export class NOAAService {
   }
 
   /**
-   * Get forecast for a location using lat/lon (convenience method)
-   * This combines getPointData and getForecast
-   */
-  async getForecastByCoordinates(latitude: number, longitude: number, units: 'us' | 'si' = 'us'): Promise<ForecastResponse> {
-    const pointData = await this.getPointData(latitude, longitude);
-    const { gridId, gridX, gridY } = pointData.properties;
-    return this.getForecast(gridId, gridX, gridY, units);
-  }
-
-  /**
-   * Get hourly forecast for a location using lat/lon (convenience method)
-   * This combines getPointData and getHourlyForecast
-   */
-  async getHourlyForecastByCoordinates(latitude: number, longitude: number, units: 'us' | 'si' = 'us'): Promise<ForecastResponse> {
-    const pointData = await this.getPointData(latitude, longitude);
-    const { gridId, gridX, gridY } = pointData.properties;
-    return this.getHourlyForecast(gridId, gridX, gridY, units);
-  }
-
-  /**
    * Get gridpoint data for a location using grid coordinates
    * Contains detailed forecast data including fire weather indices
    */
@@ -568,31 +548,6 @@ export class NOAAService {
     }
 
     return this.makeRequest<ObservationCollectionResponse>(url);
-  }
-
-  /**
-   * Get current conditions for a location (convenience method)
-   * This combines getStations and getLatestObservation
-   */
-  async getCurrentConditions(latitude: number, longitude: number): Promise<ObservationResponse> {
-    const stations = await this.getStations(latitude, longitude);
-
-    if (!stations.features || stations.features.length === 0) {
-      throw new Error('No weather stations found near the specified location.');
-    }
-
-    // Try the first station, fallback to others if it fails
-    for (const station of stations.features) {
-      try {
-        const stationId = station.properties.stationIdentifier;
-        return await this.getLatestObservation(stationId);
-      } catch {
-        // Try next station
-        continue;
-      }
-    }
-
-    throw new Error('Unable to retrieve current conditions from nearby stations.');
   }
 
   /**
