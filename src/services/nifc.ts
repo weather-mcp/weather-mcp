@@ -174,42 +174,4 @@ export class NIFCService {
       throw new Error('Failed to query NIFC fire perimeters.');
     }
   }
-
-  /**
-   * Check if the NIFC service is operational
-   */
-  async checkServiceStatus(): Promise<{
-    operational: boolean;
-    message: string;
-    timestamp: string;
-  }> {
-    try {
-      // Query a small bounding box to test service availability
-      const response = await this.client.get(`${this.featureServerUrl}?f=json`, {
-        timeout: 10000
-      });
-
-      if (response.status === 200 && response.data) {
-        return {
-          operational: true,
-          message: 'NIFC ArcGIS service is operational',
-          timestamp: new Date().toISOString()
-        };
-      }
-
-      return {
-        operational: false,
-        message: 'NIFC service returned unexpected response',
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      logger.warn('NIFC service check failed', { error: error instanceof Error ? error.message : String(error) });
-
-      return {
-        operational: false,
-        message: `NIFC service is unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        timestamp: new Date().toISOString()
-      };
-    }
-  }
 }
