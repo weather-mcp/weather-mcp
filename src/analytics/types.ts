@@ -66,13 +66,6 @@ export interface AnalyticsConfig {
 }
 
 /**
- * Event batch for transport
- */
-export interface EventBatch {
-  events: AnalyticsEvent[];
-}
-
-/**
  * Metadata collected during tool execution
  */
 export interface ToolExecutionMetadata {
