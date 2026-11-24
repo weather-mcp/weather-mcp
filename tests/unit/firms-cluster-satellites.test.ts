@@ -26,13 +26,17 @@ function detection(satellite: string): FIRMSDetection {
 
 describe('get_wildfire_info — satellites per cluster', () => {
   it('names every satellite that saw the cluster, never a raw code', async () => {
-    // One array per satellite, concatenated, so T4 can split them per product.
+    // Each product answers with its own satellite's row.
     const n20 = [detection('N20')];
     const n21 = [detection('N21')];
     const firms = {
       isKeyAvailable: vi.fn(() => false),
       getDetectionsByBbox: vi.fn(async () => []),
-      getDetectionsByRegion: vi.fn(async () => [...n20, ...n21])
+      getDetectionsByRegion: vi.fn(async (_r: string, product: { id: string }) => ({
+        detections: product.id === 'VIIRS_NOAA20_NRT' ? n20 : n21,
+        lastModified: undefined
+      })),
+      getProductAvailability: vi.fn(async () => undefined)
     } as unknown as FIRMSService;
 
     const result = await handleGetWildfireInfo(

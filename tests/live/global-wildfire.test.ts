@@ -117,10 +117,29 @@ const FLAT_FILE_QUERY_LON = 16.4;
 /** Private axios client, typed only as far as the spy needs (same shape as tests/unit/imagery-fetch-bounds.test.ts). */
 type Client = { get: (...a: unknown[]) => Promise<unknown> };
 
+/**
+ * The handler reads every FIRMS product. Answer the fixture for NOAA-20
+ * only, a header-only body for NOAA-21, and a current `data_availability`
+ * body, so the rendered counts are the fixture's own.
+ */
+function productAwareResponse(csv: string) {
+  return (...args: unknown[]) => {
+    const url = String(args[0]);
+    if (url.includes('/data_availability/')) {
+      const today = new Date().toISOString().slice(0, 10);
+      return textResponse(
+        `data_id,min_date,max_date\nVIIRS_NOAA20_NRT,2026-01-01,${today}\nVIIRS_NOAA21_NRT,2026-01-01,${today}`
+      );
+    }
+    const isNoaa20 = url.includes('VIIRS_NOAA20_NRT') || url.includes('/J1_');
+    return textResponse(isNoaa20 ? csv : csv.split('\n')[0]);
+  };
+}
+
 describe('Global wildfire integration — mocked CSV shapes end-to-end (deterministic)', () => {
   it('renders a keyed Area-API (14-column) response through the real service and handler', async () => {
     const firmsService = new FIRMSService({ mapKey: 'FAKE_TEST_MAP_KEY' });
-    vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(() => textResponse(AREA_API_CSV));
+    vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(productAwareResponse(AREA_API_CSV));
 
     const nominatimService = makeNominatimFake('pt'); // Portugal — non-US, routes to FIRMS
 
@@ -160,7 +179,7 @@ describe('Global wildfire integration — mocked CSV shapes end-to-end (determin
 
   it('renders a keyless flat-file (13-column) response through the real service and handler, with the day_range upgrade note', async () => {
     const firmsService = new FIRMSService({ mapKey: undefined }); // no key configured -> keyless path
-    vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(() => textResponse(FLAT_FILE_CSV));
+    vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(productAwareResponse(FLAT_FILE_CSV));
 
     const nominatimService = makeNominatimFake('at'); // Austria — non-US, routes to FIRMS
 

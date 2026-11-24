@@ -183,6 +183,11 @@ export const CacheConfig = {
     // in a region cost one fetch per half hour.
     firmsRegionalFile: 30 * MINUTE,
 
+    // NASA FIRMS data_availability (keyed path): each product's max_date.
+    // Read at request time against the clock, so the entry never freezes a
+    // stale/current verdict; a failed check is never cached (retried next call).
+    firmsDataAvailability: 3 * HOUR,
+
     // National CAP documents and polygon documents, keyed on (index identifier,
     // index published stamp). SACHET re-serves a thread's latest version under
     // one GUID; the stamp (not the identifier) makes the key immutable. A named

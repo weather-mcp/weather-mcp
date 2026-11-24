@@ -147,7 +147,11 @@ async function renderFirmsAt(distanceKm: number): Promise<string> {
   const firmsService = {
     isKeyAvailable: () => false,
     getDetectionsByBbox: async () => [],
-    getDetectionsByRegion: async () => [detection]
+    getDetectionsByRegion: async (_r: unknown, p: { id: string }) => ({
+      detections: p.id === 'VIIRS_NOAA20_NRT' ? [detection] : [],
+      lastModified: undefined
+    }),
+    getProductAvailability: async () => undefined
   } as never;
   const inertNifc = {} as never;
 

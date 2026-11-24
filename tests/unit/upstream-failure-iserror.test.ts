@@ -58,17 +58,30 @@ function nifcFake(impl: () => Promise<NIFCQueryResponse>): NIFCService {
   return { queryFirePerimeters: vi.fn(impl) } as unknown as NIFCService;
 }
 
+type FirmsProductArg = { id: string };
+
 function firmsFake(opts: {
   keyAvailable: boolean;
-  bbox: () => Promise<FIRMSDetection[]>;
-  region: () => Promise<FIRMSDetection[]>;
+  bbox: (product: FirmsProductArg) => Promise<FIRMSDetection[]>;
+  region: (product: FirmsProductArg) => Promise<FIRMSDetection[]>;
 }): FIRMSService {
+  // The handler fetches every FIRMS product; the product is passed through so
+  // a row-returning implementation answers for one product only.
   return {
     isKeyAvailable: vi.fn(() => opts.keyAvailable),
-    getDetectionsByBbox: vi.fn(opts.bbox),
-    getDetectionsByRegion: vi.fn(opts.region)
+    getDetectionsByBbox: vi.fn(
+      (_w: number, _s: number, _e: number, _n: number, _d: number, product: FirmsProductArg) =>
+        opts.bbox(product)
+    ),
+    getDetectionsByRegion: vi.fn(async (_r: string, product: FirmsProductArg) => ({
+      detections: await opts.region(product),
+      lastModified: undefined
+    })),
+    getProductAvailability: vi.fn(async () => undefined)
   } as unknown as FIRMSService;
 }
+
+const NOAA20 = 'VIIRS_NOAA20_NRT';
 
 function nominatimFake(impl: () => Promise<string | null>): NominatimService {
   return { reverseCountry: vi.fn(impl) } as unknown as NominatimService;
@@ -270,7 +283,7 @@ describe('answers carry no isError key', () => {
       firmsFake({
         keyAvailable: true,
         bbox: async () => { throw new FIRMSKeyRejectedError(); },
-        region: async () => [detection()]
+        region: async (p) => (p.id === NOAA20 ? [detection()] : [])
       }),
       nominatimFake(async () => 'au')
     );
@@ -322,7 +335,7 @@ describe('answers carry no isError key', () => {
         firmsFake({
           keyAvailable: false,
           bbox: async () => { throw new Error('bbox must not be called'); },
-          region: async () => [detection()]
+          region: async (p) => (p.id === NOAA20 ? [detection()] : [])
         }),
         nominatimFake(async () => 'au')
       );
@@ -373,7 +386,7 @@ describe('answers carry no isError key', () => {
       firmsFake({
         keyAvailable: false,
         bbox: async () => { throw new Error('bbox must not be called'); },
-        region: async () => many
+        region: async (p) => (p.id === NOAA20 ? many : [])
       }),
       nominatimFake(async () => 'au')
     );

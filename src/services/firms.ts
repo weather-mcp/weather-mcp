@@ -8,7 +8,14 @@
  *   `day_range` 1-5, requires `FIRMS_MAP_KEY`. The map key is embedded in
  *   the request URL itself — see the security note below.
  * - **Keyless flat files** (`getDetectionsByRegion`): fixed 24 h regional
- *   CSV cuts, no key required, no key in the URL.
+ *   CSV cuts, no key required, no key in the URL. Returns the file's
+ *   `Last-Modified` header with the rows, for the handler's freshness check.
+ * - **Keyed `data_availability`** (`getProductAvailability`): each product's
+ *   latest data date. Garnish — it never throws, and a failure is not cached.
+ *
+ * Every data method takes one product from `FIRMS_PRODUCTS`
+ * (`src/utils/firmsProducts.ts`); this module defines no product data.
+ * Staleness is judged by the handler at read time, never here.
  *
  * Both paths return the same normalized `FIRMSDetection[]` via
  * `parseFIRMSCsv` (`src/utils/firmsHotspots.ts`) — CSV parsing, region
@@ -32,8 +39,9 @@ import { FIRMS_MAP_KEY } from '../config/api.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { parseFIRMSCsv } from '../utils/firmsHotspots.js';
+import { parseDataAvailabilityCsv } from '../utils/firmsProducts.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
-import type { FIRMSDetection, FIRMSRegionFile } from '../types/firms.js';
+import type { FIRMSDetection, FIRMSProduct, FIRMSRegionFile } from '../types/firms.js';
 
 /**
  * Thrown when the FIRMS Area API rejects the configured `FIRMS_MAP_KEY`
@@ -57,11 +65,18 @@ export interface FIRMSServiceConfig {
 }
 
 const AREA_API_BASE = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv';
-const FLAT_FILE_BASE = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv';
+const FLAT_FILE_ROOT = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire';
+const DATA_AVAILABILITY_BASE = 'https://firms.modaps.eosdis.nasa.gov/api/data_availability/csv';
 
-// Both ingestion paths use the same VIIRS instrument family so results are
-// comparable across the keyed/keyless split (see D3).
-const AREA_API_SATELLITE = 'VIIRS_SNPP_NRT';
+/** A keyless region file's parsed rows and its `Last-Modified` header, cached together. */
+export interface FIRMSRegionResult {
+  detections: FIRMSDetection[];
+  /** The raw `Last-Modified` header, or `undefined` when absent or empty. */
+  lastModified: string | undefined;
+}
+
+// Both ingestion paths read the same products (every one VIIRS), so results
+// are comparable across the keyed/keyless split (see D3).
 
 export class FIRMSService {
   private client: AxiosInstance;
@@ -118,7 +133,8 @@ export class FIRMSService {
     south: number,
     east: number,
     north: number,
-    dayRange: number
+    dayRange: number,
+    product: FIRMSProduct
   ): Promise<FIRMSDetection[]> {
     validateLongitude(west);
     validateLongitude(east);
@@ -139,7 +155,7 @@ export class FIRMSService {
     // Rounded to 2 decimal places (~1.1km) — plenty precise for a cache key
     // while keeping nearby repeat queries as cache hits.
     const bboxKey = `${west.toFixed(2)},${south.toFixed(2)},${east.toFixed(2)},${north.toFixed(2)}`;
-    const cacheKey = Cache.generateKey('firms-area-query', bboxKey, dayRange);
+    const cacheKey = Cache.generateKey('firms-area-query', product.id, bboxKey, dayRange);
 
     if (CacheConfig.enabled) {
       const cached = this.cache.get(cacheKey);
@@ -148,13 +164,14 @@ export class FIRMSService {
         const ne = redactCoordinatesForLogging(north, east);
         logger.info('FIRMS area query cache hit', {
           bbox: `${sw.lon},${sw.lat},${ne.lon},${ne.lat}`,
-          dayRange
+          dayRange,
+          product: product.id
         });
         return cached as FIRMSDetection[];
       }
     }
 
-    const detections = await this.queryAreaApi(west, south, east, north, dayRange);
+    const detections = await this.queryAreaApi(west, south, east, north, dayRange, product);
 
     if (CacheConfig.enabled) {
       this.cache.set(cacheKey, detections, CacheConfig.ttl.firmsAreaQuery);
@@ -168,18 +185,20 @@ export class FIRMSService {
     south: number,
     east: number,
     north: number,
-    dayRange: number
+    dayRange: number,
+    product: FIRMSProduct
   ): Promise<FIRMSDetection[]> {
     // The map key is embedded in the URL path itself — never log or throw
     // this URL (see module doc comment).
     const key = this.mapKey as string; // isKeyAvailable() already checked by the caller
-    const url = `${AREA_API_BASE}/${key}/${AREA_API_SATELLITE}/${west},${south},${east},${north}/${dayRange}`;
+    const url = `${AREA_API_BASE}/${key}/${product.id}/${west},${south},${east},${north}/${dayRange}`;
 
     const sw = redactCoordinatesForLogging(south, west);
     const ne = redactCoordinatesForLogging(north, east);
     logger.info('Querying FIRMS area API', {
       bbox: `${sw.lon},${sw.lat},${ne.lon},${ne.lat}`,
-      dayRange
+      dayRange,
+      product: product.id
     });
 
     try {
@@ -187,7 +206,7 @@ export class FIRMSService {
       const detections = parseFIRMSCsv(
         typeof response.data === 'string' ? response.data : String(response.data)
       );
-      logger.info('FIRMS area query complete', { detectionCount: detections.length });
+      logger.info('FIRMS area query complete', { detectionCount: detections.length, product: product.id });
       return detections;
     } catch (error) {
       // Deliberately do not pass the raw axios error object to the logger —
@@ -195,58 +214,129 @@ export class FIRMSService {
       // key). Only fixed, sanitized fields are logged.
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
       const code = axios.isAxiosError(error) ? error.code : undefined;
-      logger.error('FIRMS area query failed', undefined, { status, code });
+      logger.error('FIRMS area query failed', undefined, { status, code, product: product.id });
 
       throw mapAreaApiError(error);
     }
   }
 
   /**
-   * Keyless flat-file path — the fixed 24 h regional cut (or `Global`),
-   * parsed and cached whole.
+   * Keyless flat-file path — one product's fixed 24 h regional cut (or
+   * `Global`), parsed and cached whole together with its `Last-Modified`
+   * header (G6). Staleness is not judged here: the header is cached raw and
+   * the handler compares it with the clock on every read (G7).
    */
-  async getDetectionsByRegion(regionFile: FIRMSRegionFile): Promise<FIRMSDetection[]> {
-    const cacheKey = Cache.generateKey('firms-regional-file', regionFile);
+  async getDetectionsByRegion(
+    regionFile: FIRMSRegionFile,
+    product: FIRMSProduct
+  ): Promise<FIRMSRegionResult> {
+    const cacheKey = Cache.generateKey('firms-regional-file', product.id, regionFile);
 
     if (CacheConfig.enabled) {
       const cached = this.cache.get(cacheKey);
       if (cached) {
-        logger.info('FIRMS regional file cache hit', { regionFile });
-        return cached as FIRMSDetection[];
+        logger.info('FIRMS regional file cache hit', { regionFile, product: product.id });
+        return cached as FIRMSRegionResult;
       }
     }
 
-    const detections = await this.fetchRegionFile(regionFile);
+    const result = await this.fetchRegionFile(regionFile, product);
 
     if (CacheConfig.enabled) {
-      this.cache.set(cacheKey, detections, CacheConfig.ttl.firmsRegionalFile);
+      this.cache.set(cacheKey, result, CacheConfig.ttl.firmsRegionalFile);
     }
 
-    return detections;
+    return result;
   }
 
-  private async fetchRegionFile(regionFile: FIRMSRegionFile): Promise<FIRMSDetection[]> {
-    const url = `${FLAT_FILE_BASE}/SUOMI_VIIRS_C2_${regionFile}_24h.csv`;
+  private async fetchRegionFile(
+    regionFile: FIRMSRegionFile,
+    product: FIRMSProduct
+  ): Promise<FIRMSRegionResult> {
+    const url = `${FLAT_FILE_ROOT}/${product.flatFileDir}/csv/${product.flatFilePrefix}_${regionFile}_24h.csv`;
 
-    logger.info('Fetching FIRMS regional flat file', { regionFile });
+    logger.info('Fetching FIRMS regional flat file', { regionFile, product: product.id });
 
     try {
       const response = await this.client.get<string>(url, { responseType: 'text' });
       const detections = parseFIRMSCsv(
         typeof response.data === 'string' ? response.data : String(response.data)
       );
+      // axios lower-cases header names. Keep only a non-empty string.
+      const header: unknown = response.headers?.['last-modified'];
+      const lastModified = typeof header === 'string' && header.trim() !== '' ? header : undefined;
       logger.info('FIRMS regional file fetch complete', {
         regionFile,
+        product: product.id,
         detectionCount: detections.length
       });
-      return detections;
+      return { detections, lastModified };
     } catch (error) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
       const code = axios.isAxiosError(error) ? error.code : undefined;
-      logger.error('FIRMS regional file fetch failed', undefined, { regionFile, status, code });
+      logger.error('FIRMS regional file fetch failed', undefined, {
+        regionFile,
+        product: product.id,
+        status,
+        code
+      });
 
       throw mapRegionFileError(error);
     }
+  }
+
+  /**
+   * Keyed freshness signal: `data_availability`'s `data_id` → `max_date` map.
+   *
+   * **Garnish — never throws.** Resolves `undefined` when no key is configured
+   * (no request), on any request failure, and on a body that yields no rows;
+   * the handler then treats every product as current (fail open). Only a
+   * non-empty map is cached, so a failure is retried on the next call (G7).
+   * The key is in the URL path: nothing here logs or throws the URL or the
+   * axios error — logs carry `{ status, code }` only.
+   */
+  async getProductAvailability(): Promise<Map<string, string> | undefined> {
+    if (!this.isKeyAvailable()) {
+      return undefined;
+    }
+
+    const cacheKey = Cache.generateKey('firms-data-availability');
+    if (CacheConfig.enabled) {
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return cached as Map<string, string>;
+      }
+    }
+
+    const key = this.mapKey as string;
+    const url = `${DATA_AVAILABILITY_BASE}/${key}/all`;
+
+    let body: string;
+    try {
+      const response = await this.client.get<string>(url, { responseType: 'text' });
+      const data: unknown = response.data;
+      body = data == null ? '' : typeof data === 'string' ? data : String(data);
+    } catch (error) {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      const code = axios.isAxiosError(error) ? error.code : undefined;
+      if (status === 401 || status === 403) {
+        logger.warn('FIRMS data availability check failed', { status, code, securityEvent: true });
+      } else {
+        logger.warn('FIRMS data availability check failed', { status, code });
+      }
+      return undefined;
+    }
+
+    const availability = parseDataAvailabilityCsv(body);
+    if (availability.size === 0) {
+      logger.warn('FIRMS data availability check failed', { status: 200, code: 'EMPTY_BODY' });
+      return undefined;
+    }
+
+    if (CacheConfig.enabled) {
+      this.cache.set(cacheKey, availability, CacheConfig.ttl.firmsDataAvailability);
+    }
+    return availability;
   }
 }
 
