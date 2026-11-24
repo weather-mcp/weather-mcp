@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.24] - 2026-11-24
+
 Outside the US, `get_wildfire_info` reads NASA FIRMS satellite fire detections. It read only one satellite, Suomi NPP, which stopped publishing on 2 November 2026. Since then the tool said "No satellite fire detections" everywhere outside the US, while two other satellites were still reporting fires. The answer was well formed and carried its not-an-all-clear caveat, so nothing looked wrong. The tool now reads both current satellites and checks on every call that each one is still publishing.
 
 ### Fixed
@@ -2438,7 +2440,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.23...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.24...HEAD
+[1.35.24]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.23...v1.35.24
 [1.35.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.22...v1.35.23
 [1.35.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.21...v1.35.22
 [1.35.21]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.20...v1.35.21
