@@ -192,7 +192,9 @@ describe('Global wildfire integration — mocked CSV shapes end-to-end (determin
   });
 
   it('renders a keyless flat-file (13-column) response through the real service and handler, with the day_range upgrade note', async () => {
-    const firmsService = new FIRMSService({ mapKey: undefined }); // no key configured -> keyless path
+    // '' not undefined: the constructor's `mapKey = FIRMS_MAP_KEY` default fills an
+    // undefined from the environment, which made this case keyed whenever the key was set.
+    const firmsService = new FIRMSService({ mapKey: '' }); // keyless path, whatever the env holds
     vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(productAwareResponse(FLAT_FILE_CSV));
 
     const nominatimService = makeNominatimFake('at'); // Austria — non-US, routes to FIRMS
