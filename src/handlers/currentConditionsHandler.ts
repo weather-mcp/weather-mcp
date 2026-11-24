@@ -65,6 +65,7 @@ import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { UnitPreferences } from '../config/units.js';
 import { DisplayThresholds } from '../config/displayThresholds.js';
 import { displayValue } from '../utils/displayBanding.js';
+import { gridpointToDisplayUnit } from '../utils/gridpointSeries.js';
 import {
   getHainesCategory,
   getGrasslandFireDangerCategory,
@@ -913,30 +914,6 @@ function formatFosbergIndexLines(ffwi: number): string {
     `**${emoji} Fosberg Fire Weather Index:** ${index} (${category.level})\n` +
     `Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.\n\n`
   );
-}
-
-/**
- * Convert a current NWS gridpoint value from its published unit to the
- * display unit. A null value (no interval contains now) stays null with no
- * warn: an absent or stale series is not a unit problem. A value in any unit
- * other than the expected one, including none, is null, so the line is left
- * out rather than printed under a guessed unit; that case warns once.
- */
-function gridpointToDisplayUnit(
-  field: string,
-  uom: string | undefined,
-  value: number | null,
-  expectedUom: string,
-  convert: (v: number) => number
-): number | null {
-  if (value === null) {
-    return null;
-  }
-  if (uom !== expectedUom) {
-    logger.warn('Unrecognised gridpoint unit; line omitted', { field, uom: uom ?? null });
-    return null;
-  }
-  return convert(value);
 }
 
 /**

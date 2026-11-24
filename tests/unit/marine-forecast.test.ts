@@ -214,6 +214,9 @@ describe('get_marine_conditions forecast', () => {
   });
 });
 
+// One interval that contains the real clock for the whole test run: started an hour ago, lasts a day.
+const currentInterval = (): string => `${new Date(Date.now() - 3_600_000).toISOString()}/P1D`;
+
 /**
  * Build a NOAA gridpoint fixture with marine wave data
  */
@@ -233,34 +236,24 @@ function buildNOAAGridpointResponse(): GridpointResponse {
       gridX: 1,
       gridY: 1,
       waveHeight: {
-        values: [
-          { validTime: '2026-07-16T11:00:00Z', value: 1.5 },
-          { validTime: '2026-07-16T12:00:00Z', value: 1.6 }
-        ]
+        uom: 'wmoUnit:m',
+        values: [{ validTime: currentInterval(), value: 1.5 }]
       },
       waveDirection: {
-        values: [
-          { validTime: '2026-07-16T11:00:00Z', value: 200 },
-          { validTime: '2026-07-16T12:00:00Z', value: 205 }
-        ]
+        uom: 'wmoUnit:degree_(angle)',
+        values: [{ validTime: currentInterval(), value: 200 }]
       },
       wavePeriod: {
-        values: [
-          { validTime: '2026-07-16T11:00:00Z', value: 8.0 },
-          { validTime: '2026-07-16T12:00:00Z', value: 8.2 }
-        ]
+        uom: 'nwsUnit:s',
+        values: [{ validTime: currentInterval(), value: 8.0 }]
       },
       windSpeed: {
-        values: [
-          { validTime: '2026-07-16T11:00:00Z', value: 5.0 },
-          { validTime: '2026-07-16T12:00:00Z', value: 5.5 }
-        ]
+        uom: 'wmoUnit:km_h-1',
+        values: [{ validTime: currentInterval(), value: 5.0 }]
       },
       windDirection: {
-        values: [
-          { validTime: '2026-07-16T11:00:00Z', value: 210 },
-          { validTime: '2026-07-16T12:00:00Z', value: 215 }
-        ]
+        uom: 'wmoUnit:degree_(angle)',
+        values: [{ validTime: currentInterval(), value: 210 }]
       }
     }
   } as unknown as GridpointResponse;

@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.24 (Production Ready)
+- **Version:** 1.35.25 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -80,7 +80,7 @@ src/
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── nowcast.ts           # minutely_15 nowcast: model superset boxes, 3-state response classification, quarter bands, hourly-probability pick (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
-│   ├── gridpointSeries.ts   # NWS gridpoint validTime → interval; value at an instant; max over a window; bounded with a securityEvent warn (pure)
+│   ├── gridpointSeries.ts   # NWS gridpoint validTime → interval; value at an instant; max over a window; unit guard (`gridpointToDisplayUnit`); bounded with a securityEvent warn (pure)
 │   ├── connectionFailure.ts # Transport codes meaning "connection failed before any answer"; shared by the alert-feed services, NOAA and Open-Meteo (pure)
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
 │   ├── httpDeadline.ts      # withRequestDeadline — one wall-clock deadline per axios request (proxy included), emitted as axios's own ECONNABORTED; every axios.create passes it; hands a tunnelled https request proxy: false and a per-request TunnelAgent on its own signal
@@ -765,15 +765,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.24 — Production Ready ✅
-- **Test Coverage:** 5,671 tests, 100% pass rate
+- **Version:** 1.35.25 — Production Ready ✅
+- **Test Coverage:** 5,682 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.25:** NOAA marine conditions on the Great Lakes and US bays show current values, not the start of the forecast period
 - **New in v1.35.24:** FIRMS wildfire detections read NOAA-20 and NOAA-21, with a per-satellite freshness check
 - **New in v1.35.23:** A broken Google Weather alerts answer is reported as an error, not as no alerts
-- **New in v1.35.22:** A broken saved-location entry is named instead of crashing the server, save_location can replace it, and saved locations have size limits
 
 ## Useful References
 
@@ -796,7 +796,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-24 (v1.35.24)
+**Last Updated:** 2026-11-24 (v1.35.25)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
