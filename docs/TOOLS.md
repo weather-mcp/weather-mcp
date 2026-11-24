@@ -705,7 +705,7 @@ Get marine weather conditions including wave height, swell, ocean currents, and 
 
 **Description:**
 Provides comprehensive marine weather data with intelligent dual-source support:
-- **Great Lakes & Coastal Bays**: Automatically uses NOAA gridpoint data for all 5 Great Lakes (Superior, Michigan, Huron, Erie, Ontario) and major US coastal bays (Chesapeake Bay, San Francisco Bay, Tampa Bay, Puget Sound, Lake Okeechobee). Provides wave height, wave period, wave direction, and wind conditions.
+- **Great Lakes & Coastal Bays**: Automatically uses NOAA gridpoint data for all 5 Great Lakes (Superior, Michigan, Huron, Erie, Ontario) and major US coastal bays (Chesapeake Bay, San Francisco Bay, Tampa Bay, Puget Sound, Lake Okeechobee). Provides wave height, wave period, wave direction, and wind conditions — the forecast grid's values for the interval that contains the request time.
 - **Ocean Coverage**: Uses Open-Meteo Marine API for global ocean coverage, including significant wave height categorised on WMO Code Table 3700 (the Douglas sea scale), using the code table's own terms, wind waves vs swell separation, wave period/direction, ocean currents, and safety assessment for maritime activities.
 - **Automatic Selection**: Intelligent geographic detection automatically selects the best data source with zero configuration required.
 

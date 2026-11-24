@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **NOAA marine conditions show the current values, not the start of the forecast period.** On the Great Lakes and the US coastal bays, `get_marine_conditions` printed the first value of each NOAA gridpoint series. That is the start of the forecast period, 7 to 13 hours before the request, so every reading was stale. The error ran both ways: on 2026-11-24 Lake Huron printed 2.1 m where the current forecast was 0.9 m, and Lake Superior printed 0.6 m against 0.9 m. Each value now comes from the forecast interval that contains the request time, and is read only under its published unit. A value with no interval at the request time, or under an unexpected unit, is left out rather than guessed. The report's layout is unchanged.
+
 ## [1.35.24] - 2026-11-24
 
 Outside the US, `get_wildfire_info` reads NASA FIRMS satellite fire detections. It read only one satellite, Suomi NPP, which stopped publishing on 2 November 2026. Since then the tool said "No satellite fire detections" everywhere outside the US, while two other satellites were still reporting fires. The answer was well formed and carried its not-an-all-clear caveat, so nothing looked wrong. The tool now reads both current satellites and checks on every call that each one is still publishing.

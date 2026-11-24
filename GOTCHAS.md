@@ -7576,12 +7576,15 @@ metres and speeds in km/h. A comment that asserted "already in feet" was wrong f
 the printed mixing height was 3.3 times too low.
 
 **Verify:** `grep -rnE "for \(const entry of series\.values\)|= entry\.validTime\.split\('/'\)" src/`
-names the readers that still select by position or by start. On 2026-11-14 it prints `src/utils/marine.ts:30`
-(filed, F1) and `src/utils/snow.ts:91`, `:142` (accumulation, a different question), and nothing else.
+names the readers that still select by position or by start. Since 2026-11-24 it prints only
+`src/utils/snow.ts:91`, `:142` (accumulation over a window, a different question); the marine reader at
+`src/utils/marine.ts:30` that it named on 2026-11-14 now reads through `valueAt`.
 
 **Evidence:** 2026-11-14, fire-weather-units-interval: T1 `633276d` (the module), T2 `aad79ca` (fire weather),
 T4 `967a82b` (severe-weather window). Live: nine offices on 2026-11-14 and the T6 read
 (`qa-fire-weather-units-interval.md`). Boulder printed `150 ft` where the current interval was about 2,400 ft.
+2026-11-24, marine-current-interval: T2 `2cabeb2` (the NOAA marine reader). Lake Huron printed 2.1 m of waves
+where the current interval said 0.9 m.
 
 **Status:** active. Lint candidate: `no-restricted-syntax` on `.values[0]` of a `GridpointDataSeries`. Related:
 [G162], [G69], [G56].
