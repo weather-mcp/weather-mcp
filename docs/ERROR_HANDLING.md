@@ -565,6 +565,14 @@ flagged the same way. A rejected `FIRMS_MAP_KEY` whose keyless fallback succeeds
 error: the result is a normal report with the note
 *FIRMS_MAP_KEY was rejected; showing keyless 24-hour data.*
 
+The satellite path reads two satellites, NOAA-20 and NOAA-21. A partial answer — one satellite's
+request failed, or its feed is stale — is **not** an error either. The report shows the other
+satellite's detections and one note naming each satellite left out, for example
+*Note: not every satellite is included — NOAA-21: no new data since 2026-11-12 (UTC).* or
+*… NOAA-21: request failed.* The error block above appears only when no satellite answered. When
+every satellite's feed is stale, the block carries `isError: true` and the message
+`NASA FIRMS satellite feeds are not currently updating (NOAA-20: last data <date>; NOAA-21: last data <date>).`
+
 ### Wildfire Containment: `not reported`
 
 `get_wildfire_info` renders `**Containment:** not reported` — with no percentage and no bar — for a

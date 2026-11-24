@@ -60,7 +60,7 @@ get_wildfire_info({
 **Size:** 7259 acres (2937 hectares)
 **Containment:** 92% █████████░
 **Discovery Date:** 6/28/2026
-**Days Active:** 139
+**Days Active:** 148
 
 ---
 
@@ -76,7 +76,7 @@ get_wildfire_info({
 **Size:** 102003 acres (41279 hectares)
 **Containment:** 96% █████████░
 **Discovery Date:** 6/29/2026
-**Days Active:** 138
+**Days Active:** 147
 
 ---
 
@@ -127,9 +127,9 @@ get_air_quality({
 **Timezone:** America/Denver
 **Elevation:** 1599m
 
-**Observation Time:** 11/14/2026, 6:00:00 PM
+**Observation Time:** 11/23/2026, 10:00:00 PM
 
-## 🟡 US Air Quality Index: 57
+## 🟡 US Air Quality Index: 59
 
 **Category:** Moderate (Yellow)
 **Description:** Air quality is acceptable
@@ -147,15 +147,15 @@ Air quality is acceptable; however, unusually sensitive people may experience mi
 
 ## Pollutant Concentrations
 
-**PM2.5 (Fine Particulate Matter):** 8.3 μg/m³
-**PM10 (Coarse Particulate Matter):** 9.9 μg/m³
-**Ozone (O₃):** 39 μg/m³
-**Nitrogen Dioxide (NO₂):** 23 μg/m³
-**Sulfur Dioxide (SO₂):** 1.0 μg/m³
-**Carbon Monoxide (CO):** 220 μg/m³
-**Aerosol Optical Depth:** 0.230 (atmospheric haze indicator)
+**PM2.5 (Fine Particulate Matter):** 13 μg/m³
+**PM10 (Coarse Particulate Matter):** 14 μg/m³
+**Ozone (O₃):** 13 μg/m³
+**Nitrogen Dioxide (NO₂):** 27 μg/m³
+**Sulfur Dioxide (SO₂):** 1.2 μg/m³
+**Carbon Monoxide (CO):** 200 μg/m³
+**Aerosol Optical Depth:** 0.120 (atmospheric haze indicator)
 
-*European AQI: 37 (Fair)*
+*European AQI: 41 (Moderate)*
 ````
 
 </details>
@@ -191,17 +191,13 @@ get_current_conditions({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KBJC
-**Time:** Nov 14, 2026, 4:47 PM (1.3 hours ago)
+**Time:** Nov 23, 2026, 4:58 PM (5.5 hours ago)
 
-**Conditions:** Mostly Cloudy
-**Temperature:** 46°F
-**Feels Like (Wind Chill):** 42°F
-**Dewpoint:** 37°F
-**Humidity:** 71%
-**Wind:** 9 mph from 340°
-**Pressure:** 29.87 inHg
+⚠️ **This observation is 5.5 hours old** — the station may have stopped reporting. Conditions may have changed substantially.
+
+**Conditions:** Partly Cloudy
 **Visibility:** 10.0 miles (clear)
-**Cloud Cover:** Broken clouds at 12008ft
+**Cloud Cover:** Scattered clouds at 1312ft
 
 ## Fire Weather
 
@@ -209,8 +205,8 @@ get_current_conditions({
 Winter season with minimal fire risk due to cold temperatures, snow cover, or high humidity. Fire danger indices are calculated during dry, warm periods with elevated fire potential.
 
 **Atmospheric Monitoring:**
-**Mixing Height:** 964 ft (very poor dispersion)
-**Transport Wind:** 7 mph (moderate smoke transport)
+**Mixing Height:** 1059 ft (poor dispersion)
+**Transport Wind:** 3 mph (light - poor smoke transport)
 
 *Fire danger indices (Haines Index, Grassland Fire Danger, Red Flag Threat) are calculated during elevated fire risk periods, typically during dry seasons or when Red Flag conditions are possible.*
 
@@ -230,15 +226,16 @@ Winter season with minimal fire risk due to cold temperatures, snow cover, or hi
 **Claude Code answered** (using `get_wildfire_info`):
 
 <!-- answer-4 -->
-**No satellite heat detections in the last 3 days within 200 km** — but read that carefully, because it is not the same as "no fires."
+**65 satellite heat detections in the last 3 days within 200 km, in 38 clusters.** The nearest is 23.9 km northwest of the city: 4 night-time hotspots, newest about 5 hours old, seen by both NOAA-20 and NOAA-21. That distance puts the server's safety tier at **HIGH ALERT**.
 
 Read this differently from the Denver answer, because it *is* different data:
 
 - Outside the US there are **hotspots, not incidents.** There are no fire names, no acreage, no containment percentages — because no agency is publishing them here. What a satellite sees is heat.
-- Some detections, when there are any, may not be wildfires at all. The server says so up front: detections can be industrial heat sources, gas flares, or agricultural burns.
-- An empty result is not an all-clear. Cloud cover hides fires from satellites, and small or new fires can slip between overpasses, so the server refuses to print an all-clear it can't back up.
+- Some detections may not be wildfires at all. The server says so up front: detections can be industrial heat sources, gas flares, or agricultural burns. The nearest cluster's peak intensity is only 2.1 MW, which is small.
+- Two satellites contribute, so one fire seen on two overpasses counts every detection. Each cluster names the satellites that saw it.
+- An empty result would not have been an all-clear either. Cloud cover hides fires from satellites, and small or new fires can slip between overpasses.
 
-So: nothing seen right now, and worth checking again closer to the trip.
+So: real heat signatures nearby, most of them small. Check the nearest clusters against local news and the Greek fire service before the trip, and check again closer to it.
 <!-- /answer-4 -->
 
 <!-- capture:athens-hotspots -->
@@ -264,12 +261,82 @@ get_wildfire_info({
 **Location:** 37.9838, 23.7275
 **Search Radius:** 200 km (124.3 miles)
 **Source:** NASA FIRMS satellite fire detections (VIIRS, near real-time)
+**Satellites:** NOAA-20, NOAA-21 (VIIRS)
 
 ⚠️ Satellite heat detections — not managed incident data. No fire names, sizes, or containment are available; detections may include industrial heat sources, gas flares, or agricultural burns.
 
-**No satellite fire detections in the last 3 days within 200 km.**
+🔥 **65 satellite fire detections in the last 3 days, grouped into 38 clusters within 200 km**
 
-*Note: absence of detections is not an all-clear — cloud cover can hide fires from satellites, and small or new fires may evade detection.*
+## Detection Cluster 1
+
+**Detections:** 4 hotspots (0 day / 4 night)
+**Distance:** 23.9 km (14.85 mi) NW
+**Center:** 38.1281, 23.5253
+**Peak intensity:** 2.1 MW (fire radiative power)
+**Newest detection:** 4.8 hours ago
+**Confidence:** 4 nominal
+**Satellite:** NOAA-20 (VIIRS), NOAA-21 (VIIRS)
+
+---
+
+## Detection Cluster 2
+
+**Detections:** 3 hotspots (0 day / 3 night)
+**Distance:** 52.3 km (32.50 mi) NNE
+**Center:** 38.3743, 24.0602
+**Peak intensity:** 1.7 MW (fire radiative power)
+**Newest detection:** 4.8 hours ago
+**Confidence:** 3 nominal
+**Satellite:** NOAA-20 (VIIRS), NOAA-21 (VIIRS)
+
+---
+
+## Detection Cluster 3
+
+**Detections:** 1 hotspot (1 day / 0 night)
+**Distance:** 53.2 km (33.06 mi) NNW
+**Center:** 38.3834, 23.3932
+**Peak intensity:** 4.3 MW (fire radiative power)
+**Newest detection:** 3 days ago
+**Confidence:** 1 nominal
+**Satellite:** NOAA-21 (VIIRS)
+
+---
+
+## Detection Cluster 4
+
+**Detections:** 1 hotspot (0 day / 1 night)
+**Distance:** 58.0 km (36.04 mi) W
+**Center:** 37.9202, 23.0704
+**Peak intensity:** 1.4 MW (fire radiative power)
+**Newest detection:** 28.4 hours ago
+**Confidence:** 1 nominal
+**Satellite:** NOAA-20 (VIIRS)
+
+---
+
+## Detection Cluster 5
+
+**Detections:** 2 hotspots (2 day / 0 night)
+**Distance:** 61.2 km (38.03 mi) NW
+**Center:** 38.3574, 23.2135
+**Peak intensity:** 6.1 MW (fire radiative power)
+**Newest detection:** 18.1 hours ago
+**Confidence:** 2 nominal
+**Satellite:** NOAA-20 (VIIRS), NOAA-21 (VIIRS)
+
+---
+
+
+*Note: 33 additional clusters found within radius (showing nearest 5 only — use detail="full" for more)*
+
+## Safety Assessment
+
+🟠 **HIGH ALERT** - Satellite fire detections within 25 km
+- Monitor fire conditions closely
+- Prepare for possible evacuation
+- Watch for smoke and changing conditions
+
 
 ---
 *Data source: NASA FIRMS (Fire Information for Resource Management System)*
@@ -312,25 +379,25 @@ get_current_conditions({
 ````markdown
 # Current Weather Conditions
 
-**Time:** Nov 15, 2026, 3:00 AM
+**Time:** Nov 24, 2026, 7:15 AM
 
-**Conditions:** Mainly clear
-**Temperature:** 60°F
-**Today's Range:** High 70°F / Low 59°F
-**Dewpoint:** 52°F
-**Humidity:** 73%
-**Wind:** 4 mph from 49°, gusting to 10 mph
-**Pressure:** 30.18 inHg
-**Cloud Cover:** 19%
+**Conditions:** Partly cloudy
+**Temperature:** 55°F
+**Today's Range:** High 64°F / Low 51°F
+**Dewpoint:** 47°F
+**Humidity:** 76%
+**Wind:** 4 mph from 63°, gusting to 10 mph
+**Pressure:** 30.09 inHg
+**Cloud Cover:** 67%
 
 ## Fire Weather
 
-**🟢 Fosberg Fire Weather Index:** 5 (Low)
+**🟢 Fosberg Fire Weather Index:** 4 (Low)
 Computed from current temperature, humidity, and sustained wind. Higher values mean faster potential fire spread in fine fuels.
 
 **Dryness context:**
-- **Vapour-pressure deficit:** 0.5 kPa (low drying power)
-- **Topsoil moisture (top 1 cm):** 0.35 m³/m³ (wet)
+- **Vapour-pressure deficit:** 0.3 kPa (low drying power)
+- **Topsoil moisture (top 1 cm):** 0.33 m³/m³ (wet)
 
 *Derived by this server from Open-Meteo model data — not an official fire-danger rating. Heed warnings from your national fire authority.*
 
@@ -343,8 +410,8 @@ Computed from current temperature, humidity, and sustained wind. Higher values m
 
 ---
 
-**Features shown:** `get_wildfire_info` on both paths — NIFC named incidents in the US (containment, distance to the mapped perimeter, safety tier) and NASA FIRMS satellite heat detections everywhere else (clustered hotspots, no names or containment, never an all-clear) · `get_current_conditions` with `include_fire_weather` on both paths — NOAA's published indices in the US, a server-computed Fosberg index with dryness context elsewhere, each labeled for what it is · `get_air_quality` on the US path — US AQI scale, pollutant breakdown (PM2.5 is the smoke signal), UV index, health recommendations.
+**Features shown:** `get_wildfire_info` on both paths — NIFC named incidents in the US (containment, distance to the mapped perimeter, safety tier) and NASA FIRMS satellite heat detections everywhere else (clustered hotspots from NOAA-20 and NOAA-21, each cluster naming the satellites that saw it, no names or containment, never an all-clear) · `get_current_conditions` with `include_fire_weather` on both paths — NOAA's published indices in the US, a server-computed Fosberg index with dryness context elsewhere, each labeled for what it is · `get_air_quality` on the US path — US AQI scale, pollutant breakdown (PM2.5 is the smoke signal), UV index, health recommendations.
 
 <!-- capture-stamp -->
-*Captured 2026-11-15 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-11-24 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

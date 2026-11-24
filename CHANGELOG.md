@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `get_wildfire_info` outside the US (NASA FIRMS) reads the NOAA-20 and NOAA-21 satellites instead of Suomi NPP, which stopped publishing on 2 November 2026. Each satellite's feed is checked for freshness on every call: a stale satellite is left out and named, a failed one is named while the other's detections still show, and every feed stale is an error rather than an empty answer. Clusters name every satellite that saw them.
+
 ## [1.35.23] - 2026-11-23
 
 With the optional Google Weather key set, `get_alerts` uses Google for places outside the keyless alert services. When Google answered with something other than its alerts list, such as a maintenance page or an empty body, the tool said there were no active alerts and repeated that for five minutes. On safety data, a false all-clear is the worst answer the tool can give. It now reports an error instead.
