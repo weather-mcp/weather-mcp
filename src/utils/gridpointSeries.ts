@@ -1,6 +1,7 @@
 /**
- * NWS gridpoint series: validTime intervals, the value at an instant, and the
- * maximum over a window. Pure: reads no clock; callers pass the instants.
+ * NWS gridpoint series: validTime intervals, the value at an instant, the
+ * maximum over a window, and the unit guard that converts a current value only
+ * from its published unit. Pure: reads no clock; callers pass the instants.
  */
 import { logger } from './logger.js';
 
@@ -122,4 +123,28 @@ export function maxOverlapping(
     }
   }
   return max;
+}
+
+/**
+ * Convert a current NWS gridpoint value from its published unit to the
+ * display unit. A null value (no interval contains now) stays null with no
+ * warn: an absent or stale series is not a unit problem. A value in any unit
+ * other than the expected one, including none, is null, so the line is left
+ * out rather than printed under a guessed unit; that case warns once.
+ */
+export function gridpointToDisplayUnit(
+  field: string,
+  uom: string | undefined,
+  value: number | null,
+  expectedUom: string,
+  convert: (v: number) => number
+): number | null {
+  if (value === null) {
+    return null;
+  }
+  if (uom !== expectedUom) {
+    logger.warn('Unrecognised gridpoint unit; line omitted', { field, uom: uom ?? null });
+    return null;
+  }
+  return convert(value);
 }
