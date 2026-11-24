@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ENABLED_TOOLS=-alerts,standard` exposed `get_alerts`; a `+tool` or `-tool` written before a preset now applies.** The value is read in two passes. The base set is every bare token (preset, tool name or alias), in token order. Then each modifier applies to that base, in token order. `-alerts,standard` now equals `standard,-alerts`, and `-marine,all` equals `all,-marine`. A `+tool` or `-tool` alone now starts from the default `basic` preset where it started from nothing: `+marine` alone goes from one tool to seven, and `-alerts` alone from zero tools to five. To expose one tool, name it bare (`marine`). Every documented form (preset first, then modifiers) returns the same tools in the same order as before. (src/config/tools.ts)
+
 ## [1.35.25] - 2026-11-24
 
 On the Great Lakes and the major US coastal bays, `get_marine_conditions` reports NOAA's forecast grid. It printed the oldest value in that grid instead of the one for now, so wave height, period and wind were up to half a day stale on every call. Sometimes they were higher than the current forecast and sometimes lower. This release reads the value for the time of the request. Open-Meteo marine reports elsewhere are unchanged.

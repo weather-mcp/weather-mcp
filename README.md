@@ -243,6 +243,8 @@ ENABLED_TOOLS=basic,+historical,+air_quality    # Add to a preset
 ENABLED_TOOLS=all,-marine                       # Remove from a preset
 ```
 
+Order does not matter between a preset and its `+`/`-` modifiers: `-marine,all` is the same as `all,-marine`. A value of only modifiers adjusts the default `basic` preset: `+marine` is `basic` plus marine. To expose a single tool, name it bare (`marine`).
+
 Short aliases are supported: `forecast`, `current`, `alerts`, `historical`, `status`, `search`, `aqi`, `marine`, `radar`, `lightning`, and more.
 
 ### Units & Localization
