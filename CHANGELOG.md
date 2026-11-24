@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.25] - 2026-11-24
+
+On the Great Lakes and the major US coastal bays, `get_marine_conditions` reports NOAA's forecast grid. It printed the oldest value in that grid instead of the one for now, so wave height, period and wind were up to half a day stale on every call. Sometimes they were higher than the current forecast and sometimes lower. This release reads the value for the time of the request. Open-Meteo marine reports elsewhere are unchanged.
+
 ### Fixed
 
 - **NOAA marine conditions show the current values, not the start of the forecast period.** On the Great Lakes and the US coastal bays, `get_marine_conditions` printed the first value of each NOAA gridpoint series. That is the start of the forecast period, 7 to 13 hours before the request, so every reading was stale. The error ran both ways: on 2026-11-24 Lake Huron printed 2.1 m where the current forecast was 0.9 m, and Lake Superior printed 0.6 m against 0.9 m. Each value now comes from the forecast interval that contains the request time, and is read only under its published unit. A value with no interval at the request time, or under an unexpected unit, is left out rather than guessed. The report's layout is unchanged.
@@ -2444,7 +2448,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.24...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.25...HEAD
+[1.35.25]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.24...v1.35.25
 [1.35.24]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.23...v1.35.24
 [1.35.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.22...v1.35.23
 [1.35.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.21...v1.35.22
