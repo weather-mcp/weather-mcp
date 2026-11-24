@@ -97,6 +97,7 @@ src/
 │   ├── modelComparison.ts / ensembleSpread.ts        # Forecast agreement + member spread (pure)
 │   ├── fireWeather.ts / thermalStress.ts             # Fire indices incl. Fosberg; wind chill, frostbite, WBGT (pure)
 │   ├── firmsHotspots.ts / metarStation.ts / riverDischarge.ts  # FIRMS parse+cluster; METAR picker; GloFAS cell snap (pure)
+│   ├── firmsProducts.ts     # FIRMS product table (NOAA-20/21), freshness by clock, satellite names (pure)
 │   ├── firePerimeter.ts     # NIFC perimeter distance: zero inside, nearest edge outside, even-odd over all rings (pure)
 │   ├── eaGauges.ts          # EA station filter, measure selection, level banding (pure)
 │   ├── capParse.ts / pointInPolygon.ts  # CAP 1.2 XML → records, active filter, feed-URL allowlist; ray-casting point-in-ring (pure)

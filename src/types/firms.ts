@@ -50,7 +50,10 @@ export interface FIRMSDetection {
   acquiredAt: string;
   /** Day or night overpass. */
   daynight: FIRMSDayNight;
-  /** Satellite identifier, e.g. `"N"` (Suomi NPP). Passed through as-is. */
+  /**
+   * Satellite code as the feed spells it: `"N20"` / `"N21"` in the flat files and
+   * Area API, or the legacy `"1"` / `"2"` / `"N"` (Suomi NPP). Passed through as-is.
+   */
   satellite: string;
   /** Sensor/processing identifier. Only the Area API's 14-column shape carries this column. */
   instrument?: string;
@@ -127,3 +130,26 @@ export interface FIRMSCluster {
   /** Satellite of the cluster's founding (highest-FRP) detection. */
   satellite: string;
 }
+
+/**
+ * One FIRMS VIIRS near-real-time product the server queries. `id` is the Area
+ * API source name and the `data_availability` `data_id`; the flat-file path is
+ * `<flatFileDir>/csv/<flatFilePrefix>_<Region>_24h.csv`.
+ */
+export interface FIRMSProduct {
+  /** Area API source and `data_availability` id, e.g. `VIIRS_NOAA20_NRT`. Contains no `:`. */
+  id: string;
+  /** Flat-file directory, e.g. `noaa-20-viirs-c2`. */
+  flatFileDir: string;
+  /** Flat-file name prefix, e.g. `J1_VIIRS_C2`. */
+  flatFilePrefix: string;
+  /** Satellite name without the sensor, e.g. `NOAA-20`. */
+  displayName: string;
+  /** Every `satellite` column value this product's detections carry. */
+  satelliteCodes: readonly string[];
+}
+
+/** Whether a product's feed is still updating. `lastDataDate` is a `YYYY-MM-DD` UTC date. */
+export type FIRMSProductFreshness =
+  | { state: 'current' }
+  | { state: 'stale'; lastDataDate: string };
