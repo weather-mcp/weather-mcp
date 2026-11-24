@@ -4,6 +4,7 @@
 
 import { displayValue } from './displayBanding.js';
 import type { GridpointResponse, GridpointDataSeries } from '../types/noaa.js';
+import { gridpointToDisplayUnit, valueAt } from './gridpointSeries.js';
 
 /**
  * NOAA Marine Conditions extracted from gridpoint data
@@ -18,38 +19,35 @@ export interface NOAAMarineConditions {
   timestamp: string; // ISO 8601
 }
 
+const identity = (v: number): number => v;
+
 /**
- * Extract current value from a gridpoint data series
+ * The value of the interval that contains nowMs, under the series' published
+ * unit. No containing interval, or a value under any other unit, is absent:
+ * never the first interval of the forecast period, which is hours old (G163).
  */
-function extractCurrentValue(series: GridpointDataSeries | undefined): number | undefined {
-  if (!series || !series.values || series.values.length === 0) {
-    return undefined;
-  }
-
-  // Find the first valid value (gridpoint data is time-ordered)
-  for (const entry of series.values) {
-    const value = entry.value;
-    if (value !== null && value !== undefined) {
-      return value;
-    }
-  }
-
-  return undefined;
+function readAt(
+  field: string,
+  series: GridpointDataSeries | undefined,
+  nowMs: number,
+  expectedUom: string
+): number | undefined {
+  return gridpointToDisplayUnit(field, series?.uom, valueAt(series, nowMs), expectedUom, identity) ?? undefined;
 }
 
 /**
- * Extract marine conditions from NOAA gridpoint response
+ * Extract marine conditions from NOAA gridpoint response, each value read at
+ * the interval that contains nowMs. All six fields share the one instant.
  */
-export function extractNOAAMarineConditions(gridpoint: GridpointResponse): NOAAMarineConditions | null {
+export function extractNOAAMarineConditions(gridpoint: GridpointResponse, nowMs: number): NOAAMarineConditions | null {
   const props = gridpoint.properties;
 
-  // Extract marine data
-  const waveHeight = extractCurrentValue(props.waveHeight);
-  const wavePeriod = extractCurrentValue(props.wavePeriod);
-  const waveDirection = extractCurrentValue(props.waveDirection);
-  const windSpeed = extractCurrentValue(props.windSpeed);
-  const windDirection = extractCurrentValue(props.windDirection);
-  const windGust = extractCurrentValue(props.windGust);
+  const waveHeight = readAt('waveHeight', props.waveHeight, nowMs, 'wmoUnit:m');
+  const wavePeriod = readAt('wavePeriod', props.wavePeriod, nowMs, 'nwsUnit:s');
+  const waveDirection = readAt('waveDirection', props.waveDirection, nowMs, 'wmoUnit:degree_(angle)');
+  const windSpeed = readAt('windSpeed', props.windSpeed, nowMs, 'wmoUnit:km_h-1');
+  const windDirection = readAt('windDirection', props.windDirection, nowMs, 'wmoUnit:degree_(angle)');
+  const windGust = readAt('windGust', props.windGust, nowMs, 'wmoUnit:km_h-1');
 
   // Check if we have any marine data
   if (waveHeight === undefined && wavePeriod === undefined && waveDirection === undefined) {

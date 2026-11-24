@@ -97,7 +97,9 @@ export async function handleGetMarineConditions(
       });
 
       const gridpointData = await noaaService.getGridpointDataByCoordinates(latitude, longitude);
-      const noaaMarineData = extractNOAAMarineConditions(gridpointData);
+      // Read at the request time, not the grid's update time: a cached grid
+      // must still advance to the interval that contains now.
+      const noaaMarineData = extractNOAAMarineConditions(gridpointData, Date.now());
 
       if (noaaMarineData) {
         // Format NOAA marine data
