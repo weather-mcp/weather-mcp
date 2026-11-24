@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.26] - 2026-11-24
+
 `ENABLED_TOOLS` read its tokens once, left to right, so a `+tool` or `-tool` written before a preset acted on an empty set and the preset then undid it. `ENABLED_TOOLS=-alerts,standard` started cleanly, printed no warning, and exposed `get_alerts`, the one tool the operator asked to remove. This release reads the value in two passes: first every preset and tool name, then every modifier. The order between a preset and its modifiers no longer matters. Every documented form (preset first, then modifiers) gives the same tools in the same order as before.
 
 ### Fixed
@@ -2458,7 +2460,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.25...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.26...HEAD
+[1.35.26]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.25...v1.35.26
 [1.35.25]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.24...v1.35.25
 [1.35.24]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.23...v1.35.24
 [1.35.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.22...v1.35.23
