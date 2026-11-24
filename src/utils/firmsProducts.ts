@@ -76,7 +76,12 @@ export function classifyLastModified(
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-/** UTC midnight of a `YYYY-MM-DD` string, from its components; `undefined` when malformed. */
+/**
+ * UTC midnight of a `YYYY-MM-DD` string, from its components; `undefined` when
+ * malformed. `Date.UTC` rolls an impossible date over (`2026-02-31` → 3 March,
+ * month `00` → the previous December, years 0-99 → 1900+), so the result is
+ * read back and must name the same year, month and day.
+ */
 function utcDayFromString(date: string): number | undefined {
   if (!DATE_PATTERN.test(date)) {
     return undefined;
@@ -86,7 +91,14 @@ function utcDayFromString(date: string): number | undefined {
     return undefined;
   }
   const ms = Date.UTC(y, m - 1, d);
-  return Number.isFinite(ms) ? ms : undefined;
+  if (!Number.isFinite(ms)) {
+    return undefined;
+  }
+  const back = new Date(ms);
+  if (back.getUTCFullYear() !== y || back.getUTCMonth() !== m - 1 || back.getUTCDate() !== d) {
+    return undefined;
+  }
+  return ms;
 }
 
 /**

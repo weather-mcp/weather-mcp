@@ -142,6 +142,19 @@ describe('classifyMaxDate', () => {
     },
   );
 
+  // Regex-valid but not a calendar date. Each would roll over to a real past
+  // date under Date.UTC and read as stale; an impossible date is malformed.
+  it.each([['2026-02-31'], ['2025-02-29'], ['2026-00-10'], ['2026-13-01'], ['2026-11-00'], ['0050-01-01']])(
+    'fails open on the impossible date %s',
+    (value) => {
+      expect(classifyMaxDate(value, NOW)).toEqual({ state: 'current' });
+    },
+  );
+
+  it('reads a real leap day as a date, not as malformed', () => {
+    expect(classifyMaxDate('2024-02-29', NOW)).toEqual({ state: 'stale', lastDataDate: '2024-02-29' });
+  });
+
   it('counts calendar days across a month seam, not 24 h spans', () => {
     // 00:30 UTC on 1 Dec: 30 Nov is one calendar day behind, 29 Nov is two.
     const seam = Date.parse('2026-12-01T00:30:00Z');
