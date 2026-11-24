@@ -130,10 +130,17 @@ describe('FIRMS product freshness — keyed data_availability (live)', () => {
     async () => {
       const service = new FIRMSService({ mapKey: KEY });
       // getProductAvailability never throws by contract: it maps every transport,
-      // HTTP and key failure to undefined. A throw here is a real fault and fails.
+      // HTTP and key failure to undefined, and the runtime check then fails open.
+      // So undefined is exactly the silently dead keyed check this control exists
+      // to catch. With a key set it fails; it is never a skip.
       const availability = await service.getProductAvailability();
+      expect(
+        availability,
+        'FIRMS data_availability returned no table with FIRMS_MAP_KEY set ' +
+          '(rejected key, HTTP error, transport failure or empty body); ' +
+          'the runtime freshness check is failing open for every keyed product',
+      ).toBeDefined();
       if (availability === undefined) {
-        console.warn('FIRMS data_availability skipped — service returned no table (network, key or empty body)');
         return;
       }
 
