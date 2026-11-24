@@ -97,18 +97,32 @@ const AREA_API_QUERY_LAT = 39.5;
 const AREA_API_QUERY_LON = -8.0;
 
 /**
+ * Recent acquisition in the flat files' zero-padded `acq_time` style
+ * (`0048`, `0130`). The keyless render now filters rows to the 24 h it names
+ * (G168), so like the keyed fixture these must be recent, not static.
+ */
+function recentFlatAcq(hoursAgo: number): { date: string; time: string } {
+  const d = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+  const date = d.toISOString().slice(0, 10);
+  const time = `${String(d.getUTCHours()).padStart(2, '0')}${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  return { date, time };
+}
+
+const FLAT_A = recentFlatAcq(2);
+const FLAT_B = recentFlatAcq(5);
+
+/**
  * Trimmed flat-file (keyless) capture — 13 columns, no `instrument`,
- * confidence spelled out (`nominal`/`high`/`low`), zero-padded `acq_time`
- * (`0048`/`0130`). Five rows near Vienna, Austria, same clustering logic
- * as above.
+ * confidence spelled out (`nominal`/`high`/`low`), zero-padded `acq_time`.
+ * Five rows near Vienna, Austria, same clustering logic as above.
  */
 const FLAT_FILE_CSV = [
   'latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight',
-  '48.201,16.401,325.0,0.4,0.4,2026-08-13,0048,N,nominal,2.0NRT,288.0,9.7,N',
-  '48.202,16.402,330.0,0.4,0.4,2026-08-13,0048,N,high,2.0NRT,292.0,18.2,N',
-  '48.199,16.403,320.0,0.4,0.4,2026-08-13,0130,N,nominal,2.0NRT,285.0,6.5,D',
-  '48.203,16.400,340.0,0.4,0.4,2026-08-13,0130,N,high,2.0NRT,298.0,25.0,D',
-  '48.198,16.399,318.0,0.4,0.4,2026-08-13,0048,N,low,2.0NRT,283.0,4.2,N'
+  `48.201,16.401,325.0,0.4,0.4,${FLAT_A.date},${FLAT_A.time},N,nominal,2.0NRT,288.0,9.7,N`,
+  `48.202,16.402,330.0,0.4,0.4,${FLAT_A.date},${FLAT_A.time},N,high,2.0NRT,292.0,18.2,N`,
+  `48.199,16.403,320.0,0.4,0.4,${FLAT_B.date},${FLAT_B.time},N,nominal,2.0NRT,285.0,6.5,D`,
+  `48.203,16.400,340.0,0.4,0.4,${FLAT_B.date},${FLAT_B.time},N,high,2.0NRT,298.0,25.0,D`,
+  `48.198,16.399,318.0,0.4,0.4,${FLAT_A.date},${FLAT_A.time},N,low,2.0NRT,283.0,4.2,N`
 ].join('\n');
 
 const FLAT_FILE_QUERY_LAT = 48.2;
