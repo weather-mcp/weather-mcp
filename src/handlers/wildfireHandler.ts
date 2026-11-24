@@ -31,6 +31,7 @@ import { distanceToPerimeterKm } from '../utils/firePerimeter.js';
 import { displayValue } from '../utils/displayBanding.js';
 import { isInUS } from '../utils/geography.js';
 import { logger } from '../utils/logger.js';
+import { satelliteDisplayName } from '../utils/firmsProducts.js';
 import {
   pickRegionFile,
   filterByRadius,
@@ -814,20 +815,6 @@ async function formatFIRMSWildfire(
   return { text: output, failed };
 }
 
-/** Human-readable satellite name from the FIRMS satellite code. */
-function formatSatellite(code: string): string {
-  switch (code) {
-    case 'N':
-      return 'Suomi NPP (VIIRS)';
-    case '1':
-      return 'NOAA-20 (VIIRS)';
-    case '2':
-      return 'NOAA-21 (VIIRS)';
-    default:
-      return code || 'Unknown';
-  }
-}
-
 /** Non-zero confidence buckets, highest first — e.g. "3 high, 12 nominal". */
 function formatConfidenceSummary(cluster: FIRMSCluster): string {
   const parts: string[] = [];
@@ -867,7 +854,7 @@ function formatClusterDetails(cluster: FIRMSCluster, ordinal: number): string {
   if (confidenceSummary.length > 0) {
     output += `**Confidence:** ${confidenceSummary}\n`;
   }
-  output += `**Satellite:** ${formatSatellite(cluster.satellite)}\n`;
+  output += `**Satellite:** ${cluster.satellites.map(satelliteDisplayName).join(', ') || 'Unknown'}\n`;
 
   output += `\n---\n\n`;
   return output;

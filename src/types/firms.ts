@@ -127,8 +127,8 @@ export interface FIRMSCluster {
   nightCount: number;
   /** Detection counts per confidence bucket. */
   confidenceCounts: Record<FIRMSConfidence, number>;
-  /** Satellite of the cluster's founding (highest-FRP) detection. */
-  satellite: string;
+  /** Every satellite code that saw this cluster, sorted, empty codes dropped. */
+  satellites: string[];
 }
 
 /**

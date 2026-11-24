@@ -362,8 +362,8 @@ interface MutableCluster {
   dayCount: number;
   nightCount: number;
   confidenceCounts: Record<FIRMSConfidence, number>;
-  /** Satellite of the founding (highest-FRP) detection — see module doc comment. */
-  satellite: string;
+  /** Every non-empty satellite code seen in the cluster (founder and merged members). */
+  satellites: Set<string>;
 }
 
 function emptyConfidenceCounts(): Record<FIRMSConfidence, number> {
@@ -385,7 +385,7 @@ function emptyConfidenceCounts(): Record<FIRMSConfidence, number> {
  *    cluster with this detection as its founder. Ties in distance-to-
  *    centroid resolve to whichever cluster was created first.
  * 3. Because detections are processed FRP-descending, a cluster's founder
- *    always holds the cluster's `maxFrp` and supplies its `satellite`.
+ *    always holds the cluster's `maxFrp`; every member adds its code to `satellites`.
  * 4. Once all detections are assigned, compute each cluster's `distanceKm`
  *    and `bearing` from `(lat, lon)` to its final centroid.
  * 5. Return clusters **sorted nearest-first** by `distanceKm` — that's the
@@ -439,7 +439,7 @@ export function clusterDetections(
         dayCount: detection.daynight === 'D' ? 1 : 0,
         nightCount: detection.daynight === 'N' ? 1 : 0,
         confidenceCounts,
-        satellite: detection.satellite
+        satellites: new Set(detection.satellite ? [detection.satellite] : [])
       });
       continue;
     }
@@ -457,8 +457,9 @@ export function clusterDetections(
     if (detection.daynight === 'D') cluster.dayCount += 1;
     if (detection.daynight === 'N') cluster.nightCount += 1;
     cluster.confidenceCounts[detection.confidence] += 1;
-    // maxFrp/satellite stay as the founder's — FRP-descending processing
-    // guarantees no later member exceeds the founder's FRP.
+    if (detection.satellite) cluster.satellites.add(detection.satellite);
+    // maxFrp stays the founder's — FRP-descending processing guarantees no
+    // later member exceeds the founder's FRP.
   }
 
   const results: FIRMSCluster[] = clusters.map(cluster => {
@@ -477,7 +478,7 @@ export function clusterDetections(
       dayCount: cluster.dayCount,
       nightCount: cluster.nightCount,
       confidenceCounts: cluster.confidenceCounts,
-      satellite: cluster.satellite
+      satellites: [...cluster.satellites].sort()
     };
   });
 

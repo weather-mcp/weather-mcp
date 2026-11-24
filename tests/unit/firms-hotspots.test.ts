@@ -346,7 +346,7 @@ describe('clusterDetections', () => {
     expect(fromOriginal).toEqual(fromReversed);
     // Nearest cluster (near-origin pair) always founded by its own highest-FRP
     // member, regardless of the traversal order used to discover it.
-    expect(fromOriginal[0].satellite).toBe('HIGH');
+    expect(fromOriginal[0].satellites).toEqual(['HIGH', 'LOW']);
     expect(fromOriginal[0].maxFrp).toBe(40);
   });
 
@@ -398,5 +398,39 @@ describe('clusterDetections', () => {
 
     expect(clusters[0]).not.toHaveProperty('bright_ti4');
     expect(clusters[0]).not.toHaveProperty('bright_ti5');
+  });
+});
+
+describe('clusterDetections — satellites', () => {
+  const det = (kmNorth: number, frp: number, satellite: string): FIRMSDetection => ({
+    latitude: kmNorth / 111.19,
+    longitude: 0,
+    frp,
+    confidence: 'nominal',
+    acquiredAt: '2026-08-14T00:00:00.000Z',
+    daynight: 'D',
+    satellite
+  });
+
+  it('lists every satellite once, sorted', () => {
+    const input = [det(0.1, 9, 'N20'), det(0.2, 8, 'N21'), det(0.3, 7, 'N20')];
+    expect(clusterDetections(input, 0, 0)[0].satellites).toEqual(['N20', 'N21']);
+  });
+
+  it('gives the same answer for reversed input', () => {
+    const input = [det(0.1, 9, 'N20'), det(0.2, 8, 'N21'), det(0.3, 7, 'N20')];
+    expect(clusterDetections([...input].reverse(), 0, 0)[0].satellites).toEqual(['N20', 'N21']);
+  });
+
+  it('keeps two clusters with different single codes apart', () => {
+    const input = [det(0.1, 9, 'N20'), det(500, 8, 'N21')];
+    const out = clusterDetections(input, 0, 0);
+    expect(out.map((c) => c.satellites)).toEqual([['N20'], ['N21']]);
+  });
+
+  it('drops empty codes', () => {
+    const mixed = clusterDetections([det(0.1, 9, ''), det(0.2, 8, 'N21')], 0, 0);
+    expect(mixed[0].satellites).toEqual(['N21']);
+    expect(clusterDetections([det(0.1, 9, ''), det(0.2, 8, '')], 0, 0)[0].satellites).toEqual([]);
   });
 });
