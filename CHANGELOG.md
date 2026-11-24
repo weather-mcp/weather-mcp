@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Outside the US, `get_wildfire_info` reads NASA FIRMS satellite fire detections. It read only one satellite, Suomi NPP, which stopped publishing on 2 November 2026. Since then the tool said "No satellite fire detections" everywhere outside the US, while two other satellites were still reporting fires. The answer was well formed and carried its not-an-all-clear caveat, so nothing looked wrong. The tool now reads both current satellites and checks on every call that each one is still publishing.
+
 ### Fixed
 
-- `get_wildfire_info` outside the US (NASA FIRMS) reads the NOAA-20 and NOAA-21 satellites instead of Suomi NPP, which stopped publishing on 2 November 2026. Each satellite's feed is checked for freshness on every call: a stale satellite is left out and named, a failed one is named while the other's detections still show, and every feed stale is an error rather than an empty answer. Clusters name every satellite that saw them.
-- `get_wildfire_info` without a `FIRMS_MAP_KEY` now shows only detections from the last 24 hours, as its heading says. The keyless regional files hold 25 to 45 hours of detections, and all of them were counted as "in the last 24 h" — at one point in the Central African Republic, 393 detections against 2 on the keyed path.
+- **Satellite fire detections outside the US are back.** `get_wildfire_info` now reads VIIRS on NOAA-20 and NOAA-21 and merges their detections. A new `**Satellites:**` line names the satellites that contributed. Each cluster's `**Satellite:**` line names every satellite that saw it.
+- **A satellite that stops publishing is named, not silently counted as "no fires".** Each satellite's feed is checked for freshness on every call. A stale satellite is left out, and a note gives the date of its last data. A satellite whose request fails is named in a note while the other's detections still show. When every satellite is stale or every request fails, the tool returns an error, not an empty answer. When the freshness check itself cannot be read, the satellite is included as before.
+
+### Changed
+
+- **Without a `FIRMS_MAP_KEY`, the report counts only the last 24 hours, as its heading says.** The keyless regional files hold 25 to 45 hours of detections, and every one was counted as "in the last 24 h". At one point in the Central African Republic that was 393 detections, against 2 on the keyed path for the same 24 hours. Keyless reports now show fewer detections than before. The keyless files also run about two hours behind the keyed service, so a very recent detection can appear only with a key.
 
 ## [1.35.23] - 2026-11-23
 
