@@ -9,6 +9,9 @@
  * - ENABLED_TOOLS=basic,+air_quality       # Basic tools + air quality
  * - ENABLED_TOOLS=all,-marine              # All tools except marine
  * - ENABLED_TOOLS=forecast,current,alerts  # Specific tools only
+ * - ENABLED_TOOLS=-alerts,standard         # Same as standard,-alerts: order between a preset
+ *                                          #   and its +/- modifiers does not matter
+ * - ENABLED_TOOLS=-alerts                  # Modifiers alone adjust the default basic preset
  */
 
 /**
@@ -166,19 +169,41 @@ const TOOL_ALIASES: Record<string, ToolName> = {
  * - Removing from presets: "all,-marine"
  * - Combinations: "standard,+air_quality,-alerts"
  *
+ * Two passes over one token list. The base set is the union of every bare token (preset, tool
+ * or alias) in token order, or the `basic` preset when the value has no bare token at all. Every
+ * `+tool` / `-tool` then applies to that base, in token order. So a modifier's position relative
+ * to a bare token never changes the result; a value that lists every bare token before its
+ * modifiers gives the same tools, in the same order, as the old single-pass parser did.
+ *
  * @param envValue The ENABLED_TOOLS environment variable value
  * @returns Set of enabled tool names
  */
 function parseEnabledTools(envValue: string | undefined): Set<ToolName> {
-  // Default to "basic" preset if not specified
-  if (!envValue) {
-    return new Set(TOOL_PRESETS.basic);
+  const parts = (envValue ?? '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+  const isModifier = (part: string): boolean => part.startsWith('+') || part.startsWith('-');
+  const bareParts = parts.filter(part => !isModifier(part));
+
+  // Pass 1 — the base. No bare token at all (unset, empty, or modifiers only) → the default
+  // preset. Bare tokens that are all unknown still give an empty base, not the default.
+  const enabledTools = new Set<ToolName>(bareParts.length === 0 ? TOOL_PRESETS.basic : []);
+
+  for (const part of bareParts) {
+    if (Object.prototype.hasOwnProperty.call(TOOL_PRESETS, part)) {
+      for (const tool of TOOL_PRESETS[part]) {
+        enabledTools.add(tool);
+      }
+      continue;
+    }
+
+    const resolvedTool = resolveToolName(part);
+    if (resolvedTool) {
+      enabledTools.add(resolvedTool);
+    } else {
+      console.warn(`Unknown tool or preset: "${part}"`);
+    }
   }
 
-  const parts = envValue.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
-  let enabledTools = new Set<ToolName>();
-  let hasBaseSet = false;
-
+  // Pass 2 — modifiers, in token order, against the base.
   for (const part of parts) {
     // Handle additions (+tool)
     if (part.startsWith('+')) {
@@ -201,37 +226,8 @@ function parseEnabledTools(envValue: string | undefined): Set<ToolName> {
       } else {
         console.warn(`Unknown tool to remove: "${toolName}"`);
       }
-      continue;
     }
-
-    // Handle presets
-    if (Object.prototype.hasOwnProperty.call(TOOL_PRESETS, part)) {
-      if (!hasBaseSet) {
-        // First preset replaces the default
-        enabledTools = new Set(TOOL_PRESETS[part]);
-        hasBaseSet = true;
-      } else {
-        // Additional presets merge with existing
-        for (const tool of TOOL_PRESETS[part]) {
-          enabledTools.add(tool);
-        }
-      }
-      continue;
-    }
-
-    // Handle individual tools
-    const resolvedTool = resolveToolName(part);
-    if (resolvedTool) {
-      if (!hasBaseSet) {
-        // First individual tool creates a new set
-        enabledTools = new Set([resolvedTool]);
-        hasBaseSet = true;
-      } else {
-        enabledTools.add(resolvedTool);
-      }
-    } else {
-      console.warn(`Unknown tool or preset: "${part}"`);
-    }
+    // Bare tokens were applied in pass 1.
   }
 
   return enabledTools;

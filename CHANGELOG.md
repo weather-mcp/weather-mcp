@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.26] - 2026-11-24
+
+`ENABLED_TOOLS` read its tokens once, left to right, so a `+tool` or `-tool` written before a preset acted on an empty set and the preset then undid it. `ENABLED_TOOLS=-alerts,standard` started cleanly, printed no warning, and exposed `get_alerts`, the one tool the operator asked to remove. This release reads the value in two passes: first every preset and tool name, then every modifier. The order between a preset and its modifiers no longer matters. Every documented form (preset first, then modifiers) gives the same tools in the same order as before.
+
+### Fixed
+
+- **A `+tool` or `-tool` written before a preset now applies.** `-alerts,standard` now equals `standard,-alerts`, and `-marine,all` equals `all,-marine`. Before, the removal was silently lost and the tool stayed on. The same applies to additions: `+marine,basic` now gives `basic` plus marine, where the marine tool was dropped. Modifiers still apply in the order written among themselves, so `basic,-alerts,+alerts` keeps alerts on.
+
+### Changed
+
+- **A value of only modifiers now adjusts the default `basic` preset.** Before, it started from an empty set. `+marine` alone goes from one tool to seven (`basic` plus marine), and `-alerts` alone goes from zero tools to five. To expose a single tool, name it bare: `ENABLED_TOOLS=marine`. A value that is blank, only spaces or only commas now gives the default `basic` preset, the same as leaving the variable unset. Before, it gave zero tools. Two things deliberately stay as they were. A misspelt name with no `+` or `-` still adds nothing: `ENABLED_TOOLS=forcast` starts with zero tools and a warning, not with `basic`, because a server that exposes tools you did not name would hide the typo. And removing a tool does not remove its data from `get_weather_summary`: `-alerts` takes `get_alerts` out of the tool list, but the summary still has its alerts section.
+
 ## [1.35.25] - 2026-11-24
 
 On the Great Lakes and the major US coastal bays, `get_marine_conditions` reports NOAA's forecast grid. It printed the oldest value in that grid instead of the one for now, so wave height, period and wind were up to half a day stale on every call. Sometimes they were higher than the current forecast and sometimes lower. This release reads the value for the time of the request. Open-Meteo marine reports elsewhere are unchanged.
@@ -2448,7 +2460,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.25...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.26...HEAD
+[1.35.26]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.25...v1.35.26
 [1.35.25]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.24...v1.35.25
 [1.35.24]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.23...v1.35.24
 [1.35.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.22...v1.35.23
