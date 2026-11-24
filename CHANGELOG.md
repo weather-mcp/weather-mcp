@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.24] - 2026-11-24
+
+Outside the US, `get_wildfire_info` reads NASA FIRMS satellite fire detections. It read only one satellite, Suomi NPP, which stopped publishing on 2 November 2026. Since then the tool said "No satellite fire detections" everywhere outside the US, while two other satellites were still reporting fires. The answer was well formed and carried its not-an-all-clear caveat, so nothing looked wrong. The tool now reads both current satellites and checks on every call that each one is still publishing.
+
+### Fixed
+
+- **Satellite fire detections outside the US are back.** `get_wildfire_info` now reads VIIRS on NOAA-20 and NOAA-21 and merges their detections. A new `**Satellites:**` line names the satellites that contributed. Each cluster's `**Satellite:**` line names every satellite that saw it.
+- **A satellite that stops publishing is named, not silently counted as "no fires".** Each satellite's feed is checked for freshness on every call. A stale satellite is left out, and a note gives the date of its last data. A satellite whose request fails is named in a note while the other's detections still show. When every satellite is stale or every request fails, the tool returns an error, not an empty answer. When the freshness check itself cannot be read, the satellite is included as before.
+
+### Changed
+
+- **Without a `FIRMS_MAP_KEY`, the report counts only the last 24 hours, as its heading says.** The keyless regional files hold 25 to 45 hours of detections, and every one was counted as "in the last 24 h". At one point in the Central African Republic that was 393 detections, against 2 on the keyed path for the same 24 hours. Keyless reports now show fewer detections than before. The keyless files also run about two hours behind the keyed service, so a very recent detection can appear only with a key.
+
 ## [1.35.23] - 2026-11-23
 
 With the optional Google Weather key set, `get_alerts` uses Google for places outside the keyless alert services. When Google answered with something other than its alerts list, such as a maintenance page or an empty body, the tool said there were no active alerts and repeated that for five minutes. On safety data, a false all-clear is the worst answer the tool can give. It now reports an error instead.
@@ -2427,7 +2440,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.23...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.24...HEAD
+[1.35.24]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.23...v1.35.24
 [1.35.23]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.22...v1.35.23
 [1.35.22]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.21...v1.35.22
 [1.35.21]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.20...v1.35.21

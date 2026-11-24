@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.23 (Production Ready)
+- **Version:** 1.35.24 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -97,6 +97,7 @@ src/
 │   ├── modelComparison.ts / ensembleSpread.ts        # Forecast agreement + member spread (pure)
 │   ├── fireWeather.ts / thermalStress.ts             # Fire indices incl. Fosberg; wind chill, frostbite, WBGT (pure)
 │   ├── firmsHotspots.ts / metarStation.ts / riverDischarge.ts  # FIRMS parse+cluster; METAR picker; GloFAS cell snap (pure)
+│   ├── firmsProducts.ts     # FIRMS product table (NOAA-20/21), freshness by clock, satellite names (pure)
 │   ├── firePerimeter.ts     # NIFC perimeter distance: zero inside, nearest edge outside, even-odd over all rings (pure)
 │   ├── eaGauges.ts          # EA station filter, measure selection, level banding (pure)
 │   ├── capParse.ts / pointInPolygon.ts  # CAP 1.2 XML → records, active filter, feed-URL allowlist; ray-casting point-in-ring (pure)
@@ -260,6 +261,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 ### Upstream data hygiene
 
 - **Never trust the HTTP 200 alone.** Open-Meteo and others return 200 with all-null series for uncovered points (pollen outside Europe, flood at sea, ensemble probability). Guard with `!= null`, not `!== undefined` — JSON `null` survives `!== undefined` and then coerces to 0 in arithmetic/conversion (the v1.20.0 F1 and normals-averaging bugs). The Open-Meteo series types declare this honestly (`field?: (number | null)[]`), and so do the `current.*` and geocoding scalars (`field?: number | null`), so the compiler now enumerates the guard sites rather than certifying their absence; `finiteSampleAt` (`src/utils/finiteSample.ts`) is the shared accessor for reading one sample.
+- **A dead feed and a quiet region both answer with zero rows; only the clock tells them apart.** FIRMS products are freshness-checked on every call, by clock (the flat file's `Last-Modified`, `data_availability`'s `max_date`), and a stale product is named and excluded, never merged; a missing signal fails open (`src/utils/firmsProducts.ts`).
 - **Parse CSV/JSON by field name, never by position.** Two live shapes of the same feed have differed in column order and count.
 - **A pushed feed is validated before it is buffered.** The Blitzortung strike buffer holds only strikes with finite, in-range coordinates and a time no later than ingest plus 5 minutes; `parseStrike` (`src/utils/strikeBuffer.ts`) is the only way in, and latitude or longitude 0 is valid. Rejects are counted per reason and warned at most once a minute, with no topic or payload text, because a per-message warn hands the broker the stderr write rate and copies its bytes into the log.
 - **Verify documented shapes live before building on them.** Documented field names, enum casing, duration formats, and error codes have all been wrong upstream (Google Weather: six divergences; FIRMS Area API counts calendar UTC days while flat files are rolling 24 h). Record the verified shape in the plan doc.
@@ -763,15 +765,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.23 — Production Ready ✅
-- **Test Coverage:** 5,580 tests, 100% pass rate
+- **Version:** 1.35.24 — Production Ready ✅
+- **Test Coverage:** 5,671 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.24:** FIRMS wildfire detections read NOAA-20 and NOAA-21, with a per-satellite freshness check
 - **New in v1.35.23:** A broken Google Weather alerts answer is reported as an error, not as no alerts
 - **New in v1.35.22:** A broken saved-location entry is named instead of crashing the server, save_location can replace it, and saved locations have size limits
-- **New in v1.35.21:** check_service_status no longer lists USGS, which this server never contacts
 
 ## Useful References
 
@@ -794,7 +796,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-23 (v1.35.23)
+**Last Updated:** 2026-11-24 (v1.35.24)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

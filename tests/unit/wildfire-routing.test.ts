@@ -61,11 +61,26 @@ function makeFirmsFake(opts: {
   bboxImpl?: (...args: unknown[]) => Promise<FIRMSDetection[]>;
   regionImpl?: (...args: unknown[]) => Promise<FIRMSDetection[]>;
 } = {}) {
+  // The handler fetches every FIRMS product. Both products reach the impl, so
+  // a rejecting impl rejects for both; a fulfilled impl's rows are answered
+  // for NOAA-20 only ([] for NOAA-21), so rendered counts are not doubled.
+  const onlyNoaa20 = (product: unknown, rows: FIRMSDetection[]) =>
+    (product as { id?: string } | undefined)?.id === 'VIIRS_NOAA20_NRT' ? rows : [];
+  const bboxImpl = opts.bboxImpl ?? (async () => []);
+  const regionImpl = opts.regionImpl ?? (async () => []);
   const isKeyAvailable = vi.fn(() => opts.keyAvailable ?? false);
-  const getDetectionsByBbox = vi.fn(opts.bboxImpl ?? (async () => []));
-  const getDetectionsByRegion = vi.fn(opts.regionImpl ?? (async () => []));
-  const service = { isKeyAvailable, getDetectionsByBbox, getDetectionsByRegion } as unknown as FIRMSService;
-  return { service, isKeyAvailable, getDetectionsByBbox, getDetectionsByRegion };
+  const getDetectionsByBbox = vi.fn(async (...args: unknown[]) =>
+    onlyNoaa20(args[5], await bboxImpl(...args))
+  );
+  const getDetectionsByRegion = vi.fn(async (...args: unknown[]) => ({
+    detections: onlyNoaa20(args[1], await regionImpl(...args)),
+    lastModified: undefined
+  }));
+  const getProductAvailability = vi.fn(async () => undefined);
+  const service = {
+    isKeyAvailable, getDetectionsByBbox, getDetectionsByRegion, getProductAvailability
+  } as unknown as FIRMSService;
+  return { service, isKeyAvailable, getDetectionsByBbox, getDetectionsByRegion, getProductAvailability };
 }
 
 function makeNominatimFake(impl: (lat: number, lon: number) => Promise<string | null>) {
@@ -154,7 +169,7 @@ describe('handleGetWildfireInfo — country routing (D1)', () => {
       nominatim.service
     );
 
-    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(2);
     expect(nifc.queryFirePerimeters).not.toHaveBeenCalled();
     expect(nominatim.reverseCountry).not.toHaveBeenCalled();
   });
@@ -248,7 +263,7 @@ describe('handleGetWildfireInfo — country routing (D1)', () => {
     );
 
     expect(nominatim.reverseCountry).not.toHaveBeenCalled();
-    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(2);
     expect(nifc.queryFirePerimeters).not.toHaveBeenCalled();
   });
 
@@ -266,7 +281,7 @@ describe('handleGetWildfireInfo — country routing (D1)', () => {
       nominatim.service
     );
 
-    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(2);
     expect(nifc.queryFirePerimeters).not.toHaveBeenCalled();
   });
 
@@ -327,7 +342,7 @@ describe('handleGetWildfireInfo — country routing (D1)', () => {
       undefined
     );
 
-    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(2);
     expect(nifc.queryFirePerimeters).not.toHaveBeenCalled();
     expect(result.content[0].text).not.toContain('country lookup service was unavailable');
   });
@@ -688,8 +703,8 @@ describe('handleGetWildfireInfo — FIRMS renderer', () => {
       nominatim.service
     );
 
-    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(1);
-    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(2);
+    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(2);
     expect(result.content[0].text).toContain(
       '*Note: FIRMS_MAP_KEY was rejected; showing keyless 24-hour data.*'
     );
@@ -710,7 +725,7 @@ describe('handleGetWildfireInfo — FIRMS renderer', () => {
     );
 
     expect(firms.getDetectionsByBbox).not.toHaveBeenCalled();
-    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByRegion).toHaveBeenCalledTimes(2);
     expect(result.content[0].text).toContain(
       '*Multi-day detection history requires a free FIRMS_MAP_KEY; showing the last 24 hours.*'
     );
@@ -733,7 +748,7 @@ describe('handleGetWildfireInfo — FIRMS renderer', () => {
       nominatim.service
     );
 
-    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(2);
     const args = firms.getDetectionsByBbox.mock.calls[0];
     expect(args[4]).toBe(4);
   });
@@ -871,10 +886,10 @@ describe('handleGetWildfireInfo — keyed FIRMS antimeridian bbox splitting (F6/
       nominatim.service
     );
 
-    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(2);
-    const calls = firms.getDetectionsByBbox.mock.calls as unknown as Array<
-      [number, number, number, number, number]
-    >;
+    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(4);
+    const calls = (firms.getDetectionsByBbox.mock.calls as unknown as Array<
+      [number, number, number, number, number, { id: string }]
+    >).filter(call => call[5].id === 'VIIRS_NOAA20_NRT');
 
     for (const [west, , east] of calls) {
       expect(west).toBeLessThan(east);
@@ -922,7 +937,7 @@ describe('handleGetWildfireInfo — keyed FIRMS antimeridian bbox splitting (F6/
       nominatim.service
     );
 
-    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(2);
+    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(4);
     expect(result.content[0].text).toContain('2 satellite fire detections');
   });
 
@@ -940,7 +955,7 @@ describe('handleGetWildfireInfo — keyed FIRMS antimeridian bbox splitting (F6/
       nominatim.service
     );
 
-    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(2);
     const [west, south, east, north] = firms.getDetectionsByBbox.mock.calls[0] as [
       number,
       number,
@@ -971,7 +986,7 @@ describe('handleGetWildfireInfo — keyed FIRMS antimeridian bbox splitting (F6/
       nominatim.service
     );
 
-    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(1);
+    expect(firms.getDetectionsByBbox).toHaveBeenCalledTimes(2);
     const [west, , east] = firms.getDetectionsByBbox.mock.calls[0] as [
       number,
       number,

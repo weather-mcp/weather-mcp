@@ -4347,6 +4347,15 @@ gate or probe flagged it. Only a sibling product exposed the outage. Here the co
 is a sibling **product** on the same API; for JMA it was a sibling endpoint. Filed as a
 ROADMAP Hardening row.
 
+**In-field check, shipped:** 2026-11-24, firms-satellite-products (`b6f59f7`). Every FIRMS call
+now judges each product by the clock — the flat file's `Last-Modified` keyless,
+`data_availability`'s `max_date` keyed — and names and excludes a stale one
+(`src/utils/firmsProducts.ts`); `tests/live/firms-product-freshness.test.ts` is the per-release
+control, with a MODIS sibling. The design measured the dead-vs-quiet case that rules out a row
+count: live NOAA-21 returned **0** rows for Alaska while current. On this host the cache-buster
+did **not** suppress `last-modified`. Verify re-run 2026-11-24 05:21 UTC: NOAA-20, NOAA-21 and
+the MODIS sibling current; SNPP still 12 Nov.
+
 **Status:** active. Related: [G47] (the fast sibling — a throttled upstream
 returning a plausible zero; same "well-formed body, wrong answer" family, but
 its control is a count and this one's is a clock), [G4] (never trust the HTTP
@@ -7648,6 +7657,69 @@ called once (`.devdocs/archive/completed/qa-google-alerts-envelope.md`).
 
 **Status:** active. Related: G108 (run the repro on the base), G158
 (`clearServiceCaches()` does not reach every service's cache).
+
+---
+
+## G167 — A fan-out discriminator added to a service call is silently ignored by old fakes, so one fixture is answered once per branch
+
+**Trigger:** a handler starts calling one service method once per product, provider or variant
+(a new argument tells the calls apart), and existing test fakes were written as zero-argument
+callbacks or ignore that argument.
+
+**Rule:** enumerate **every** row-returning fake of the changed method, pass the discriminator
+through its helper, and make a fulfilled fake answer rows for one named branch (or distinct rows
+per branch). Keep a rejecting fake rejecting for **every** branch, so all-failed contracts keep
+their shape. Keep at least one total-count assertion that goes red by the fan-out factor if the
+fake answers every branch with the same rows.
+
+**Why:** JavaScript accepts extra arguments, and `as unknown as Service` hides the signature
+mismatch, so the old fake compiles and returns the same fixture for each fan-out call. Counts
+double while every failure-only contract stays green. A plan that product-keys three fake files
+and says the fourth "holds unedited" gives no warning until the gate is red, and then the
+tempting fix is to edit the lock assertion.
+
+**Verify:** grep every fake implementation of the changed method; each callback that returns
+rows shows the branch in its body. Temporarily remove that branch and confirm a count contract
+fails by the fan-out factor.
+
+**Evidence:** 2026-11-24, firms-satellite-products. The plan review (codex-R1) found
+`tests/unit/upstream-failure-iserror.test.ts`'s `firmsFake` passing zero-argument callbacks
+through; with NOAA-20 and NOAA-21 fetched, its pinned `1 satellite fire detection` (`:329`) would
+have read 2. Folded into T4 before the run (`b6f59f7`); `wildfire-routing.test.ts`'s
+`makeFirmsFake` wraps every impl the same way.
+
+**Status:** active. Related: G93 (a trailing parameter moves positional assertions), G45.
+
+---
+
+## G168 — A FIRMS `_24h` flat file is not a 24-hour window
+
+**Trigger:** reading, labelling or counting the keyless FIRMS flat files
+(`<product>/csv/<prefix>_<Region>_24h.csv`) as "the last 24 hours".
+
+**Rule:** treat the file as "recent acquisitions", not as a rolling 24 h window. Anything that
+labels its contents with a duration, or compares keyless and keyed counts, must filter by
+`acquiredAt` against the clock first, as the keyed path's rolling-window filter does.
+
+**Why:** the file's name is a product label. At one reading it held about 44 h of acquisitions,
+so the keyless report labelled "last 24 h" showed detections up to ~45 h old while the keyed path
+(which filters) did not. Nothing in a unit suite sees it: fixtures carry whatever dates the
+author chose.
+
+**Verify:** download one `_24h` file and count `acq_date` values; compare the oldest
+`acq_date`/`acq_time` with now.
+
+**Evidence:** 2026-11-24 ~05:27 UTC, firms-satellite-products T7. `J1_` and
+`J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv` held rows dated 2026-11-22 (from 08:52) and
+2026-11-23; the keyless Denver report printed `**Newest detection:** 44.6 hours ago` under
+`… in the last 24 h`. Pre-existing — the keyless path had never filtered by time. The same
+branch's QA (2026-11-24 13:19 UTC) measured the Central African Republic at 393 keyless detections
+"in the last 24 h" against 2 keyed, with rows 25-36 h old, while both files were current.
+
+**Status:** active. The keyless render now filters on the same rolling cutoff as the keyed
+path (`servedDays`, `src/handlers/wildfireHandler.ts`), pinned by
+`tests/unit/wildfire-firms-products.test.ts` case 9. The trap stays live for anything else that
+reads these files: a new consumer must filter too. Related: G72.
 
 ---
 

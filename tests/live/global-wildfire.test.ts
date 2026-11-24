@@ -97,18 +97,32 @@ const AREA_API_QUERY_LAT = 39.5;
 const AREA_API_QUERY_LON = -8.0;
 
 /**
+ * Recent acquisition in the flat files' zero-padded `acq_time` style
+ * (`0048`, `0130`). The keyless render now filters rows to the 24 h it names
+ * (G168), so like the keyed fixture these must be recent, not static.
+ */
+function recentFlatAcq(hoursAgo: number): { date: string; time: string } {
+  const d = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+  const date = d.toISOString().slice(0, 10);
+  const time = `${String(d.getUTCHours()).padStart(2, '0')}${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  return { date, time };
+}
+
+const FLAT_A = recentFlatAcq(2);
+const FLAT_B = recentFlatAcq(5);
+
+/**
  * Trimmed flat-file (keyless) capture — 13 columns, no `instrument`,
- * confidence spelled out (`nominal`/`high`/`low`), zero-padded `acq_time`
- * (`0048`/`0130`). Five rows near Vienna, Austria, same clustering logic
- * as above.
+ * confidence spelled out (`nominal`/`high`/`low`), zero-padded `acq_time`.
+ * Five rows near Vienna, Austria, same clustering logic as above.
  */
 const FLAT_FILE_CSV = [
   'latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight',
-  '48.201,16.401,325.0,0.4,0.4,2026-08-13,0048,N,nominal,2.0NRT,288.0,9.7,N',
-  '48.202,16.402,330.0,0.4,0.4,2026-08-13,0048,N,high,2.0NRT,292.0,18.2,N',
-  '48.199,16.403,320.0,0.4,0.4,2026-08-13,0130,N,nominal,2.0NRT,285.0,6.5,D',
-  '48.203,16.400,340.0,0.4,0.4,2026-08-13,0130,N,high,2.0NRT,298.0,25.0,D',
-  '48.198,16.399,318.0,0.4,0.4,2026-08-13,0048,N,low,2.0NRT,283.0,4.2,N'
+  `48.201,16.401,325.0,0.4,0.4,${FLAT_A.date},${FLAT_A.time},N,nominal,2.0NRT,288.0,9.7,N`,
+  `48.202,16.402,330.0,0.4,0.4,${FLAT_A.date},${FLAT_A.time},N,high,2.0NRT,292.0,18.2,N`,
+  `48.199,16.403,320.0,0.4,0.4,${FLAT_B.date},${FLAT_B.time},N,nominal,2.0NRT,285.0,6.5,D`,
+  `48.203,16.400,340.0,0.4,0.4,${FLAT_B.date},${FLAT_B.time},N,high,2.0NRT,298.0,25.0,D`,
+  `48.198,16.399,318.0,0.4,0.4,${FLAT_A.date},${FLAT_A.time},N,low,2.0NRT,283.0,4.2,N`
 ].join('\n');
 
 const FLAT_FILE_QUERY_LAT = 48.2;
@@ -117,10 +131,29 @@ const FLAT_FILE_QUERY_LON = 16.4;
 /** Private axios client, typed only as far as the spy needs (same shape as tests/unit/imagery-fetch-bounds.test.ts). */
 type Client = { get: (...a: unknown[]) => Promise<unknown> };
 
+/**
+ * The handler reads every FIRMS product. Answer the fixture for NOAA-20
+ * only, a header-only body for NOAA-21, and a current `data_availability`
+ * body, so the rendered counts are the fixture's own.
+ */
+function productAwareResponse(csv: string) {
+  return (...args: unknown[]) => {
+    const url = String(args[0]);
+    if (url.includes('/data_availability/')) {
+      const today = new Date().toISOString().slice(0, 10);
+      return textResponse(
+        `data_id,min_date,max_date\nVIIRS_NOAA20_NRT,2026-01-01,${today}\nVIIRS_NOAA21_NRT,2026-01-01,${today}`
+      );
+    }
+    const isNoaa20 = url.includes('VIIRS_NOAA20_NRT') || url.includes('/J1_');
+    return textResponse(isNoaa20 ? csv : csv.split('\n')[0]);
+  };
+}
+
 describe('Global wildfire integration — mocked CSV shapes end-to-end (deterministic)', () => {
   it('renders a keyed Area-API (14-column) response through the real service and handler', async () => {
     const firmsService = new FIRMSService({ mapKey: 'FAKE_TEST_MAP_KEY' });
-    vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(() => textResponse(AREA_API_CSV));
+    vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(productAwareResponse(AREA_API_CSV));
 
     const nominatimService = makeNominatimFake('pt'); // Portugal — non-US, routes to FIRMS
 
@@ -159,8 +192,10 @@ describe('Global wildfire integration — mocked CSV shapes end-to-end (determin
   });
 
   it('renders a keyless flat-file (13-column) response through the real service and handler, with the day_range upgrade note', async () => {
-    const firmsService = new FIRMSService({ mapKey: undefined }); // no key configured -> keyless path
-    vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(() => textResponse(FLAT_FILE_CSV));
+    // '' not undefined: the constructor's `mapKey = FIRMS_MAP_KEY` default fills an
+    // undefined from the environment, which made this case keyed whenever the key was set.
+    const firmsService = new FIRMSService({ mapKey: '' }); // keyless path, whatever the env holds
+    vi.spyOn((firmsService as unknown as { client: Client }).client, 'get').mockImplementation(productAwareResponse(FLAT_FILE_CSV));
 
     const nominatimService = makeNominatimFake('at'); // Austria — non-US, routes to FIRMS
 

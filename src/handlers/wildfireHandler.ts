@@ -32,12 +32,18 @@ import { displayValue } from '../utils/displayBanding.js';
 import { isInUS } from '../utils/geography.js';
 import { logger } from '../utils/logger.js';
 import {
+  FIRMS_PRODUCTS,
+  satelliteDisplayName,
+  classifyLastModified,
+  classifyMaxDate
+} from '../utils/firmsProducts.js';
+import {
   pickRegionFile,
   filterByRadius,
   clusterDetections,
   MAX_RADIUS_DETECTIONS
 } from '../utils/firmsHotspots.js';
-import type { FIRMSDetection, FIRMSCluster } from '../types/firms.js';
+import type { FIRMSDetection, FIRMSCluster, FIRMSProduct } from '../types/firms.js';
 import type { WildfireInfo } from '../types/wildfire.js';
 
 interface WildfireArgs {
@@ -631,92 +637,57 @@ async function formatFIRMSWildfire(
   let output = `# Wildfire Information Report\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Search Radius:** ${radius} km (${(radius * 0.621371).toFixed(1)} miles)\n`;
-  output += `**Source:** NASA FIRMS satellite fire detections (VIIRS, near real-time)\n\n`;
-  output += `⚠️ Satellite heat detections — not managed incident data. No fire names, `;
-  output += `sizes, or containment are available; detections may include industrial `;
-  output += `heat sources, gas flares, or agricultural burns.\n\n`;
+  output += `**Source:** NASA FIRMS satellite fire detections (VIIRS, near real-time)\n`;
+  // The `**Satellites:**` line needs the fetch outcome, so the warning
+  // paragraph that follows it is appended once the products have answered
+  // (or, on the error path, by the catch).
+  const warning =
+    `⚠️ Satellite heat detections — not managed incident data. No fire names, ` +
+    `sizes, or containment are available; detections may include industrial ` +
+    `heat sources, gas flares, or agricultural burns.\n\n`;
+  let preambleDone = false;
 
   let failed = false;
   try {
-    let detections: FIRMSDetection[];
-    let truncated: boolean;
-    let keyRejected = false;
-    // Effective window actually served: dayRange on the keyed path, 24 h keyless.
-    let servedDays = dayRange;
+    const collected = await collectFirmsDetections(
+      firmsService, latitude, longitude, radius, dayRange
+    );
 
-    if (firmsService.isKeyAvailable()) {
-      try {
-        // Same bbox math as the NIFC path. Latitude is clamped to valid
-        // coordinate range (the pole genuinely ends at ±90). Longitude is
-        // *sliced*, not clamped (F6): clamping truncated the query near the
-        // antimeridian instead of wrapping it, silently dropping detections
-        // across the dateline that the keyless path (whole-region haversine
-        // filter) found fine. See docs/release-review-hardening-plan.md D6.
-        const latOffset = radius / 111;
-        const lonOffset = radius / (111 * Math.cos(latitude * Math.PI / 180));
-        const south = Math.max(-90, latitude - latOffset);
-        const north = Math.min(90, latitude + latOffset);
-
-        // Upstream semantics (live-verified 2026-08-14): the Area API's day
-        // range counts calendar UTC days *including today*, while the keyless
-        // flat files serve a rolling 24 h window — so a day-range-1 query at
-        // midday would silently miss yesterday evening's detections that the
-        // keyless path shows. Request one extra calendar day (the API caps at
-        // 5) and filter to the true rolling window, keeping the "last N days"
-        // label honest and the two paths comparable. At day_range 5 the
-        // request can't widen further, so the tail of the window may fall up
-        // to a day short — acceptable for multi-day history.
-        const fetchDays = Math.min(dayRange + 1, 5);
-
-        // Longitude slices: near the poles cos(latitude) blows up and
-        // lonOffset can reach or exceed 180 (including Infinity) — one query
-        // spanning the full longitude range. Otherwise, if the raw ±lonOffset
-        // window crosses the antimeridian, two disjoint slices that meet at
-        // ±180. Otherwise, today's single-query window, unchanged.
-        const rawWest = longitude - lonOffset;
-        const rawEast = longitude + lonOffset;
-        let lonSlices: Array<[west: number, east: number]>;
-        if (lonOffset >= 180) {
-          lonSlices = [[-180, 180]];
-        } else if (rawWest < -180) {
-          lonSlices = [[rawWest + 360, 180], [-180, rawEast]];
-        } else if (rawEast > 180) {
-          lonSlices = [[rawWest, 180], [-180, rawEast - 360]];
-        } else {
-          lonSlices = [[rawWest, rawEast]];
-        }
-
-        // Slices are disjoint, so the raw detections are concatenated
-        // without dedup. Awaited sequentially — a FIRMSKeyRejectedError from
-        // either call propagates out of this try unchanged, straight to the
-        // keyless-fallback catch below.
-        let raw: FIRMSDetection[] = [];
-        for (const [west, east] of lonSlices) {
-          const slice = await firmsService.getDetectionsByBbox(west, south, east, north, fetchDays);
-          raw = raw.concat(slice);
-        }
-        const cutoffMs = Date.now() - dayRange * 24 * 60 * 60 * 1000;
-        const withinWindow = raw.filter(
-          d => new Date(d.acquiredAt).getTime() >= cutoffMs
-        );
-        ({ detections, truncated } = filterByRadius(withinWindow, latitude, longitude, radius));
-      } catch (error) {
-        if (!(error instanceof FIRMSKeyRejectedError)) {
-          throw error;
-        }
-        // Key rejected → keyless fallback with a disclosure note (D3): the
-        // tool keeps working while surfacing the misconfiguration.
-        keyRejected = true;
-        const regionFile = pickRegionFile(latitude, longitude);
-        const raw = await firmsService.getDetectionsByRegion(regionFile);
-        ({ detections, truncated } = filterByRadius(raw, latitude, longitude, radius));
-        servedDays = 1;
+    if (collected.contributing.length === 0) {
+      if (collected.failed.length > 0) {
+        // No product answered and at least one failed: today's error block.
+        throw collected.failed[0].error;
       }
-    } else {
-      const regionFile = pickRegionFile(latitude, longitude);
-      const raw = await firmsService.getDetectionsByRegion(regionFile);
-      ({ detections, truncated } = filterByRadius(raw, latitude, longitude, radius));
-      servedDays = 1;
+      // Every product stale: a distinct state from "unreachable", not an answer.
+      const dates = collected.stale
+        .map(s => `${s.product.displayName}: last data ${s.lastDataDate}`)
+        .join('; ');
+      throw new Error(`NASA FIRMS satellite feeds are not currently updating (${dates}).`);
+    }
+
+    output += `**Satellites:** ${collected.contributing.map(p => p.displayName).join(', ')} (VIIRS)\n`;
+    output += `\n${warning}`;
+    preambleDone = true;
+
+    const { keyRejected } = collected;
+    // Effective window actually served: dayRange on the keyed path, 24 h keyless.
+    const servedDays = collected.keyed ? dayRange : 1;
+    // Rolling-window filter on both paths, over the window the report names.
+    // Keyed: the request asks for one extra calendar day (see
+    // collectFirmsDetections). Keyless: a `_24h` flat file is "recent
+    // acquisitions", not a 24 h window — measured holding 25-45 h (G168).
+    const cutoffMs = Date.now() - servedDays * 24 * 60 * 60 * 1000;
+    const rows = collected.raw.filter(d => new Date(d.acquiredAt).getTime() >= cutoffMs);
+    // filterByRadius sorts by distance before its row cap, so the cap never
+    // drops one satellite's detections as a block.
+    const { detections, truncated } = filterByRadius(rows, latitude, longitude, radius);
+
+    if (collected.stale.length > 0 || collected.failed.length > 0) {
+      const parts = [
+        ...collected.stale.map(s => `${s.product.displayName}: no new data since ${s.lastDataDate} (UTC)`),
+        ...collected.failed.map(f => `${f.product.displayName}: request failed`)
+      ];
+      output += `*Note: not every satellite is included — ${parts.join('; ')}.*\n\n`;
     }
 
     if (keyRejected) {
@@ -798,6 +769,9 @@ async function formatFIRMSWildfire(
     }
   } catch (error) {
     failed = true;
+    if (!preambleDone) {
+      output += `\n${warning}`;
+    }
     output += `❌ **Error retrieving wildfire data**\n\n`;
     output += `Unable to fetch fire information. This may be due to:\n`;
     output += `- Temporary service unavailability\n`;
@@ -814,18 +788,167 @@ async function formatFIRMSWildfire(
   return { text: output, failed };
 }
 
-/** Human-readable satellite name from the FIRMS satellite code. */
-function formatSatellite(code: string): string {
-  switch (code) {
-    case 'N':
-      return 'Suomi NPP (VIIRS)';
-    case '1':
-      return 'NOAA-20 (VIIRS)';
-    case '2':
-      return 'NOAA-21 (VIIRS)';
-    default:
-      return code || 'Unknown';
+/** One FIRMS call's per-product outcome, before radius filtering. */
+interface FirmsCollection {
+  /** Rows from every contributing product, concatenated (no dedup across satellites). */
+  raw: FIRMSDetection[];
+  /** Current products that answered, in table order — zero rows is still an answer. */
+  contributing: FIRMSProduct[];
+  /** Products excluded as stale, in table order. */
+  stale: Array<{ product: FIRMSProduct; lastDataDate: string }>;
+  /** Products whose request failed (other than a key rejection), in table order. */
+  failed: Array<{ product: FIRMSProduct; error: unknown }>;
+  /** The keyed path's key was rejected and the keyless path answered instead (D3). */
+  keyRejected: boolean;
+  /** True when the rows came from the keyed Area API (multi-day, rolling-window filter applies). */
+  keyed: boolean;
+}
+
+/**
+ * Fetch every product in `FIRMS_PRODUCTS`, judge each one's freshness by the
+ * clock, and sort the products into contributing / stale / failed.
+ *
+ * Keyed: `data_availability` first (garnish, fails open); a product whose
+ * `max_date` is stale is not fetched. The rest run concurrently, each walking
+ * its longitude slices in sequence. A `FIRMSKeyRejectedError` from any product
+ * discards the keyed results and runs the keyless branch (D3).
+ *
+ * Keyless: every product's regional file concurrently; a fulfilled product is
+ * judged by its `Last-Modified` header (missing ⇒ current).
+ */
+async function collectFirmsDetections(
+  firmsService: FIRMSService,
+  latitude: number,
+  longitude: number,
+  radius: number,
+  dayRange: number
+): Promise<FirmsCollection> {
+  const nowMs = Date.now();
+
+  if (firmsService.isKeyAvailable()) {
+    // Same bbox math as the NIFC path. Latitude is clamped to valid
+    // coordinate range (the pole genuinely ends at ±90). Longitude is
+    // *sliced*, not clamped (F6): clamping truncated the query near the
+    // antimeridian instead of wrapping it, silently dropping detections
+    // across the dateline that the keyless path (whole-region haversine
+    // filter) found fine. See docs/release-review-hardening-plan.md D6.
+    const latOffset = radius / 111;
+    const lonOffset = radius / (111 * Math.cos(latitude * Math.PI / 180));
+    const south = Math.max(-90, latitude - latOffset);
+    const north = Math.min(90, latitude + latOffset);
+
+    // Upstream semantics (live-verified 2026-08-14): the Area API's day
+    // range counts calendar UTC days *including today*, while the keyless
+    // flat files serve a rolling 24 h window — so a day-range-1 query at
+    // midday would silently miss yesterday evening's detections that the
+    // keyless path shows. Request one extra calendar day (the API caps at
+    // 5) and the caller filters to the true rolling window, keeping the
+    // "last N days" label honest and the two paths comparable. At day_range
+    // 5 the request can't widen further, so the tail of the window may fall
+    // up to a day short — acceptable for multi-day history.
+    const fetchDays = Math.min(dayRange + 1, 5);
+
+    // Longitude slices: near the poles cos(latitude) blows up and
+    // lonOffset can reach or exceed 180 (including Infinity) — one query
+    // spanning the full longitude range. Otherwise, if the raw ±lonOffset
+    // window crosses the antimeridian, two disjoint slices that meet at
+    // ±180. Otherwise, a single-query window.
+    const rawWest = longitude - lonOffset;
+    const rawEast = longitude + lonOffset;
+    let lonSlices: Array<[west: number, east: number]>;
+    if (lonOffset >= 180) {
+      lonSlices = [[-180, 180]];
+    } else if (rawWest < -180) {
+      lonSlices = [[rawWest + 360, 180], [-180, rawEast]];
+    } else if (rawEast > 180) {
+      lonSlices = [[rawWest, 180], [-180, rawEast - 360]];
+    } else {
+      lonSlices = [[rawWest, rawEast]];
+    }
+
+    const availability = await firmsService.getProductAvailability();
+    const stale: FirmsCollection['stale'] = [];
+    const toFetch: FIRMSProduct[] = [];
+    for (const product of FIRMS_PRODUCTS) {
+      const freshness = classifyMaxDate(availability?.get(product.id), nowMs);
+      if (freshness.state === 'stale') {
+        logger.warn('FIRMS product feed is stale', { product: product.id, path: 'keyed' });
+        stale.push({ product, lastDataDate: freshness.lastDataDate });
+      } else {
+        toFetch.push(product);
+      }
+    }
+
+    // Slices are disjoint, so a product's slices are concatenated without
+    // dedup, awaited in sequence.
+    const settled = await Promise.allSettled(
+      toFetch.map(async product => {
+        let rows: FIRMSDetection[] = [];
+        for (const [west, east] of lonSlices) {
+          const slice = await firmsService.getDetectionsByBbox(west, south, east, north, fetchDays, product);
+          rows = rows.concat(slice);
+        }
+        return rows;
+      })
+    );
+
+    const keyRejected = settled.some(
+      r => r.status === 'rejected' && r.reason instanceof FIRMSKeyRejectedError
+    );
+    if (!keyRejected) {
+      const collection: FirmsCollection = {
+        raw: [], contributing: [], stale, failed: [], keyRejected: false, keyed: true
+      };
+      settled.forEach((result, i) => {
+        const product = toFetch[i];
+        if (result.status === 'fulfilled') {
+          collection.contributing.push(product);
+          collection.raw = collection.raw.concat(result.value);
+        } else {
+          collection.failed.push({ product, error: result.reason });
+        }
+      });
+      return collection;
+    }
+    // Key rejected → keyless fallback with a disclosure note (D3): the tool
+    // keeps working while surfacing the misconfiguration. The keyless path
+    // applies its own freshness rules; the keyed verdicts are discarded.
+    const fallback = await collectKeyless(firmsService, latitude, longitude, nowMs);
+    return { ...fallback, keyRejected: true };
   }
+
+  return collectKeyless(firmsService, latitude, longitude, nowMs);
+}
+
+async function collectKeyless(
+  firmsService: FIRMSService,
+  latitude: number,
+  longitude: number,
+  nowMs: number
+): Promise<FirmsCollection> {
+  const regionFile = pickRegionFile(latitude, longitude);
+  const settled = await Promise.allSettled(
+    FIRMS_PRODUCTS.map(product => firmsService.getDetectionsByRegion(regionFile, product))
+  );
+  const collection: FirmsCollection = {
+    raw: [], contributing: [], stale: [], failed: [], keyRejected: false, keyed: false
+  };
+  settled.forEach((result, i) => {
+    const product = FIRMS_PRODUCTS[i];
+    if (result.status === 'rejected') {
+      collection.failed.push({ product, error: result.reason });
+      return;
+    }
+    const freshness = classifyLastModified(result.value.lastModified, nowMs);
+    if (freshness.state === 'stale') {
+      logger.warn('FIRMS product feed is stale', { product: product.id, path: 'keyless' });
+      collection.stale.push({ product, lastDataDate: freshness.lastDataDate });
+      return;
+    }
+    collection.contributing.push(product);
+    collection.raw = collection.raw.concat(result.value.detections);
+  });
+  return collection;
 }
 
 /** Non-zero confidence buckets, highest first — e.g. "3 high, 12 nominal". */
@@ -867,7 +990,7 @@ function formatClusterDetails(cluster: FIRMSCluster, ordinal: number): string {
   if (confidenceSummary.length > 0) {
     output += `**Confidence:** ${confidenceSummary}\n`;
   }
-  output += `**Satellite:** ${formatSatellite(cluster.satellite)}\n`;
+  output += `**Satellite:** ${cluster.satellites.map(satelliteDisplayName).join(', ') || 'Unknown'}\n`;
 
   output += `\n---\n\n`;
   return output;
