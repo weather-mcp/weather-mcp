@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `get_wildfire_info` outside the US (NASA FIRMS) reads the NOAA-20 and NOAA-21 satellites instead of Suomi NPP, which stopped publishing on 2 November 2026. Each satellite's feed is checked for freshness on every call: a stale satellite is left out and named, a failed one is named while the other's detections still show, and every feed stale is an error rather than an empty answer. Clusters name every satellite that saw them.
+- `get_wildfire_info` without a `FIRMS_MAP_KEY` now shows only detections from the last 24 hours, as its heading says. The keyless regional files hold 25 to 45 hours of detections, and all of them were counted as "in the last 24 h" — at one point in the Central African Republic, 393 detections against 2 on the keyed path.
 
 ## [1.35.23] - 2026-11-23
 

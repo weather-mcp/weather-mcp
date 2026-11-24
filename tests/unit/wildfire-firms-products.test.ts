@@ -361,4 +361,43 @@ describe('get_wildfire_info FIRMS products', () => {
       expect(text).not.toContain('*Note: not every satellite');
     });
   });
+  describe('9: keyless rows are filtered to the 24 h the report names (G168)', () => {
+    // A `_24h` flat file is "recent acquisitions": measured live holding rows
+    // 25-36 h old, which rendered as "in the last 24 h" (codex-DR-M2).
+    function aged(satellite: string, ageMs: number, dLat = 0): FIRMSDetection {
+      return { ...detection(satellite, dLat), acquiredAt: new Date(NOW - ageMs).toISOString() };
+    }
+
+    it('keeps rows at 1 h and exactly 24 h, drops 24 h + 1 s and 36 h', async () => {
+      const f = fake({
+        region: {
+          [N20_ID]: { rows: [aged('N20', 3_600_000), aged('N20', DAY + 1000, 0.2)], lastModified: fresh },
+          [N21_ID]: { rows: [aged('N21', DAY, 0.4), aged('N21', 1.5 * DAY, 0.6)], lastModified: fresh }
+        },
+        availability: undefined
+      });
+      const result = await run(f.service);
+      const text = result.content[0].text;
+      expect(Object.keys(result)).toEqual(['content']);
+      expect(text).toContain('2 satellite fire detections in the last 24 h');
+      expect(text).not.toContain('**Newest detection:** 36');
+      expect(text).not.toContain('**Newest detection:** 24.0');
+    });
+
+    it('current products holding only rows older than 24 h → the no-detections line and caveat', async () => {
+      const f = fake({
+        region: {
+          [N20_ID]: { rows: [aged('N20', 1.5 * DAY)], lastModified: fresh },
+          [N21_ID]: { rows: [aged('N21', 1.1 * DAY)], lastModified: fresh }
+        },
+        availability: undefined
+      });
+      const result = await run(f.service);
+      const text = result.content[0].text;
+      expect(Object.keys(result)).toEqual(['content']);
+      expect(text).toContain('**Satellites:** NOAA-20, NOAA-21 (VIIRS)\n');
+      expect(text).toContain('**No satellite fire detections in the last 24 h within');
+      expect(text).toContain('absence of detections is not an all-clear');
+    });
+  });
 });

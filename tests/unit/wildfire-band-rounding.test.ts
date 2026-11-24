@@ -45,7 +45,10 @@ function offsetDeg(km: number): number {
   return km / KM_PER_DEGREE_LAT;
 }
 
-const FIXED_ACQUIRED_AT = '2026-08-20T12:00:00.000Z';
+// One hour before the clock: the FIRMS render keeps only rows inside the
+// window it names (24 h keyless, G168), so a fixed past date is filtered out
+// and nothing renders. These contracts are about distance, not time.
+const FIXED_ACQUIRED_AT = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
 const emptyStore = {} as never;
 const emptyGeocoding = {} as never;

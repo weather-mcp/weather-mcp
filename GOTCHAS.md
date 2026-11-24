@@ -7712,11 +7712,14 @@ author chose.
 **Evidence:** 2026-11-24 ~05:27 UTC, firms-satellite-products T7. `J1_` and
 `J2_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv` held rows dated 2026-11-22 (from 08:52) and
 2026-11-23; the keyless Denver report printed `**Newest detection:** 44.6 hours ago` under
-`… in the last 24 h`. Pre-existing — the keyless path has never filtered by time — and not
-changed by this plan.
+`… in the last 24 h`. Pre-existing — the keyless path had never filtered by time. The same
+branch's QA (2026-11-24 13:19 UTC) measured the Central African Republic at 393 keyless detections
+"in the last 24 h" against 2 keyed, with rows 25-36 h old, while both files were current.
 
-**Status:** active, **unfixed** — a follow-up candidate (apply the rolling 24 h filter on the
-keyless path). Related: G72.
+**Status:** active. The keyless render now filters on the same rolling cutoff as the keyed
+path (`servedDays`, `src/handlers/wildfireHandler.ts`), pinned by
+`tests/unit/wildfire-firms-products.test.ts` case 9. The trap stays live for anything else that
+reads these files: a new consumer must filter too. Related: G72.
 
 ---
 

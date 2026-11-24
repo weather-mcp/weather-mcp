@@ -672,13 +672,12 @@ async function formatFIRMSWildfire(
     const { keyRejected } = collected;
     // Effective window actually served: dayRange on the keyed path, 24 h keyless.
     const servedDays = collected.keyed ? dayRange : 1;
-    let rows = collected.raw;
-    if (collected.keyed) {
-      // Rolling-window filter (see collectFirmsDetections for why the keyed
-      // request asks for one extra calendar day).
-      const cutoffMs = Date.now() - dayRange * 24 * 60 * 60 * 1000;
-      rows = rows.filter(d => new Date(d.acquiredAt).getTime() >= cutoffMs);
-    }
+    // Rolling-window filter on both paths, over the window the report names.
+    // Keyed: the request asks for one extra calendar day (see
+    // collectFirmsDetections). Keyless: a `_24h` flat file is "recent
+    // acquisitions", not a 24 h window — measured holding 25-45 h (G168).
+    const cutoffMs = Date.now() - servedDays * 24 * 60 * 60 * 1000;
+    const rows = collected.raw.filter(d => new Date(d.acquiredAt).getTime() >= cutoffMs);
     // filterByRadius sorts by distance before its row cap, so the cap never
     // drops one satellite's detections as a block.
     const { detections, truncated } = filterByRadius(rows, latitude, longitude, radius);
