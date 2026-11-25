@@ -525,5 +525,143 @@ describe('FIRMSService', () => {
         spies.forEach(s => s.mockRestore());
       }
     });
+
+    it('never includes the map key or body text in a thrown message or a log on a wrong-shaped 200', async () => {
+      const bodies = [
+        `<html>${FAKE_KEY} BODY-SENTINEL</html>`,
+        `latitude,longitude\nBODY-SENTINEL,${FAKE_KEY}`
+      ];
+      const calls: Array<(service: FIRMSService) => Promise<unknown>> = [
+        service => service.getDetectionsByBbox(-106, 39, -104, 41, 1, N20),
+        service => service.getDetectionsByRegion('Europe', N20)
+      ];
+      for (const body of bodies) {
+        for (const call of calls) {
+          const spies = spyAll();
+          try {
+            mockGet.mockReset();
+            mockGet.mockImplementation(() => textResponse(body));
+            let thrown: Error | undefined;
+            try {
+              await call(new FIRMSService({ mapKey: FAKE_KEY }));
+            } catch (error) {
+              thrown = error as Error;
+            }
+            expect(thrown).toBeDefined();
+            for (const text of [thrown!.message, thrown!.stack ?? '', serialized(spies)]) {
+              expect(text).not.toContain(FAKE_KEY);
+              expect(text).not.toContain('BODY-SENTINEL');
+            }
+          } finally {
+            spies.forEach(s => s.mockRestore());
+          }
+        }
+      }
+    });
+  });
+
+  describe('wrong-shaped 200 body', () => {
+    const REFUSAL = 'FIRMS returned an unexpected response.';
+
+    // Literal column list on purpose: a shrinking required-column constant must not hide a gap.
+    const AREA_COLUMNS = [
+      'latitude', 'longitude', 'bright_ti4', 'scan', 'track', 'acq_date', 'acq_time',
+      'satellite', 'instrument', 'confidence', 'version', 'bright_ti5', 'frp', 'daynight'
+    ];
+    const AREA_ROW = ['40.1', '-105.2', '330.5', '0.4', '0.4', '2026-08-13', '215', 'N', 'VIIRS', 'n', '2.0NRT', '290.1', '15.3', 'D'];
+    const AREA_HEADER = AREA_COLUMNS.join(',');
+    const withoutColumn = (column: string): string => {
+      const i = AREA_COLUMNS.indexOf(column);
+      return [
+        AREA_COLUMNS.filter((_c, j) => j !== i).join(','),
+        AREA_ROW.filter((_v, j) => j !== i).join(',')
+      ].join('\n');
+    };
+    const badLatRow = ['north', ...AREA_ROW.slice(1)].join(',');
+
+    const bodies: Array<[string, string, 'NO_HEADER' | 'NO_USABLE_ROWS']> = [
+      ['empty body', '', 'NO_HEADER'],
+      ['HTML', '<html><body>Maintenance</body></html>', 'NO_HEADER'],
+      ['JSON', '{"error":"Service unavailable"}', 'NO_HEADER'],
+      ['no latitude column', withoutColumn('latitude'), 'NO_HEADER'],
+      ['no longitude column', withoutColumn('longitude'), 'NO_HEADER'],
+      ['no acq_date column', withoutColumn('acq_date'), 'NO_HEADER'],
+      ['no acq_time column', withoutColumn('acq_time'), 'NO_HEADER'],
+      ['every row unusable', [AREA_HEADER, badLatRow, badLatRow].join('\n'), 'NO_USABLE_ROWS']
+    ];
+
+    const methods: Array<[string, () => FIRMSService, (s: FIRMSService) => Promise<unknown>, string]> = [
+      [
+        'getDetectionsByBbox',
+        () => new FIRMSService({ mapKey: FAKE_KEY }),
+        s => s.getDetectionsByBbox(-106, 39, -104, 41, 1, N20),
+        AREA_API_CSV
+      ],
+      [
+        'getDetectionsByRegion',
+        () => new FIRMSService(),
+        s => s.getDetectionsByRegion('Europe', N20),
+        FLAT_FILE_CSV
+      ]
+    ];
+
+    const matrix = methods.flatMap(m => bodies.map(b => [m[0], b[0], m, b] as const));
+
+    it.each(matrix)('%s refuses a 200 that is %s, logs a warn only, and caches nothing', async (_m, _b, method, row) => {
+      const [, make, call, goodBody] = method;
+      const [, body, code] = row;
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      try {
+        mockGet.mockImplementation(() => textResponse(body));
+        const service = make();
+
+        await expect(call(service)).rejects.toThrow(new Error(REFUSAL));
+        expect(mockGet).toHaveBeenCalledTimes(1);
+        expect(error).not.toHaveBeenCalled();
+        const unexpected = warn.mock.calls.filter(c => c[0] === 'FIRMS returned an unexpected response');
+        expect(unexpected).toHaveLength(1);
+        expect(unexpected[0][1]).toMatchObject({ status: 200, securityEvent: true, code });
+
+        // Nothing cached: the SAME instance re-fetches, and a good body now resolves one detection.
+        mockGet.mockImplementation(() => textResponse(goodBody));
+        const recovered = (await call(service)) as unknown;
+        const detections = Array.isArray(recovered)
+          ? recovered
+          : (recovered as { detections: unknown[] }).detections;
+        expect(detections).toHaveLength(1);
+        expect(mockGet).toHaveBeenCalledTimes(2);
+      } finally {
+        warn.mockRestore();
+        error.mockRestore();
+      }
+    });
+
+    it('a header-only Area body is an honest empty answer, resolved and cached', async () => {
+      mockGet.mockImplementation(() => textResponse(AREA_HEADER));
+      const service = new FIRMSService({ mapKey: FAKE_KEY });
+
+      await expect(service.getDetectionsByBbox(-106, 39, -104, 41, 1, N20)).resolves.toEqual([]);
+      await expect(service.getDetectionsByBbox(-106, 39, -104, 41, 1, N20)).resolves.toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('a header-only flat-file body is an honest empty answer, resolved and cached', async () => {
+      mockGet.mockImplementation(() => textResponse(FLAT_FILE_CSV.split('\n')[0]));
+      const service = new FIRMSService();
+
+      const first = await service.getDetectionsByRegion('Europe', N20);
+      await service.getDetectionsByRegion('Europe', N20);
+      expect(first.detections).toEqual([]);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('a body with one good row and one bad row resolves the good one', async () => {
+      mockGet.mockImplementation(() => textResponse([AREA_HEADER, AREA_ROW.join(','), badLatRow].join('\n')));
+      const service = new FIRMSService({ mapKey: FAKE_KEY });
+
+      const detections = await service.getDetectionsByBbox(-106, 39, -104, 41, 1, N20);
+      expect(detections).toHaveLength(1);
+    });
   });
 });
