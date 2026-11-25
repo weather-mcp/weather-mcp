@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A wildfire feed's error page no longer reads as "no fires".** `get_wildfire_info` treated any HTTP 200 it could not read as an answer with no fires in it. In the US, the National Interagency Fire Center's map service reports a query error as a 200 with an error object. That rendered "No active wildfires found" and was served from cache for 30 minutes. Outside the US, a NASA FIRMS maintenance page, an empty answer or a file whose rows could not be read rendered "No satellite fire detections". Both now report the failure (`NIFC service returned an unexpected response.`, or `FIRMS returned an unexpected response.` when the first failed satellite's answer was unusable) and cache nothing. When only one satellite's answer is unusable, the report shows the other satellite's detections and names the one left out.
+
 ## [1.35.26] - 2026-11-24
 
 `ENABLED_TOOLS` read its tokens once, left to right, so a `+tool` or `-tool` written before a preset acted on an empty set and the preset then undid it. `ENABLED_TOOLS=-alerts,standard` started cleanly, printed no warning, and exposed `get_alerts`, the one tool the operator asked to remove. This release reads the value in two passes: first every preset and tool name, then every modifier. The order between a preset and its modifiers no longer matters. Every documented form (preset first, then modifiers) gives the same tools in the same order as before.
