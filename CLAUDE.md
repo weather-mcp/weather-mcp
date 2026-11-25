@@ -495,8 +495,8 @@ via `src/utils/unitFormat.ts`.
 - **Forecasts:** 2 hours (updated hourly)
 - **Current conditions:** 15 minutes (update frequency)
 - **Alerts:** 5 minutes (can change rapidly)
-- **Historical data (>1 day old):** Infinity (finalized)
-- **Recent historical (<1 day):** 1 hour (may be corrected)
+- **Historical data (range ending more than 7 days ago):** Infinity (finalized)
+- **Recent historical (range ending within 7 days):** 1 hour (may be corrected; today's archive slice is model data) — chosen from the range end by `getHistoricalDataTTL`
 - **NWPS gauge detail (flood-stage thresholds):** 24 hours (gauge metadata, revised ~annually)
 - **NWPS gauge status (list + stage/flow series):** 30 minutes (per-refresh readings; observations are roughly hourly)
 - **EA bulk latest readings:** 15 minutes (every EA gauge measure publishes on a 15-minute period)
