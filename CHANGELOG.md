@@ -11,7 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`save_location` resolves a query to the same place as `city_name`.** A `location_query` is now looked up exactly as `city_name` and `search_location` look it up: Census.gov for a US address, then Nominatim, then Open-Meteo. `search_location` with the same text now shows the place a save will store. **An address saved by an earlier version can be at the wrong place.** Save it again with the same `location_query` to fix it. Two visible changes follow. A street address is saved under its own name, such as `10 Downing Street`, where before it was saved under its town's name. A failed lookup now reports the same two messages as `city_name`: "No locations found matching …" when no service found the place, and "Location lookup is unavailable right now …" when none answered. A `location_query` of only spaces is refused before any lookup. (`src/handlers/savedLocationsHandler.ts`, `src/server/weatherServer.ts`, `tests/unit/save-location-geocode-parity.test.ts`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`)
+- **`save_location` resolves a query to the same place as `city_name`.** A `location_query` is now looked up exactly as `city_name` and `search_location` look it up: Census.gov for a US address, then Nominatim, then Open-Meteo. `search_location` with the same text now shows the place a save will store. **An address saved by an earlier version can be at the wrong place.** Save it again with the same `location_query` to fix it. (`src/handlers/savedLocationsHandler.ts`, `src/server/weatherServer.ts`, `tests/unit/save-location-geocode-parity.test.ts`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`)
+
+### Changed
+
+- **A street address is saved under its own name.** `save_location` with a `location_query` such as `10 Downing Street, London` now stores `10 Downing Street`, where before it stored the town's name. Saved locations that already exist keep their names until they are saved again.
+- **A failed `save_location` lookup reports the same messages as `city_name`.** "No locations found matching …" means no service found the place. "Location lookup is unavailable right now …" means no service answered. A `location_query` of only spaces is refused before any lookup.
 
 ## [1.35.29] - 2026-11-25
 
