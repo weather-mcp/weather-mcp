@@ -185,24 +185,21 @@ function formatNOAAMarineConditions(
   // Wave Conditions
   output += `## 🌊 Wave Conditions\n\n`;
 
-  // A published 0 is a value, not an absence: it bands as the lowest rung in the block above,
-  // exactly as a displayed 0.0m does on the Open-Meteo path. Only an absent height renders no
-  // wave line, and the block above has already said `Unknown` for it.
-  if (data.waveHeight !== undefined) {
-    const waveCategory = getWaveHeightCategory(data.waveHeight);
-    output += `**Significant Wave Height:** ${formatWaveHeight(data.waveHeight)}`;
-    output += ` (${waveCategory.description})\n`;
+  // A published 0 in a varying series is a reading and bands as the lowest rung in the block
+  // above. An all-zero series never reaches here: extractNOAAMarineConditions returns null.
+  const waveCategory = getWaveHeightCategory(data.waveHeight);
+  output += `**Significant Wave Height:** ${formatWaveHeight(data.waveHeight)}`;
+  output += ` (${waveCategory.description})\n`;
 
-    if (data.waveDirection !== undefined) {
-      output += `**Wave Direction:** ${formatDirection(data.waveDirection)}\n`;
-    }
-
-    if (data.wavePeriod !== undefined) {
-      output += `**Wave Period:** ${formatWavePeriod(data.wavePeriod)}\n`;
-    }
-
-    output += `\n`;
+  if (data.waveDirection !== undefined) {
+    output += `**Wave Direction:** ${formatDirection(data.waveDirection)}\n`;
   }
+
+  if (data.wavePeriod !== undefined) {
+    output += `**Wave Period:** ${formatWavePeriod(data.wavePeriod)}\n`;
+  }
+
+  output += `\n`;
 
   // Wind Conditions
   if (data.windSpeed !== undefined || data.windDirection !== undefined) {

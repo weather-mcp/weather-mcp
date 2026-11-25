@@ -4,13 +4,13 @@
 
 import { displayValue } from './displayBanding.js';
 import type { GridpointResponse, GridpointDataSeries } from '../types/noaa.js';
-import { gridpointToDisplayUnit, valueAt } from './gridpointSeries.js';
+import { gridpointToDisplayUnit, isAllZero, valueAt } from './gridpointSeries.js';
 
 /**
  * NOAA Marine Conditions extracted from gridpoint data
  */
 export interface NOAAMarineConditions {
-  waveHeight?: number; // meters
+  waveHeight: number; // meters — required: no height, no NOAA report
   wavePeriod?: number; // seconds
   waveDirection?: number; // degrees
   windSpeed?: number; // km/h
@@ -36,21 +36,42 @@ function readAt(
 }
 
 /**
+ * A wave period that displays as 0.0 s is absent: zero is physically
+ * impossible for a period, so it is a placeholder, not a reading (G56). The
+ * comparison uses the render site's rounding, so 0.04 s is absent too.
+ */
+const isZeroPeriod = (p: number): boolean => displayValue(p, 1) === 0;
+
+/**
  * Extract marine conditions from NOAA gridpoint response, each value read at
  * the interval that contains nowMs. All six fields share the one instant.
+ *
+ * An NWS office that publishes no wave forecast for a gridpoint fills the
+ * series with 0 rather than leaving it empty. So an all-zero height or
+ * direction series is absent ("not forecast"), while a 0 inside a varying
+ * series is a reading. The all-zero check runs before the unit guard: zero in
+ * any unit is zero, and the line is not printed for that other reason. A
+ * period that displays as 0.0 s is absent at any position. No height returns
+ * null, and the handler answers from Open-Meteo instead.
  */
 export function extractNOAAMarineConditions(gridpoint: GridpointResponse, nowMs: number): NOAAMarineConditions | null {
   const props = gridpoint.properties;
 
-  const waveHeight = readAt('waveHeight', props.waveHeight, nowMs, 'wmoUnit:m');
-  const wavePeriod = readAt('wavePeriod', props.wavePeriod, nowMs, 'nwsUnit:s');
-  const waveDirection = readAt('waveDirection', props.waveDirection, nowMs, 'wmoUnit:degree_(angle)');
+  const waveHeight = isAllZero(props.waveHeight)
+    ? undefined
+    : readAt('waveHeight', props.waveHeight, nowMs, 'wmoUnit:m');
+  const rawPeriod = readAt('wavePeriod', props.wavePeriod, nowMs, 'nwsUnit:s');
+  const wavePeriod = rawPeriod !== undefined && isZeroPeriod(rawPeriod) ? undefined : rawPeriod;
+  const waveDirection = isAllZero(props.waveDirection)
+    ? undefined
+    : readAt('waveDirection', props.waveDirection, nowMs, 'wmoUnit:degree_(angle)');
   const windSpeed = readAt('windSpeed', props.windSpeed, nowMs, 'wmoUnit:km_h-1');
   const windDirection = readAt('windDirection', props.windDirection, nowMs, 'wmoUnit:degree_(angle)');
   const windGust = readAt('windGust', props.windGust, nowMs, 'wmoUnit:km_h-1');
 
-  // Check if we have any marine data
-  if (waveHeight === undefined && wavePeriod === undefined && waveDirection === undefined) {
+  // No wave height, no NOAA report: a header and sea state with no height would
+  // describe nothing, so the caller falls through to Open-Meteo.
+  if (waveHeight === undefined) {
     return null;
   }
 

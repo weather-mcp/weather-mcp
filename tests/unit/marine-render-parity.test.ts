@@ -270,20 +270,16 @@ describe('The legend appears exactly once in every report, on both paths (contra
 // ---------------------------------------------------------------------------
 
 describe('NOAA zero/no-data banding (contract 3, design decision D2)', () => {
-  it('a gridpoint with wavePeriod but no waveHeight renders an Unknown header, a full sea-state block, and no wave-height line', async () => {
+  // plan-marine-placeholder-zero D3 reverses this case: no height, no NOAA report.
+  it('a gridpoint with wavePeriod but no waveHeight falls through to the Open-Meteo report', async () => {
     getGridpointDataMock.mockResolvedValue(buildNOAAGridpointResponse({ wavePeriod: 8.0 }));
+    getMarineMock.mockResolvedValue(buildOpenMeteoCurrent(1.0, 8.0));
     const result = await callHandler(LAKE_MICHIGAN_COORDS);
     const text = result.content[0].text;
 
-    // Parsed through the block, not just a header substring: a malformed or
-    // truncated block (e.g. a missing **Safety:** line) throws here rather
-    // than passing silently.
-    const block = extractSeaStateBlock(text);
-    expect(block.marker).toBe(NO_DATA_MARKER);
-    expect(block.level).toBe('Unknown');
-    expect(block.safety.length).toBeGreaterThan(0);
-
-    expect(text).not.toContain('**Significant Wave Height:**');
+    expect(text).toContain('**NOT suitable for coastal navigation.**');
+    expect(text).not.toContain('*Data source: NOAA National Weather Service*');
+    expect(getMarineMock).toHaveBeenCalledTimes(1);
   });
 
   it('a gridpoint with waveHeight: 0 renders Calm with the calm marker, a full sea-state block, and no "Calm or minimal wave activity" fallback line', async () => {
