@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.27] - 2026-11-25
+
 `get_wildfire_info` could report "no fires" when its data source had actually failed. Both of its sources sometimes answer an error with a normal success status: the US fire-perimeter service sends an error object, and the satellite feed used elsewhere can send a maintenance page or an empty file. The tool read those answers as "nothing found", which on fire data is the one answer that must never be made up. It now recognises an answer it cannot read and reports the failure instead. Normal reports, with or without fires, are unchanged.
 
 ### Fixed
@@ -2466,7 +2468,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.26...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.27...HEAD
+[1.35.27]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.26...v1.35.27
 [1.35.26]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.25...v1.35.26
 [1.35.25]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.24...v1.35.25
 [1.35.24]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.23...v1.35.24
