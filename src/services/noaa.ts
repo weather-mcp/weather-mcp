@@ -541,8 +541,9 @@ export class NOAAService {
 
       const result = await this.makeRequest<ObservationCollectionResponse>(url);
 
-      // Use smart TTL based on date range
-      const ttl = startTime ? getHistoricalDataTTL(startTime) : CacheConfig.ttl.recentHistorical;
+      // Smart TTL from the END of the range; a query with no end is open-ended
+      // to now and never final
+      const ttl = endTime ? getHistoricalDataTTL(endTime) : CacheConfig.ttl.recentHistorical;
       this.cache.set(cacheKey, result, ttl);
       return result;
     }
