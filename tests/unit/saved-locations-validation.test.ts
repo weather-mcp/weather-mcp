@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { LocationStore } from '../../src/services/locationStore.js';
 import { handleSaveLocation } from '../../src/handlers/savedLocationsHandler.js';
-import type { NominatimService } from '../../src/services/nominatim.js';
+import type { GeocodingService } from '../../src/services/geocoding.js';
 
 /**
  * Pins the write-path name/metadata contracts added in 30a2d39 (T2):
@@ -34,30 +34,30 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
   let storePath: string;
   let locationStore: LocationStore;
   let geocoderCalls: number;
-  let nominatimStub: NominatimService;
+  let geocodingStub: GeocodingService;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'weather-mcp-test-'));
     storePath = join(tempDir, 'locations.json');
     locationStore = new LocationStore(storePath);
     geocoderCalls = 0;
-    nominatimStub = {
-      searchLocation: async () => {
+    geocodingStub = {
+      geocode: async () => {
         geocoderCalls++;
-        return {
-          results: [
-            {
-              id: 1,
-              name: 'Geocoded Town',
-              latitude: 47.6,
-              longitude: -122.3,
-              country_code: 'US',
-              admin1: 'Washington'
-            }
-          ]
-        };
+        return [
+          {
+            name: 'Geocoded Town',
+            display_name: 'Geocoded Town, Washington, United States',
+            latitude: 47.6,
+            longitude: -122.3,
+            country_code: 'US',
+            admin1: 'Washington',
+            confidence: 'medium',
+            source: 'nominatim'
+          }
+        ];
       }
-    } as unknown as NominatimService;
+    } as unknown as GeocodingService;
   });
 
   afterEach(() => {
@@ -73,7 +73,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
     await handleSaveLocation(
       { alias: 'home', latitude: 47.6062, longitude: -122.3321, name: 'Seattle' },
       locationStore,
-      nominatimStub
+      geocodingStub
     );
   }
 
@@ -90,7 +90,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
         const before = bytesOf(storePath);
 
         await expect(
-          handleSaveLocation({ alias: 'home', name: badName }, locationStore, nominatimStub)
+          handleSaveLocation({ alias: 'home', name: badName }, locationStore, geocodingStub)
         ).rejects.toThrow('name must be a string');
 
         expect(bytesOf(storePath).equals(before)).toBe(true);
@@ -105,7 +105,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
           handleSaveLocation(
             { alias: 'home', location_query: 'somewhere', name: badName },
             locationStore,
-            nominatimStub
+            geocodingStub
           )
         ).rejects.toThrow('name must be a string');
 
@@ -122,7 +122,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
           handleSaveLocation(
             { alias: 'home', latitude: 47.6062, longitude: -122.3321, name: badName },
             locationStore,
-            nominatimStub
+            geocodingStub
           )
         ).rejects.toThrow('name must be a string');
 
@@ -139,7 +139,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
         handleSaveLocation(
           { alias: 'home', latitude: 47.6062, longitude: -122.3321 },
           locationStore,
-          nominatimStub
+          geocodingStub
         )
       ).rejects.toThrow('name parameter is required when providing coordinates directly');
 
@@ -154,7 +154,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
       const before = bytesOf(storePath);
 
       await expect(
-        handleSaveLocation({ alias: 'home', description: 42 }, locationStore, nominatimStub)
+        handleSaveLocation({ alias: 'home', description: 42 }, locationStore, geocodingStub)
       ).rejects.toThrow('description must be a string');
 
       expect(bytesOf(storePath).equals(before)).toBe(true);
@@ -166,7 +166,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
       const before = bytesOf(storePath);
 
       await expect(
-        handleSaveLocation({ alias: 'home', notes: 42 }, locationStore, nominatimStub)
+        handleSaveLocation({ alias: 'home', notes: 42 }, locationStore, geocodingStub)
       ).rejects.toThrow('notes must be a string');
 
       expect(bytesOf(storePath).equals(before)).toBe(true);
@@ -178,7 +178,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
       const before = bytesOf(storePath);
 
       await expect(
-        handleSaveLocation({ alias: 'home', alternateNames: 'x' }, locationStore, nominatimStub)
+        handleSaveLocation({ alias: 'home', alternateNames: 'x' }, locationStore, geocodingStub)
       ).rejects.toThrow('alternateNames must be an array of strings');
 
       expect(bytesOf(storePath).equals(before)).toBe(true);
@@ -190,7 +190,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
       const before = bytesOf(storePath);
 
       await expect(
-        handleSaveLocation({ alias: 'home', activities: 'boating' }, locationStore, nominatimStub)
+        handleSaveLocation({ alias: 'home', activities: 'boating' }, locationStore, geocodingStub)
       ).rejects.toThrow('activities must be an array of strings');
 
       expect(bytesOf(storePath).equals(before)).toBe(true);
@@ -201,13 +201,13 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
   describe('contract 4: an empty or whitespace-only name is treated as not supplied, per branch', () => {
     it('partial branch: name "" keeps the stored name', async () => {
       await seedHome();
-      await handleSaveLocation({ alias: 'home', name: '' }, locationStore, nominatimStub);
+      await handleSaveLocation({ alias: 'home', name: '' }, locationStore, geocodingStub);
       expect(locationStore.get('home')?.name).toBe('Seattle');
     });
 
     it('partial branch: name "   " keeps the stored name', async () => {
       await seedHome();
-      await handleSaveLocation({ alias: 'home', name: '   ' }, locationStore, nominatimStub);
+      await handleSaveLocation({ alias: 'home', name: '   ' }, locationStore, geocodingStub);
       expect(locationStore.get('home')?.name).toBe('Seattle');
     });
 
@@ -216,7 +216,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
       await handleSaveLocation(
         { alias: 'home', location_query: 'somewhere', name: '' },
         locationStore,
-        nominatimStub
+        geocodingStub
       );
       expect(locationStore.get('home')?.name).toBe('Geocoded Town');
     });
@@ -226,7 +226,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
       await handleSaveLocation(
         { alias: 'home', location_query: 'somewhere', name: '   ' },
         locationStore,
-        nominatimStub
+        geocodingStub
       );
       expect(locationStore.get('home')?.name).toBe('Geocoded Town');
     });
@@ -239,7 +239,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
         handleSaveLocation(
           { alias: 'home', latitude: 47.6062, longitude: -122.3321, name: '' },
           locationStore,
-          nominatimStub
+          geocodingStub
         )
       ).rejects.toThrow('name parameter is required when providing coordinates directly');
 
@@ -254,7 +254,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
         handleSaveLocation(
           { alias: 'home', latitude: 47.6062, longitude: -122.3321, name: '   ' },
           locationStore,
-          nominatimStub
+          geocodingStub
         )
       ).rejects.toThrow('name parameter is required when providing coordinates directly');
 
@@ -263,7 +263,7 @@ describe('Saved Locations - name/metadata write-path contracts', () => {
 
     it('partial branch: name "  Portland  " stores the trimmed name', async () => {
       await seedHome();
-      await handleSaveLocation({ alias: 'home', name: '  Portland  ' }, locationStore, nominatimStub);
+      await handleSaveLocation({ alias: 'home', name: '  Portland  ' }, locationStore, geocodingStub);
       expect(locationStore.get('home')?.name).toBe('Portland');
     });
   });

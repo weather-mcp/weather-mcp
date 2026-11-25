@@ -1,21 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { LocationStore } from '../../src/services/locationStore.js';
 import { handleSaveLocation } from '../../src/handlers/savedLocationsHandler.js';
-import { NominatimService } from '../../src/services/nominatim.js';
+import { GeocodingService } from '../../src/services/geocoding.js';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
 describe('Saved Locations - Metadata preservation on update (bug fix F1)', () => {
   let locationStore: LocationStore;
-  let nominatimService: NominatimService;
+  let geocodingService: GeocodingService;
   let tempDir: string;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'weather-mcp-test-'));
     const storePath = join(tempDir, 'locations.json');
     locationStore = new LocationStore(storePath);
-    nominatimService = new NominatimService();
+    geocodingService = new GeocodingService();
   });
 
   afterEach(() => {
@@ -41,7 +41,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           notes: 'Bring an umbrella, always rains there'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('auntlisa');
@@ -69,7 +69,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           notes: 'Winterize by November'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Partial update: only touch activities
@@ -79,7 +79,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           activities: ['boating', 'fishing']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('cabin');
@@ -110,7 +110,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           notes: 'Badge required'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       await handleSaveLocation(
@@ -119,7 +119,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           name: 'San Francisco HQ'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('office');
@@ -142,7 +142,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           notes: 'Parking fills up early'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       await handleSaveLocation(
@@ -151,7 +151,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           description: ''
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('trailhead');
@@ -171,7 +171,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           alternateNames: ['the park', 'central green']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       await handleSaveLocation(
@@ -180,7 +180,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           alternateNames: []
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('park');
@@ -197,7 +197,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           notes: 'Watch for high water in spring'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       await handleSaveLocation(
@@ -206,7 +206,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           notes: ''
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('river');
@@ -225,7 +225,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           notes: '\t\n'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('lot');
@@ -248,7 +248,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           notes: 'Great sunsets'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Full re-save: new coordinates + name provided, metadata omitted
@@ -260,7 +260,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           name: 'New Spot'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('movedspot');
@@ -288,7 +288,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           activities: ['hiking', 'fishing']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Full re-save: new coordinates + name provided, activities omitted.
@@ -301,7 +301,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           name: 'New Spot'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('activespot');
@@ -319,7 +319,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           activities: ['hiking']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       await handleSaveLocation(
@@ -331,7 +331,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           activities: []
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       expect(locationStore.get('clearspot')?.activities).toBeUndefined();
@@ -349,7 +349,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           notes: 'Bear boxes provided'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       await handleSaveLocation(
@@ -362,7 +362,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           // alternateNames and notes omitted -> preserved
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('campsite');
@@ -384,7 +384,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
             description: 123 as any
           },
           locationStore,
-          nominatimService
+          geocodingService
         )
       ).rejects.toThrow('description must be a string');
     });
@@ -400,7 +400,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
             alternateNames: 'nope' as any
           },
           locationStore,
-          nominatimService
+          geocodingService
         )
       ).rejects.toThrow('alternateNames must be an array of strings');
     });
@@ -416,7 +416,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
             alternateNames: [123] as any
           },
           locationStore,
-          nominatimService
+          geocodingService
         )
       ).rejects.toThrow('Each alternate name must be a string');
     });
@@ -432,7 +432,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
             notes: 123 as any
           },
           locationStore,
-          nominatimService
+          geocodingService
         )
       ).rejects.toThrow('notes must be a string');
     });
@@ -459,23 +459,22 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
         release = resolve;
       });
 
-      nominatimService.searchLocation = (async () => {
+      geocodingService.geocode = (async () => {
         await gate;
-        return {
-          results: [
-            {
-              id: 1,
-              name: coords.name,
-              latitude: coords.latitude,
-              longitude: coords.longitude,
-              timezone: 'America/Chicago',
-              country_code: 'US',
-              admin1: 'Illinois'
-            }
-          ],
-          generationtime_ms: 1
-        };
-      }) as typeof nominatimService.searchLocation;
+        return [
+          {
+            name: coords.name,
+            display_name: `${coords.name}, Chicago, Illinois, United States`,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            timezone: 'America/Chicago',
+            country_code: 'US',
+            admin1: 'Illinois',
+            confidence: 'medium',
+            source: 'nominatim'
+          }
+        ];
+      }) as typeof geocodingService.geocode;
 
       return release;
     }
@@ -503,7 +502,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           location_query: 'Chicago, IL'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Let the handler reach the geocoder await before the second client writes.
@@ -558,7 +557,7 @@ describe('Saved Locations - Metadata preservation on update (bug fix F1)', () =>
           location_query: 'Chicago, IL'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       await Promise.resolve();

@@ -28,8 +28,7 @@ import {
   resolveLocationAsync,
   clearCityGeocodeCache
 } from '../../src/utils/locationResolver.js';
-import type { GeocodingService } from '../../src/services/geocoding.js';
-import { NominatimService } from '../../src/services/nominatim.js';
+import { GeocodingService } from '../../src/services/geocoding.js';
 
 // The two reserved names this plan fixes, plus a lowercase-but-not-on-the-
 // prototype control. `tostring` lowercases from "toString" the same way the
@@ -42,14 +41,14 @@ describe('Saved location reserved aliases (RF-03)', () => {
   let tempDir: string;
   let storePath: string;
   let store: LocationStore;
-  let nominatimService: NominatimService;
+  let geocodingService: GeocodingService;
   const originalDefaultLocation = process.env.WEATHER_DEFAULT_LOCATION;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'weather-mcp-reserved-alias-'));
     storePath = join(tempDir, 'locations.json');
     store = new LocationStore(storePath);
-    nominatimService = new NominatimService();
+    geocodingService = new GeocodingService();
     clearCityGeocodeCache();
   });
 
@@ -155,7 +154,7 @@ describe('Saved location reserved aliases (RF-03)', () => {
         const firstSave = await handleSaveLocation(
           { alias, name: 'Reserved Alias Test', latitude: 10, longitude: 20 },
           store,
-          nominatimService
+          geocodingService
         );
         // Anchor on the heading construct only (G116): the alias itself renders
         // inside backticks via escapeMarkdown elsewhere in this output, and
@@ -184,7 +183,7 @@ describe('Saved location reserved aliases (RF-03)', () => {
         const secondSave = await handleSaveLocation(
           { alias, name: 'Reserved Alias Test Renamed', latitude: 10, longitude: 20 },
           store,
-          nominatimService
+          geocodingService
         );
         expect(secondSave.content[0].text.startsWith('# Updated Location')).toBe(true);
         const afterSecondSave = store.get(alias);
@@ -305,7 +304,7 @@ describe('Saved location reserved aliases (RF-03)', () => {
       await handleSaveLocation(
         { alias: 'constructor', name: 'X', latitude: 10, longitude: 20 },
         store,
-        nominatimService
+        geocodingService
       );
       const { service, calls } = countingGeocodingStub([]);
 

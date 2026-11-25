@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { LocationStore } from '../../src/services/locationStore.js';
 import { handleSaveLocation, handleGetSavedLocation, handleListSavedLocations } from '../../src/handlers/savedLocationsHandler.js';
-import { NominatimService } from '../../src/services/nominatim.js';
+import { GeocodingService } from '../../src/services/geocoding.js';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
 describe('Saved Locations - Activities Feature', () => {
   let locationStore: LocationStore;
-  let nominatimService: NominatimService;
+  let geocodingService: GeocodingService;
   let tempDir: string;
 
   beforeEach(() => {
@@ -16,7 +16,7 @@ describe('Saved Locations - Activities Feature', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'weather-mcp-test-'));
     const storePath = join(tempDir, 'locations.json');
     locationStore = new LocationStore(storePath);
-    nominatimService = new NominatimService();
+    geocodingService = new GeocodingService();
   });
 
   afterEach(() => {
@@ -41,7 +41,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['boating']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('lake_house');
@@ -60,7 +60,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['hiking', 'camping', 'fishing']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('cabin');
@@ -81,7 +81,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['SURFING', 'Swimming', 'BeachVolleyball']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('beach');
@@ -98,7 +98,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['  running  ', ' cycling ', 'photography']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('park');
@@ -115,7 +115,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['hiking', '', '  ', 'backpacking']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('trail');
@@ -131,7 +131,7 @@ describe('Saved Locations - Activities Feature', () => {
           name: 'Seattle, WA'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('home');
@@ -149,7 +149,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: []
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('office');
@@ -169,7 +169,7 @@ describe('Saved Locations - Activities Feature', () => {
             activities: 'boating' as any
           },
           locationStore,
-          nominatimService
+          geocodingService
         )
       ).rejects.toThrow('activities must be an array of strings');
     });
@@ -185,7 +185,7 @@ describe('Saved Locations - Activities Feature', () => {
             activities: [123, 'boating'] as any
           },
           locationStore,
-          nominatimService
+          geocodingService
         )
       ).rejects.toThrow('Each activity must be a string');
     });
@@ -201,7 +201,7 @@ describe('Saved Locations - Activities Feature', () => {
             activities: ['a'.repeat(51)]
           },
           locationStore,
-          nominatimService
+          geocodingService
         )
       ).rejects.toThrow('Each activity must be 50 characters or less');
     });
@@ -217,7 +217,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: [fiftyCharActivity]
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('test');
@@ -237,7 +237,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['İ'.repeat(25)]
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const saved = locationStore.get('test');
@@ -255,7 +255,7 @@ describe('Saved Locations - Activities Feature', () => {
             activities: ['İ'.repeat(26)]
           },
           locationStore,
-          nominatimService
+          geocodingService
         )
       ).rejects.toThrow(/^Each activity must be 50 characters or less$/);
     });
@@ -271,7 +271,7 @@ describe('Saved Locations - Activities Feature', () => {
             activities: ['İ'.repeat(50)]
           },
           locationStore,
-          nominatimService
+          geocodingService
         )
       ).rejects.toThrow(/^Each activity must be 50 characters or less$/);
       expect(locationStore.has('test')).toBe(false);
@@ -289,7 +289,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['kayaking', 'fishing']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const result = await handleGetSavedLocation(
@@ -311,7 +311,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['swimming', 'boating']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const result = await handleListSavedLocations(locationStore);
@@ -329,7 +329,7 @@ describe('Saved Locations - Activities Feature', () => {
           name: 'City Center'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const result = await handleGetSavedLocation(
@@ -353,7 +353,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['hiking']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Update with new activities
@@ -366,7 +366,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['hiking', 'camping', 'photography']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('spot');
@@ -384,7 +384,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['skiing']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Update with empty array
@@ -397,7 +397,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: []
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('place');
@@ -417,7 +417,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['camping']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Partial update: just add more activities
@@ -427,7 +427,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['camping', 'grilling', 'hiking', 'mountain biking']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('campsite');
@@ -449,7 +449,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['surfing']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Partial update: just change name
@@ -459,7 +459,7 @@ describe('Saved Locations - Activities Feature', () => {
           name: 'Santa Monica Beach'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('beach');
@@ -480,7 +480,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['running']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Partial update: change both name and activities
@@ -491,7 +491,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['running', 'cycling', 'photography']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('park');
@@ -512,7 +512,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['boating', 'fishing']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Partial update: only change name, don't specify activities
@@ -522,7 +522,7 @@ describe('Saved Locations - Activities Feature', () => {
           name: 'Lake Tahoe'
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('lake');
@@ -539,7 +539,7 @@ describe('Saved Locations - Activities Feature', () => {
             activities: ['hiking']
           },
           locationStore,
-          nominatimService
+          geocodingService
         )
       ).rejects.toThrow('Either location_query OR (latitude + longitude + name) must be provided');
     });
@@ -555,7 +555,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: ['hiking', 'backpacking']
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       // Partial update: remove all activities
@@ -565,7 +565,7 @@ describe('Saved Locations - Activities Feature', () => {
           activities: []
         },
         locationStore,
-        nominatimService
+        geocodingService
       );
 
       const savedLocation = locationStore.get('trail');

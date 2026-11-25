@@ -25,7 +25,7 @@ import {
 } from '../../src/handlers/savedLocationsHandler.js';
 import { LocationStore } from '../../src/services/locationStore.js';
 import { resolveLocation } from '../../src/utils/locationResolver.js';
-import type { NominatimService } from '../../src/services/nominatim.js';
+import type { GeocodingService } from '../../src/services/geocoding.js';
 
 const tempDirs: string[] = [];
 afterEach(() => {
@@ -68,10 +68,10 @@ function crowded(count: number, lastRaw?: string): Fixture {
 }
 
 const stub = {
-  searchLocation: vi.fn(async () => ({
-    results: [{ name: 'g'.repeat(501), latitude: 1.5, longitude: 2.5, timezone: 'Etc/UTC', country_code: 'xx' }],
-  })),
-} as unknown as NominatimService;
+  geocode: vi.fn(async () => [
+    { name: 'g'.repeat(501), display_name: 'g'.repeat(501), latitude: 1.5, longitude: 2.5, timezone: 'Etc/UTC', country_code: 'xx', confidence: 'medium', source: 'openmeteo' },
+  ]),
+} as unknown as GeocodingService;
 
 function text(r: { content: Array<{ type: string; text: string }> }): string {
   return r.content[0].text;
@@ -265,10 +265,10 @@ describe('a geocoded name over 500', () => {
   it('is accepted at exactly 500', async () => {
     const fx = withHome();
     const at500 = {
-      searchLocation: vi.fn(async () => ({
-        results: [{ name: 'g'.repeat(500), latitude: 1.5, longitude: 2.5 }],
-      })),
-    } as unknown as NominatimService;
+      geocode: vi.fn(async () => [
+        { name: 'g'.repeat(500), display_name: 'g'.repeat(500), latitude: 1.5, longitude: 2.5, confidence: 'medium', source: 'nominatim' },
+      ]),
+    } as unknown as GeocodingService;
     await handleSaveLocation({ alias: 'geo', location_query: 'anywhere' }, fx.store, at500);
     expect(((own(parsed(fx.file), 'geo') as Record<string, unknown>).name as string).length).toBe(500);
   });
