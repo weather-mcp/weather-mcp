@@ -36,10 +36,10 @@ type Field = 'waveHeight' | 'wavePeriod' | 'waveDirection' | 'windSpeed' | 'wind
 interface Span {
   startMs: number;
   hours: number;
-  value: number | null;
+  value: number;
 }
 
-function span(startMs: number, hours: number, value: number | null): Span {
+function span(startMs: number, hours: number, value: number): Span {
   return { startMs, hours, value };
 }
 
