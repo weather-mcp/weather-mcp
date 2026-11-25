@@ -7,13 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.28] - 2026-11-25
+
 `get_marine_conditions` could report a calm lake or bay where NOAA publishes no wave forecast at all. Where a forecast office has no wave forecast for a point, it does not leave the data empty. It fills it with zero. The tool read that zero as a real sea state and printed `🟢 Current Conditions: Calm` and "Ideal for all water activities", whatever the water was doing. This happened at every land point inside the Great Lakes and bay regions, such as Traverse City, Duluth, Marquette, Cleveland, Baltimore and Seattle, and on 2026-11-25 at every point in San Francisco Bay. The tool now treats that fill as "not forecast" and answers from the Open-Meteo model instead. NOAA reports that carry a real wave forecast are unchanged.
 
 ### Fixed
 
 - **A NOAA grid with no wave forecast no longer reads as a calm sea.** When every value in a NOAA gridpoint's wave-height series is zero, that series is the office's fill for "not forecast". `get_marine_conditions` now leaves the NOAA report out and answers with the Open-Meteo model report, under its usual disclaimer. On land, where the model has no water cell, it answers with the model's no-cell note. A zero inside a series that also has non-zero values is still a reading, and it still bands as `Calm`.
 - **No more `0.0s` wave period or `N (0°)` wave direction from a placeholder.** A wave period that displays as `0.0s` is now left out, because a real wave period is never zero. Before, it also added a false "choppy (short period)" to the sea-state line. A wave-direction series of all zeros is left out too. Hampton Roads, for example, publishes a real wave height with no period or direction, and its report now shows the height alone.
-- **A NOAA gridpoint with a wave period but no wave height now answers from Open-Meteo.** Before, it printed a NOAA report headed `⚪ Current Conditions: Unknown` with no wave-height line.
+
+### Changed
+
+- **Some points in the NOAA marine regions now show the Open-Meteo report instead of a NOAA report.** This applies to land points inside the Great Lakes and bay regions, to all of San Francisco Bay while NOAA publishes no wave forecast there, and to any NOAA gridpoint with a wave period but no wave height. That last case used to print a NOAA report headed `⚪ Current Conditions: Unknown` with no wave-height line. The Open-Meteo report is a model, so it carries its usual "not suitable for coastal navigation" disclaimer.
 
 ## [1.35.27] - 2026-11-25
 
@@ -2476,7 +2481,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.27...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.28...HEAD
+[1.35.28]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.27...v1.35.28
 [1.35.27]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.26...v1.35.27
 [1.35.26]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.25...v1.35.26
 [1.35.25]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.24...v1.35.25
