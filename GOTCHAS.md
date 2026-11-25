@@ -107,7 +107,8 @@ against the installed parser version, not from documentation.
 
 ## G4 — A right-root document with no usable envelope is not an empty feed
 
-**Trigger:** parsing any index/list response on safety-critical data.
+**Trigger:** parsing any index/list response on safety-critical data — alert feeds, and the wildfire
+feeds too: a FIRMS CSV (its envelope is the header line) and NIFC's ArcGIS FeatureServer JSON.
 
 **Rule:** distinguish three outcomes explicitly — a valid envelope with no
 items (**honest empty**, return normally), a missing or unusable envelope
@@ -159,6 +160,19 @@ and rendered the all-clear. A field the parser may skip on is allowed to be **ab
 (that is the verified empty shape). When it is present it must have the verified type,
 or the guard throws. Pin one body whose outer element is an object and whose nested
 record is a string, through the service and through the dispatch.
+
+**Wildfire feeds, 2026-11-25** (wildfire-feed-envelope, `666a97f` FIRMS, `83a9560` NIFC). Both
+`get_wildfire_info` authorities read any 200 as an answer. `parseFIRMSCsv` returns `[]` for an empty
+body, HTML, or a header without its required columns (every `indexOf` is `-1`, every row skipped), so a
+maintenance page rendered "No satellite fire detections". ArcGIS answers a query error **as HTTP 200**
+with `{"error":{…}}` and no `features` (measured live 2026-11-25), and the handler's
+`response.features || []` rendered "✅ No active wildfires found" — **cached for 30 minutes**, because
+the design's claim that `queryFirePerimeters` writes no cache was wrong (impl recon caught it). The CSV
+envelope is the header naming `latitude`, `longitude`, `acq_date`, `acq_time` (not `instrument`: the
+flat file omits it), plus "at least one data line parses when there are any"; a partial row drop stays
+usable. Both guards run outside the request `catch`, in the Google shape. **Verify** also: the `wrong-shaped
+200 body` block in `tests/unit/firms-service.test.ts`, `tests/unit/firms-csv-envelope.test.ts`,
+`tests/unit/nifc-service.test.ts`, and `tests/unit/wildfire-feed-envelope.test.ts` (through the handler).
 
 **Status:** active. Sharper instance of CLAUDE.md's "never trust the HTTP 200
 alone" and "distinguish empty from not-covered".
@@ -7481,6 +7495,12 @@ module constant never reaches that path: the caller passes its own `500`, and th
 parameter to the exported constant, so the cap has one source. Evidence: 2026-11-14, fire-weather-units-interval
 T4 (`967a82b`): M8 (`GRIDPOINT_MAX_ENTRIES = 499`) survived `forecast-severe-weather-probability.test.ts` until
 `getMaxProbabilityFromSeries` defaulted to the constant.
+
+**Third shape — a set-valued constant.** A test that builds its "each required member missing" rows by mapping
+over the exported set shrinks with it: drop a member from the set and its row vanishes rather than going red.
+List the members literally in the test. Evidence: 2026-11-25, wildfire-feed-envelope T1 (`b42d1ad`):
+`FIRMS_REQUIRED_COLUMNS` minus any one column passed until the 3-of-4 rows used a literal list; all four
+mutations then went red.
 
 **Status:** active. Lint candidate: flag a test that both imports an exported numeric constant and uses it in an
 arithmetic fixture expression. Related: [G65] (where mutation rows come from), [G45].

@@ -545,7 +545,7 @@ Error details: NIFC service request timed out. The service may be temporarily un
 ```
 
 **The report does not say "no fires" when this happens.** It says the data could not be retrieved.
-The `Error details:` line is one of six fixed messages:
+The `Error details:` line is one of seven fixed messages:
 
 | Failure | Message |
 |---|---|
@@ -553,11 +553,14 @@ The `Error details:` line is one of six fixed messages:
 | Connection refused, reset, unreachable or unresolved | `Unable to connect to the NIFC service. The service may be unreachable from this network.` |
 | HTTP 400 | `Invalid query parameters for NIFC service.` |
 | HTTP 503 | `NIFC service is temporarily unavailable. Please try again later.` |
+| HTTP 200 whose body is not a fire-perimeter list (an ArcGIS error object, a maintenance page, an empty answer) | `NIFC service returned an unexpected response.` |
 | Any other HTTP status | `NIFC service returned HTTP <status>.` |
 | Anything else | `Failed to query NIFC fire perimeters.` |
 
 No network-library text is shown. The stderr log line `NIFC query failed` carries the error type,
-its code and the HTTP status, and adds the error's message and stack only under `LOG_PII`.
+its code and the HTTP status, and adds the error's message and stack only under `LOG_PII`. An
+unusable HTTP 200 logs a `NIFC returned an unexpected response` warning instead, with no text from
+the body. It is not cached, so the next request asks again.
 
 The response carries `isError: true`, so a client that checks the error flag sees the failure. The
 text is the same as above. Outside the US, the same block on the satellite path (NASA FIRMS) is
@@ -569,7 +572,12 @@ The satellite path reads two satellites, NOAA-20 and NOAA-21. A partial answer �
 request failed, or its feed is stale — is **not** an error either. The report shows the other
 satellite's detections and one note naming each satellite left out, for example
 *Note: not every satellite is included — NOAA-21: no new data since 2026-11-12 (UTC).* or
-*… NOAA-21: request failed.* The error block above appears only when no satellite answered. When
+*… NOAA-21: request failed.* A satellite whose answer is not a FIRMS data file (an error page, an
+empty answer, or a file whose rows cannot be read) is treated like a failed request. The error block
+above appears only when no satellite answered usably. It carries the first failed satellite's fixed
+error; when that failure is an unusable HTTP 200 body, the message is
+`FIRMS returned an unexpected response.` Neither case is ever reported as "no satellite fire
+detections". When
 every satellite's feed is stale, the block carries `isError: true` and the message
 `NASA FIRMS satellite feeds are not currently updating (NOAA-20: last data <date>; NOAA-21: last data <date>).`
 

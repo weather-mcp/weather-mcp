@@ -127,6 +127,14 @@ function splitCsvLines(csv: string): string[] {
     .filter(line => line.length > 0);
 }
 
+/** Columns every FIRMS CSV answer must carry; `instrument` is absent from the flat file, so it is not listed. */
+export const FIRMS_REQUIRED_COLUMNS = ['latitude', 'longitude', 'acq_date', 'acq_time'] as const;
+
+/** Read a CSV header line the way the parser and the envelope predicate both do (trimmed, lower-cased). */
+function readCsvHeader(line: string): string[] {
+  return line.split(',').map(h => h.trim().toLowerCase());
+}
+
 /**
  * Parse a FIRMS CSV payload (either the Area API or a flat-file shape) into
  * normalized detections, resolving every field by header name.
@@ -142,7 +150,7 @@ export function parseFIRMSCsv(csv: string): FIRMSDetection[] {
   const lines = splitCsvLines(csv);
   if (lines.length === 0) return [];
 
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const headers = readCsvHeader(lines[0]);
   const indexOf = (name: string): number => headers.indexOf(name);
 
   const idx = {
@@ -189,6 +197,37 @@ export function parseFIRMSCsv(csv: string): FIRMSDetection[] {
   }
 
   return detections;
+}
+
+/** What a FIRMS 200 body is: see `classifyFIRMSCsvEnvelope`. */
+export type FIRMSCsvEnvelope = 'usable' | 'no-header' | 'no-usable-rows';
+
+/**
+ * Is a FIRMS 200 body a FIRMS answer? (G4) `parsedRowCount` is
+ * `parseFIRMSCsv(csv).length` for the same text.
+ *
+ * Three outcomes:
+ * - `usable`: a header with every required column and either no data lines
+ *   (the honest empty) or at least one parsed row.
+ * - `no-header`: an empty body, or a first line that lacks a required column
+ *   (HTML, JSON, a truncated header).
+ * - `no-usable-rows`: a valid header and data lines, but the parser dropped
+ *   every one.
+ *
+ * `instrument` is not required: the keyless flat file omits it. A partial
+ * drop is `usable`: one bad row must not knock out a whole satellite. A row
+ * that parses but is old is also `usable`; the window filter is the
+ * handler's job.
+ */
+export function classifyFIRMSCsvEnvelope(csv: string, parsedRowCount: number): FIRMSCsvEnvelope {
+  const lines = splitCsvLines(csv);
+  if (lines.length === 0) return 'no-header';
+
+  const headers = readCsvHeader(lines[0]);
+  if (FIRMS_REQUIRED_COLUMNS.some(column => !headers.includes(column))) return 'no-header';
+
+  if (lines.length - 1 >= 1 && parsedRowCount === 0) return 'no-usable-rows';
+  return 'usable';
 }
 
 // ---------------------------------------------------------------------------

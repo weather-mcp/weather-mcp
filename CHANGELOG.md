@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.27] - 2026-11-25
+
+`get_wildfire_info` could report "no fires" when its data source had actually failed. Both of its sources sometimes answer an error with a normal success status: the US fire-perimeter service sends an error object, and the satellite feed used elsewhere can send a maintenance page or an empty file. The tool read those answers as "nothing found", which on fire data is the one answer that must never be made up. It now recognises an answer it cannot read and reports the failure instead. Normal reports, with or without fires, are unchanged.
+
+### Fixed
+
+- **A wildfire feed's error page no longer reads as "no fires".** `get_wildfire_info` treated any HTTP 200 it could not read as an answer with no fires in it. In the US, the National Interagency Fire Center's map service reports a query error as a 200 with an error object. That rendered "No active wildfires found" and was served from cache for 30 minutes. Outside the US, a NASA FIRMS maintenance page, an empty answer or a file whose rows could not be read rendered "No satellite fire detections". Both now report the failure (`NIFC service returned an unexpected response.`, or `FIRMS returned an unexpected response.` when the first failed satellite's answer was unusable) and cache nothing. When only one satellite's answer is unusable, the report shows the other satellite's detections and names the one left out.
+
 ## [1.35.26] - 2026-11-24
 
 `ENABLED_TOOLS` read its tokens once, left to right, so a `+tool` or `-tool` written before a preset acted on an empty set and the preset then undid it. `ENABLED_TOOLS=-alerts,standard` started cleanly, printed no warning, and exposed `get_alerts`, the one tool the operator asked to remove. This release reads the value in two passes: first every preset and tool name, then every modifier. The order between a preset and its modifiers no longer matters. Every documented form (preset first, then modifiers) gives the same tools in the same order as before.
@@ -2460,7 +2468,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.26...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.27...HEAD
+[1.35.27]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.26...v1.35.27
 [1.35.26]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.25...v1.35.26
 [1.35.25]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.24...v1.35.25
 [1.35.24]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.23...v1.35.24
