@@ -487,8 +487,9 @@ export class OpenMeteoService {
       const response = await this.makeRequest<OpenMeteoHistoricalResponse>('/archive', params);
       this.validateResponse(response, startDate, endDate, useHourly);
 
-      // Use smart TTL based on date range
-      const ttl = getHistoricalDataTTL(startDate);
+      // Smart TTL: chosen from the END of the range, since a range that reaches
+      // into the correction window still holds days that are being revised
+      const ttl = getHistoricalDataTTL(endDate);
       this.cache.set(cacheKey, response, ttl);
 
       return response;

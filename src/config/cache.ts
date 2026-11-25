@@ -2,7 +2,9 @@
  * Cache configuration for weather data
  *
  * TTL (Time To Live) values are set based on data volatility:
- * - Historical data: Never changes once recorded
+ * - Historical data: a range ending within the last 7 days refreshes hourly
+ *   (today's archive slice is model data, recent days are revised); a range
+ *   that ended earlier is finalized and cached indefinitely
  * - Geographic data: Static (grid coordinates, station locations)
  * - Forecasts: Updated approximately hourly
  * - Current conditions: Observations typically update every 20-60 minutes
@@ -68,6 +70,13 @@ export const CacheConfig = {
   // Min: 5000ms (5 seconds), Max: 120000ms (2 minutes), Default: 30000ms (30 seconds)
   apiTimeoutMs: getEnvNumber('API_TIMEOUT_MS', 30000, 5000, 120000),
 
+  // How long after a historical range ends its data may still change. A range
+  // whose end lies inside this window takes ttl.recentHistorical; one that
+  // ended earlier takes ttl.historicalData. This is a window, not a TTL, and it
+  // is deliberately independent of ApiConstants.historicalDataThresholdDays,
+  // which decides NOAA-vs-archive routing, not mutability.
+  historicalCorrectionWindow: 7 * DAY,
+
   // TTL values for different data types
   ttl: {
     // Grid coordinate lookups (lat/lon -> grid mapping)
@@ -94,12 +103,12 @@ export const CacheConfig = {
     // Alerts can change rapidly, cache for shorter period
     alerts: 5 * MINUTE,
 
-    // Recent historical data (< 7 days old)
-    // Recent data may still be updated/corrected
+    // Historical range ending within historicalCorrectionWindow (7 days)
+    // Recent data may still be updated/corrected (getHistoricalDataTTL)
     recentHistorical: 1 * HOUR,
 
-    // Historical data (> 1 day old from current time)
-    // Historical data beyond 1 day is finalized and won't change
+    // Historical range that ended more than historicalCorrectionWindow ago
+    // Finalized; never refetched (getHistoricalDataTTL)
     historicalData: Infinity,
 
     // Climate normals (1991–2020 baseline)
@@ -254,21 +263,52 @@ export const CacheConfig = {
   },
 } as const;
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 /**
- * Determine appropriate TTL for historical weather data based on date
- * @param startDate Start date of the historical query
+ * Determine the cache TTL for a historical response from the END of its range.
+ *
+ * A range whose end lies within `CacheConfig.historicalCorrectionWindow` of now
+ * takes `ttl.recentHistorical`; one that ended earlier takes `ttl.historicalData`.
+ * The start never matters: it cannot make a range more mutable than its end does.
+ *
+ * - A `Date`, or a string naming an instant, is that instant.
+ * - A date-only `YYYY-MM-DD` is a calendar date in the location's zone, which
+ *   this layer does not know. Its last instant is taken as the latest local
+ *   midnight anywhere (`D+1 00:00` at UTC-12), so the window can only err toward
+ *   refreshing. It is read from its components with `Date.UTC`, never through a
+ *   process-zone calendar read (GOTCHAS G162).
+ * - An end that cannot be read returns `ttl.recentHistorical`: a value the
+ *   server cannot interpret is never cached forever.
+ *
+ * @param rangeEnd End of the historical query range
  * @returns TTL in milliseconds
  */
-export function getHistoricalDataTTL(startDate: string | Date): number {
-  const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
-  const now = new Date();
-  const daysDiff = (now.getTime() - start.getTime()) / DAY;
-
-  if (daysDiff > 1) {
-    // Data is more than 1 day old - it's finalized and won't change
-    return CacheConfig.ttl.historicalData;
+export function getHistoricalDataTTL(rangeEnd: string | Date): number {
+  let endMs: number;
+  if (typeof rangeEnd === 'string') {
+    const m = DATE_ONLY.exec(rangeEnd);
+    if (m) {
+      const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+      const day = new Date(Date.UTC(y, mo - 1, d));
+      // Date.UTC normalizes an impossible date (2024-02-31 → 2024-03-02), so
+      // round-trip the components: one that does not survive is unreadable.
+      endMs = day.getUTCFullYear() === y && day.getUTCMonth() === mo - 1 && day.getUTCDate() === d
+        ? Date.UTC(y, mo - 1, d + 1) + 12 * HOUR
+        : NaN;
+    } else {
+      endMs = new Date(rangeEnd).getTime();
+    }
   } else {
-    // Recent data may still be updated
+    endMs = rangeEnd.getTime();
+  }
+
+  if (!Number.isFinite(endMs)) {
     return CacheConfig.ttl.recentHistorical;
   }
+
+  const age = Date.now() - endMs;
+  return age < CacheConfig.historicalCorrectionWindow
+    ? CacheConfig.ttl.recentHistorical
+    : CacheConfig.ttl.historicalData;
 }

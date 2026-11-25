@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.28 (Production Ready)
+- **Version:** 1.35.29 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -495,8 +495,8 @@ via `src/utils/unitFormat.ts`.
 - **Forecasts:** 2 hours (updated hourly)
 - **Current conditions:** 15 minutes (update frequency)
 - **Alerts:** 5 minutes (can change rapidly)
-- **Historical data (>1 day old):** Infinity (finalized)
-- **Recent historical (<1 day):** 1 hour (may be corrected)
+- **Historical data (range ending more than 7 days ago):** Infinity (finalized)
+- **Recent historical (range ending within 7 days):** 1 hour (may be corrected; today's archive slice is model data) — chosen from the range end by `getHistoricalDataTTL`
 - **NWPS gauge detail (flood-stage thresholds):** 24 hours (gauge metadata, revised ~annually)
 - **NWPS gauge status (list + stage/flow series):** 30 minutes (per-refresh readings; observations are roughly hourly)
 - **EA bulk latest readings:** 15 minutes (every EA gauge measure publishes on a 15-minute period)
@@ -766,15 +766,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.28 — Production Ready ✅
-- **Test Coverage:** 5,803 tests, 100% pass rate
+- **Version:** 1.35.29 — Production Ready ✅
+- **Test Coverage:** 5,823 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.29:** A historical range ending in the last week is refreshed hourly instead of cached for good
 - **New in v1.35.28:** NOAA marine conditions answer from Open-Meteo where NOAA publishes no wave forecast, instead of a calm sea
 - **New in v1.35.27:** A wildfire feed's error page reports the failure instead of no fires
-- **New in v1.35.26:** ENABLED_TOOLS modifiers apply wherever they are written; modifiers alone adjust basic
 
 ## Useful References
 
@@ -797,7 +797,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-25 (v1.35.28)
+**Last Updated:** 2026-11-25 (v1.35.29)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

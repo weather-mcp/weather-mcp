@@ -38,27 +38,50 @@ Different data types have different cache durations based on how frequently they
 | **Station Lists** | 24 hours | Weather stations rarely change locations |
 | **7-Day Forecasts** | 2 hours | NOAA updates forecasts approximately hourly |
 | **Current Conditions** | 15 minutes | Observations typically update every 20-60 minutes |
-| **Recent Historical Data** (< 7 days) | 1 hour | Recent data may still be updated or corrected |
-| **Historical Data** (> 1 day old) | Infinite | Finalized historical data never changes |
+| **Historical data, range ending within 7 days** | 1 hour | Recent days are still revised, and today's archive slice is model data |
+| **Historical data, range ending more than 7 days ago** | Infinite | Finalized historical data never changes |
 
 ### Smart TTL for Historical Data
 
-The cache automatically determines the appropriate TTL for historical weather data:
+The cache chooses the TTL for historical weather data from the **end** of the requested range. The start does not matter.
 
 ```typescript
 // src/config/cache.ts
-export function getHistoricalDataTTL(startDate: string | Date): number {
-  const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
-  const now = new Date();
-  const daysDiff = (now.getTime() - start.getTime()) / DAY;
-
-  if (daysDiff > 1) {
-    return Infinity; // Historical data is finalized
+export function getHistoricalDataTTL(rangeEnd: string | Date): number {
+  let endMs: number;
+  if (typeof rangeEnd === 'string') {
+    const m = DATE_ONLY.exec(rangeEnd);
+    if (m) {
+      const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+      const day = new Date(Date.UTC(y, mo - 1, d));
+      // Date.UTC normalizes an impossible date (2024-02-31 → 2024-03-02), so
+      // round-trip the components: one that does not survive is unreadable.
+      endMs = day.getUTCFullYear() === y && day.getUTCMonth() === mo - 1 && day.getUTCDate() === d
+        ? Date.UTC(y, mo - 1, d + 1) + 12 * HOUR
+        : NaN;
+    } else {
+      endMs = new Date(rangeEnd).getTime();
+    }
   } else {
-    return 1 * HOUR; // Recent data may still be updated
+    endMs = rangeEnd.getTime();
   }
+
+  if (!Number.isFinite(endMs)) {
+    return CacheConfig.ttl.recentHistorical;
+  }
+
+  const age = Date.now() - endMs;
+  return age < CacheConfig.historicalCorrectionWindow
+    ? CacheConfig.ttl.recentHistorical
+    : CacheConfig.ttl.historicalData;
 }
 ```
+
+- A range whose end lies within the last 7 days (`CacheConfig.historicalCorrectionWindow`) is refreshed hourly.
+- A range that ended earlier is cached indefinitely.
+- A date-only end (`YYYY-MM-DD`) counts from the latest local midnight anywhere on Earth (`D+1 00:00` at UTC-12).
+- An end that cannot be read, including an impossible date such as `2024-02-31`, is refreshed hourly, never cached indefinitely.
+- A NOAA observations query with no end is refreshed hourly.
 
 ## Configuration
 

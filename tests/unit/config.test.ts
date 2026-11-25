@@ -89,18 +89,16 @@ describe('Cache Configuration', () => {
       expect(ttl).toBe(CacheConfig.ttl.recentHistorical);
     });
 
-    it('should return infinite TTL for data more than 1 day old', () => {
-      const twoDaysAgo = new Date();
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      const ttl = getHistoricalDataTTL(twoDaysAgo);
+    it('should return infinite TTL for data more than 7 days old', () => {
+      const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+      const ttl = getHistoricalDataTTL(eightDaysAgo);
       expect(ttl).toBe(Infinity);
     });
 
-    it('should handle boundary at exactly 1 day', () => {
-      const oneDayAgo = new Date();
-      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-      oneDayAgo.setMinutes(oneDayAgo.getMinutes() - 1); // Slightly more than 1 day
-      const ttl = getHistoricalDataTTL(oneDayAgo);
+    it('should handle boundary at exactly 7 days', () => {
+      // Slightly more than 7 days
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000 - 60 * 1000);
+      const ttl = getHistoricalDataTTL(sevenDaysAgo);
       expect(ttl).toBe(Infinity);
     });
 
@@ -190,10 +188,9 @@ describe('Cache Configuration', () => {
       const ttl1 = getHistoricalDataTTL(yesterday);
       expect(ttl1).toBe(CacheConfig.ttl.recentHistorical);
 
-      // Just over 24 hours ago - need to go back more than 1 day
-      const twoDaysAgo = new Date(now);
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      const ttl2 = getHistoricalDataTTL(twoDaysAgo);
+      // More than 7 days ago - outside the correction window
+      const eightDaysAgo = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+      const ttl2 = getHistoricalDataTTL(eightDaysAgo);
       expect(ttl2).toBe(Infinity);
     });
   });

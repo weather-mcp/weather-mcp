@@ -2753,7 +2753,16 @@ recorded as such, not "fixed" with a test that cannot exist.
 
 **Extended 2026-11-10** (`a7f5754`, river-gauge-staleness T3) — **a test that pins a rejected source behind a strip-on-merge is a lock on the merge, so a read-only mutation cannot redden it.** The Status line must ignore the detail endpoint's `inService` (G7). The planned mutation "read `inService?.enabled === false` from the merged gauge" reddened the `out_of_service` rows but **not** the row whose detail says out of service, because the fresh-copy merge `{ ...gauge, flood }` never carries `inService`, so the read is always `undefined`. Only a compound mutation — import the field at the merge **and** read it — reddens that row. When a plan's row says a rejected-source test reddens under a read mutation, check whether an upstream strip already makes the read unobservable; if so, record the row as a merge lock and run the compound mutation.
 
-**Status:** active, **extended 2026-08-29, twice on 2026-09-01, 2026-09-03, 2026-09-24, 2026-11-09, and 2026-11-10**. Related: [G13] (a fixture that cannot discriminate),
+**Extended 2026-11-25** (`b4ddfa5`, historical-ttl-end-date T2) — **a mutation that swaps which
+of two inputs a function reads is caught only by a case where the two inputs disagree.** The fix
+changed `getObservations`' TTL from the range's start to its end. All three planned NOAA cases put
+start and end on the same side of the seven-day window (start 3 days ago is recent whichever is read;
+start 11 / end 10 days ago is final whichever is read), so reverting to the start stayed green. The
+one case that discriminates is start outside the window, end inside it. When a plan's mutation is
+"read A instead of B", list the cases by whether A and B give different answers, and require at
+least one that does.
+
+**Status:** active, **extended 2026-08-29, twice on 2026-09-01, 2026-09-03, 2026-09-24, 2026-11-09, 2026-11-10, and 2026-11-25**. Related: [G13] (a fixture that cannot discriminate),
 [G32] (mutating to every *rejected implementation* — this entry is about the
 *entry point*, that one about the *alternative*), [G11] (read the real output),
 [G41] (a plan's mechanical prediction is not the contract), [G57] (the run that

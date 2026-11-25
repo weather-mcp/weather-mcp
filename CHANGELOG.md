@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.29] - 2026-11-25
+
+`get_historical_weather` could keep answering a question about recent weather with the first answer it ever gave. A range that started more than a day ago was cached for as long as the server ran, even when it ended today. Today's part of that answer is not a record yet: the Open-Meteo archive fills it from a forecast model, including hours that have not happened. NOAA observations for the last few days still arrive late. A repeated question now gets fresh data within an hour.
+
+### Fixed
+
+- **A historical range that ends today was cached for good.** `get_historical_weather` chose its cache lifetime from the start of the requested range. A range that ended today, or in the last week, was therefore cached for as long as the server ran, so a repeated question kept returning the first answer. The Open-Meteo archive's answer for today is model data, including hours that have not happened yet. The cache lifetime is now chosen from the end of the range. A range that ends in the last 7 days is refreshed hourly. An older range is still cached for good. Output is unchanged. (`src/config/cache.ts`, `src/services/openmeteo.ts`, `src/services/noaa.ts`, `tests/unit/historical-ttl.test.ts`, `tests/unit/historical-cache-ttl.test.ts`, `tests/unit/config.test.ts`, `.github/CACHING.md`)
+
 ## [1.35.28] - 2026-11-25
 
 `get_marine_conditions` could report a calm lake or bay where NOAA publishes no wave forecast at all. Where a forecast office has no wave forecast for a point, it does not leave the data empty. It fills it with zero. The tool read that zero as a real sea state and printed `🟢 Current Conditions: Calm` and "Ideal for all water activities", whatever the water was doing. This happened at every land point inside the Great Lakes and bay regions, such as Traverse City, Duluth, Marquette, Cleveland, Baltimore and Seattle, and on 2026-11-25 at every point in San Francisco Bay. The tool now treats that fill as "not forecast" and answers from the Open-Meteo model instead. NOAA reports that carry a real wave forecast are unchanged.
@@ -2481,7 +2489,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.28...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.29...HEAD
+[1.35.29]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.28...v1.35.29
 [1.35.28]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.27...v1.35.28
 [1.35.27]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.26...v1.35.27
 [1.35.26]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.25...v1.35.26
