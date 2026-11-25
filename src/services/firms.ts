@@ -38,7 +38,7 @@ import { CacheConfig } from '../config/cache.js';
 import { FIRMS_MAP_KEY } from '../config/api.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
-import { parseFIRMSCsv } from '../utils/firmsHotspots.js';
+import { classifyFIRMSCsvEnvelope, parseFIRMSCsv } from '../utils/firmsHotspots.js';
 import { parseDataAvailabilityCsv } from '../utils/firmsProducts.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
 import type { FIRMSDetection, FIRMSProduct, FIRMSRegionFile } from '../types/firms.js';
@@ -67,6 +67,9 @@ export interface FIRMSServiceConfig {
 const AREA_API_BASE = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv';
 const FLAT_FILE_ROOT = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire';
 const DATA_AVAILABILITY_BASE = 'https://firms.modaps.eosdis.nasa.gov/api/data_availability/csv';
+
+/** Fixed message for an HTTP 200 whose body is not a FIRMS CSV answer (G4). */
+const UNEXPECTED_RESPONSE_MESSAGE = 'FIRMS returned an unexpected response.';
 
 /** A keyless region file's parsed rows and its `Last-Modified` header, cached together. */
 export interface FIRMSRegionResult {
@@ -126,6 +129,8 @@ export class FIRMSService {
    * Keyed Area API — targeted bbox query, `dayRange` days of detections.
    *
    * @throws {FIRMSKeyRejectedError} the configured key was rejected
+   * @throws {Error} `FIRMS returned an unexpected response.` for an HTTP 200
+   *   whose body is not a FIRMS CSV answer (never cached)
    * @throws {Error} no key configured, invalid bbox, or any other failure
    */
   async getDetectionsByBbox(
@@ -201,13 +206,33 @@ export class FIRMSService {
       product: product.id
     });
 
+    const text = await this.requestAreaCsv(url, product);
+    const detections = parseFIRMSCsv(text);
+
+    // A 200 that is not a FIRMS answer is an error, never an empty list (G4).
+    // Thrown outside the request `catch`, so it is never re-mapped to the
+    // generic failure text, and before the caller's `cache.set`, so it is
+    // never cached.
+    const envelope = classifyFIRMSCsvEnvelope(text, detections.length);
+    if (envelope !== 'usable') {
+      logger.warn('FIRMS returned an unexpected response', {
+        status: 200,
+        code: envelope === 'no-header' ? 'NO_HEADER' : 'NO_USABLE_ROWS',
+        product: product.id,
+        securityEvent: true
+      });
+      throw new Error(UNEXPECTED_RESPONSE_MESSAGE);
+    }
+
+    logger.info('FIRMS area query complete', { detectionCount: detections.length, product: product.id });
+    return detections;
+  }
+
+  /** The Area API request alone: raw body text, or the mapped fixed-message error. */
+  private async requestAreaCsv(url: string, product: FIRMSProduct): Promise<string> {
     try {
       const response = await this.client.get<string>(url, { responseType: 'text' });
-      const detections = parseFIRMSCsv(
-        typeof response.data === 'string' ? response.data : String(response.data)
-      );
-      logger.info('FIRMS area query complete', { detectionCount: detections.length, product: product.id });
-      return detections;
+      return typeof response.data === 'string' ? response.data : String(response.data);
     } catch (error) {
       // Deliberately do not pass the raw axios error object to the logger —
       // it carries the request config (including the URL, and therefore the
@@ -225,6 +250,10 @@ export class FIRMSService {
    * `Global`), parsed and cached whole together with its `Last-Modified`
    * header (G6). Staleness is not judged here: the header is cached raw and
    * the handler compares it with the clock on every read (G7).
+   *
+   * @throws {Error} `FIRMS returned an unexpected response.` for an HTTP 200
+   *   whose body is not a FIRMS CSV answer (never cached)
+   * @throws {Error} any other failure, as a fixed message
    */
   async getDetectionsByRegion(
     regionFile: FIRMSRegionFile,
@@ -257,20 +286,46 @@ export class FIRMSService {
 
     logger.info('Fetching FIRMS regional flat file', { regionFile, product: product.id });
 
+    const { text, lastModified } = await this.requestRegionFile(url, regionFile, product);
+    const detections = parseFIRMSCsv(text);
+
+    // A 200 that is not a FIRMS answer is an error, never an empty list (G4).
+    // Thrown outside the request `catch`, so it is never re-mapped to the
+    // generic failure text, and before the caller's `cache.set`, so it is
+    // never cached.
+    const envelope = classifyFIRMSCsvEnvelope(text, detections.length);
+    if (envelope !== 'usable') {
+      logger.warn('FIRMS returned an unexpected response', {
+        status: 200,
+        code: envelope === 'no-header' ? 'NO_HEADER' : 'NO_USABLE_ROWS',
+        regionFile,
+        product: product.id,
+        securityEvent: true
+      });
+      throw new Error(UNEXPECTED_RESPONSE_MESSAGE);
+    }
+
+    logger.info('FIRMS regional file fetch complete', {
+      regionFile,
+      product: product.id,
+      detectionCount: detections.length
+    });
+    return { detections, lastModified };
+  }
+
+  /** The flat-file request alone: raw body text and `Last-Modified`, or the mapped fixed-message error. */
+  private async requestRegionFile(
+    url: string,
+    regionFile: FIRMSRegionFile,
+    product: FIRMSProduct
+  ): Promise<{ text: string; lastModified: string | undefined }> {
     try {
       const response = await this.client.get<string>(url, { responseType: 'text' });
-      const detections = parseFIRMSCsv(
-        typeof response.data === 'string' ? response.data : String(response.data)
-      );
+      const text = typeof response.data === 'string' ? response.data : String(response.data);
       // axios lower-cases header names. Keep only a non-empty string.
       const header: unknown = response.headers?.['last-modified'];
       const lastModified = typeof header === 'string' && header.trim() !== '' ? header : undefined;
-      logger.info('FIRMS regional file fetch complete', {
-        regionFile,
-        product: product.id,
-        detectionCount: detections.length
-      });
-      return { detections, lastModified };
+      return { text, lastModified };
     } catch (error) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
       const code = axios.isAxiosError(error) ? error.code : undefined;
