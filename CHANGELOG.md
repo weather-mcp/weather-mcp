@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+`get_historical_weather` could keep answering a question about recent weather with the first answer it ever gave. A range that started more than a day ago was cached for as long as the server ran, even when it ended today. Today's part of that answer is not a record yet: the Open-Meteo archive fills it from a forecast model, including hours that have not happened. NOAA observations for the last few days still arrive late. A repeated question now gets fresh data within an hour.
+
 ### Fixed
 
 - **A historical range that ends today was cached for good.** `get_historical_weather` chose its cache lifetime from the start of the requested range. A range that ended today, or in the last week, was therefore cached for as long as the server ran, so a repeated question kept returning the first answer. The Open-Meteo archive's answer for today is model data, including hours that have not happened yet. The cache lifetime is now chosen from the end of the range. A range that ends in the last 7 days is refreshed hourly. An older range is still cached for good. Output is unchanged. (`src/config/cache.ts`, `src/services/openmeteo.ts`, `src/services/noaa.ts`, `tests/unit/historical-ttl.test.ts`, `tests/unit/historical-cache-ttl.test.ts`, `tests/unit/config.test.ts`, `.github/CACHING.md`)
