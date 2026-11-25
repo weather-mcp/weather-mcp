@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+`get_wildfire_info` could report "no fires" when its data source had actually failed. Both of its sources sometimes answer an error with a normal success status: the US fire-perimeter service sends an error object, and the satellite feed used elsewhere can send a maintenance page or an empty file. The tool read those answers as "nothing found", which on fire data is the one answer that must never be made up. It now recognises an answer it cannot read and reports the failure instead. Normal reports, with or without fires, are unchanged.
+
 ### Fixed
 
 - **A wildfire feed's error page no longer reads as "no fires".** `get_wildfire_info` treated any HTTP 200 it could not read as an answer with no fires in it. In the US, the National Interagency Fire Center's map service reports a query error as a 200 with an error object. That rendered "No active wildfires found" and was served from cache for 30 minutes. Outside the US, a NASA FIRMS maintenance page, an empty answer or a file whose rows could not be read rendered "No satellite fire detections". Both now report the failure (`NIFC service returned an unexpected response.`, or `FIRMS returned an unexpected response.` when the first failed satellite's answer was unusable) and cache nothing. When only one satellite's answer is unusable, the report shows the other satellite's detections and names the one left out.
