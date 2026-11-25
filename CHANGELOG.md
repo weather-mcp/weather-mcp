@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.29] - 2026-11-25
+
 `get_historical_weather` could keep answering a question about recent weather with the first answer it ever gave. A range that started more than a day ago was cached for as long as the server ran, even when it ended today. Today's part of that answer is not a record yet: the Open-Meteo archive fills it from a forecast model, including hours that have not happened. NOAA observations for the last few days still arrive late. A repeated question now gets fresh data within an hour.
 
 ### Fixed
@@ -2487,7 +2489,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.28...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.29...HEAD
+[1.35.29]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.28...v1.35.29
 [1.35.28]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.27...v1.35.28
 [1.35.27]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.26...v1.35.27
 [1.35.26]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.25...v1.35.26
