@@ -51,9 +51,17 @@ export function getHistoricalDataTTL(rangeEnd: string | Date): number {
   let endMs: number;
   if (typeof rangeEnd === 'string') {
     const m = DATE_ONLY.exec(rangeEnd);
-    endMs = m
-      ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1) + 12 * HOUR
-      : new Date(rangeEnd).getTime();
+    if (m) {
+      const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+      const day = new Date(Date.UTC(y, mo - 1, d));
+      // Date.UTC normalizes an impossible date (2024-02-31 → 2024-03-02), so
+      // round-trip the components: one that does not survive is unreadable.
+      endMs = day.getUTCFullYear() === y && day.getUTCMonth() === mo - 1 && day.getUTCDate() === d
+        ? Date.UTC(y, mo - 1, d + 1) + 12 * HOUR
+        : NaN;
+    } else {
+      endMs = new Date(rangeEnd).getTime();
+    }
   } else {
     endMs = rangeEnd.getTime();
   }
@@ -72,7 +80,7 @@ export function getHistoricalDataTTL(rangeEnd: string | Date): number {
 - A range whose end lies within the last 7 days (`CacheConfig.historicalCorrectionWindow`) is refreshed hourly.
 - A range that ended earlier is cached indefinitely.
 - A date-only end (`YYYY-MM-DD`) counts from the latest local midnight anywhere on Earth (`D+1 00:00` at UTC-12).
-- An end that cannot be read is refreshed hourly, never cached indefinitely.
+- An end that cannot be read, including an impossible date such as `2024-02-31`, is refreshed hourly, never cached indefinitely.
 - A NOAA observations query with no end is refreshed hourly.
 
 ## Configuration

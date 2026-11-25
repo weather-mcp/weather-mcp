@@ -288,9 +288,17 @@ export function getHistoricalDataTTL(rangeEnd: string | Date): number {
   let endMs: number;
   if (typeof rangeEnd === 'string') {
     const m = DATE_ONLY.exec(rangeEnd);
-    endMs = m
-      ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1) + 12 * HOUR
-      : new Date(rangeEnd).getTime();
+    if (m) {
+      const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+      const day = new Date(Date.UTC(y, mo - 1, d));
+      // Date.UTC normalizes an impossible date (2024-02-31 → 2024-03-02), so
+      // round-trip the components: one that does not survive is unreadable.
+      endMs = day.getUTCFullYear() === y && day.getUTCMonth() === mo - 1 && day.getUTCDate() === d
+        ? Date.UTC(y, mo - 1, d + 1) + 12 * HOUR
+        : NaN;
+    } else {
+      endMs = new Date(rangeEnd).getTime();
+    }
   } else {
     endMs = rangeEnd.getTime();
   }

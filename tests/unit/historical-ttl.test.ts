@@ -106,4 +106,12 @@ describe('getHistoricalDataTTL — unreadable end', () => {
     expect(getHistoricalDataTTL('')).toBe(RECENT);
     expect(getHistoricalDataTTL(new Date(NaN))).toBe(RECENT);
   });
+
+  it('treats an impossible date-only end as unreadable, not as the date it normalizes to', () => {
+    // Each would normalize to a real date far outside the window, and so to Infinity.
+    for (const end of ['2024-02-31', '2023-02-29', '2024-13-01', '2024-04-31', '2024-00-10']) {
+      expect(getHistoricalDataTTL(end), end).toBe(RECENT);
+    }
+    expect(getHistoricalDataTTL('2024-02-29')).toBe(FINAL); // a real leap day
+  });
 });
