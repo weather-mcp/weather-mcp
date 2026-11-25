@@ -11,6 +11,25 @@ import { logger, redactCoordinatesForLogging, describeErrorForLogging } from '..
 import { withRequestDeadline } from '../utils/httpDeadline.js';
 import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 
+/** Fixed message for an HTTP 200 whose body is not a fire-perimeter feature list (G4). */
+const UNEXPECTED_RESPONSE_MESSAGE = 'NIFC service returned an unexpected response.';
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Is a FeatureServer 200 body a feature list? A plain object, no ArcGIS
+ * `error` key, and `features` an array of plain objects (the handler reads
+ * `feature.attributes` on each one). `{ features: [] }` is the honest empty.
+ */
+function isFeatureListEnvelope(body: unknown): body is NIFCQueryResponse {
+  return isPlainObject(body)
+    && body.error === undefined
+    && Array.isArray(body.features)
+    && body.features.every(isPlainObject);
+}
+
 export interface NIFCServiceConfig {
   baseURL?: string;
   timeout?: number;
@@ -60,6 +79,8 @@ export class NIFCService {
    * @param east Eastern longitude boundary
    * @param north Northern latitude boundary
    * @returns Fire perimeter features within the bounding box
+   * @throws {Error} `NIFC service returned an unexpected response.` for an
+   *   HTTP 200 whose body is not a feature list (never cached)
    */
   async queryFirePerimeters(
     west: number,
@@ -114,6 +135,36 @@ export class NIFCService {
     east: number,
     north: number
   ): Promise<NIFCQueryResponse> {
+    const body = await this.requestFeatureServer(west, south, east, north);
+
+    // ArcGIS reports a query error as HTTP 200 with an `error` object and no
+    // `features` (measured live 2026-11-25). That is an error, never an empty
+    // list (G4). Thrown outside the request `catch`, so it is never mapped to
+    // `Failed to query NIFC fire perimeters.`, and before
+    // `queryFirePerimeters`'s 30-minute `cache.set`, so it is never cached.
+    // Nothing from the body is logged.
+    if (!isFeatureListEnvelope(body)) {
+      logger.warn('NIFC returned an unexpected response', { status: 200, securityEvent: true });
+      throw new Error(UNEXPECTED_RESPONSE_MESSAGE);
+    }
+
+    logger.info('NIFC query complete', {
+      featureCount: body.features?.length || 0,
+      exceeded: body.exceededTransferLimit || false
+    });
+
+    return body;
+  }
+
+  /**
+   * The FeatureServer request alone: the raw response body, or a fixed-message error.
+   */
+  private async requestFeatureServer(
+    west: number,
+    south: number,
+    east: number,
+    north: number
+  ): Promise<unknown> {
     try {
       // Build ArcGIS REST query
       const params = new URLSearchParams({
@@ -139,13 +190,7 @@ export class NIFCService {
         url: this.featureServerUrl
       });
 
-      const response = await this.client.get<NIFCQueryResponse>(url);
-
-      logger.info('NIFC query complete', {
-        featureCount: response.data.features?.length || 0,
-        exceeded: response.data.exceededTransferLimit || false
-      });
-
+      const response = await this.client.get<unknown>(url);
       return response.data;
     } catch (error) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
