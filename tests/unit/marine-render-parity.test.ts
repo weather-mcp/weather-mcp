@@ -73,6 +73,13 @@ const LAKE_MICHIGAN_COORDS = { latitude: 43.0, longitude: -86.0 };
 // One interval that contains the real clock for the whole test run: started an hour ago, lasts a day.
 const currentInterval = (): string => `${new Date(Date.now() - 3_600_000).toISOString()}/P1D`;
 
+// An earlier, non-zero interval ending exactly where currentInterval() starts (now - 1 h), so every
+// series carries two distinct values and a real zero is not the uniform placeholder shape.
+const staleInterval = (value: number) => ({
+  validTime: `${new Date(Date.now() - 25 * 3_600_000).toISOString()}/PT24H`,
+  value
+});
+
 /**
  * Build a NOAA gridpoint fixture. Each of waveHeight/wavePeriod/waveDirection
  * is included in `properties` only when the caller explicitly names it in
@@ -98,13 +105,13 @@ function buildNOAAGridpointResponse(opts: {
   };
 
   if (opts.waveHeight !== undefined) {
-    properties.waveHeight = { uom: 'wmoUnit:m', values: [{ validTime: currentInterval(), value: opts.waveHeight }] };
+    properties.waveHeight = { uom: 'wmoUnit:m', values: [staleInterval(opts.waveHeight + 1), { validTime: currentInterval(), value: opts.waveHeight }] };
   }
   if (opts.wavePeriod !== undefined) {
-    properties.wavePeriod = { uom: 'nwsUnit:s', values: [{ validTime: currentInterval(), value: opts.wavePeriod }] };
+    properties.wavePeriod = { uom: 'nwsUnit:s', values: [staleInterval(opts.wavePeriod + 1), { validTime: currentInterval(), value: opts.wavePeriod }] };
   }
   if (opts.waveDirection !== undefined) {
-    properties.waveDirection = { uom: 'wmoUnit:degree_(angle)', values: [{ validTime: currentInterval(), value: opts.waveDirection }] };
+    properties.waveDirection = { uom: 'wmoUnit:degree_(angle)', values: [staleInterval(opts.waveDirection + 1), { validTime: currentInterval(), value: opts.waveDirection }] };
   }
 
   return { properties } as unknown as GridpointResponse;
