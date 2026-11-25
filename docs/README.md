@@ -75,7 +75,7 @@ extend coverage beyond their keyless path:
 
 ## Version Information
 
-- **Current Version:** 1.35.29
+- **Current Version:** 1.35.30
 - **Test Coverage:** 5,830 tests, 100% pass rate
 
 ---
