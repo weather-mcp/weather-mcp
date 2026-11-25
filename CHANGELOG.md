@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+`save_location` could save a street address far from where the same text pointed everywhere else. It looked up a query through a different path from `city_name` and `search_location`, one that never asked Census.gov, which is the service that matches a US street address. `350 Fifth Avenue, New York, NY` was saved near Albany, 219 km from the Empire State Building that `city_name` returned for the same text. Every later weather call on that saved name, alerts included, reported the wrong town. `save_location` now uses the same lookup as `city_name`. Place names such as `Seattle, WA` or `Paris, France` already matched and are unchanged.
+
+### Fixed
+
+- **`save_location` resolves a query to the same place as `city_name`.** A `location_query` is now looked up exactly as `city_name` and `search_location` look it up: Census.gov for a US address, then Nominatim, then Open-Meteo. `search_location` with the same text now shows the place a save will store. **An address saved by an earlier version can be at the wrong place.** Save it again with the same `location_query` to fix it. Two visible changes follow. A street address is saved under its own name, such as `10 Downing Street`, where before it was saved under its town's name. A failed lookup now reports the same two messages as `city_name`: "No locations found matching …" when no service found the place, and "Location lookup is unavailable right now …" when none answered. A `location_query` of only spaces is refused before any lookup. (`src/handlers/savedLocationsHandler.ts`, `src/server/weatherServer.ts`, `tests/unit/save-location-geocode-parity.test.ts`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`)
+
 ## [1.35.29] - 2026-11-25
 
 `get_historical_weather` could keep answering a question about recent weather with the first answer it ever gave. A range that started more than a day ago was cached for as long as the server ran, even when it ended today. Today's part of that answer is not a record yet: the Open-Meteo archive fills it from a forecast model, including hours that have not happened. NOAA observations for the last few days still arrive late. A repeated question now gets fresh data within an hour.

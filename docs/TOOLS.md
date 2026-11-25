@@ -1009,7 +1009,7 @@ Save a location with an alias for easy reuse in weather queries.
 - `activities` (optional): Activities you do at this location (e.g., ["boating", "fishing"]). Helps AI provide relevant weather information. Each activity max 50 characters.
 
 **Description:**
-Saves a location to persistent storage (`~/.weather-mcp/locations.json`) for easy reuse. Accepts either a location query (which will be automatically geocoded using Nominatim/OpenStreetMap) or direct coordinates. Once saved, the location can be used in any weather tool by providing `location_name` instead of coordinates.
+Saves a location to persistent storage (`~/.weather-mcp/locations.json`) for easy reuse. Accepts either a location query or direct coordinates. A location query is looked up the same way as `city_name` and `search_location`: Census.gov for a US address, then Nominatim (OpenStreetMap), then Open-Meteo. Running `search_location` with the same text shows the place a save will store. If the lookup fails, nothing is saved. Once saved, the location can be used in any weather tool by providing `location_name` instead of coordinates.
 
 **Smart Updates:** If the alias already exists and you only provide `name` and/or `activities` (without location details), it will update just those fields while preserving all coordinates and metadata. This makes it easy to add activities or rename locations without re-specifying the full address. `name` is the one field an empty value does not clear.
 
