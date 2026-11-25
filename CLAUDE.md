@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.29 (Production Ready)
+- **Version:** 1.35.30 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -544,7 +544,7 @@ The saved locations feature allows users to save frequently used locations with 
 - Storage location: `~/.weather-mcp/locations.json`
 
 **Data Flow:**
-1. User saves location → `save_location` tool → Nominatim geocoding (if query provided) → LocationStore → JSON file
+1. User saves location → `save_location` tool → shared geocoding (`GeocodingService`, if a query is provided) → LocationStore → JSON file
 2. User queries weather → `location_name` parameter → locationResolver → coordinates → weather API
 
 ### Using Location Names in Tools
@@ -611,7 +611,7 @@ tools use to skip the reverse-geocode lookup.
 - **Aliases are normalized**: Always lowercased and trimmed for consistency
 - **Max alias length**: 50 characters
 - **Validation**: coordinates and every metadata field are type-checked before any write, on every branch, in the handler and again in `LocationStore.set()`; a malformed on-disk entry is named by the renderers and never dropped (`src/utils/savedLocationShape.ts`). The resolver refuses only a bad coordinate (`SavedLocationCoordinateError`, which `WEATHER_DEFAULT_LOCATION` must never fall through to geocoding)
-- **Geocoding**: Uses Nominatim service (rate-limited to 1 req/sec)
+- **Geocoding**: Uses the shared `GeocodingService` (Census.gov → Nominatim → Open-Meteo), the same lookup as `city_name`; the Nominatim leg is rate-limited to 1 req/sec
 - **Error handling**: Helpful messages if location not found or invalid
 - **No cache**: `load()` reads and parses the file on **every** operation and returns a fresh
   object. A save in one client is visible to the others with no restart. The store previously
@@ -766,15 +766,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.29 — Production Ready ✅
-- **Test Coverage:** 5,823 tests, 100% pass rate
+- **Version:** 1.35.30 — Production Ready ✅
+- **Test Coverage:** 5,830 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.30:** save_location saves a query at the same place city_name resolves it to
 - **New in v1.35.29:** A historical range ending in the last week is refreshed hourly instead of cached for good
 - **New in v1.35.28:** NOAA marine conditions answer from Open-Meteo where NOAA publishes no wave forecast, instead of a calm sea
-- **New in v1.35.27:** A wildfire feed's error page reports the failure instead of no fires
 
 ## Useful References
 
@@ -797,7 +797,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-25 (v1.35.29)
+**Last Updated:** 2026-11-25 (v1.35.30)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

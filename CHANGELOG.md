@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.30] - 2026-11-25
+
+`save_location` could save a street address far from where the same text pointed everywhere else. It looked up a query through a different path from `city_name` and `search_location`, one that never asked Census.gov, which is the service that matches a US street address. `350 Fifth Avenue, New York, NY` was saved near Albany, 219 km from the Empire State Building that `city_name` returned for the same text. Every later weather call on that saved name, alerts included, reported the wrong town. `save_location` now uses the same lookup as `city_name`. Place names such as `Seattle, WA` or `Paris, France` already matched and are unchanged.
+
+### Fixed
+
+- **`save_location` resolves a query to the same place as `city_name`.** A `location_query` is now looked up exactly as `city_name` and `search_location` look it up: Census.gov for a US address, then Nominatim, then Open-Meteo. `search_location` with the same text now shows the place a save will store. **An address saved by an earlier version can be at the wrong place.** Save it again with the same `location_query` to fix it. (`src/handlers/savedLocationsHandler.ts`, `src/server/weatherServer.ts`, `tests/unit/save-location-geocode-parity.test.ts`, `docs/TOOLS.md`, `docs/ERROR_HANDLING.md`)
+
+### Changed
+
+- **A street address is saved under its own name.** `save_location` with a `location_query` such as `10 Downing Street, London` now stores `10 Downing Street`, where before it stored the town's name. Saved locations that already exist keep their names until they are saved again.
+- **A failed `save_location` lookup reports the same messages as `city_name`.** "No locations found matching …" means no service found the place. "Location lookup is unavailable right now …" means no service answered. A `location_query` of only spaces is refused before any lookup.
+
 ## [1.35.29] - 2026-11-25
 
 `get_historical_weather` could keep answering a question about recent weather with the first answer it ever gave. A range that started more than a day ago was cached for as long as the server ran, even when it ended today. Today's part of that answer is not a record yet: the Open-Meteo archive fills it from a forecast model, including hours that have not happened. NOAA observations for the last few days still arrive late. A repeated question now gets fresh data within an hour.
@@ -2489,7 +2502,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.29...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.30...HEAD
+[1.35.30]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.29...v1.35.30
 [1.35.29]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.28...v1.35.29
 [1.35.28]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.27...v1.35.28
 [1.35.27]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.26...v1.35.27

@@ -29,7 +29,7 @@ void BEFORE;
 
 import { handleSaveLocation } from '../../src/handlers/savedLocationsHandler.js';
 import { LocationStore } from '../../src/services/locationStore.js';
-import type { NominatimService } from '../../src/services/nominatim.js';
+import type { GeocodingService } from '../../src/services/geocoding.js';
 import { createWeatherServer } from '../../src/server/weatherServer.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -80,12 +80,10 @@ const withBad = (raw: string): Fixture =>
   fixture([['home', HOME_RAW], ['x', raw], ['__proto__', PROTO_RAW], ['zurich', ZURICH_RAW]]);
 
 const stub = {
-  searchLocation: vi.fn(async () => ({
-    results: [
-      { name: 'Geocoded X', latitude: 1.5, longitude: 2.5, timezone: 'Etc/UTC', country_code: 'xx', admin1: 'Reg' },
-    ],
-  })),
-} as unknown as NominatimService;
+  geocode: vi.fn(async () => [
+    { name: 'Geocoded X', display_name: 'Geocoded X, Reg', latitude: 1.5, longitude: 2.5, timezone: 'Etc/UTC', country_code: 'xx', admin1: 'Reg', confidence: 'medium', source: 'openmeteo' },
+  ]),
+} as unknown as GeocodingService;
 
 function text(r: { content: Array<{ type: string; text: string }> }): string {
   return r.content[0].text;

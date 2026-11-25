@@ -3,7 +3,7 @@
  */
 
 import { LocationStore } from '../services/locationStore.js';
-import { NominatimService } from '../services/nominatim.js';
+import type { GeocodingService } from '../services/geocoding.js';
 import { validateLatitude, validateLongitude } from '../utils/validation.js';
 import {
   SAVED_LOCATION_LIST_LIMITS,
@@ -101,7 +101,7 @@ function describeStoredOversize(v: LimitViolation): string {
 export async function handleSaveLocation(
   args: unknown,
   locationStore: LocationStore,
-  nominatimService: NominatimService
+  geocodingService: GeocodingService
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   const saveArgs = args as SaveLocationArgs;
 
@@ -318,20 +318,19 @@ export async function handleSaveLocation(
       }
     }
   } else if (saveArgs.location_query && typeof saveArgs.location_query === 'string') {
-    // Geocode the query
+    // Geocode the query with the same service and the same call as city_name
+    // (locationResolver.ts), so one text resolves to one place on every tool.
     const query = saveArgs.location_query.trim();
-    const results = await nominatimService.searchLocation(query, 1);
-
-    if (!results.results || results.results.length === 0) {
-      throw new Error(
-        `Could not find location "${query}". Please try:\n` +
-        `- Being more specific (e.g., "Seattle, WA, USA" instead of "Seattle")\n` +
-        `- Using a different spelling\n` +
-        `- Providing coordinates directly with latitude and longitude parameters`
-      );
+    if (query.length === 0) {
+      throw new Error('location_query cannot be empty');
     }
 
-    const location = results.results[0];
+    // geocode() returns a non-empty array or throws GeocodingNotFoundError /
+    // GeocodingServiceUnavailableError. Both propagate unchanged: a save whose
+    // query could not be resolved writes nothing. This is the branch's only
+    // await (G100: the merge base is re-read after it).
+    const results = await geocodingService.geocode(query, 1);
+    const location = results[0];
     if (providedName === undefined && location.name.length > SAVED_LOCATION_TEXT_LIMITS.name) {
       throw new Error(
         `The geocoded name is ${location.name.length} characters, over the ` +

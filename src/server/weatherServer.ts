@@ -705,7 +705,7 @@ export const TOOL_DEFINITIONS = {
         },
         location_query: {
           type: 'string' as const,
-          description: 'Location to geocode and save (e.g., "Seattle, WA", "Paris, France", "Lake Tahoe, CA"). Will be geocoded using Nominatim. Not required if latitude/longitude provided.'
+          description: 'Location to geocode and save (e.g., "Seattle, WA", "Paris, France", "Lake Tahoe, CA"). Looked up the same way as city_name; search_location with the same text shows where it will be saved. Not required if latitude/longitude provided.'
         },
         latitude: {
           type: 'number' as const,
@@ -936,7 +936,7 @@ export function createWeatherServer(options: WeatherServerOptions): Server {
 
           case 'save_location':
             return await withAnalytics('save_location', async () =>
-              handleSaveLocation(args, locationStore, nominatimService)
+              handleSaveLocation(args, locationStore, geocodingService)
             );
 
           case 'list_saved_locations':

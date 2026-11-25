@@ -862,8 +862,9 @@ Error: The geocoded name is 501 characters, over the 500-character limit. Pass a
 ### Location Lookup Errors
 
 A place name has to be looked up before any weather service is called. This applies to
-`search_location`, to `city_name` on every location tool, and to a `WEATHER_DEFAULT_LOCATION` that
-is not a saved alias or a `"lat,lon"` pair. The server tries up to three lookup services in turn:
+`search_location`, to `city_name` on every location tool, to `save_location` with a `location_query`,
+and to a `WEATHER_DEFAULT_LOCATION` that is not a saved alias or a `"lat,lon"` pair. A failed lookup
+in `save_location` saves nothing. The server tries up to three lookup services in turn:
 Census.gov (skipped for a place that is clearly outside the US), Nominatim (OpenStreetMap), then
 Open-Meteo. The first one that finds a match wins. When none does, you get one of two errors, and
 they ask you to do different things.

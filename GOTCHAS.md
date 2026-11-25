@@ -6155,6 +6155,17 @@ control was run first, it failed, and the run halted before any row built on it.
 case was the real hang. Through the server, the reset path already matched
 `docs/ERROR_HANDLING.md`, so the doc edit the plan had planned was dropped.
 
+**Again 2026-11-25** (save-location-geocode-parity, design stage; fix `494eb7e`): review finding
+M11 blamed the request shape. `save_location` sent `+`-encoded spaces and `limit=1`, while
+`GeocodingService` sends `%20` and asks for at least five results. Porting those two fixes was the
+review's suggested remedy. The base probe found the shape alone changed the first result on 1 of
+19 raw Nominatim queries. The real divergence was one layer up: `city_name` asks Census.gov first,
+and `save_location` never did. The 219 km case, `350 Fifth Avenue, New York, NY`, would have moved
+from Watervliet to Greenport under the suggested port, so the defect would have stayed, in a
+different wrong town. This is the same rule from the other side. When a finding names a
+*mechanism*, probe that mechanism in isolation (the 2×2 of encoding × limit) **and** the shipped
+path end to end, before the design adopts the finding's remedy.
+
 **Status:** active. Related: [G10] (the base column as the defect's own proof),
 [G46] (every published behavioural sentence names its proof), [G19] (read what a
 layer passes on; do not infer it).
