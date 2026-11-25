@@ -135,7 +135,7 @@ describe('extractNOAAMarineConditions reads the interval that contains now', () 
 
   it('reads zero as a value (kills: falsy check)', () => {
     const result = extractNOAAMarineConditions(
-      gridpoint({ waveHeight: series(M, [span(NOW - HOUR, 2, 0)]) }),
+      gridpoint({ waveHeight: series(M, [span(NOW - 5 * HOUR, 4, 0.6), span(NOW - HOUR, 2, 0)]) }),
       NOW
     );
     expect(result).not.toBeNull();
@@ -146,8 +146,8 @@ describe('extractNOAAMarineConditions reads the interval that contains now', () 
     const here = (uom: string | undefined, v: number) => series(uom, [span(NOW - HOUR, 2, v)]);
     const result = extractNOAAMarineConditions(
       gridpoint({
-        waveHeight: here('wmoUnit:ft', 3),
-        wavePeriod: here(S, 6),
+        waveHeight: here(M, 3),
+        wavePeriod: here('nwsUnit:min', 6),
         waveDirection: here(DEG, 200),
         windSpeed: here(undefined, 20),
         windGust: here(KMH, 30),
@@ -155,13 +155,13 @@ describe('extractNOAAMarineConditions reads the interval that contains now', () 
       }),
       NOW
     );
-    expect(result?.waveHeight).toBeUndefined();
+    expect(result?.wavePeriod).toBeUndefined();
     expect(result?.windSpeed).toBeUndefined();
-    expect(result).toMatchObject({ wavePeriod: 6, waveDirection: 200, windGust: 30, windDirection: 210 });
+    expect(result).toMatchObject({ waveHeight: 3, waveDirection: 200, windGust: 30, windDirection: 210 });
     expect(warnSpy).toHaveBeenCalledTimes(2);
     expect(warnSpy).toHaveBeenCalledWith('Unrecognised gridpoint unit; line omitted', {
-      field: 'waveHeight',
-      uom: 'wmoUnit:ft'
+      field: 'wavePeriod',
+      uom: 'nwsUnit:min'
     });
     expect(warnSpy).toHaveBeenCalledWith('Unrecognised gridpoint unit; line omitted', {
       field: 'windSpeed',

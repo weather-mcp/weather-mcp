@@ -573,7 +573,15 @@ seam and one just inside the gap, not only at the region centres. Shipped code w
 unaffected (a real `0.05` gap), but the check that was supposed to defend it was
 not defending it.
 
-**Status:** active. **Verify line re-run 2026-08-26** (cap-disclosure-accuracy
+
+**The same degeneracy hides on the clock of a captured fixture, 2026-11-25** (`5adc9c5`,
+marine-placeholder-zero T3). A row that freezes the clock over a committed capture discriminates only if the
+mutated code gives a different answer *at that instant*. MTR/87,106 at 12:00Z had a 0 height and a 0 period, so
+restoring the old three-field gate still returned `null` there and the row stayed green. The row only kills
+that mutation at 2026-11-28T14:00Z, inside the one 14 s period interval. Pick the frozen instant from the
+mutation, not from the capture time, and run the mutation to prove it.
+
+**Status:** active, **extended 2026-11-25**. **Verify line re-run 2026-08-26** (cap-disclosure-accuracy
 curation): mutating `count > topCount` to `>=` still turns exactly one test red
 (`alerts-remainder-detail.test.ts` — *"resolves a tie deterministically, by
 first appearance in the remainder"*), so `74b69ab`'s tie case still holds the
@@ -2810,7 +2818,15 @@ claim quotes a string, copy it from the artifact that emits it**, not from the
 plan that specified it — and this holds for `GOTCHAS.md` itself, which is
 otherwise easy to treat as notes rather than as published prose.
 
-**Status:** active, **extended 2026-08-30**. Related: [G11] (read the real
+
+**Grep the tool's whole doc section for the old claim, not just the line the plan names, 2026-11-25**
+(marine-placeholder-zero T5, `a522d8e`; found by plan-review copilot R2). The plan named `docs/TOOLS.md:708`.
+The same behaviour was stated a second time, in the `Returns:` list at `:726` ("a gridpoint that publishes a
+period but no height reads `⚪ Unknown`"), and the fix made it false. A behaviour change needs a search of the
+tool's entire section for every sentence that describes it, because one tool's reference states the same
+behaviour in several lists.
+
+**Status:** active, **extended 2026-08-30 and 2026-11-25**. Related: [G11] (read the real
 output), [G41] (test the acceptance check before obeying it), [G45] (a contract
 that cannot reach its subject), [G60] (proving a workflow step's behaviour
 outside CI — the harness that would have supplied the string). Not lintable —
@@ -7606,7 +7622,18 @@ T4 `967a82b` (severe-weather window). Live: nine offices on 2026-11-14 and the T
 2026-11-24, marine-current-interval: T2 `2cabeb2` (the NOAA marine reader). Lake Huron printed 2.1 m of waves
 where the current interval said 0.9 m.
 
-**Status:** active. Lint candidate: `no-restricted-syntax` on `.values[0]` of a `GridpointDataSeries`. Related:
+
+**An office with no forecast fills the series with `0`; it does not leave it empty, 2026-11-25**
+(marine-placeholder-zero, `5adc9c5`). A marine series the office does not forecast arrives as zeros over the
+whole grid: one interval (MTR/87,106), four (TBW/71,98), or beside a varying height (AKQ/89,58 period and
+direction). Every land cell inside the Great Lakes and bay boxes read this way on 2026-11-25. `valueAt` returns
+that `0` correctly, so the reader cannot tell "not forecast" from "flat calm" at one instant. Ask the whole
+series with `isAllZero` before reading the value now, and read the series as absent when it is all zero. A
+`0` inside a varying series is a reading. A quantity that cannot physically be zero (a wave period) is absent
+at any position. Do not apply this to `valueAt` itself: zero is a real constant for snowfall and precipitation
+probability.
+
+**Status:** active, **extended 2026-11-25**. Verify line re-run 2026-11-25: still only `snow.ts:91`, `:142`. Lint candidate: `no-restricted-syntax` on `.values[0]` of a `GridpointDataSeries`. Related:
 [G162], [G69], [G56].
 
 ---

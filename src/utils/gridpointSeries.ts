@@ -1,7 +1,8 @@
 /**
  * NWS gridpoint series: validTime intervals, the value at an instant, the
- * maximum over a window, and the unit guard that converts a current value only
- * from its published unit. Pure: reads no clock; callers pass the instants.
+ * maximum over a window, the all-zero predicate over a whole series, and the
+ * unit guard that converts a current value only from its published unit.
+ * Pure: reads no clock; callers pass the instants.
  */
 import { logger } from './logger.js';
 
@@ -123,6 +124,30 @@ export function maxOverlapping(
     }
   }
   return max;
+}
+
+/**
+ * True when the series holds at least one finite value and every finite value
+ * is 0. Entries are read through the same bounded walk as valueAt; validTime
+ * is not parsed (the question is about the whole series, not an instant).
+ * Non-finite values (null, NaN) are skipped, not counted as zero.
+ */
+export function isAllZero(
+  series: SeriesLike | undefined,
+  maxEntries: number = GRIDPOINT_MAX_ENTRIES
+): boolean {
+  let sawFinite = false;
+  for (const entry of boundedValues(series, maxEntries)) {
+    const v = finiteOrNull(entry.value);
+    if (v === null) {
+      continue;
+    }
+    if (v !== 0) {
+      return false;
+    }
+    sawFinite = true;
+  }
+  return sawFinite;
 }
 
 /**

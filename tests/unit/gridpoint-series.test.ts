@@ -5,6 +5,7 @@ import {
   valueAt,
   maxOverlapping
 } from '../../src/utils/gridpointSeries.js';
+import { isAllZero } from '../../src/utils/gridpointSeries.js';
 import { logger } from '../../src/utils/logger.js';
 
 const START = '2026-11-14T12:00:00+00:00';
@@ -178,5 +179,46 @@ describe('cap', () => {
     const series = build(501, 99);
     expect(maxOverlapping(series, START_MS, START_MS + 600 * H)).toBe(1);
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('isAllZero', () => {
+  let warn: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    warn.mockRestore();
+  });
+
+  const series = (...values: unknown[]) => ({
+    values: values.map((v, i) => entry(START_MS + i * H, 'PT1H', v))
+  });
+
+  it.each([
+    ['an undefined series', undefined, false],
+    ['an empty series', { values: [] }, false],
+    ['a values-less series', {}, false],
+    ['all null', series(null, null), false],
+    ['all NaN', series(Number.NaN), false],
+    ['[0]', series(0), true],
+    ['[0, 0, 0, 0]', series(0, 0, 0, 0), true],
+    ['[0, null, 0]', series(0, null, 0), true],
+    ['[0, 0.3]', series(0, 0.3), false],
+    ['[0.3]', series(0.3), false],
+    ['[-0]', series(-0), true]
+  ])('%s', (_label, input, expected) => {
+    expect(isAllZero(input)).toBe(expected);
+  });
+
+  it('ignores a non-zero entry beyond the cap and warns once', () => {
+    const values = Array.from({ length: 501 }, (_v, i) => entry(START_MS + i * H, 'PT1H', i === 500 ? 1.0 : 0));
+    expect(isAllZero({ values })).toBe(true);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('Gridpoint series exceeds max entries', {
+      length: 501,
+      maxEntries: 500,
+      securityEvent: true
+    });
   });
 });

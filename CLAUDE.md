@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.27 (Production Ready)
+- **Version:** 1.35.28 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -80,7 +80,7 @@ src/
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
 │   ├── nowcast.ts           # minutely_15 nowcast: model superset boxes, 3-state response classification, quarter bands, hourly-probability pick (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
-│   ├── gridpointSeries.ts   # NWS gridpoint validTime → interval; value at an instant; max over a window; unit guard (`gridpointToDisplayUnit`); bounded with a securityEvent warn (pure)
+│   ├── gridpointSeries.ts   # NWS gridpoint validTime → interval; value at an instant; max over a window; all-zero predicate (`isAllZero`); unit guard (`gridpointToDisplayUnit`); bounded with a securityEvent warn (pure)
 │   ├── connectionFailure.ts # Transport codes meaning "connection failed before any answer"; shared by the alert-feed services, NOAA and Open-Meteo (pure)
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
 │   ├── httpDeadline.ts      # withRequestDeadline — one wall-clock deadline per axios request (proxy included), emitted as axios's own ECONNABORTED; every axios.create passes it; hands a tunnelled https request proxy: false and a per-request TunnelAgent on its own signal
@@ -261,6 +261,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 ### Upstream data hygiene
 
 - **Never trust the HTTP 200 alone.** Open-Meteo and others return 200 with all-null series for uncovered points (pollen outside Europe, flood at sea, ensemble probability). Guard with `!= null`, not `!== undefined` — JSON `null` survives `!== undefined` and then coerces to 0 in arithmetic/conversion (the v1.20.0 F1 and normals-averaging bugs). The Open-Meteo series types declare this honestly (`field?: (number | null)[]`), and so do the `current.*` and geocoding scalars (`field?: number | null`), so the compiler now enumerates the guard sites rather than certifying their absence; `finiteSampleAt` (`src/utils/finiteSample.ts`) is the shared accessor for reading one sample.
+- **An NWS gridpoint marine series of all zeros is a fill value for "not forecast", not a calm sea.** An office with no wave forecast for a cell fills the series with `0` rather than leaving it empty. A `0` inside a varying series is a reading; a wave period that displays as 0.0 s is absent, because zero is physically impossible for a period. `extractNOAAMarineConditions` checks `isAllZero` (`src/utils/gridpointSeries.ts`) before the unit guard, and returns `null` with no height, so the handler answers from Open-Meteo.
 - **A dead feed and a quiet region both answer with zero rows; only the clock tells them apart.** FIRMS products are freshness-checked on every call, by clock (the flat file's `Last-Modified`, `data_availability`'s `max_date`), and a stale product is named and excluded, never merged; a missing signal fails open (`src/utils/firmsProducts.ts`).
 - **Parse CSV/JSON by field name, never by position.** Two live shapes of the same feed have differed in column order and count.
 - **A pushed feed is validated before it is buffered.** The Blitzortung strike buffer holds only strikes with finite, in-range coordinates and a time no later than ingest plus 5 minutes; `parseStrike` (`src/utils/strikeBuffer.ts`) is the only way in, and latitude or longitude 0 is valid. Rejects are counted per reason and warned at most once a minute, with no topic or payload text, because a per-message warn hands the broker the stderr write rate and copies its bytes into the log.
@@ -765,15 +766,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.27 — Production Ready ✅
-- **Test Coverage:** 5,775 tests, 100% pass rate
+- **Version:** 1.35.28 — Production Ready ✅
+- **Test Coverage:** 5,803 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.28:** NOAA marine conditions answer from Open-Meteo where NOAA publishes no wave forecast, instead of a calm sea
 - **New in v1.35.27:** A wildfire feed's error page reports the failure instead of no fires
 - **New in v1.35.26:** ENABLED_TOOLS modifiers apply wherever they are written; modifiers alone adjust basic
-- **New in v1.35.25:** NOAA marine conditions on the Great Lakes and US bays show current values, not the start of the forecast period
 
 ## Useful References
 
@@ -796,7 +797,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-25 (v1.35.27)
+**Last Updated:** 2026-11-25 (v1.35.28)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

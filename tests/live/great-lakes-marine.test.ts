@@ -50,10 +50,13 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
   });
 
   describe('NOAA Marine Data Retrieval', () => {
-    it('should retrieve marine conditions for Traverse City, MI (Lake Michigan)', async () => {
+    // Open water, not a shore town: land cells inside the lake boxes carry an
+    // all-zero gridpoint wave height, which now answers from Open-Meteo.
+    // Probed 2026-11-25T16:10Z: MKX/118,88, 36 values, 8+ distinct (0 to 2.13 m).
+    it('should retrieve marine conditions for open Lake Michigan (43.5, -87.0)', async () => {
       const args = {
-        latitude: 44.7631,
-        longitude: -85.6206,
+        latitude: 43.5,
+        longitude: -87.0,
         forecast: false
       };
 
@@ -70,13 +73,14 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
                            text.includes('Lake Michigan');
       expect(isNOAASource).toBe(true);
 
-      console.log('Traverse City Marine Conditions:\n', text.substring(0, 500));
+      console.log('Lake Michigan open-water Marine Conditions:\n', text.substring(0, 500));
     });
 
-    it('should retrieve marine conditions for Duluth, MN (Lake Superior)', async () => {
+    // Probed 2026-11-25T16:10Z: MQT/83,112, 11 values, 5 distinct (0 to 1.22 m).
+    it('should retrieve marine conditions for open Lake Superior (47.5, -89.5)', async () => {
       const args = {
-        latitude: 46.7867,
-        longitude: -92.1005,
+        latitude: 47.5,
+        longitude: -89.5,
         forecast: false
       };
 
@@ -94,7 +98,7 @@ describe('Great Lakes Marine Conditions (v1.1.0)', () => {
                                text.includes('NOAA National Weather Service');
       expect(isGreatLakesData).toBe(true);
 
-      console.log('Duluth Marine Conditions:\n', text.substring(0, 500));
+      console.log('Lake Superior open-water Marine Conditions:\n', text.substring(0, 500));
     });
 
     it('should retrieve marine conditions for Cleveland, OH (Lake Erie)', async () => {
