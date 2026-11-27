@@ -309,14 +309,18 @@ turns a real upstream contract regression into a logged "network flake" that
 nobody investigates — and a vacuous loop over an empty feed makes a broken
 parser look healthy.
 
-**Verify:** `grep -n 'isTransportFailure\|throw' tests/live/national-cap-alerts.test.ts`,
+**Verify:** `grep -n 'TransportFailure\|throw' tests/live/national-cap-alerts.test.ts`,
 and confirm no `catch` block in that file contains `expect(`. Same for
-`tests/live/lightning-broker-smoke.test.ts`.
+`tests/live/lightning-broker-smoke.test.ts`, `tests/live/japan-alerts.test.ts`
+and `tests/live/international-alerts.test.ts`.
 
 **Evidence:** 2026-08-23 (`2d564ef`) — the shape being avoided is
 `tests/integration/international-alerts.test.ts:299-325`, which puts its
 `expect`s inside the tolerant catch; raised as a major plan-review finding
-(codex-R7).
+(codex-R7). Fixed 2026-11-27 (`1d774d6`): that file is now
+`tests/live/international-alerts.test.ts`, and its two live tests skip only on
+exact per-service transport strings from `tests/helpers/liveAlertTransport.ts`,
+locked offline by `tests/unit/live-alert-transport.test.ts` (`a38fea8`).
 
 **Status:** active.
 
