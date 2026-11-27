@@ -10,22 +10,35 @@
  * - Current conditions: Observations typically update every 20-60 minutes
  */
 
+import { parseEnvBoolean } from '../utils/envBoolean.js';
+
 // Time constants in milliseconds
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 /**
- * Parse a boolean environment variable
+ * Parse a boolean environment variable: true/false/1/0, trimmed, any case
+ * (`parseEnvBoolean`). Any other value warns and takes the default — it says
+ * nothing about the user's intent, so it must not silently mean "on".
  * @param key Environment variable key
- * @param defaultValue Default value if not set
+ * @param defaultValue Default value if not set or unrecognized
  * @returns Boolean value
  */
 function getEnvBoolean(key: string, defaultValue: boolean): boolean {
   const value = process.env[key];
-  if (value === undefined) return defaultValue;
-  return value !== 'false' && value !== '0';
+  const parsed = parseEnvBoolean(value);
+  if (parsed === undefined) return defaultValue;
+  if (parsed === 'invalid') {
+    console.warn(`Invalid ${key}: "${value}". Using default: ${defaultValue}`);
+    return defaultValue;
+  }
+  return parsed;
 }
+
+/** A base-10 integer, optional sign, nothing else. Trailing text, decimals,
+ *  exponents and hex are rejected rather than truncated by `parseInt`. */
+const STRICT_INTEGER = /^[+-]?\d+$/;
 
 /**
  * Parse a number environment variable with validation
@@ -39,7 +52,8 @@ function getEnvNumber(key: string, defaultValue: number, min?: number, max?: num
   const value = process.env[key];
   if (value === undefined) return defaultValue;
 
-  const parsed = parseInt(value, 10);
+  const trimmed = value.trim();
+  const parsed = STRICT_INTEGER.test(trimmed) ? Number(trimmed) : NaN;
   if (isNaN(parsed)) {
     console.warn(`Invalid ${key}: "${value}". Using default: ${defaultValue}`);
     return defaultValue;
