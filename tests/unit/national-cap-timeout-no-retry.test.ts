@@ -239,6 +239,59 @@ describe('NationalCapService — a timed-out request is not retried', () => {
     });
   });
 
+  describe('the refresh deadline stops the index fetch (diff review codex-DR-M1)', () => {
+    // With API_TIMEOUT_MS above the 40 s refresh deadline, the index GET used to outlive the
+    // answer: refresh() aborted its controller, but fetchIndex never received the signal.
+    function makeSlowService(): NationalCapService {
+      return new NationalCapService({
+        feeds: TEST_FEEDS,
+        timeout: 120_000,
+        now: () => new Date(),
+        backoffJitter: () => 0.5
+      });
+    }
+
+    function indexSignal(callIndex: number): AbortSignal | undefined {
+      const calls = mockGet.mock.calls as unknown as Array<[string, { signal?: AbortSignal }?]>;
+      return calls[callIndex]?.[1]?.signal;
+    }
+
+    it('an index GET still open at the 40 s deadline is aborted, and the caller gets the timeout message', async () => {
+      mockGet.mockImplementation(() => new Promise(() => undefined));
+      const caught = makeSlowService()
+        .getWarnings('ph')
+        .catch((e: unknown) => e as Error);
+      await vi.advanceTimersByTimeAsync(40_000);
+      const err = await caught;
+      expect((err as Error).message).toBe('PAGASA-DOST alert feed request timed out');
+      expect(mockGet).toHaveBeenCalledTimes(1);
+      expect(indexSignal(0)?.aborted).toBe(true);
+    });
+
+    it('a 503 just before the deadline starts no retry after it', async () => {
+      mockGet.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            setTimeout(() => reject({ response: { status: 503 } }), 39_500);
+          })
+      );
+      const caught = makeSlowService()
+        .getWarnings('ph')
+        .catch((e: unknown) => e as Error);
+      // The 503 lands at 39.5 s; the first backoff (1000 ms × 0.75) ends after the 40 s abort.
+      await vi.advanceTimersByTimeAsync(50_000);
+      const err = await caught;
+      expect((err as Error).message).toBe('PAGASA-DOST alert feed request timed out');
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('the diagnostic getIndex path passes no signal', async () => {
+      mockGet.mockImplementation(() => xmlResponse(rssIndex([])));
+      await settle(makeService().getIndex('in'));
+      expect(indexSignal(0)).toBeUndefined();
+    });
+  });
+
   describe('controls: a rate limit and a 5xx are still retried', () => {
     it('an index 429 is fetched four times and rejects with the rate-limit message', async () => {
       mockGet.mockImplementation(() => Promise.reject({ response: { status: 429 } }));

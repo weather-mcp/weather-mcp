@@ -334,21 +334,33 @@ export class NationalCapService {
     }
   }
 
-  /** The index fetch, with MeteoAlarm-style backoff on a rate limit or a 5xx. */
+  /**
+   * The index fetch, with MeteoAlarm-style backoff on a rate limit or a 5xx.
+   *
+   * `signal` is the refresh's abort signal. Once the refresh deadline has
+   * passed, the in-flight GET is cancelled and no further attempt starts, so
+   * nothing keeps fetching after the caller has its answer — even when
+   * API_TIMEOUT_MS is longer than the 40 s refresh deadline. `getIndex`, the
+   * diagnostic path, has no refresh deadline and passes none.
+   */
   private async fetchIndex(
     countryCode: string,
     feed: NationalCapFeed,
+    signal?: AbortSignal,
     retries = 0
   ): Promise<string> {
     try {
-      return await this.fetchText(feed.indexUrl, countryCode, feed);
+      return await this.fetchText(feed.indexUrl, countryCode, feed, { signal });
     } catch (error) {
       const mapped = error as Error;
-      if (retries < this.maxIndexRetries && this.isRetryable(mapped)) {
+      if (retries < this.maxIndexRetries && this.isRetryable(mapped) && !signal?.aborted) {
         const baseDelay = Math.pow(2, retries) * 1000;
         const delay = baseDelay * (0.5 + this.backoffJitter() * 0.5);
         await new Promise<void>(resolve => setTimeout(resolve, delay));
-        return this.fetchIndex(countryCode, feed, retries + 1);
+        if (signal?.aborted) {
+          throw mapped;
+        }
+        return this.fetchIndex(countryCode, feed, signal, retries + 1);
       }
       throw mapped;
     }
@@ -493,7 +505,7 @@ export class NationalCapService {
       // The index is the contract: its failure propagates, and a 200 HTML
       // error page is a parse failure, not zero alerts.
       const indexXml = await Promise.race([
-        this.fetchIndex(countryCode, feed),
+        this.fetchIndex(countryCode, feed, controller.signal),
         deadline.then(() => {
           throw new Error(`${feed.publisher} alert feed request timed out`);
         })
