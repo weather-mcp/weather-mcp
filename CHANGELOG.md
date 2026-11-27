@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Local times in American Samoa, Tokelau and parts of western Alaska are no longer a calendar day off.** The server works out a place's time zone from its coordinates when no weather service supplies one. The zone data it used is coarse at the International Date Line, and in three places it named a zone on the wrong side of the line. Tutuila, where almost everyone in American Samoa lives, was given Samoa's zone (UTC+13) instead of its own (UTC−11), so times there were shown a full day ahead: an alert expiring at 6 PM on Tuesday read as 6 PM on Wednesday. Fakaofo in Tokelau was shown a day behind. Gambell on St Lawrence Island and Little Diomede in Alaska were given a Russian zone and shown 21 hours ahead. Those places now get their real local zone; everywhere else is unchanged. The affected times were the effective and expiry times from `get_alerts` when no nearby weather station names a zone, the expiry time in the life-threatening alert banner on `get_forecast`, `get_current_conditions` and `get_weather_summary`, the backup forecast used when Open-Meteo cannot be reached (where the zone also decides which day each hour is counted in), airport observation times from `get_current_conditions` with `source="metar"`, and times in river and wildfire reports. Forecast, current-conditions, marine and air-quality data from Open-Meteo already carried the correct zone and are unchanged.
+
 ## [1.36.1] - 2026-11-27
 
 The checks that confirm the European (MeteoAlarm) and Canadian (MSC GeoMet) alert feeds still answer in the shape the server expects could not fail. They treated every error as a network blip, including a feed that changed its format or moved its address. Those are the failures that would make `get_alerts` refuse to answer for Europe or Canada, so the check meant to warn about them before a release was blind to them. This release makes those checks fail when they should. Nothing the server returns changes.

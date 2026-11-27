@@ -7869,6 +7869,50 @@ not as an empty log.
 
 ---
 
+## G176 — `tz-lookup` is a calendar day wrong at three date-line places, and an override box asserts a rendered zone
+
+**Trigger:** editing `TIMEZONE_OVERRIDE_BOXES` (`src/utils/timezoneOverrides.ts`), replacing or
+upgrading `tz-lookup`, or adding a time render at a point near the International Date Line.
+
+**Rule:** a box in that table decides the zone every alert time, banner expiry and fallback
+forecast day is rendered in, so measure its edges against a full-resolution zone dataset
+(`geo-tz`), never against a routing box. Do not derive a box from `isInNwsTerritory` or `isInUS`:
+those were drawn for a different question ([G53]). When `tz-lookup` changes, run the
+dataset-defect rows in `tests/unit/timezone-overrides.test.ts` first. A red row there means the
+upstream fixed that place, and the box should be re-measured and retired, not the row edited.
+
+**Why:** `tz-lookup` 6.1.25 stores coarse polygons, and at the date line coarse is a whole day,
+not an hour. It resolves Pago Pago to `Pacific/Apia` (UTC+13, not `Pacific/Pago_Pago` UTC−11),
+Fakaofo to `Pacific/Pago_Pago` (not `Pacific/Fakaofo`), and Gambell and Little Diomede to
+`Asia/Anadyr` (not `America/Nome`). Open-Meteo's `timezone=auto` is right at all of them, so the
+error shows only on paths that call `guessTimezoneFromCoords`: the critical-alert banner,
+`get_alerts` without a station zone, the met.no fallback, METAR, river and wildfire. The
+maintained fork `@photostructure/tz-lookup` 11.8.0 has the same three errors, so swapping
+packages does not fix it. The routing box `isInNwsTerritory` was tuned to where api.weather.gov
+answers 400; its American Samoa box stops at −168.05 and knows nothing of Tokelau or Alaska.
+
+**Verify:** in a scratch directory, `npm i geo-tz@8.1.10 luxon` next to the repo's `tz-lookup`.
+For each grid point where `geo-tz`'s `find(lat, lon)[0]` is not an `Etc/` zone, compare its UTC
+offset on a fixed date with the offset of `guessTimezoneFromCoords`' answer, and list the areas
+that differ. Grids and expected results, as measured on 2026-11-27:
+- 0.1° global, lat −60..75, ≥ 6 h against bare `tz-lookup`: Tutuila, Fakaofo, and St Lawrence
+  Island with Little Diomede (plus an open-water Russian strip south of Big Diomede);
+- 0.05° date-line band (lat −25..70, lon ±165..180), ≥ 1 h: the same, plus Rose Atoll
+  (`Pacific/Rarotonga`, 1 h) and the Aleutian `America/Adak`/`America/Nome` strip near Umnak;
+- 0.02° date-line band against the overridden function: 10 residual open-water points on the
+  US–Russia maritime line south of the Diomedes at ≥ 6 h; the same plus the Aleutian 1 h strip at
+  ≥ 1 h (out of scope; revisit on a user report). Run each `node` script from outside the
+  download directory and pass the package paths as arguments.
+
+**Evidence:** 2026-11-27, plan-dateline-timezone-overrides T1 (`9ea36b2`) and T2 (`a09b44d`).
+First seen in the v1.35.14 test drive (`qa-alert-territory-trim-cancel-drive.md`, Observation 1):
+keyless saved-`AS` `get_alerts` printed alert times a day ahead. Before T1, the banner at Pago
+Pago read `November 27, 2026 at 6:00 PM GMT+13` for an instant that is November 26, 6 PM local.
+
+**Status:** active. Related: [G53], [G75].
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
