@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The national alert feeds for India, the Philippines and Indonesia no longer retry a request that timed out.** When one of those feeds stopped answering, `get_alerts` and the alerts section of `get_weather_summary` waited for the 40-second refresh deadline instead of the configured timeout. The abandoned retries also kept running in the background after the answer was sent. Now an unresponsive feed fails at the configured timeout (`API_TIMEOUT_MS`, 30 seconds by default), and nothing keeps running afterwards. A timed-out alert document is fetched once and counted as unavailable, as before. Rate limits and server errors are still retried. These feeds now match NOAA, Open-Meteo, MeteoAlarm and GeoMet. The error message text is unchanged. (`src/services/nationalCap.ts`)
+
 ## [1.36.2] - 2026-11-27
 
 In American Samoa the server showed local times a full day ahead, so an alert that ran out on Tuesday evening read as running until Wednesday evening. Tokelau was a day behind, and two Alaskan villages on the Bering Strait were 21 hours ahead. This release puts those places on their real local time. Nothing changes anywhere else.
