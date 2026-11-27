@@ -6,6 +6,7 @@
 import { DateTime } from 'luxon';
 import tzLookup from 'tz-lookup';
 import { logger } from './logger.js';
+import { timezoneOverrideFor } from './timezoneOverrides.js';
 
 /**
  * Format an ISO 8601 datetime string in the specified timezone
@@ -128,13 +129,17 @@ export function getTimezoneAbbreviation(timezone: string, datetime?: Date): stri
  * back to a coarse US longitude heuristic and finally UTC if the lookup fails
  * (e.g. invalid coordinates).
  *
+ * A handful of date-line areas where `tz-lookup` is a calendar day wrong (American
+ * Samoa, Tokelau, St Lawrence Island) are answered first by the override boxes in
+ * `./timezoneOverrides.ts`.
+ *
  * @param latitude - Latitude
  * @param longitude - Longitude
  * @returns IANA timezone identifier
  */
 export function guessTimezoneFromCoords(latitude: number, longitude: number): string {
   try {
-    return tzLookup(latitude, longitude);
+    return timezoneOverrideFor(latitude, longitude) ?? tzLookup(latitude, longitude);
   } catch (error) {
     logger.warn('tz-lookup failed; falling back to coarse timezone heuristic', {
       error: error instanceof Error ? error.message : String(error)
