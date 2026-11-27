@@ -42,9 +42,14 @@ import {
  *
  * The message is fixed apart from the path. The underlying cause goes to the log,
  * never into the message.
+ *
+ * `remoteMessage` is the same statement for a caller on another machine (the
+ * HTTP entry): no path, and a remedy addressed to someone who cannot touch the
+ * file. `errorTextForCaller` (`src/errors/ApiError.ts`) picks between the two.
  */
 export class LocationStoreUnreadableError extends Error {
   readonly storePath: string;
+  readonly remoteMessage: string;
 
   constructor(storePath: string) {
     super(
@@ -54,6 +59,31 @@ export class LocationStoreUnreadableError extends Error {
     );
     this.name = 'LocationStoreUnreadableError';
     this.storePath = storePath;
+    this.remoteMessage =
+      'The saved locations file on the server could not be read.\n\n' +
+      "The file was not modified. The server's operator must repair it or move it aside.\n" +
+      'Saved locations will work again as soon as that is done; no restart is needed.';
+  }
+}
+
+/**
+ * Thrown when the store could not create its directory or write its file.
+ *
+ * `message` names the path, because the machine's owner needs it to act.
+ * `remoteMessage` says the same thing to a caller on another machine, with no
+ * path. The underlying cause goes to the log, never into either.
+ */
+export class LocationStoreWriteError extends Error {
+  readonly storePath: string;
+  readonly remoteMessage: string;
+
+  constructor(message: string, storePath: string) {
+    super(message);
+    this.name = 'LocationStoreWriteError';
+    this.storePath = storePath;
+    this.remoteMessage =
+      'The server could not save to its saved locations file, so nothing was changed. ' +
+      "The server's operator must check that the file and its directory are writable.";
   }
 }
 
@@ -89,7 +119,7 @@ export class LocationStore {
         logger.error('Failed to create storage directory', error as Error, {
           path: this.storeDir
         });
-        throw new Error(`Failed to create storage directory at ${this.storeDir}`);
+        throw new LocationStoreWriteError(`Failed to create storage directory at ${this.storeDir}`, this.storePath);
       }
     }
   }
@@ -179,7 +209,7 @@ export class LocationStore {
       logger.error('Failed to save locations', error as Error, {
         path: this.storePath
       });
-      throw new Error(`Failed to save locations to ${this.storePath}`);
+      throw new LocationStoreWriteError(`Failed to save locations to ${this.storePath}`, this.storePath);
     }
   }
 
