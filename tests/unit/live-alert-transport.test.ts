@@ -147,6 +147,40 @@ describe('GeoMet transport classifier (real service, stubbed adapter)', () => {
   });
 });
 
+describe('every 5xx status is a transport failure (the range, not a sample)', () => {
+  // The classifiers' server-error patterns are a range contract (5\d\d). Two sampled rows
+  // would stay green under a pattern narrowed to (500|503), so sweep the whole range through
+  // the real services, then check that 499 and 600 fall outside it.
+  const statuses = Array.from({ length: 100 }, (_, i) => 500 + i);
+
+  it('MeteoAlarm: 500-599 each classify true with the exact message', async () => {
+    for (const status of statuses) {
+      const { error, requests } = await captureMeteoAlarm({ status, data: {} });
+      expect((error as Error).message, `status ${status}`).toBe(`MeteoAlarm API server error (status ${status})`);
+      expect(requests, `status ${status}`).toBe(1);
+      expect(isMeteoAlarmTransportFailure(error), `status ${status}`).toBe(true);
+    }
+  });
+
+  it('GeoMet: 500-599 each classify true with the exact message', async () => {
+    for (const status of statuses) {
+      const { error, requests } = await captureGeoMet({ status, data: {} });
+      expect((error as Error).message, `status ${status}`).toBe(`GeoMet API returned status ${status} (server error)`);
+      expect(requests, `status ${status}`).toBe(1);
+      expect(isGeoMetTransportFailure(error), `status ${status}`).toBe(true);
+    }
+  });
+
+  it('499 and 600 sit outside the range for both services', async () => {
+    for (const status of [499, 600]) {
+      const meteo = await captureMeteoAlarm({ status, data: {} });
+      expect(isMeteoAlarmTransportFailure(meteo.error), `MeteoAlarm status ${status}`).toBe(false);
+      const geo = await captureGeoMet({ status, data: {} });
+      expect(isGeoMetTransportFailure(geo.error), `GeoMet status ${status}`).toBe(false);
+    }
+  });
+});
+
 describe('classifiers refuse what is not a service transport error', () => {
   it('a real Vitest assertion failure is not a transport failure', () => {
     let caught: unknown;

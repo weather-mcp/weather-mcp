@@ -8,7 +8,7 @@ Quick reference guide for the Weather MCP test suite.
 
 | Metric | Value |
 |--------|-------|
-| **Total Tests** | 6,093 |
+| **Total Tests** | 6,096 |
 | **Execution Time (`npm test`, offline)** | ~20 seconds |
 | **Execution Time (live, `npm run test:live`)** | several minutes, network-bound |
 
@@ -254,7 +254,7 @@ describe('Feature Name', () => {
 ## Test Metrics & Goals
 
 ### Current Performance
-- ✅ 6,093 total tests
+- ✅ 6,096 total tests
 - ✅ ~20s offline gate (`npm test`)
 
 ### Coverage Goals
