@@ -6884,6 +6884,13 @@ goes through axios, whose timeout is also an inactivity timer (the design's defe
 
 **One mutation cannot fail on the count (2026-10-15, `b35988a`):** removing a retry ladder's bound (`retries < this.maxRetries`) makes the loop retry forever, so the promise never settles inside the advance and the test fails by vitest's 5 s timeout. Record that row as "red by timeout" and move on — it is the one mutation start-advance-await cannot turn into a count.
 
+**Extended 2026-11-26** (`6b13129`, cache-config-eviction T4): **a large `advanceTimersByTime` runs the
+sweep too.** A `Cache` built under fake timers with a "never" interval of `2_147_483_647` ms still
+sweeps once the clock moves past about 24.8 days. A row that advanced a year to expire entries
+passed under the mutation it was written to catch, because the periodic sweep, not `set`, removed
+the entries. Keep every advance shorter than the cleanup interval when the test observes which
+path removed an entry.
+
 **Status:** active. Lint candidate: `runAllTimersAsync` in a file whose `beforeEach` calls `useFakeTimers` ahead of a `new *Service(`.
 
 ---
@@ -7790,6 +7797,33 @@ branch's QA (2026-11-24 13:19 UTC) measured the Central African Republic at 393 
 path (`servedDays`, `src/handlers/wildfireHandler.ts`), pinned by
 `tests/unit/wildfire-firms-products.test.ts` case 9. The trap stays live for anything else that
 reads these files: a new consumer must filter too. Related: G72.
+
+---
+
+## G169 — `CACHE_ENABLED` is enforced by each cache consumer, not by `Cache`
+
+**Trigger:** adding a production `new Cache(...)` site, or a new read or write path on an existing
+service cache.
+
+**Rule:** gate every read **and** every write on `CacheConfig.enabled`, as `nominatim.ts`,
+`basemap.ts`, `locationResolver.ts` and (since `70b50db`) `environmentAgency.ts`, `jma.ts` and
+`metno.ts` do. Keep same-key in-flight dedupe when disabled. A conditional-request validator
+(`If-None-Match`, `If-Modified-Since`) comes from a retained entry, so with the cache off none is
+sent. To prove it, test the **write** guard: with writes skipped the cache is always empty, so a
+mutation that drops only the read guard stays green. That row is masked, not weak (G32).
+
+**Why:** `Cache` knows nothing of `CacheConfig.enabled`. The switch is a distributed caller contract,
+and a service written in the otherwise-correct cache-then-in-flight shape silently ignores it, while
+`check_service_status` reports `Cache Status: ❌ Disabled`.
+
+**Verify:** `for f in $(grep -rl "new Cache" src); do grep -q "CacheConfig\.enabled" "$f" || echo "$f"; done`
+prints nothing.
+
+**Evidence:** 2026-11-26, plan-review codex R1 on RF-36. The EA, JMA and met.no caches read and
+wrote unconditionally. Fixed in `70b50db`, pinned by `tests/unit/cache-disabled-services.test.ts`.
+
+**Status:** active. Lint candidate: the Verify loop is mechanical. A structural alternative is to move
+the switch into `Cache` itself.
 
 ---
 
