@@ -7,12 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Turning the cache off did not always turn it off. `CACHE_ENABLED=FALSE` (capital letters) left caching on, and even `CACHE_ENABLED=false` was ignored by the river-level, Japanese-warning and MET Norway caches, which kept serving stored answers while `check_service_status` said caching was disabled. `WEATHER_LIGHTNING_PREWARM=FALSE` still opened the lightning connection. A mistyped number such as `CACHE_MAX_SIZE=1000abc` was quietly read as a different number. This release makes these settings mean what they say, and warns when a value is not understood.
+
+### Changed
+
+- **`CACHE_ENABLED` and `WEATHER_LIGHTNING_PREWARM` accept `false` and `0` in any case.** `FALSE`, `False` and `0` now turn caching off and skip the lightning pre-warm. Before, only the exact lowercase `false` worked for the pre-warm, and `false` or `0` for the cache. **A setup that wrote `FALSE` and has been running with caching or the pre-warm on will now have it off**, which is what the setting always asked for. A value that is not `true`, `false`, `1` or `0` now prints one warning on stderr and keeps the default (on). (`src/utils/envBoolean.ts`, `src/config/cache.ts`, `src/server/lightningPrewarm.ts`)
+- **`CACHE_MAX_SIZE` and `API_TIMEOUT_MS` must be whole numbers.** A value such as `1000abc`, `1.5` or `1e5` used to be cut down to a different number without a word: `API_TIMEOUT_MS=1e5` became 5 seconds. It now warns and uses the default. Values that were already whole numbers behave exactly as before, including the clamp to the allowed range. (`src/config/cache.ts`)
+
 ### Fixed
 
-- **`CACHE_ENABLED` and `WEATHER_LIGHTNING_PREWARM` accept any spelling of false.** `FALSE`, `False` and `0` now turn caching off and skip the lightning pre-warm. Before, only the exact lowercase `false` (and `0` for the cache) worked, so `CACHE_ENABLED=FALSE` left caching on and `WEATHER_LIGHTNING_PREWARM=FALSE` still opened the MQTT connection. A value that is not `true`/`false`/`1`/`0` now warns on stderr and keeps the default. (`src/utils/envBoolean.ts`, `src/config/cache.ts`, `src/server/lightningPrewarm.ts`)
-- **`CACHE_ENABLED=false` turns off every cache.** The Environment Agency river, JMA warning and MET Norway fallback-forecast caches ignored it and kept serving cached answers while `check_service_status` reported caching disabled. (`src/services/environmentAgency.ts`, `src/services/jma.ts`, `src/services/metno.ts`)
-- **`CACHE_MAX_SIZE` and `API_TIMEOUT_MS` must be whole numbers.** A value such as `1000abc`, `1.5` or `1e5` used to be truncated to a different number without a word (`API_TIMEOUT_MS=1e5` became 5000 ms). It now warns and uses the default. (`src/config/cache.ts`)
-- **A full cache drops expired entries before live ones.** It used to evict the least recently used entry even while expired ones were still held, so a live forecast could go before a dead alert answer. The eviction count in `check_service_status` now counts live evictions only. (`src/utils/cache.ts`)
+- **`CACHE_ENABLED=false` turns off every cache.** The Environment Agency river, JMA warning and MET Norway fallback-forecast caches ignored it. With the cache off they now ask the upstream every time, and they send no conditional-request header, because there is no stored answer to revalidate. (`src/services/environmentAgency.ts`, `src/services/jma.ts`, `src/services/metno.ts`)
+- **A full cache drops expired entries before live ones.** It used to evict the least recently used entry even while expired entries were still held, so a live forecast could be dropped while a dead alert answer stayed. The `Evictions` count in `check_service_status` now counts only live entries pushed out, so it can read lower for the same traffic. (`src/utils/cache.ts`)
 
 ## [1.35.30] - 2026-11-25
 
