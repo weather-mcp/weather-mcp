@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.4] - 2026-11-27
+
+Two places on the US (NOAA) path printed times by the server's own clock instead of the location's: the observation times in recent US weather history, and the dates of the snowfall and ice forecast period. On a server set to a different time zone than the place you asked about, such as a container, a remote host, or any question about somewhere else, those times were hours off and the snowfall period could start on the wrong day. This release prints them in the location's time zone, like every other time the server shows.
+
+### Fixed
+
+- **Recent US weather history and the snowfall and ice forecast period now use the location's time zone, not the server's.** `get_historical_weather` printed each NOAA observation time, and the note that a station stopped reporting, in the server's zone. The winter-weather section of `get_forecast` and `get_weather_summary` could show the period starting a day early or late. On a server whose clock is already in the location's zone, the times and dates are unchanged.
+
+### Changed
+
+- **Recent US weather history now names its time zone.** The NOAA output of `get_historical_weather` has a new `**Timezone:**` line under the data source, so the times above it can be read correctly. The format of each time is unchanged.
+
 ## [1.36.3] - 2026-11-27
 
 When the official alert service for India, the Philippines or Indonesia stopped answering, the server kept asking it again before giving up, so a request for alerts there took several times longer than it should have before it reported the problem. It also left those repeat requests running in the background after it had answered. This release gives up after the first request that times out, the way it already does for the US, Canada, Europe and the weather forecasts. Alerts that arrive normally look exactly as before.
@@ -2571,7 +2583,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...HEAD
+[1.36.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...v1.36.4
 [1.36.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.2...v1.36.3
 [1.36.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.1...v1.36.2
 [1.36.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.0...v1.36.1

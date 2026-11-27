@@ -21,7 +21,7 @@ import {
 } from '../utils/unitFormat.js';
 import { ApiConstants, FormatConstants, DisplayThresholds } from '../config/displayThresholds.js';
 import { isInUS } from '../utils/geography.js';
-import { formatWallClockDate, formatWallClockDateTime } from '../utils/timezone.js';
+import { formatWallClockDate, formatWallClockDateTime, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { ApiError, DataNotFoundError, InvalidLocationError, errorTextForCaller } from '../errors/ApiError.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 
@@ -297,15 +297,20 @@ export async function handleGetHistoricalWeather(
       }, resolved);
     }
 
+    // NOAA timestamps are instants: print them in the location's zone, in today's
+    // format. formatInTimezone was rejected here because it would change the format.
+    const timeZone = guessTimezoneFromCoords(latitude, longitude);
+
     // Format the observations
     let output = `# Historical Weather Observations\n\n`;
     output += `**Period:** ${start_date.split('T')[0]} to ${end_date.split('T')[0]}\n`;
     output += `**Number of observations:** ${observations.features.length}\n`;
-    output += `**Data source:** NOAA Real-time API\n\n`;
+    output += `**Data source:** NOAA Real-time API\n`;
+    output += `**Timezone:** ${timeZone}\n\n`;
 
     for (const obs of observations.features) {
       const props = obs.properties;
-      output += `## ${new Date(props.timestamp).toLocaleString()}\n`;
+      output += `## ${new Date(props.timestamp).toLocaleString(undefined, { timeZone })}\n`;
 
       if (props.temperature.value !== null) {
         output += `- **Temperature:** ${formatTemperatureQV(props.temperature, prefs)}\n`;
@@ -335,7 +340,7 @@ export async function handleGetHistoricalWeather(
     }
     const gapMinutes = (noaaEndTime.getTime() - newestTimestamp.getTime()) / (60 * 1000);
     if (gapMinutes > DisplayThresholds.currentConditions.staleWarningMinutes) {
-      output += `*Observations end ${newestTimestamp.toLocaleString()}; the reporting station may have gone offline.*\n\n`;
+      output += `*Observations end ${newestTimestamp.toLocaleString(undefined, { timeZone })}; the reporting station may have gone offline.*\n\n`;
     }
 
     return prependLocationLine({
