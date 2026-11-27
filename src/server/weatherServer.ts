@@ -7,8 +7,8 @@
  * Server with both handlers registered and returns it **unconnected** — the
  * caller chooses the transport.
  *
- * What this module deliberately does NOT do: it does not load `.env` (a library
- * module that reads a .env from the caller's cwd is a trap — see GOTCHAS G26),
+ * What this module deliberately does NOT do: it does not load `.env` (only the
+ * entries do, through src/config/envFile.ts, and never from the caller's cwd),
  * it constructs no transport, and it registers no process signal handler and
  * calls no process.exit. Importing it is therefore inert, with one exception:
  * `withAnalytics` pulls in the analytics singleton that reads the analytics
