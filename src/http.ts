@@ -35,6 +35,7 @@ import { createTokenVerifier } from './server/tokenVerifier.js';
 import { discoverIssuer } from './server/oauthDiscovery.js';
 import { startLightningPrewarm, type LightningPrewarmHandle } from './server/lightningPrewarm.js';
 import { createShutdown, SHUTDOWN_DEADLINE_MS } from './server/shutdown.js';
+import { installProcessGuards } from './server/processGuards.js';
 
 /** As in src/index.ts: half the budget, leaving room for the MQTT disconnect after it. */
 const ANALYTICS_SHUTDOWN_FLUSH_MS = SHUTDOWN_DEADLINE_MS / 2;
@@ -85,9 +86,12 @@ function listen(server: NodeHttpServer, port: number, host: string): Promise<voi
 }
 
 async function main(): Promise<void> {
+  // Set by an uncaught exception: the coordinator exits 0 when every step completes, and a
+  // crash must not read as a clean stop.
+  let crashed = false;
   const shutdown = createShutdown({
     deadlineMs: SHUTDOWN_DEADLINE_MS,
-    exit: (code) => process.exit(code),
+    exit: (code) => process.exit(crashed ? 1 : code),
     steps: [
       { name: 'http', run: closeHttpServer },
       { name: 'lightning-prewarm', run: () => lightningPrewarm?.stop() },
@@ -95,6 +99,17 @@ async function main(): Promise<void> {
       { name: 'mqtt', run: () => blitzortungService.disconnect() }
     ]
   });
+  // An error nothing caught (src/server/processGuards.ts). A rejection is logged and the
+  // server keeps running. An exception is logged, then takes the same bounded shutdown as
+  // every other trigger and exits 1 even when every step completes.
+  installProcessGuards({
+    emitter: process,
+    onFatal: (reason) => {
+      crashed = true;
+      void shutdown(reason);
+    }
+  });
+
   process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
   process.on('SIGINT', () => { void shutdown('SIGINT'); });
 

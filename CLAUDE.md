@@ -24,6 +24,7 @@ src/
 ├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
 ├── server/lightningPrewarm.ts  # Saved-location lightning pre-warm: gate, guarded store read, refresh timer (never evicts)
 ├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one ref'd deadline that bounds teardown, stderr only
+├── server/processGuards.ts   # unhandledRejection (log, continue) and uncaughtException (log, then the entry's bounded shutdown, exit 1); class and code only, stderr only
 ├── server/tokenVerifier.ts  # OAuth resource server: jose JWT verification (issuer, audience = public URL, exp, asymmetric algs) → AuthInfo; fixed SDK errors
 ├── server/oauthDiscovery.ts  # Issuer metadata (RFC 8414 / OIDC) via the SDK; exact-issuer and jwks_uri checks; never throws
 ├── server/httpApp.ts       # createHttpApp(): healthz → host validation → RFC 9728 metadata → bearer auth → body limit → stateless transport; side-effect-free
