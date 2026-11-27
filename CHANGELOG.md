@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.1] - 2026-11-27
+
 The checks that confirm the European (MeteoAlarm) and Canadian (MSC GeoMet) alert feeds still answer in the shape the server expects could not fail. They treated every error as a network blip, including a feed that changed its format or moved its address. Those are the failures that would make `get_alerts` refuse to answer for Europe or Canada, so the check meant to warn about them before a release was blind to them. This release makes those checks fail when they should. Nothing the server returns changes.
 
 ### Testing
@@ -2553,7 +2555,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.0...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.1...HEAD
+[1.36.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.0...v1.36.1
 [1.36.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.32...v1.36.0
 [1.35.32]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.31...v1.35.32
 [1.35.31]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.30...v1.35.31
