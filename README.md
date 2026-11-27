@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-5%2C892%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-6%2C029%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Four optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 5,892 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 6,029 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, and no telemetry unless you opt in.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -300,7 +300,7 @@ still works; it just returns the keyless answer.
 
 | Variable | What it costs | What it adds | Without it |
 |----------|---------------|--------------|------------|
-| [`NCEI_API_TOKEN`](https://www.ncdc.noaa.gov/cdo-web/token) | Free registration (email) | Official NOAA station climate normals for US locations | Normals are computed from the Open-Meteo reanalysis archive — global, and the path virtually every user is already on |
+| [`NCEI_API_TOKEN`](https://www.ncdc.noaa.gov/cdo-web/token) | Free registration (email) | Official NOAA station climate normals for US locations | Normals are computed from the Open-Meteo reanalysis archive — global, and the path virtually every user is already on. A rejected token falls back to these and says so under the normals |
 | [`FIRMS_MAP_KEY`](https://firms.modaps.eosdis.nasa.gov/api/map_key/) | Free registration (email) | Targeted wildfire bbox queries with 1–5 days of detection history | Keyless 24-hour regional detection files — `get_wildfire_info` still works globally |
 | `GOOGLE_POLLEN_API_KEY` | **Free tier, but requires a Google Cloud billing account (credit card on file)** — 5,000 lookups/month free, ~$10/1,000 after. [Setup guide](./docs/GOOGLE_POLLEN_KEY_SETUP.md) | Grass/tree/weed Universal Pollen Index outside Europe, including the US (65+ countries) | European pollen via CAMS still works keyless; elsewhere no pollen section renders |
 | `GOOGLE_WEATHER_API_KEY` | **Free tier, but requires a Google Cloud billing account (credit card on file)** — the Weather API bills under a Maps Platform Essentials SKU; check Google's current allowance. [Setup guide](./docs/GOOGLE_WEATHER_KEY_SETUP.md) | Official weather alerts for ~45+ more territories — Australia, Brazil, Mexico and others ([Google's coverage list](https://developers.google.com/maps/documentation/weather/coverage) is authoritative) | US, Canadian, European, Indian, Philippine, Indonesian, and Japanese alerts still work keyless; elsewhere `get_alerts` returns today's not-covered message |
@@ -398,7 +398,7 @@ npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
 npm test               # Offline tests: unit + integration (what CI runs)
 npm run test:live      # Live-network tests against the real upstreams, by hand
-npm test && npm run test:live   # Run all 5,892 tests
+npm test && npm run test:live   # Run all 6,029 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

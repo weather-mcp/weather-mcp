@@ -659,6 +659,25 @@ its trend or flood-stage section, and the result is a normal report.
 The Environment Agency path (Great Britain) and the Open-Meteo path (elsewhere) return an error
 response on failure, as they did before.
 
+### Climate Normals: NCEI Token Rejected
+
+With `NCEI_API_TOKEN` set, US climate normals come from NOAA's NCEI service. If NCEI refuses the
+token, the normals still render, computed from the Open-Meteo archive, and the section ends with:
+
+```
+*Note: NCEI_API_TOKEN was rejected; these are Open-Meteo normals.*
+```
+
+If the Open-Meteo normals also could not be fetched, the section's failure note is followed by
+`*Note: NCEI_API_TOKEN was rejected.*` The forecast or current conditions around it are unaffected.
+The server logs `NCEI token rejected; using Open-Meteo normals` with `reason: "token-rejected"`,
+never the token.
+
+**Fix the token and restart the server.** The token is read once at startup, so after the first
+refusal the server stops asking NCEI until it restarts. Get a free token at
+https://www.ncdc.noaa.gov/cdo-web/token. Any other NCEI failure falls back to Open-Meteo silently,
+as before: an outage is not your configuration.
+
 ### Saved Locations File Unreadable
 
 Every saved-locations tool — and every weather tool called with `location_name`, and any
@@ -671,6 +690,18 @@ Saved locations file could not be read: /home/you/.weather-mcp/locations.json
 The file was not modified. To recover, either repair it so it contains a valid JSON object,
 or move it aside (rename or delete it) to start with an empty list. No restart is needed.
 ```
+
+**Over the HTTP entry (`weather-mcp-http`) the message names no path.** Its callers are on other
+machines and cannot reach the file, so they read:
+
+```
+The saved locations file on the server could not be read.
+
+The file was not modified. The server's operator must repair it or move it aside.
+Saved locations will work again as soon as that is done; no restart is needed.
+```
+
+The operator finds the path and the cause in the server's stderr log, as below.
 
 **The file is never modified, renamed, copied, or replaced.** The server does not quarantine it,
 does not write a `.corrupt` copy beside it, and does not overwrite it with an empty store. Your
@@ -721,7 +752,10 @@ new file cannot be written or put in place. For example, the disk is full, the d
 writable, or the server cannot read the existing file's permissions for a reason other than the
 file being missing. The previous file keeps its content and its permissions, and no temporary file
 is left beside it. The cause goes to the stderr log. A new file is created readable by your account
-only (`0600`, in a `0700` directory); an existing file keeps the permissions it had.
+only (`0600`, in a `0700` directory); an existing file keeps the permissions it had. Over the HTTP
+entry the same failure reads `The server could not save to its saved locations file, so nothing was
+changed. The server's operator must check that the file and its directory are writable.`, with no
+path; so does a storage directory that could not be created.
 
 Pre-warm also never displaces an area you queried: a saved location that does not fit the
 50-subscription limit is skipped, with one
@@ -750,6 +784,10 @@ Error: Saved location "home" cannot be shown: name is not text.
 
 Remove it with remove_saved_location or repair it in /home/you/.weather-mcp/locations.json.
 ```
+
+Over the HTTP entry both messages end `or ask the server's operator to repair the saved-locations
+file.` instead of naming the file, and the saved-location tools print no `*Storage location: …*`
+line.
 
 **Weather tools refuse only a bad coordinate.** Called with `location_name` — or through a
 `WEATHER_DEFAULT_LOCATION` set to that alias — a saved entry whose coordinates are not usable
@@ -858,6 +896,37 @@ A geocoded place name longer than 500 characters is refused the same way:
 ```
 Error: The geocoded name is 501 characters, over the 500-character limit. Pass a shorter name with the name parameter.
 ```
+
+### Internal Errors on the HTTP Entry
+
+Over `weather-mcp-http`, an error that comes from the runtime or a library rather than from this
+server's own messages is replaced by one fixed sentence:
+
+```
+Error: The server could not complete this request because of an internal error. The server's log has the details.
+```
+
+That covers a programming error (`TypeError` and similar), a file-system error, a module that
+failed to load, and a raw network error. Their own text can carry absolute paths on the server,
+property names or internal addresses, which a remote caller has no use for. A tool's section-level
+`Error details:` line (wildfire, river levels) and a `get_weather_summary` section note use the same
+sentence. Every message this server writes itself — a service outage, a validation error, a feed
+that could not be reached — reads the same over both entries. The local (stdio) server shows the
+original text, because its caller is the machine's owner. The operator finds the error's class and
+code in the stderr log, under `Tool execution error`.
+
+### Errors Nothing Caught
+
+Both entries log an error that no code caught as one JSON line on stderr, with its class and code
+and no message or stack (unless `LOG_PII=true`):
+
+- **`Unhandled promise rejection`** — the work that owned the promise has failed, and the server
+  keeps running.
+- **`Uncaught exception`** — the server runs its normal bounded shutdown (at most 1.5 seconds) and
+  exits with code 1. On the HTTP entry, run it under a supervisor that restarts it (systemd,
+  a container restart policy).
+
+Before this, Node printed the raw error and stack and exited immediately in both cases.
 
 ### Location Lookup Errors
 

@@ -103,6 +103,11 @@ It stops on `SIGTERM` or `SIGINT`. It does not watch stdin, so it is safe to run
 started without `-i`. On shutdown it stops accepting connections, gives in-flight requests 400 ms,
 then closes the rest. The whole shutdown is bounded at 1.5 seconds.
 
+An error that no code caught is logged as one line with its class and code. An **unhandled
+rejection** leaves the server running. An **uncaught exception** takes the same bounded shutdown
+and exits with code 1, so run the server under a supervisor that restarts it: a systemd unit with
+`Restart=on-failure`, or a container restart policy.
+
 ## Behind a reverse proxy
 
 Terminate TLS at the proxy and forward to `127.0.0.1:3939`. Three things matter:
@@ -125,6 +130,20 @@ weather.example.net {
 
 Caddy preserves the path and the `Host` header by default. With nginx, use `proxy_pass` without a
 trailing URI part and `proxy_set_header Host $host;`.
+
+### Rate and connection limits belong to the proxy
+
+The server has **no rate limiter and no connection limit of its own**. Set them at the proxy, which
+sees the client's address and every connection:
+
+- **Requests per client address**, for example Caddy's `rate_limit` module or nginx's
+  `limit_req_zone` and `limit_req`.
+- **Concurrent connections per client address**, for example nginx's `limit_conn`.
+
+What the server does enforce on every request: a valid token, a 256 KB body limit, and a per-call
+time budget of the larger of `API_TIMEOUT_MS` and 55 seconds, which bounds how long one tool call
+can hold a connection. Every caller also shares the server's own pacing of the geocoding service
+(one request per second).
 
 ## Endpoints
 
@@ -162,6 +181,20 @@ gives a running server that answers `500`, not a refusal to start.
 Every authenticated caller uses the same saved-location store, `~/.weather-mcp/locations.json` of
 the account that runs the server. A location one caller saves, another can read and remove. Only
 give access to people who should share that list.
+
+## What a remote caller sees when something fails
+
+Remote callers never receive a path on the server or the text of a runtime error:
+
+- The saved-location tools print no `Storage location` line, and their errors ask the operator to
+  repair the file rather than naming it.
+- An error from the runtime or a library (a programming error, a file-system error, a raw network
+  error) reads `The server could not complete this request because of an internal error. The
+  server's log has the details.` Its class and code are in the stderr log.
+- Every message the server writes itself (a service outage, a validation error, a feed that could
+  not be reached) reads exactly as it does on the local server.
+
+See [ERROR_HANDLING.md](./ERROR_HANDLING.md#internal-errors-on-the-http-entry).
 
 ## What is logged
 
