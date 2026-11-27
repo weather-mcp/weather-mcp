@@ -9,7 +9,9 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-if (process.env.DOTENV_CONFIG_PATH === undefined && existsSync('.env')) {
+// Unset or empty means "no file named", the loader's own absence rule (src/config/envFile.ts).
+const configuredPath = process.env.DOTENV_CONFIG_PATH;
+if ((configuredPath === undefined || configuredPath === '') && existsSync('.env')) {
   process.env.DOTENV_CONFIG_PATH = resolve('.env');
 }
 await import(pathToFileURL(resolve(process.argv[2])).href);

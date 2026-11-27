@@ -20,6 +20,7 @@ import { ERR_ISSUER_REQUIRED, ERR_PUBLIC_URL_REQUIRED } from '../../src/config/h
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STDIO_ENTRY = join(__dirname, '../../src/index.ts');
 const HTTP_ENTRY = join(__dirname, '../../src/http.ts');
+const DEV_WRAPPER = join(__dirname, '../../scripts/dev-entry.mjs');
 // Resolved from this file: the child's cwd is outside the repo.
 const TSX_LOADER = import.meta.resolve('tsx');
 
@@ -75,11 +76,12 @@ async function makeCwd(envFile: string | undefined): Promise<{ cwd: string; home
 }
 
 function start(
-  entry: string,
+  entry: string | string[],
   cwd: string,
   env: NodeJS.ProcessEnv
 ): { child: ChildProcessWithoutNullStreams; out: Buffer[]; err: Buffer[]; exited: Promise<number | null> } {
-  const child = spawn(process.execPath, ['--import', TSX_LOADER, entry], {
+  const entryArgs = Array.isArray(entry) ? entry : [entry];
+  const child = spawn(process.execPath, ['--import', TSX_LOADER, ...entryArgs], {
     cwd,
     env,
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -104,8 +106,13 @@ function start(
 }
 
 /** Drive a stdio server through initialize and tools/list, then end stdin and await exit. */
-async function runStdio(cwd: string, home: string, extra: Record<string, string>): Promise<RunResult> {
-  const { child, out, err, exited } = start(STDIO_ENTRY, cwd, buildEnv(home, extra, false));
+async function runStdio(
+  cwd: string,
+  home: string,
+  extra: Record<string, string>,
+  entry: string | string[] = STDIO_ENTRY
+): Promise<RunResult> {
+  const { child, out, err, exited } = start(entry, cwd, buildEnv(home, extra, false));
   const messages = [
     {
       jsonrpc: '2.0',
@@ -307,6 +314,47 @@ describe('the .env file is read only from DOTENV_CONFIG_PATH', () => {
       const withPath = await refusal((cwd) => ({ DOTENV_CONFIG_PATH: join(cwd, '.env') }));
       expect(withPath.code).not.toBe(0);
       expect(withPath.reasons).toEqual([ERR_ISSUER_REQUIRED]);
+    },
+    CASE_TIMEOUT_MS
+  );
+});
+
+// `npm run dev` runs scripts/dev-entry.mjs, which names ./.env in DOTENV_CONFIG_PATH when none is
+// named. "None" is the loader's own absence rule: unset or empty (diff-review codex-C1).
+describe('the dev wrapper names ./.env only when no path is named', () => {
+  const WRAPPED = [DEV_WRAPPER, STDIO_ENTRY];
+
+  it(
+    'unset: loads ./.env',
+    async () => {
+      const { cwd, home } = await makeCwd('ENABLED_TOOLS=all\n');
+      await expectFile(join(cwd, '.env'), 'ENABLED_TOOLS=all');
+      const r = await runStdio(cwd, home, {}, WRAPPED);
+      expect(r.toolCount).toBe(FULL_COUNT);
+    },
+    CASE_TIMEOUT_MS
+  );
+
+  it(
+    'empty: loads ./.env',
+    async () => {
+      const { cwd, home } = await makeCwd('ENABLED_TOOLS=all\n');
+      await expectFile(join(cwd, '.env'), 'ENABLED_TOOLS=all');
+      const r = await runStdio(cwd, home, { DOTENV_CONFIG_PATH: '' }, WRAPPED);
+      expect(r.toolCount).toBe(FULL_COUNT);
+    },
+    CASE_TIMEOUT_MS
+  );
+
+  it(
+    'a named path wins over ./.env',
+    async () => {
+      const { cwd, home } = await makeCwd('ENABLED_TOOLS=all\n');
+      await expectFile(join(cwd, '.env'), 'ENABLED_TOOLS=all');
+      const other = join(cwd, 'other.env');
+      await writeFile(other, 'ENABLED_TOOLS=basic\n');
+      const r = await runStdio(cwd, home, { DOTENV_CONFIG_PATH: other }, WRAPPED);
+      expect(r.toolCount).toBe(BASIC_COUNT);
     },
     CASE_TIMEOUT_MS
   );
