@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Server as HttpServer } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decodeJwt, errors, type JWTVerifyGetKey } from 'jose';
@@ -517,5 +517,95 @@ describe('13. whole-path log sentinel (G123)', () => {
       valid.split('.')[1] ?? 'unreachable-payload-segment'
     ];
     for (const needle of forbidden) expect(everything).not.toContain(needle);
+  });
+});
+
+// A remote caller never reads where the saved-location store lives: not in an
+// error, and not in a successful saved-location response (plan-http-entry-hardening).
+describe('16. remote callers never receive the store path', () => {
+  const dirs: string[] = [];
+
+  afterAll(() => {
+    for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
+  });
+
+  async function appOver(prepare: (storePath: string) => void): Promise<{ base: string; dir: string }> {
+    const dir = mkdtempSync(join(tmpdir(), 'http-app-remote-'));
+    dirs.push(dir);
+    const storePath = join(dir, 'locations.json');
+    prepare(storePath);
+    const verifier = createTokenVerifier({ issuer: ISSUER, audience: mainConfig.publicUrl.href, getKey: issuer.getKey });
+    const app = createHttpApp({
+      config: mainConfig,
+      verifier,
+      oauthMetadata: metadataFor(ISSUER),
+      locationStore: new LocationStore(storePath)
+    });
+    const { base } = await listen(app);
+    return { base, dir };
+  }
+
+  async function callTool(
+    base: string,
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<{ status: number; isError: boolean; text: string; raw: string }> {
+    const bearer = await issuer.sign({ claims: goodClaims() });
+    const response = await mcpPost(base, { jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name, arguments: args } }, bearer);
+    const raw = await response.text();
+    const body = JSON.parse(raw) as { result?: { isError?: boolean; content?: Array<{ text?: string }> } };
+    return {
+      status: response.status,
+      isError: body.result?.isError === true,
+      text: (body.result?.content ?? []).map(block => block.text ?? '').join(''),
+      raw
+    };
+  }
+
+  function expectNoPath(raw: string, dir: string): void {
+    expect(raw).not.toContain(dir);
+    expect(raw).not.toContain(tmpdir());
+    expect(raw).not.toContain('locations.json');
+    expect(raw).not.toContain('Storage location');
+  }
+
+  it('an unreadable store answers with the path-free message', async () => {
+    const { base, dir } = await appOver(storePath => writeFileSync(storePath, 'not json'));
+
+    const listed = await callTool(base, 'list_saved_locations', {});
+    expect(listed.status).toBe(200);
+    expect(listed.isError).toBe(true);
+    expect(listed.text).toContain('The saved locations file on the server could not be read.');
+    expectNoPath(listed.raw, dir);
+
+    // A weather tool reaching the store through location_name takes the same path.
+    const forecast = await callTool(base, 'get_forecast', { location_name: 'home' });
+    expect(forecast.isError).toBe(true);
+    expect(forecast.text).toContain('The saved locations file on the server could not be read.');
+    expectNoPath(forecast.raw, dir);
+  });
+
+  it('a healthy store lists and saves without printing where it is', async () => {
+    const { base, dir } = await appOver(() => undefined);
+
+    const empty = await callTool(base, 'list_saved_locations', {});
+    expect(empty.isError).toBe(false);
+    expect(empty.text).toContain('No saved locations yet.');
+    expectNoPath(empty.raw, dir);
+
+    const saved = await callTool(base, 'save_location', {
+      alias: 'home',
+      latitude: 47.6062,
+      longitude: -122.3321,
+      name: 'Seattle, WA'
+    });
+    expect(saved.isError).toBe(false);
+    expect(saved.text).toContain('home');
+    expectNoPath(saved.raw, dir);
+
+    const populated = await callTool(base, 'list_saved_locations', {});
+    expect(populated.isError).toBe(false);
+    expect(populated.text).toContain('Seattle, WA');
+    expectNoPath(populated.raw, dir);
   });
 });

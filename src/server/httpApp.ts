@@ -148,7 +148,8 @@ export function createHttpApp(deps: HttpAppDeps): express.Express {
 
   // 5. One Server and one transport per request, closed when the response closes.
   app.post(route, express.json({ limit: HTTP_BODY_LIMIT }), async (req: Request, res: Response) => {
-    const server = createServer({ locationStore });
+    // Every caller of this entry is on another machine.
+    const server = createServer({ locationStore, remoteCallers: true });
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true
