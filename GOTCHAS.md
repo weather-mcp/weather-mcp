@@ -4448,6 +4448,14 @@ rather than by encoding U+202F in the expectations, because whitespace that
 varies by the caller's coordinates is a latent trap for every later assertion,
 grep and byte-identity sweep over the same output.
 
+**The style decides the shape too, not only the separator, 2026-11-27**
+(plan-dateline-timezone-overrides triage, codex-R2/R3). `formatInTimezone`'s styles do not share
+a date or a zone-label shape: `full` (the banner's `formatExpiry`) renders
+`November 26, 2026 at 6:00 PM GMT-11`, while the default `medium` (`get_alerts` Effective and
+Expires) renders `Nov 26, 2026, 6:00 PM` with **no** zone label. A plan that asserts `Nov 26`
+against the banner, or a label against `get_alerts`, is red on correct code. Read the call
+site's style before writing either expectation.
+
 **Status:** active. Related: [G10] (byte-identity sweeps — an invisible
 character is the purest form of a diff you cannot read), [G11] (read the
 rendered output; this is the case where reading it is not enough and you have to
