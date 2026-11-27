@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.31] - 2026-11-26
+
 Turning the cache off did not always turn it off. `CACHE_ENABLED=FALSE` (capital letters) left caching on, and even `CACHE_ENABLED=false` was ignored by the river-level, Japanese-warning and MET Norway caches, which kept serving stored answers while `check_service_status` said caching was disabled. `WEATHER_LIGHTNING_PREWARM=FALSE` still opened the lightning connection. A mistyped number such as `CACHE_MAX_SIZE=1000abc` was quietly read as a different number. This release makes these settings mean what they say, and warns when a value is not understood.
 
 ### Changed
@@ -2514,7 +2516,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.30...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.31...HEAD
+[1.35.31]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.30...v1.35.31
 [1.35.30]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.29...v1.35.30
 [1.35.29]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.28...v1.35.29
 [1.35.28]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.27...v1.35.28
