@@ -273,7 +273,9 @@ describe('handleGetHistoricalWeather — early-end note on NOAA recent path (F2)
     const text = textOf(result);
 
     expect(text).toContain('the reporting station may have gone offline');
-    expect(text).toContain(new Date(newest).toLocaleString());
+    expect(text).toContain(
+      `*Observations end ${new Date(newest).toLocaleString(undefined, { timeZone: 'America/Los_Angeles' })}; the reporting station may have gone offline.*`
+    );
 
     vi.useRealTimers();
   });
@@ -300,7 +302,9 @@ describe('handleGetHistoricalWeather — early-end note on NOAA recent path (F2)
     const text = textOf(result);
 
     expect(text).toContain('the reporting station may have gone offline');
-    expect(text).toContain(new Date(newest).toLocaleString());
+    expect(text).toContain(
+      `*Observations end ${new Date(newest).toLocaleString(undefined, { timeZone: 'America/Los_Angeles' })}; the reporting station may have gone offline.*`
+    );
 
     vi.useRealTimers();
   });
