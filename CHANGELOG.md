@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **NOAA historical observation times and the forecast snowfall and ice period now use the location's time zone, not the server's.** On a server whose clock is set to another zone (a container, a remote host, or any query about somewhere else), `get_historical_weather` printed recent US observation times in the server's zone, and the winter-weather section of `get_forecast` and `get_weather_summary` could show the wrong date for the start of the snowfall period. The historical NOAA output now also names the zone, in a new `**Timezone:**` line under the data source. On a server whose clock is already in the location's zone, the times and dates are unchanged. (`src/handlers/historicalWeatherHandler.ts`, `src/utils/snow.ts`)
+
 ## [1.36.3] - 2026-11-27
 
 When the official alert service for India, the Philippines or Indonesia stopped answering, the server kept asking it again before giving up, so a request for alerts there took several times longer than it should have before it reported the problem. It also left those repeat requests running in the background after it had answered. This release gives up after the first request that times out, the way it already does for the US, Canada, Europe and the weather forecasts. Alerts that arrive normally look exactly as before.
