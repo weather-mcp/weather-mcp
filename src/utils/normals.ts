@@ -16,6 +16,7 @@ import { UnitPreferences, IMPERIAL_PREFERENCES } from '../config/units.js';
 import { temperatureLabel, precipitationLabel } from './unitFormat.js';
 import type { OpenMeteoService } from '../services/openmeteo.js';
 import type { NCEIService } from '../services/ncei.js';
+import { NceiTokenRejectedError } from '../services/ncei.js';
 import { logger, redactCoordinatesForLogging } from './logger.js';
 import { isInUS } from './geography.js';
 import { DataNotFoundError } from '../errors/ApiError.js';
@@ -340,6 +341,10 @@ export async function renderNormalsSection(
   currentTemps: { high?: number; low?: number },
   prefs: UnitPreferences = IMPERIAL_PREFERENCES
 ): Promise<string> {
+  // Declared outside the try so the catch can read it. A rejected NCEI token is
+  // the one garnish failure that must reach the user (a configured key is silent
+  // otherwise), so it is appended to whichever text this returns.
+  const outcome: { nceiTokenRejected?: boolean } = {};
   try {
     const normals = await getClimateNormals(
       openMeteoService,
@@ -347,21 +352,26 @@ export async function renderNormalsSection(
       latitude,
       longitude,
       month,
-      day
+      day,
+      outcome
     );
 
-    return formatNormals(normals, currentTemps, prefs);
+    const section = formatNormals(normals, currentTemps, prefs);
+    return outcome.nceiTokenRejected
+      ? `${section}*Note: NCEI_API_TOKEN was rejected; these are Open-Meteo normals.*\n`
+      : section;
   } catch (error) {
+    const rejectedNote = outcome.nceiTokenRejected ? `*Note: NCEI_API_TOKEN was rejected.*\n` : '';
     // Normals failing must never fail the request that asked for them.
     if (error instanceof DataNotFoundError) {
       // The 1991-2020 record has too few samples for this date here. The all-null
       // slot is cached (CacheConfig.ttl.normals), so the answer is stable: say so,
       // and do not invite a retry.
-      return `\n${CLIMATE_SECTION_HEADING}\n\n${notFoundNote(month, day)}\n`;
+      return `\n${CLIMATE_SECTION_HEADING}\n\n${notFoundNote(month, day)}\n${rejectedNote}`;
     }
     // Anything else: the pull did not complete. Nothing was cached and the next
     // call retries, so say nothing about the place.
-    return `\n${CLIMATE_SECTION_HEADING}\n\n${RETRIEVAL_FAILURE_NOTE}\n`;
+    return `\n${CLIMATE_SECTION_HEADING}\n\n${RETRIEVAL_FAILURE_NOTE}\n${rejectedNote}`;
   }
 }
 
@@ -396,6 +406,7 @@ export function getDateComponents(iso: string, timeZone: string): { month: numbe
  * @param longitude - Longitude
  * @param month - Month (1-12)
  * @param day - Day of month (1-31)
+ * @param outcome - Optional out-parameter; `nceiTokenRejected` is set when NCEI refused the token
  * @returns Climate normals with source indication
  */
 export async function getClimateNormals(
@@ -404,7 +415,8 @@ export async function getClimateNormals(
   latitude: number,
   longitude: number,
   month: number,
-  day: number
+  day: number,
+  outcome?: { nceiTokenRejected?: boolean }
 ): Promise<ClimateNormals> {
   // Try NCEI if available and location is in US
   if (nceiService && nceiService.isAvailable() && isInUS(latitude, longitude)) {
@@ -425,12 +437,23 @@ export async function getClimateNormals(
       return normals;
     } catch (error) {
       // NCEI failed, fall back to Open-Meteo
-      logger.warn('NCEI climate normals failed, falling back to Open-Meteo', {
-        ...redactCoordinatesForLogging(latitude, longitude),
-        month,
-        day,
-        error: (error as Error).message
-      });
+      if (error instanceof NceiTokenRejectedError) {
+        if (outcome) outcome.nceiTokenRejected = true;
+        logger.warn('NCEI token rejected; using Open-Meteo normals', {
+          ...redactCoordinatesForLogging(latitude, longitude),
+          month,
+          day,
+          reason: 'token-rejected',
+          securityEvent: true
+        });
+      } else {
+        logger.warn('NCEI climate normals failed, falling back to Open-Meteo', {
+          ...redactCoordinatesForLogging(latitude, longitude),
+          month,
+          day,
+          error: (error as Error).message
+        });
+      }
     }
   }
 
