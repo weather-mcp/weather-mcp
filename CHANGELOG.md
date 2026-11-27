@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.2] - 2026-11-27
+
+In American Samoa the server showed local times a full day ahead, so an alert that ran out on Tuesday evening read as running until Wednesday evening. Tokelau was a day behind, and two Alaskan villages on the Bering Strait were 21 hours ahead. This release puts those places on their real local time. Nothing changes anywhere else.
+
+### Fixed
+
+- **Local times in American Samoa, Tokelau and parts of western Alaska are no longer a calendar day off.** The server works out a place's time zone from its coordinates when no weather service supplies one. The zone data it used is coarse at the International Date Line, and in three places it named a zone on the wrong side of the line. Tutuila, where almost everyone in American Samoa lives, was given Samoa's zone (UTC+13) instead of its own (UTC−11), so times there were shown a full day ahead: an alert expiring at 6 PM on Tuesday read as 6 PM on Wednesday. Fakaofo in Tokelau was shown a day behind. Gambell on St Lawrence Island and Little Diomede in Alaska were given a Russian zone and shown 21 hours ahead. Those places now get their real local zone; everywhere else is unchanged. The affected times were the effective and expiry times from `get_alerts` when no nearby weather station names a zone, the expiry time in the life-threatening alert banner on `get_forecast`, `get_current_conditions` and `get_weather_summary`, the backup forecast used when Open-Meteo cannot be reached (where the zone also decides which day each hour is counted in), airport observation times from `get_current_conditions` with `source="metar"`, and times in river and wildfire reports. Forecast, current-conditions, marine and air-quality data from Open-Meteo already carried the correct zone and are unchanged.
+
 ## [1.36.1] - 2026-11-27
 
 The checks that confirm the European (MeteoAlarm) and Canadian (MSC GeoMet) alert feeds still answer in the shape the server expects could not fail. They treated every error as a network blip, including a feed that changed its format or moved its address. Those are the failures that would make `get_alerts` refuse to answer for Europe or Canada, so the check meant to warn about them before a release was blind to them. This release makes those checks fail when they should. Nothing the server returns changes.
@@ -2555,7 +2563,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.1...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.2...HEAD
+[1.36.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.1...v1.36.2
 [1.36.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.0...v1.36.1
 [1.36.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.32...v1.36.0
 [1.35.32]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.31...v1.35.32
