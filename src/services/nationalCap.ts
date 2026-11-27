@@ -300,14 +300,19 @@ export class NationalCapService {
     return new Error(`Unknown error occurred while contacting the ${feed.publisher} alert feed`);
   }
 
-  /** Whether a mapped failure is worth retrying. */
+  /**
+   * Whether a mapped failure is worth retrying: a rate limit or a 5xx.
+   *
+   * Not a timeout: it has exhausted either its own deadline (API_TIMEOUT_MS,
+   * 30 s by default; 10 s for a document) or the enclosing tool call's
+   * remaining budget (`toolBudget.ts`). Either way a retry would answer after
+   * the caller has given up — the v1.34.2 rule for NOAA and Open-Meteo, which
+   * MeteoAlarm and GeoMet follow. Not a connection failure either: those fail
+   * fast (see `toFeedError`).
+   */
   private isRetryable(error: Error): boolean {
     const message = error.message;
-    return (
-      message.includes('rate limit') ||
-      message.includes('server error') ||
-      message.includes('timed out')
-    );
+    return message.includes('rate limit') || message.includes('server error');
   }
 
   /** One limited GET returning the response body as text. */
@@ -329,7 +334,7 @@ export class NationalCapService {
     }
   }
 
-  /** The index fetch, with MeteoAlarm-style backoff on transient failures. */
+  /** The index fetch, with MeteoAlarm-style backoff on a rate limit or a 5xx. */
   private async fetchIndex(
     countryCode: string,
     feed: NationalCapFeed,
@@ -349,7 +354,7 @@ export class NationalCapService {
     }
   }
 
-  /** A document/polygon fetch: one retry on a transient failure, none on 4xx/3xx. */
+  /** A document/polygon fetch: one retry on a rate limit or a 5xx; none on a timeout, 4xx or 3xx. */
   private async fetchDocument(
     url: string,
     countryCode: string,
