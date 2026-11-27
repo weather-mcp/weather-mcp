@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.4] - 2026-11-27
+
 Two places on the US (NOAA) path printed times by the server's own clock instead of the location's: the observation times in recent US weather history, and the dates of the snowfall and ice forecast period. On a server set to a different time zone than the place you asked about, such as a container, a remote host, or any question about somewhere else, those times were hours off and the snowfall period could start on the wrong day. This release prints them in the location's time zone, like every other time the server shows.
 
 ### Fixed
@@ -2581,7 +2583,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...HEAD
+[1.36.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...v1.36.4
 [1.36.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.2...v1.36.3
 [1.36.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.1...v1.36.2
 [1.36.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.0...v1.36.1
