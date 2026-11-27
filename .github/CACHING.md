@@ -4,7 +4,7 @@ This document explains the caching implementation in the Weather MCP server.
 
 ## Overview
 
-The Weather MCP server implements an in-memory cache with TTL (Time To Live) and LRU (Least Recently Used) eviction to:
+The Weather MCP server implements an in-memory cache with TTL (Time To Live) and expired-first, then LRU (Least Recently Used), eviction to:
 - Reduce API calls to NOAA and Open-Meteo services
 - Improve response times for repeated queries
 - Protect against rate limits during heavy usage
@@ -15,7 +15,7 @@ The Weather MCP server implements an in-memory cache with TTL (Time To Live) and
 ### Implementation Details
 
 - **Type**: In-memory cache (data stored in Node.js process memory)
-- **Eviction Policy**: LRU (Least Recently Used)
+- **Eviction Policy**: expired entries first; then LRU (Least Recently Used) if the cache is still full
 - **Maximum Size**: Configurable (default: 1000 entries)
 - **TTL Strategy**: Variable based on data type and volatility
 
@@ -25,7 +25,7 @@ The cache implementation provides:
 - Generic type-safe storage for any data type
 - Per-entry TTL configuration
 - Automatic expiration of stale data
-- LRU eviction when max size is reached
+- At max size, expired entries are removed first; a live entry is evicted (LRU) only if the cache is still full. Only live evictions count in the `evictions` statistic
 - Statistics tracking (hits, misses, evictions)
 
 ## TTL Configuration
@@ -91,11 +91,16 @@ Control caching behavior via environment variables:
 
 ```bash
 # Enable/disable caching (default: enabled)
+# true/false/1/0, any case; any other value warns on stderr and leaves caching on
 CACHE_ENABLED=true
 
-# Maximum cache size in entries (default: 1000)
+# Maximum cache size in entries (default: 1000, range 100-10000)
+# A whole number; trailing text, decimals or exponents warn and use the default
 CACHE_MAX_SIZE=1000
 ```
+
+`CACHE_ENABLED=false` turns off every service cache, including the Environment
+Agency, JMA and MET Norway caches.
 
 ### Disabling the Cache
 
@@ -179,7 +184,7 @@ AI conversation: "What's the weather in NYC? How about tomorrow? What about the 
 
 Entries are automatically removed when:
 1. TTL expires (checked on access)
-2. Cache reaches max size (LRU eviction)
+2. Cache reaches max size: expired entries are swept first, then the least recently used live entry is evicted if the cache is still full
 3. Periodic cleanup (performed during stats retrieval)
 
 ### Manual Cache Clearing
@@ -281,7 +286,7 @@ For typical AI usage:
 If cache statistics show zero hits:
 
 1. Verify cache is enabled: `check_service_status` should show "Cache Status: ✅ Enabled"
-2. Check environment: `CACHE_ENABLED` should not be set to `false`
+2. Check environment: `CACHE_ENABLED` should not be set to `false` or `0` (any case)
 3. Ensure queries are repeated: Cache only helps with repeated requests
 
 ### High Miss Rate

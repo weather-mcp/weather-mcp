@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`CACHE_ENABLED` and `WEATHER_LIGHTNING_PREWARM` accept any spelling of false.** `FALSE`, `False` and `0` now turn caching off and skip the lightning pre-warm. Before, only the exact lowercase `false` (and `0` for the cache) worked, so `CACHE_ENABLED=FALSE` left caching on and `WEATHER_LIGHTNING_PREWARM=FALSE` still opened the MQTT connection. A value that is not `true`/`false`/`1`/`0` now warns on stderr and keeps the default. (`src/utils/envBoolean.ts`, `src/config/cache.ts`, `src/server/lightningPrewarm.ts`)
+- **`CACHE_ENABLED=false` turns off every cache.** The Environment Agency river, JMA warning and MET Norway fallback-forecast caches ignored it and kept serving cached answers while `check_service_status` reported caching disabled. (`src/services/environmentAgency.ts`, `src/services/jma.ts`, `src/services/metno.ts`)
+- **`CACHE_MAX_SIZE` and `API_TIMEOUT_MS` must be whole numbers.** A value such as `1000abc`, `1.5` or `1e5` used to be truncated to a different number without a word (`API_TIMEOUT_MS=1e5` became 5000 ms). It now warns and uses the default. (`src/config/cache.ts`)
+- **A full cache drops expired entries before live ones.** It used to evict the least recently used entry even while expired ones were still held, so a live forecast could go before a dead alert answer. The eviction count in `check_service_status` now counts live evictions only. (`src/utils/cache.ts`)
+
 ## [1.35.30] - 2026-11-25
 
 `save_location` could save a street address far from where the same text pointed everywhere else. It looked up a query through a different path from `city_name` and `search_location`, one that never asked Census.gov, which is the service that matches a US street address. `350 Fifth Avenue, New York, NY` was saved near Albany, 219 km from the Empire State Building that `city_name` returned for the same text. Every later weather call on that saved name, alerts included, reported the wrong town. `save_location` now uses the same lookup as `city_name`. Place names such as `Seattle, WA` or `Paris, France` already matched and are unchanged.
