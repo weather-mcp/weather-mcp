@@ -7855,6 +7855,20 @@ not as an empty log.
 
 ---
 
+## G175 — Plain `npm run test:live` hides every passing test's console output, so G9's skip and empty-upstream lines never reach the reader
+
+**Trigger:** reading a `npm run test:live` result to decide whether a live smoke test exercised its upstream: at `/release`, in a run-plan hand run, or after a G9 change.
+
+**Rule:** read live results with `npx vitest run --project live <file> --reporter=verbose --silent=false`, or add those two flags after `npm run test:live --`. A green line alone says only "did not throw". It does not tell a real answer from a transport skip, or a checked list from an empty one.
+
+**Why:** G9 makes a live test log and **pass** on a transport failure, and log an empty upstream rather than loop over nothing. Both are `console` lines. Under vitest 5.1.0 the default `npm run test:live` run printed none of them for a passing test. Measured 2026-11-27 on `tests/live/international-alerts.test.ts`: `grep -c 'Live MeteoAlarm'` was 0 under the plain script, and the verbose run showed `0 warning(s) returned` and the empty-upstream line for both feeds. So a release run where every live test skipped on a dead feed reads exactly like one where every upstream answered.
+
+**Evidence:** live-alert-smoke-transport T2 (`1d774d6`), 2026-11-27.
+
+**Status:** active. Fix candidate: set `silent: false` (or the verbose reporter) on the `live` project in `vitest.config.ts`, so the script the release runs shows the lines without flags. Related: [G9], [G28].
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
