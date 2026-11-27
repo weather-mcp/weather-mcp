@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.32] - 2026-11-27
+
+The remote server (`weather-mcp-http`) told its callers more about the machine it runs on than they need: the full path of the saved-locations file, and the raw text of internal errors. One stray error could also stop it for every caller at once. And a wrong `NCEI_API_TOKEN` went unnoticed, because NCEI's refusal was never recognised. This release fixes all three. The local stdio server's output is unchanged, apart from the new token note.
+
 ### Security
 
 - **The remote server no longer shows its callers a path on the server or a raw runtime error.** Over `weather-mcp-http`, an unreadable saved-locations file used to report the file's full path, a programming error reported its own text (`Cannot read properties of undefined …`), and the saved-location tools ended every answer with `Storage location: <path>`. A remote caller now reads the same statements with no path, and one fixed sentence in place of an error the runtime or a library wrote. Every message the server writes itself, such as a service outage or a feed that could not be reached, reads as before. The local (stdio) server is unchanged: its caller owns the machine and needs the path. (`src/utils/callerAudience.ts`, `src/errors/ApiError.ts`, `src/services/locationStore.ts`, `src/handlers/savedLocationsHandler.ts`)
@@ -2530,7 +2534,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.31...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.32...HEAD
+[1.35.32]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.31...v1.35.32
 [1.35.31]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.30...v1.35.31
 [1.35.30]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.29...v1.35.30
 [1.35.29]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.28...v1.35.29
