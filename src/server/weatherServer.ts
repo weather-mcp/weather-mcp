@@ -48,6 +48,7 @@ import { GeocodingService } from '../services/geocoding.js';
 import type { LocationStore } from '../services/locationStore.js';
 import { RequestSpacer } from '../utils/requestSpacer.js';
 import { runWithToolBudget, toolBudgetMs } from '../utils/toolBudget.js';
+import { runWithCallerAudience } from '../utils/callerAudience.js';
 import { CacheConfig } from '../config/cache.js';
 import { toolConfig, type ToolName } from '../config/tools.js';
 import { getDefaultLocation } from '../config/defaultLocation.js';
@@ -803,6 +804,10 @@ export interface WeatherServerOptions {
    *  defaulted: a defaulted store resolves to ~/.weather-mcp/locations.json, and an
    *  in-process test that forgot to pass one would write the developer's real file. */
   locationStore: LocationStore;
+  /** True only for a transport whose callers are not the machine's owner (the HTTP entry).
+   *  Those callers get error text and saved-location output with no host path and no runtime
+   *  error text (`src/utils/callerAudience.ts`). Absent or false: the text is unchanged. */
+  remoteCallers?: boolean;
 }
 
 /**
@@ -814,6 +819,7 @@ export interface WeatherServerOptions {
  */
 export function createWeatherServer(options: WeatherServerOptions): Server {
   const { locationStore } = options;
+  const remoteCallers = options.remoteCallers === true;
 
   // Every request one tool call starts settles within this budget, so a tool that chains
   // requests answers before a 60 s client gives up (plan-tool-time-budget; toolBudget.ts).
@@ -860,7 +866,7 @@ export function createWeatherServer(options: WeatherServerOptions): Server {
         throw new Error(`Tool '${name}' is not enabled. Please check your ENABLED_TOOLS configuration.`);
       }
 
-      return await runWithToolBudget(toolBudget, async () => {
+      return await runWithCallerAudience(remoteCallers, () => runWithToolBudget(toolBudget, async () => {
         switch (name) {
           case 'get_forecast':
             return await withAnalytics('get_forecast', async () =>
@@ -957,7 +963,7 @@ export function createWeatherServer(options: WeatherServerOptions): Server {
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
-      });
+      }));
     } catch (error) {
       // What was called and how it failed — never what the user typed. Every
       // message reaching this catch can embed a place name, query or coordinate,
@@ -969,8 +975,9 @@ export function createWeatherServer(options: WeatherServerOptions): Server {
         argKeys: args ? Object.keys(args) : [],
         ...(isPiiLoggingEnabled() && args ? { args: JSON.stringify(args) } : {}),
       });
-      // Format error for user display (sanitized)
-      const userMessage = formatErrorForUser(error as Error);
+      // Format error for user display (sanitized). The catch is outside the scope the try
+      // opened, so the audience is set again here: a remote caller must not read a host path.
+      const userMessage = runWithCallerAudience(remoteCallers, () => formatErrorForUser(error as Error));
 
       // A life-threatening alert banner resolved by get_forecast or
       // get_current_conditions before their weather request failed. The warning

@@ -7,11 +7,11 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.31 (Production Ready)
+- **Version:** 1.35.32 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
-- **Entries:** `weather-mcp` (stdio, `src/index.ts`) and `weather-mcp-http` (Streamable HTTP behind OAuth, `src/http.ts`, for self-hosters; `docs/REMOTE_HOSTING.md`). The HTTP entry adds no tool and changes no output; it is a second way to reach the same factory
+- **Entries:** `weather-mcp` (stdio, `src/index.ts`) and `weather-mcp-http` (Streamable HTTP behind OAuth, `src/http.ts`, for self-hosters; `docs/REMOTE_HOSTING.md`). The HTTP entry adds no tool and changes no weather output; it is a second way to reach the same factory. Its callers are remote, so error text and saved-location output carry no host path and no runtime error text (`src/utils/callerAudience.ts`)
 
 ## Architecture
 
@@ -19,11 +19,12 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 
 ```
 src/
-├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown triggers (stdin EOF, transport close, signals)
-├── http.ts                  # Streamable HTTP entry (weather-mcp-http): dotenv, WebCrypto floor, config + issuer discovery (refuse to start), JWKS, LocationStore, listen, pre-warm, SIGTERM/SIGINT-only shutdown
+├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown triggers (stdin EOF, transport close, signals), process guards
+├── http.ts                  # Streamable HTTP entry (weather-mcp-http): dotenv, WebCrypto floor, config + issuer discovery (refuse to start), JWKS, LocationStore, listen, pre-warm, SIGTERM/SIGINT-only shutdown, process guards; marks its callers remote
 ├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
 ├── server/lightningPrewarm.ts  # Saved-location lightning pre-warm: gate, guarded store read, refresh timer (never evicts)
 ├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one ref'd deadline that bounds teardown, stderr only
+├── server/processGuards.ts   # unhandledRejection (log, continue) and uncaughtException (log, then the entry's bounded shutdown, exit 1); class and code only, stderr only
 ├── server/tokenVerifier.ts  # OAuth resource server: jose JWT verification (issuer, audience = public URL, exp, asymmetric algs) → AuthInfo; fixed SDK errors
 ├── server/oauthDiscovery.ts  # Issuer metadata (RFC 8414 / OIDC) via the SDK; exact-issuer and jwks_uri checks; never throws
 ├── server/httpApp.ts       # createHttpApp(): healthz → host validation → RFC 9728 metadata → bearer auth → body limit → stateless transport; side-effect-free
@@ -86,6 +87,7 @@ src/
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
 │   ├── httpDeadline.ts      # withRequestDeadline — one wall-clock deadline per axios request (proxy included), emitted as axios's own ECONNABORTED; every axios.create passes it; hands a tunnelled https request proxy: false and a per-request TunnelAgent on its own signal
 │   ├── toolBudget.ts        # Per-tool-call wall-clock budget (max(API_TIMEOUT_MS, 55 s)) carried in an AsyncLocalStorage; read by httpDeadline at the seam and by the lightning query, written by the dispatch; arms no timer (pure)
+│   ├── callerAudience.ts    # Per-tool-call caller audience (local owner or remote caller) in an AsyncLocalStorage; written by the dispatch, read by errorTextForCaller and the saved-location renders; "local" outside a scope (pure)
 │   ├── proxyTunnel.ts       # Per-request CONNECT tunnel agent hooked on the deadline's signal; tunnelProxyFor mirrors axios's proxy-from-env selection (no logging)
 │   ├── savedLocationShape.ts  # Saved-location record-shape contract — entry predicate, write-side validator, read-side describer and stored-field readers; the write-only size limits (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)
@@ -148,7 +150,7 @@ src/
 All location-based tools accept coordinates, a saved `location_name`, or a
 free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
 Every tool is reachable through both entries, stdio and `weather-mcp-http`, with the same
-`ENABLED_TOOLS` set and the same output.
+`ENABLED_TOOLS` set and the same weather output; a remote caller's error text and saved-location output carry no host path.
 Full per-tool parameter reference: `docs/TOOLS.md`.
 
 1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); surfaces a life-threatening NWS alert banner above the response for NWS-served points (the US and its territories) (positive-assertion-only — absence is never an all-clear); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only; `granularity: "minutely"` gives 2 h of 15-minute precipitation bands from HRRR / ICON-D2 by name, with coverage decided by the response (a not-covered disclosure elsewhere, no met.no fallback)
@@ -199,7 +201,7 @@ throw new Error('Invalid coordinates');
 throw new InvalidLocationError('NOAA', 'Coordinates outside US coverage');
 ```
 
-**Security:** All errors are sanitized via `formatErrorForUser()` before returning to users.
+**Security:** All errors are sanitized via `formatErrorForUser()` before returning to users. **Any other site that puts a caught error's text into a tool result reads it through `errorTextForCaller(error)`, never `error.message`**: a remote caller (the HTTP entry) then gets a path-free `remoteMessage` where the error carries one, and one fixed sentence in place of a runtime or library error's text (`TypeError` and its siblings, or anything with a string `code` or `syscall`). A local caller gets the message unchanged. An error whose message names a host path gives it a `remoteMessage`, as the saved-location store's errors do.
 
 `ApiServiceName` is a **closed union**. Newer, peripheral services (FIRMS, Google Pollen, Google Weather, ACIS, NIFC, GeoMet, MeteoAlarm, JMA) deliberately stay outside it and throw plain `Error`s with fixed, pre-written messages — see the conventions below for when that is right.
 
@@ -252,7 +254,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 ### Garnish vs contract
 
-- **Garnish** (records, normals, composited images, pollen, fire-weather dryness lines): wrapped in one try/catch, degrades silently to "no section" or a one-line note; **no retries** (must not add latency on failure); plain `Error`s. The only garnish failure that *must* surface is a **rejected API key** — silence would hide a misconfiguration from someone who deliberately configured one.
+- **Garnish** (records, normals, composited images, pollen, fire-weather dryness lines): wrapped in one try/catch, degrades silently to "no section" or a one-line note; **no retries** (must not add latency on failure); plain `Error`s. The only garnish failure that *must* surface is a **rejected API key** — silence would hide a misconfiguration from someone who deliberately configured one. All four keys do: Google Pollen and FIRMS by their own classes, Google Weather, and `NCEI_API_TOKEN` (`NceiTokenRejectedError`, a note under the normals; CDO answers a refused token with HTTP **400**, not 401/403).
 - **Contract** (alerts, model comparison, ensemble spread, river/wildfire routing): failures **propagate** with the service's fixed sanitized message. A fabricated "✅ no alerts" from a failed fetch is a dangerous lie on safety data. Incompatible flag combinations are **validation errors thrown before any request**, never a silent downgrade to a different answer.
 - **A positive-assertion-only element may fail silently; nothing that claims coverage may.** The critical-alert banner (`src/utils/criticalAlert.ts` for the gate and copy, `src/handlers/criticalAlertBanner.ts` for the one fetch) omits itself on any failure with a single `securityEvent` warn and no retry — safe *only* because its absence asserts nothing. The moment a description, schema or doc says these tools "check for alerts", absence becomes an implied all-clear and the posture is no longer defensible. Keep the failure posture in one module rather than at each render site.
 - **A render that replaces the whole answer with an error block is an error result and carries `isError: true`; a note, caveat or disclosure on an answer is not.** The render returns whether its catch fired, and the handler sets the flag from that (`get_wildfire_info`, `get_river_conditions` NWPS). The flag is absent, not `false`, on success. Never infer it at the dispatch by matching text (G45).
@@ -511,7 +513,7 @@ via `src/utils/unitFormat.ts`.
 - **Algorithm:** at max size, expired entries are swept first; a live entry is evicted (LRU) only if the cache is still full. `stats.evictions` counts live evictions only
 - **Size limits:** Configurable max size (default 1000 entries)
 - **Automatic cleanup:** Every 5 minutes
-- **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process; the analytics flush runs under its own deadline inside that budget and never sets the exit code. The HTTP entry (`src/http.ts`) uses the same coordinator with **SIGTERM and SIGINT only** — never stdin, which is at EOF from the first tick in a container started without `-i` — and its first step stops accepting connections (`server.close()`, forced after 400 ms)
+- **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process; the analytics flush runs under its own deadline inside that budget and never sets the exit code. The HTTP entry (`src/http.ts`) uses the same coordinator with **SIGTERM and SIGINT only** — never stdin, which is at EOF from the first tick in a container started without `-i` — and its first step stops accepting connections (`server.close()`, forced after 400 ms). **Errors nothing caught** (`src/server/processGuards.ts`, both entries): an unhandled rejection is logged (class and code) and the process keeps running; an uncaught exception is logged, takes the same run, and exits 1 even when every step completes
 
 ## Commit Conventions
 
@@ -769,15 +771,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.31 — Production Ready ✅
-- **Test Coverage:** 5,892 tests, 100% pass rate
+- **Version:** 1.35.32 — Production Ready ✅
+- **Test Coverage:** 6,029 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.32:** The remote server keeps host paths and runtime error text from its callers, and a rejected NCEI token is reported
 - **New in v1.35.31:** CACHE_ENABLED and the lightning pre-warm opt-out mean what they say, in any case
 - **New in v1.35.30:** save_location saves a query at the same place city_name resolves it to
-- **New in v1.35.29:** A historical range ending in the last week is refreshed hourly instead of cached for good
 
 ## Useful References
 
@@ -800,7 +802,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-26 (v1.35.31)
+**Last Updated:** 2026-11-27 (v1.35.32)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 

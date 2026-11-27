@@ -15,6 +15,7 @@ import {
   readStoredMetadata,
   type LimitViolation
 } from '../utils/savedLocationShape.js';
+import { isRemoteCaller } from '../utils/callerAudience.js';
 
 interface SaveLocationArgs {
   alias?: string;
@@ -35,6 +36,21 @@ interface GetLocationArgs {
 
 interface RemoveLocationArgs {
   alias?: string;
+}
+
+/**
+ * What a remote caller is told in place of "repair it in <the store path>": the
+ * file is on a machine they cannot reach.
+ */
+const REMOTE_REPAIR_REMEDY = "ask the server's operator to repair the saved-locations file";
+
+/**
+ * The `*Storage location: <path>*` footer. The machine's owner reads where the
+ * file is. A remote caller (the HTTP entry) reads nothing: the path is a fact
+ * about a server they do not run.
+ */
+function storageLocationFooter(locationStore: LocationStore): string {
+  return isRemoteCaller() ? '' : `*Storage location: ${locationStore.getStorePath()}*\n`;
 }
 
 /**
@@ -510,7 +526,7 @@ export async function handleSaveLocation(
     output += `The activities you've tagged will help the AI provide relevant weather information.\n\n`;
   }
 
-  output += `*Storage location: ${locationStore.getStorePath()}*\n`;
+  output += storageLocationFooter(locationStore);
 
   return {
     content: [
@@ -543,7 +559,7 @@ export async function handleListSavedLocations(
             `save_location(alias="home", location_query="Seattle, WA")\n` +
             `save_location(alias="cabin", location_query="Lake Tahoe, CA")\n` +
             `\`\`\`\n\n` +
-            `*Storage location: ${locationStore.getStorePath()}*\n`
+            storageLocationFooter(locationStore)
         }
       ]
     };
@@ -566,7 +582,7 @@ export async function handleListSavedLocations(
       malformed.add(alias);
       output += `⚠️ This entry cannot be shown: \`${defect.field}\` ${defect.problem}. ` +
         `Remove it with \`remove_saved_location(alias="${alias.replace(/[`\r\n]/g, '')}")\` ` +
-        `or repair it in the file below.\n\n`;
+        (isRemoteCaller() ? `or ${REMOTE_REPAIR_REMEDY}.\n\n` : `or repair it in the file below.\n\n`);
       continue;
     }
 
@@ -620,7 +636,7 @@ export async function handleListSavedLocations(
     }
     output += `\`\`\`\n\n`;
   }
-  output += `*Storage location: ${locationStore.getStorePath()}*\n`;
+  output += storageLocationFooter(locationStore);
 
   return {
     content: [
@@ -665,7 +681,9 @@ export async function handleGetSavedLocation(
   if (defect) {
     throw new Error(
       `Saved location "${alias}" cannot be shown: ${defect.field} ${defect.problem}.\n\n` +
-      `Remove it with remove_saved_location or repair it in ${locationStore.getStorePath()}.`
+      (isRemoteCaller()
+        ? `Remove it with remove_saved_location, or ${REMOTE_REPAIR_REMEDY}.`
+        : `Remove it with remove_saved_location or repair it in ${locationStore.getStorePath()}.`)
     );
   }
 

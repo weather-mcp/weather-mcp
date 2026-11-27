@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.32] - 2026-11-27
+
+The remote server (`weather-mcp-http`) told its callers more about the machine it runs on than they need: the full path of the saved-locations file, and the raw text of internal errors. One stray error could also stop it for every caller at once. And a wrong `NCEI_API_TOKEN` went unnoticed, because NCEI's refusal was never recognised. This release fixes all three. The local stdio server's output is unchanged, apart from the new token note.
+
+### Security
+
+- **The remote server no longer shows its callers a path on the server or a raw runtime error.** Over `weather-mcp-http`, an unreadable saved-locations file used to report the file's full path, a programming error reported its own text (`Cannot read properties of undefined …`), and the saved-location tools ended every answer with `Storage location: <path>`. A remote caller now reads the same statements with no path, and one fixed sentence in place of an error the runtime or a library wrote. Every message the server writes itself, such as a service outage or a feed that could not be reached, reads as before. The local (stdio) server is unchanged: its caller owns the machine and needs the path. (`src/utils/callerAudience.ts`, `src/errors/ApiError.ts`, `src/services/locationStore.ts`, `src/handlers/savedLocationsHandler.ts`)
+- **An error nothing caught no longer prints its message and stack, or stops the remote server for everyone.** Both servers now log such an error as one line with its class and code. An unhandled rejection leaves the server running. An uncaught exception runs the normal bounded shutdown and exits with code 1. Before, Node printed the raw error and exited at once. If you run `weather-mcp-http`, run it under a supervisor that restarts it. (`src/server/processGuards.ts`)
+- **The NCEI token is never sent to another host.** The token travels in a request header, and a redirect to another host would have carried it there. The NCEI client now follows no redirects. NCEI serves these requests directly, so nothing changes for a working setup.
+
+### Fixed
+
+- **A rejected `NCEI_API_TOKEN` is now reported.** NCEI refuses a bad token with HTTP 400, which the server did not recognise, so the climate normals quietly came from Open-Meteo with no word about the token. They still do, and the normals section now ends with `*Note: NCEI_API_TOKEN was rejected; these are Open-Meteo normals.*` The server also stops asking NCEI after the first refusal, until it restarts. (`src/services/ncei.ts`, `src/utils/normals.ts`)
+
+### Documentation
+
+- **`docs/REMOTE_HOSTING.md` says where rate limits belong.** The remote server has no rate or connection limit of its own; set them per client address at your reverse proxy.
+
 ## [1.35.31] - 2026-11-26
 
 Turning the cache off did not always turn it off. `CACHE_ENABLED=FALSE` (capital letters) left caching on, and even `CACHE_ENABLED=false` was ignored by the river-level, Japanese-warning and MET Norway caches, which kept serving stored answers while `check_service_status` said caching was disabled. `WEATHER_LIGHTNING_PREWARM=FALSE` still opened the lightning connection. A mistyped number such as `CACHE_MAX_SIZE=1000abc` was quietly read as a different number. This release makes these settings mean what they say, and warns when a value is not understood.
@@ -2516,7 +2534,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.31...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.32...HEAD
+[1.35.32]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.31...v1.35.32
 [1.35.31]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.30...v1.35.31
 [1.35.30]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.29...v1.35.30
 [1.35.29]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.28...v1.35.29

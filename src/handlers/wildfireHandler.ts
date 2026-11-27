@@ -31,6 +31,7 @@ import { distanceToPerimeterKm } from '../utils/firePerimeter.js';
 import { displayValue } from '../utils/displayBanding.js';
 import { isInUS } from '../utils/geography.js';
 import { logger } from '../utils/logger.js';
+import { errorTextForCaller } from '../errors/ApiError.js';
 import {
   FIRMS_PRODUCTS,
   satelliteDisplayName,
@@ -607,7 +608,7 @@ async function formatNIFCWildfire(
     output += `- Temporary service unavailability\n`;
     output += `- Network connectivity issues\n`;
     output += `- Service maintenance\n\n`;
-    output += `Error details: ${error instanceof Error ? error.message : String(error)}\n`;
+    output += `Error details: ${errorTextForCaller(error)}\n`;
   }
 
   output += `\n---\n`;
@@ -777,7 +778,7 @@ async function formatFIRMSWildfire(
     output += `- Temporary service unavailability\n`;
     output += `- Network connectivity issues\n`;
     output += `- Service maintenance\n\n`;
-    output += `Error details: ${error instanceof Error ? error.message : String(error)}\n`;
+    output += `Error details: ${errorTextForCaller(error)}\n`;
   }
 
   output += `\n---\n`;

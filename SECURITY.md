@@ -253,6 +253,14 @@ statements apply to that entry, not to the stdio server.
   checked. This blocks DNS rebinding from a browser on the operator's network.
 - **Bounded input.** Request bodies are limited to 256 KB. Errors are answered
   with fixed JSON-RPC messages, never a stack trace or the request body.
+- **No host detail to callers.** A tool result never carries a path on the
+  server or a runtime or library error's text. The saved-location tools omit
+  the storage path, and a runtime error reads as one fixed sentence. The
+  operator's stderr log has the class and code.
+- **Errors nothing caught.** An unhandled rejection is logged (class and code)
+  and the server keeps serving other callers. An uncaught exception is logged
+  and the server exits 1 through its bounded shutdown; run it under a
+  supervisor.
 - **Logging.** No log line carries the `Authorization` header, a token, any
   token claim, or the token's subject, at any `LOG_LEVEL`, including with
   `LOG_PII=true`. A refused request is logged once as a security event with a
@@ -262,8 +270,11 @@ statements apply to that entry, not to the stdio server.
   short.
 - **Shared store.** Every authenticated caller shares one saved-location
   file. Give access only to people who should share it.
-- **No rate limiting.** The entry is for authenticated self-hosters. The
-  per-process Nominatim spacing still applies to every caller together.
+- **Rate limiting belongs to the reverse proxy.** The entry has no limiter of
+  its own; set request and connection limits per client address at the TLS
+  proxy (docs/REMOTE_HOSTING.md). The per-process Nominatim spacing still
+  applies to every caller together, and each tool call is bounded by the
+  larger of `API_TIMEOUT_MS` and 55 seconds.
 
 ## Security Testing
 

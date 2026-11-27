@@ -18,6 +18,7 @@ import { analytics } from './analytics/index.js';
 import { createWeatherServer, SERVER_VERSION } from './server/weatherServer.js';
 import { startLightningPrewarm, type LightningPrewarmHandle } from './server/lightningPrewarm.js';
 import { createShutdown, SHUTDOWN_DEADLINE_MS } from './server/shutdown.js';
+import { installProcessGuards } from './server/processGuards.js';
 
 /**
  * The shutdown flush's own deadline. It must end before the coordinator's, with room for the
@@ -45,9 +46,12 @@ async function main() {
 
   // One bounded, run-once shutdown for every way the session can end (src/server/shutdown.ts).
   // Each step reads its target at call time: `lightningPrewarm` is assigned after connect.
+  // Set by an uncaught exception: the coordinator exits 0 when every step completes, and a
+  // crash must not read as a clean stop.
+  let crashed = false;
   const shutdown = createShutdown({
     deadlineMs: SHUTDOWN_DEADLINE_MS,
-    exit: (code) => process.exit(code),
+    exit: (code) => process.exit(crashed ? 1 : code),
     steps: [
       // No new pre-warm subscriptions during teardown.
       { name: 'lightning-prewarm', run: () => lightningPrewarm?.stop() },
@@ -59,6 +63,17 @@ async function main() {
       // Fires server.onclose synchronously; the memo returns the in-flight run.
       { name: 'server', run: () => server.close() }
     ]
+  });
+
+  // An error nothing caught (src/server/processGuards.ts). A rejection is logged and the
+  // server keeps running. An exception is logged, then takes the same bounded shutdown as
+  // every other trigger and exits 1 even when every step completes.
+  installProcessGuards({
+    emitter: process,
+    onFatal: (reason) => {
+      crashed = true;
+      void shutdown(reason);
+    }
   });
 
   // Registered before connect so an early EOF cannot be missed. An 'end' listener does not
