@@ -28,6 +28,7 @@ import type {
 import { NCEI_API_TOKEN } from '../config/api.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { DataNotFoundError, RateLimitError, ServiceUnavailableError } from '../errors/ApiError.js';
+import { isConnectionFailureCode } from '../utils/connectionFailure.js';
 import { getUserAgent } from '../utils/version.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
@@ -62,6 +63,52 @@ const MAX_STATION_ATTEMPTS = 4;
 const MISSING_VALUE_THRESHOLD = -100;
 
 /**
+ * Largest response body the client accepts. Observed on 2026-11-27: 204 bytes
+ * (`/datasets`), 717 bytes (`/stations`, five rows) and 3,794 bytes (`/data`,
+ * one month of daily normals). 1 MiB is over 250 times the largest.
+ */
+const NCEI_MAX_RESPONSE_BYTES = 1024 * 1024;
+
+/** The fixed text of a rejected token. It never carries the token. */
+const NCEI_TOKEN_REJECTED_MESSAGE =
+  'Invalid or missing API token. Get a free token at https://www.ncdc.noaa.gov/cdo-web/token';
+
+/**
+ * CDO refused the configured `NCEI_API_TOKEN`.
+ *
+ * Its own class so the normals path can tell "the key is wrong" from "the
+ * service is down" and say so under the normals: a rejected key is the one
+ * garnish failure that must surface, because silence hides a misconfiguration
+ * from someone who deliberately configured a key.
+ *
+ * A subclass of `ServiceUnavailableError`, not of `Error` as the Google and
+ * FIRMS key errors are: `NCEI` is inside the closed `ApiServiceName` union, and
+ * a rejected token has always been reported as this class.
+ *
+ * **Live-verified 2026-11-27:** CDO answers a rejected token with HTTP **400**,
+ * not 401 or 403. The body is `{"status" : "400", "message" : "The token
+ * parameter provided is not valid."}`; a missing token answers 400 with
+ * `Token parameter is required.`
+ */
+export class NceiTokenRejectedError extends ServiceUnavailableError {
+  constructor() {
+    super('NCEI', NCEI_TOKEN_REJECTED_MESSAGE);
+    this.name = 'NceiTokenRejectedError';
+  }
+}
+
+/** True when a 400 body is CDO refusing the token. The body may be an object or raw text. */
+function bodyNamesToken(data: unknown): boolean {
+  const text =
+    typeof data === 'string'
+      ? data
+      : typeof data === 'object' && data !== null
+        ? (data as { message?: unknown }).message
+        : undefined;
+  return typeof text === 'string' && /token/i.test(text);
+}
+
+/**
  * NCEI Climate Data Online (CDO) Service
  *
  * Provides access to official NOAA climate normals for US locations.
@@ -71,6 +118,12 @@ export class NCEIService {
   private client: AxiosInstance;
   private token: string | undefined;
   private cache: Cache<unknown>;
+  /**
+   * Set when CDO refuses the token. The token is read once at startup, so a
+   * refused one cannot recover without a restart: later calls throw without a
+   * request, and normals never wait on a request that is known to fail.
+   */
+  private tokenRejected = false;
 
   constructor(config: NCEIServiceConfig = {}) {
     const {
@@ -89,6 +142,12 @@ export class NCEIService {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // The token rides a header named `token`, which a redirect to another
+      // host would carry with it (follow-redirects strips only Authorization,
+      // Proxy-Authorization and Cookie). CDO serves these paths directly, so a
+      // redirect is never followed: a 3xx is an error and the normals fall back.
+      maxRedirects: 0,
+      maxContentLength: NCEI_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -152,6 +211,11 @@ export class NCEIService {
         logger.info('NCEI climate normals cache hit', { ...redacted, month, day });
         return cached;
       }
+    }
+
+    // After the cache: a normal fetched before the token was refused is still a normal.
+    if (this.tokenRejected) {
+      throw new NceiTokenRejectedError();
     }
 
     // The reference year (2010) is not a leap year, so Feb 29 has no normal.
@@ -312,13 +376,14 @@ export class NCEIService {
    */
   private async handleError(error: unknown): Promise<never> {
     const e = error as {
-      response?: { status: number; data?: { message?: string } };
+      response?: { status: number; data?: { message?: string } | string };
       message?: string;
       code?: string;
     };
     if (e.response) {
       const status = e.response.status;
-      const message = e.response.data?.message || e.message;
+      const data = e.response.data;
+      const message = (typeof data === 'object' && data !== null ? data.message : undefined) || e.message;
 
       if (status === 429) {
         throw new RateLimitError(
@@ -328,11 +393,9 @@ export class NCEIService {
         );
       }
 
-      if (status === 401 || status === 403) {
-        throw new ServiceUnavailableError(
-          'NCEI',
-          'Invalid or missing API token. Get a free token at https://www.ncdc.noaa.gov/cdo-web/token'
-        );
+      if (status === 401 || status === 403 || (status === 400 && bodyNamesToken(e.response.data))) {
+        this.tokenRejected = true;
+        throw new NceiTokenRejectedError();
       }
 
       if (status === 404) {
@@ -350,7 +413,7 @@ export class NCEIService {
       throw new ServiceUnavailableError('NCEI', 'Request timed out');
     }
 
-    if (e.code === 'ENOTFOUND' || e.code === 'ECONNREFUSED') {
+    if (isConnectionFailureCode(e.code)) {
       throw new ServiceUnavailableError('NCEI', 'Unable to connect to NCEI API');
     }
 
