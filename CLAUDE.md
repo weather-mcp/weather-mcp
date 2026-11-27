@@ -150,7 +150,7 @@ src/
 All location-based tools accept coordinates, a saved `location_name`, or a
 free-text `city_name` (geocoded on demand) — see [Currently Supported Tools](#currently-supported-tools).
 Every tool is reachable through both entries, stdio and `weather-mcp-http`, with the same
-`ENABLED_TOOLS` set and the same output.
+`ENABLED_TOOLS` set and the same weather output; a remote caller's error text and saved-location output carry no host path.
 Full per-tool parameter reference: `docs/TOOLS.md`.
 
 1. **get_forecast** - 7-day forecasts (NOAA/Open-Meteo, auto-select by location); surfaces a life-threatening NWS alert banner above the response for NWS-served points (the US and its territories) (positive-assertion-only — absence is never an all-clear); `detail` output control; `include_normals` (global) and `include_astronomy`; `compare_models: true` returns a five-model agreement view and `ensemble_spread: true` returns ECMWF ENS member spread instead of a single forecast — the two flags are mutually exclusive and daily-only; `granularity: "minutely"` gives 2 h of 15-minute precipitation bands from HRRR / ICON-D2 by name, with coverage decided by the response (a not-covered disclosure elsewhere, no met.no fallback)
