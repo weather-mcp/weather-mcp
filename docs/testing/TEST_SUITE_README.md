@@ -8,7 +8,7 @@ Quick reference guide for the Weather MCP test suite.
 
 | Metric | Value |
 |--------|-------|
-| **Total Tests** | 6,058 |
+| **Total Tests** | 6,096 |
 | **Execution Time (`npm test`, offline)** | ~20 seconds |
 | **Execution Time (live, `npm run test:live`)** | several minutes, network-bound |
 
@@ -106,9 +106,10 @@ this code: a slow or refusing API, or a broker that blocks your IP. `npm test` d
 run them, so they cannot fail the gate, CI or a publish. A human reads the result of
 `npm run test:live` at release time.
 
-Three live files classify their errors (GOTCHAS G9): `lightning-broker-smoke`,
-`japan-alerts` and `national-cap-alerts` skip only on a transport failure and rethrow
-anything else, so a red result there is worth reading before re-running. The other live
+Five live files classify their errors (GOTCHAS G9): `lightning-broker-smoke`,
+`japan-alerts`, `national-cap-alerts`, `international-alerts` and
+`firms-product-freshness` skip only on a transport failure and rethrow anything else,
+so a red result there is worth reading before re-running. The other live
 files still have tolerant catches that log any error, assertion failures included, as a
 network skip. A green result from one of them does not prove the upstream answered the
 expected shape. Read its log output.
@@ -253,7 +254,7 @@ describe('Feature Name', () => {
 ## Test Metrics & Goals
 
 ### Current Performance
-- ✅ 6,058 total tests
+- ✅ 6,096 total tests
 - ✅ ~20s offline gate (`npm test`)
 
 ### Coverage Goals

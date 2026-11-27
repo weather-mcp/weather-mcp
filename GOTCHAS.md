@@ -309,14 +309,18 @@ turns a real upstream contract regression into a logged "network flake" that
 nobody investigates — and a vacuous loop over an empty feed makes a broken
 parser look healthy.
 
-**Verify:** `grep -n 'isTransportFailure\|throw' tests/live/national-cap-alerts.test.ts`,
+**Verify:** `grep -n 'TransportFailure\|throw' tests/live/national-cap-alerts.test.ts`,
 and confirm no `catch` block in that file contains `expect(`. Same for
-`tests/live/lightning-broker-smoke.test.ts`.
+`tests/live/lightning-broker-smoke.test.ts`, `tests/live/japan-alerts.test.ts`
+and `tests/live/international-alerts.test.ts`.
 
 **Evidence:** 2026-08-23 (`2d564ef`) — the shape being avoided is
 `tests/integration/international-alerts.test.ts:299-325`, which puts its
 `expect`s inside the tolerant catch; raised as a major plan-review finding
-(codex-R7).
+(codex-R7). Fixed 2026-11-27 (`1d774d6`): that file is now
+`tests/live/international-alerts.test.ts`, and its two live tests skip only on
+exact per-service transport strings from `tests/helpers/liveAlertTransport.ts`,
+locked offline by `tests/unit/live-alert-transport.test.ts` (`a38fea8`).
 
 **Status:** active.
 
@@ -7848,6 +7852,20 @@ not as an empty log.
 **Evidence:** env-file-explicit-path, `ee2204f` (loader), `5e76939` (entries, dev wrapper), `ce317f5` (integration rows 4 and 5 go red under the old import).
 
 **Status:** active. Lint candidate: `no-restricted-imports` for `dotenv` and `dotenv/config` outside `src/config/envFile.ts` would replace the source-text test.
+
+---
+
+## G175 — Plain `npm run test:live` hides every passing test's console output, so G9's skip and empty-upstream lines never reach the reader
+
+**Trigger:** reading a `npm run test:live` result to decide whether a live smoke test exercised its upstream: at `/release`, in a run-plan hand run, or after a G9 change.
+
+**Rule:** read live results with `npx vitest run --project live <file> --reporter=verbose --silent=false`, or add those two flags after `npm run test:live --`. A green line alone says only "did not throw". It does not tell a real answer from a transport skip, or a checked list from an empty one.
+
+**Why:** G9 makes a live test log and **pass** on a transport failure, and log an empty upstream rather than loop over nothing. Both are `console` lines. Under vitest 5.1.0 the default `npm run test:live` run printed none of them for a passing test. Measured 2026-11-27 on `tests/live/international-alerts.test.ts`: `grep -c 'Live MeteoAlarm'` was 0 under the plain script, and the verbose run showed `0 warning(s) returned` and the empty-upstream line for both feeds. So a release run where every live test skipped on a dead feed reads exactly like one where every upstream answered.
+
+**Evidence:** live-alert-smoke-transport T2 (`1d774d6`), 2026-11-27.
+
+**Status:** active. Fix candidate: set `silent: false` (or the verbose reporter) on the `live` project in `vitest.config.ts`, so the script the release runs shows the lines without flags. Related: [G9], [G28].
 
 ---
 
