@@ -70,6 +70,7 @@ export default tseslint.config(
       'src/config/tools.ts', // config parsing that runs before the logger exists
       'src/config/units.ts', // config parsing that runs before the logger exists
       'src/config/cache.ts', // config parsing that runs before the logger exists
+      'src/config/envFile.ts', // the .env loader runs before the logger exists
     ],
     rules: { 'no-console': 'off' },
   },
