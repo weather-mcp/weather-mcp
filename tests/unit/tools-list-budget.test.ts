@@ -45,9 +45,9 @@
  *      treats a blank string as unset, so '' is a clean "no default" and not
  *      a default literally named "".
  *
- * `dotenv/config` is no longer in this import chain — that import lives only
- * in the entry, src/index.ts (which this file does not import) — so the
- * repo's own gitignored .env cannot reach WEATHER_DEFAULT_LOCATION here. A
+ * Neither the `.env` loader (src/config/envFile.ts) nor its importers (the
+ * two entries) are in this import chain, so the repo's own gitignored .env
+ * cannot reach WEATHER_DEFAULT_LOCATION here. A
  * shell that **exports** the variable still can, though, which is why the
  * pin stays, and stays hoisted (set before the static import evaluates)
  * rather than set in a beforeEach.
