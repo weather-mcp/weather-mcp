@@ -18,8 +18,8 @@
  * stop this server the moment it booted.
  */
 
-// Load environment variables from .env file (for local development)
-import 'dotenv/config';
+// Load DOTENV_CONFIG_PATH's file, if one is named — never ./.env (src/config/envFile.ts)
+import './config/envFile.js';
 
 import { createServer as createNodeHttpServer, type Server as NodeHttpServer } from 'node:http';
 import { createRemoteJWKSet } from 'jose';

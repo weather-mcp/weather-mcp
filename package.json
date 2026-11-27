@@ -1,6 +1,6 @@
 {
   "name": "@dangahagan/weather-mcp",
-  "version": "1.35.32",
+  "version": "1.36.0",
   "description": "MCP server giving AI assistants 17 weather tools with zero API keys: global forecasts, current conditions, alerts, air quality, marine conditions, lightning detection, radar imagery, river levels, wildfire tracking, and historical weather back to 1940. Built entirely on free public data sources (NOAA, Open-Meteo, USGS, NIFC).",
   "mcpName": "io.github.dgahagan/weather-mcp",
   "main": "dist/index.js",
@@ -20,8 +20,8 @@
   "scripts": {
     "build": "tsc",
     "lint": "eslint .",
-    "dev": "tsx src/index.ts",
-    "dev:http": "tsx src/http.ts",
+    "dev": "tsx scripts/dev-entry.mjs src/index.ts",
+    "dev:http": "tsx scripts/dev-entry.mjs src/http.ts",
     "start": "node dist/index.js",
     "start:http": "node dist/http.js",
     "prepublishOnly": "npm run build && npm audit --omit=dev --audit-level=high",

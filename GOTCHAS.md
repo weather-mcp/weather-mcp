@@ -345,7 +345,7 @@ without having exercised the change at all.
 a gap of even a few minutes between runs fabricates a diff. And `.env` is
 gitignored, so a base worktree has none — `dotenv` reads each process's own
 cwd, meaning the base silently runs *keyless* while the branch runs keyed, and
-the resulting mismatch gets blamed on the feature. Third: a *matching* hash is a
+the resulting mismatch gets blamed on the feature. *(2026-11-27, env-file-explicit-path: no build after v1.35.32 reads a cwd `.env`, so a branch built from then on runs keyless too unless the probe sets `DOTENV_CONFIG_PATH`, or passes the keys, on **both** sides. A pre-change base still reads its cwd `.env`. The rule, key both sides, is unchanged.)* Third: a *matching* hash is a
 false negative whenever the upstream is down, and nothing about the result says
 so — the sweep's own output looks exactly like a pass.
 
@@ -1170,102 +1170,6 @@ bad shape" — a different property, and the one worth having.
 
 **Status:** active. Related: [G21] (the same file's mock/runtime divergences),
 [G11], [G23].
-
----
-
-## G26 — The repo's own `.env` means a probe from the repo root is not testing the default configuration
-
-**Trigger:** verifying **default-configuration** behaviour of the built dist —
-the default tool preset, default units, default log level, analytics off — by
-spawning `node dist/index.js` and unsetting the relevant variable.
-
-**Rule:** unsetting the variable in the child env is **not enough**.
-`src/index.ts` imports `dotenv/config`, which reads `.env` from the **process's
-cwd**, so a server spawned from the repo root silently inherits the repo's own
-gitignored `.env`. To probe a default install, spawn the dist with **cwd set
-outside the repo** *and* delete the variables from the child env. Assert the
-default you expected before reading anything else — `tools/list` is the cheap
-check for the preset.
-
-**Why:** the repo `.env` sets `ENABLED_TOOLS`, `LOG_LEVEL` and the `ANALYTICS_*`
-trio. A G19 check of "does `get_weather_summary`'s lightning section work on a
-default install?", run from the repo root with `ENABLED_TOOLS` deleted from the
-child env, reported **17 tools exposed** — the `full` preset — so it exercised
-the very configuration the check exists to look past, and its green result meant
-nothing. Run again from a temp cwd it reported **6 tools**, with
-`get_lightning_activity` absent and `get_weather_summary` present: the actual
-claim G19 makes, actually tested. This is the same hazard as [G10]'s
-key-propagation half seen from the other side — there a base worktree has *no*
-`.env` and silently runs keyless; here the repo root *has* one and silently runs
-configured. Both come from dotenv resolving per-process cwd.
-
-**Verify:** spawn the built dist twice with `ENABLED_TOOLS` deleted from the
-child environment — once with `cwd` at the repo root, once with `cwd` at a fresh
-temp directory — and compare `tools/list` counts. 17 vs 6 is the trap.
-
-**Evidence:** 2026-08-25 (`99ba469`, lightning-safe-message-coherence T5) — the
-first summary probe reported `tools exposed: 17 | get_lightning_activity present:
-true` while claiming to test the `basic` preset, in which that tool is absent.
-
-**The cheapest fix is often to not import the importer at all, 2026-08-29**
-(`17b2699`, issue-86 T3). `dotenv/config` has exactly **one** importer in this
-tree — `src/index.ts:9` — so a verification driver that imports a *handler* and
-its services directly (`dist/handlers/riverConditionsHandler.js`) never loads
-`.env` on either side, whatever cwd it runs from. That closes this entry and
-[G10]'s key-propagation half **by construction** rather than by remembering to
-scrub or forward the child environment, and it lets per-call parameters carry the
-axis under test (`units` as an argument, not `WEATHER_UNITS` in the environment).
-The technique only applies when the entry point you need is reachable below
-`src/index.ts`; a probe of the **server's** own defaults — the tool preset, the
-`tools/list` count — still has to spawn `dist/index.js` and still needs the
-temp-cwd discipline above. Check the importer set (`grep -rn dotenv src/`) rather
-than assuming it is still one file.
-
-**A "fresh home" is per process, not per row (2026-09-26, analytics-no-default-endpoint,
-plan-review codex R2).** The same isolation applies to `$HOME` when a probe compares
-*first-run* output across two processes — base against branch, keyed against keyless.
-`getOrGenerateAnalyticsSalt()` (`src/analytics/config.ts`) writes
-`$HOME/.weather-mcp/analytics-salt` and logs `Generated new analytics salt` only when the
-file is absent or empty. Since 2026-09-30 (analytics-salt-gate) it runs only when analytics is
-enabled at the `detailed` level, so the first-run line appears only in probes run with
-that configuration; a default or `minimal`/`standard` probe no longer consumes the
-precondition. For those that do, two spawns sharing one `HOME=$(mktemp -d)` disagree by one line:
-the first consumed the precondition the second was meant to see. Give every compared
-process its own empty home, and record each path. The plan as first written shared one;
-the review caught it before the run, and T2 then showed each side logging the line in
-its own home, byte-identical after timestamps were stripped.
-
-**The clean environment also drops the repo's tool preset (2026-10-01,
-analytics-salt-empty-file).** A temp-cwd spawn runs the `basic` preset. A probe that calls a
-tool outside it (`list_saved_locations`, for one) gets an error result **before**
-`withAnalytics` runs, so no analytics event is attempted and the base and the branch print
-the same silence. The first two passes of that plan's empty-salt probe compared exactly
-this and looked like a no-op fix. Set `ENABLED_TOOLS=all` in the probe's own env (or call a
-`basic` tool), and print the tool result, so an unregistered tool shows up as an error and
-not as an empty log.
-
-**Status:** active, **extended 2026-08-29**; **fresh-home paragraph revised 2026-09-30** (analytics-salt-gate — the salt is now generated only for an enabled `detailed` config, so the first-run precondition exists only in probes run that way; the rule is unchanged); **revised again 2026-10-01** (analytics-salt-empty-file — an empty or whitespace-only salt file is now replaced, so a home pre-seeded with an empty file also produces the first-run line; the rule is unchanged); **preset paragraph added 2026-10-01** (same plan, `5472546` probe). **Verify line re-run 2026-08-27** (wildfire band-rounding
-T3): the live probe spawned the built dist from a temp cwd with `ENABLED_TOOLS`
-**unset** and got **6 tools, `get_wildfire_info` absent**, against the 17 a
-repo-root spawn reports — run as an explicit control *before* the keyed and
-keyless FIRMS probes beside it, so the isolation was proven rather than assumed.
-**Re-run 2026-08-25** (`3d85370`, issue-80
-lightning band rounding T4): repo-root cwd reported **17** tools, temp cwd
-reported **6**. **Re-run again 2026-08-26** (`6c75bcc`,
-issue-78-log-level-numeric T4), this time on the `LOG_LEVEL` half the entry
-names: same 17-vs-6 tool split, and with `LOG_LEVEL` deleted from the child env
-the repo-root spawn ran at **DEBUG** (the repo `.env:19`) while the temp-cwd
-spawn ran at **INFO**. Had the probe stayed at the repo root it would have
-"confirmed" a default install logs DEBUG. The trap is intact and unchanged. **Re-run 2026-08-27** (`1501080`, issue-82 display-band-coherence T7): temp cwd with
-`ENABLED_TOOLS` unset reported **6** tools against **17** from the repo root, run as an
-explicit control before any live read. The finding that made it worth running here:
-`get_air_quality` is **absent** from that default preset while `get_weather_summary` is
-**present**, so the summary is the *only* way a default install reaches the air-quality
-rendering under test — the same [G19] asymmetry this entry's 2026-08-25 evidence found
-for lightning, now on a second tool. Related: [G10] (the same
-dotenv-cwd hazard, inverted), [G19] (the check this defeats). Lint candidate — a
-probe helper that always spawns from a clean temp cwd would close it
-mechanically.
 
 ---
 
@@ -3747,7 +3651,7 @@ required together:
    that spy records zero calls and passes vacuously ([G34]). The
    `~/.weather-mcp/` half is checked **at acceptance**, and must be run CI-shaped
    — `HOME=$(mktemp -d) DOTENV_CONFIG_PATH=/nonexistent npx vitest run <file>` —
-   because the repo `.env` masks the write ([G26]).
+   because a `DOTENV_CONFIG_PATH` exported in the shell would mask the write (before 2026-11-27 the repo `.env` did, [G26], retired).
 
 **Residue — what an import of `src/server/weatherServer.ts` needs instead.** The
 factory constructs no transport, registers no signal handler and calls no
@@ -3775,8 +3679,8 @@ constructors — which since the factory split live in `src/server/weatherServer
 reached transitively — do no I/O (`LocationStore`, still constructed by the entry,
 resolves its path and touches nothing until a read or write) and `Cache` timers
 already run throughout the suite.
-Note that `import 'dotenv/config'` (`src/index.ts:9`) means the import **does**
-load the repo's own `.env` ([G26]), so nothing such a test asserts may depend on
+Note that the entry's first import, `src/config/envFile.ts`, loads the file a shell-exported
+`DOTENV_CONFIG_PATH` names (before 2026-11-27 it loaded the repo `.env`, [G26], retired), so nothing such a test asserts may depend on
 a key or on `ENABLED_TOOLS`.
 
 **Verify:** `tests/unit/tool-name-parity.test.ts` no longer imports the entry, so
@@ -3822,8 +3726,8 @@ the trigger it named was the wrong one. It said *revisit if a second test needs 
 second symbol from this file*; what actually forced it was a second **transport**,
 which needs a `Server` the caller connects. The entry is **not** retired: the rule
 about the entry is still true of the entry, and it is the reason nothing may import
-it. Related: [G21] (why point 3 is not optional), [G26] (the `.env` the entry
-loads — still exactly one importer), [G37] (a driver that constructs services and
+it. Related: [G21] (why point 3 is not optional), [G26] (retired 2026-11-27: the entry
+loads only the `DOTENV_CONFIG_PATH` file, through `src/config/envFile.ts`), [G37] (a driver that constructs services and
 never exits), [G31] (the new directory this created). **Revised 2026-09-30**
 (analytics-salt-gate): `loadAnalyticsConfig()` now generates the salt only for an
 enabled `detailed` config, so point 2, the residue and the Verify line were rewritten
@@ -4723,7 +4627,7 @@ nothing about the *filesystem*. With the file moved aside:
 `Test Files 1 failed`. Fixed by inlining the literal.
 
 **Status:** active. Related: [G10] (baseline provenance — the other half of the
-same question), [G26] (the repo's own gitignored `.env` making a local run
+same question), [G26] (retired 2026-11-27; the repo's own gitignored `.env` once made a local run
 unrepresentative), [G41] (a check that cannot fail). Lintable: **yes** — a grep
 for string literals under `tests/` containing `.claude/` or `../..` outside
 `tests/fixtures/` would catch this mechanically.
@@ -6632,7 +6536,7 @@ replies and exit 0; the held-open pipe gave 1.
 
 **Status:** active. **Lint candidate:** `/impl-plan` could flag `< request` or a bare `|` into
 `dist/index.js` in a plan's live step. Related: [G37] (a driver that never exits — this is the
-opposite failure), [G26] (the same live step's cwd/`.env` trap), [G41] (a zero count needs a
+opposite failure), [G26] (retired 2026-11-27; the same live step's cwd/`.env` trap) and [G173] (its clean-environment half), [G41] (a zero count needs a
 positive control).
 
 ---
@@ -7898,10 +7802,134 @@ required the script in T1 and T7 before a plan review caught it.
 
 ---
 
+## G173 — A live probe's clean environment is per process and runs the `basic` preset
+
+**Trigger:** a live probe that spawns the built dist in a clean environment (temp cwd, variables deleted) and compares first-run output across two processes, or calls a tool by name.
+
+**Rule:** give every compared process its own empty `HOME`. Set `ENABLED_TOOLS=all` in the probe's own env (or call a `basic` tool) and print the tool result, so an unregistered tool shows up as an error and not as silence.
+
+**Why:** split out of [G26] when that entry retired on 2026-11-27. Both halves are about the clean environment, not about dotenv, and both still hold.
+
+**A "fresh home" is per process, not per row (2026-09-26, analytics-no-default-endpoint,
+plan-review codex R2).** The same isolation applies to `$HOME` when a probe compares
+*first-run* output across two processes — base against branch, keyed against keyless.
+`getOrGenerateAnalyticsSalt()` (`src/analytics/config.ts`) writes
+`$HOME/.weather-mcp/analytics-salt` and logs `Generated new analytics salt` only when the
+file is absent or empty. Since 2026-09-30 (analytics-salt-gate) it runs only when analytics is
+enabled at the `detailed` level, so the first-run line appears only in probes run with
+that configuration; a default or `minimal`/`standard` probe no longer consumes the
+precondition. For those that do, two spawns sharing one `HOME=$(mktemp -d)` disagree by one line:
+the first consumed the precondition the second was meant to see. Give every compared
+process its own empty home, and record each path. The plan as first written shared one;
+the review caught it before the run, and T2 then showed each side logging the line in
+its own home, byte-identical after timestamps were stripped.
+
+**The clean environment also drops the repo's tool preset (2026-10-01,
+analytics-salt-empty-file).** A temp-cwd spawn runs the `basic` preset. A probe that calls a
+tool outside it (`list_saved_locations`, for one) gets an error result **before**
+`withAnalytics` runs, so no analytics event is attempted and the base and the branch print
+the same silence. The first two passes of that plan's empty-salt probe compared exactly
+this and looked like a no-op fix. Set `ENABLED_TOOLS=all` in the probe's own env (or call a
+`basic` tool), and print the tool result, so an unregistered tool shows up as an error and
+not as an empty log.
+
+**Status:** active, split from [G26] 2026-11-27 (env-file-explicit-path T6). Since that change every dist spawn runs the clean preset unless the probe sets `ENABLED_TOOLS`, from the repo root as well as a temp cwd. Related: [G10] (key both sides), [G37] (a driver that never exits).
+
+---
+
+## G174 — dotenv reads its own options from `DOTENV_*`, and its debug channel is stdout
+
+**Trigger:** any new use of dotenv: `import 'dotenv/config'`, a `dotenv.config()` call that leaves an option out, or `dotenv run` in a `package.json` script.
+
+**Rule:** in `src/`, load only through `src/config/envFile.ts`, which passes every option with a defined value (`tests/unit/entry-env-loader.test.ts` fails on any other dotenv importer). Outside `src/`, do not wrap a stdio server in `dotenv run`. Name the file in `DOTENV_CONFIG_PATH` and let the server's own loader read it, as `scripts/dev-entry.mjs` does.
+
+**Why:** dotenv 18 merges `ENCODING`, `PATH`, `QUIET`, `DEBUG`, `OVERRIDE` and `FAST` from `DOTENV_<X>` / `DOTENV_CONFIG_<X>`, and lets only *defined* explicit options win. Its debug output is `console.log`. Measured 2026-11-27: `DOTENV_DEBUG=true` put `┆ no encoding is specified …` and `┆ failed to load <path> …` on the stdio server's stdout ahead of the first JSON-RPC frame, and `DOTENV_OVERRIDE=true` let the file beat the client's own setting. The CLI (`dotenv run`) reads the same variables itself, so an exported `DOTENV_CONFIG_PATH` naming a missing file makes it exit 1 (plan-review codex R1).
+
+**Evidence:** env-file-explicit-path, `ee2204f` (loader), `5e76939` (entries, dev wrapper), `ce317f5` (integration rows 4 and 5 go red under the old import).
+
+**Status:** active. Lint candidate: `no-restricted-imports` for `dotenv` and `dotenv/config` outside `src/config/envFile.ts` would replace the source-text test.
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
 commit that removed it — never delete, never renumber.)*
+
+## G26 — The repo's own `.env` means a probe from the repo root is not testing the default configuration
+
+**Retired:** 2026-11-27, by env-file-explicit-path (`5e76939`). Both entries now import `src/config/envFile.ts` in place of `dotenv/config`, and it reads a `.env` only from the path in `DOTENV_CONFIG_PATH`, never from cwd. A dist spawned from the repo root therefore runs the default configuration: this entry's Verify line gave **17 vs 6** on `main` @ `2872aad` and **6 vs 6** on the branch (QA `qa-env-file-explicit-path.md`). **What survives:** `npm run dev` *does* load the repo `.env`, through `scripts/dev-entry.mjs`, which names it in `DOTENV_CONFIG_PATH` when none is set. So a default-configuration probe still spawns the built dist, never the dev script. A shell that **exports** `DOTENV_CONFIG_PATH` configures every child that inherits it, so delete it from a probe's env as you would any other variable. The two paragraphs that were not about dotenv (the fresh home per process, and the clean environment's `basic` preset) moved to [G173].
+
+**Trigger:** verifying **default-configuration** behaviour of the built dist —
+the default tool preset, default units, default log level, analytics off — by
+spawning `node dist/index.js` and unsetting the relevant variable.
+
+**Rule:** unsetting the variable in the child env is **not enough**.
+`src/index.ts` imports `dotenv/config`, which reads `.env` from the **process's
+cwd**, so a server spawned from the repo root silently inherits the repo's own
+gitignored `.env`. To probe a default install, spawn the dist with **cwd set
+outside the repo** *and* delete the variables from the child env. Assert the
+default you expected before reading anything else — `tools/list` is the cheap
+check for the preset.
+
+**Why:** the repo `.env` sets `ENABLED_TOOLS`, `LOG_LEVEL` and the `ANALYTICS_*`
+trio. A G19 check of "does `get_weather_summary`'s lightning section work on a
+default install?", run from the repo root with `ENABLED_TOOLS` deleted from the
+child env, reported **17 tools exposed** — the `full` preset — so it exercised
+the very configuration the check exists to look past, and its green result meant
+nothing. Run again from a temp cwd it reported **6 tools**, with
+`get_lightning_activity` absent and `get_weather_summary` present: the actual
+claim G19 makes, actually tested. This is the same hazard as [G10]'s
+key-propagation half seen from the other side — there a base worktree has *no*
+`.env` and silently runs keyless; here the repo root *has* one and silently runs
+configured. Both come from dotenv resolving per-process cwd.
+
+**Verify:** spawn the built dist twice with `ENABLED_TOOLS` deleted from the
+child environment — once with `cwd` at the repo root, once with `cwd` at a fresh
+temp directory — and compare `tools/list` counts. 17 vs 6 is the trap.
+
+**Evidence:** 2026-08-25 (`99ba469`, lightning-safe-message-coherence T5) — the
+first summary probe reported `tools exposed: 17 | get_lightning_activity present:
+true` while claiming to test the `basic` preset, in which that tool is absent.
+
+**The cheapest fix is often to not import the importer at all, 2026-08-29**
+(`17b2699`, issue-86 T3). `dotenv/config` has exactly **one** importer in this
+tree — `src/index.ts:9` — so a verification driver that imports a *handler* and
+its services directly (`dist/handlers/riverConditionsHandler.js`) never loads
+`.env` on either side, whatever cwd it runs from. That closes this entry and
+[G10]'s key-propagation half **by construction** rather than by remembering to
+scrub or forward the child environment, and it lets per-call parameters carry the
+axis under test (`units` as an argument, not `WEATHER_UNITS` in the environment).
+The technique only applies when the entry point you need is reachable below
+`src/index.ts`; a probe of the **server's** own defaults — the tool preset, the
+`tools/list` count — still has to spawn `dist/index.js` and still needs the
+temp-cwd discipline above. Check the importer set (`grep -rn dotenv src/`) rather
+than assuming it is still one file.
+
+**Status:** active, **extended 2026-08-29**; **fresh-home paragraph revised 2026-09-30** (analytics-salt-gate — the salt is now generated only for an enabled `detailed` config, so the first-run precondition exists only in probes run that way; the rule is unchanged); **revised again 2026-10-01** (analytics-salt-empty-file — an empty or whitespace-only salt file is now replaced, so a home pre-seeded with an empty file also produces the first-run line; the rule is unchanged); **preset paragraph added 2026-10-01** (same plan, `5472546` probe). **Verify line re-run 2026-08-27** (wildfire band-rounding
+T3): the live probe spawned the built dist from a temp cwd with `ENABLED_TOOLS`
+**unset** and got **6 tools, `get_wildfire_info` absent**, against the 17 a
+repo-root spawn reports — run as an explicit control *before* the keyed and
+keyless FIRMS probes beside it, so the isolation was proven rather than assumed.
+**Re-run 2026-08-25** (`3d85370`, issue-80
+lightning band rounding T4): repo-root cwd reported **17** tools, temp cwd
+reported **6**. **Re-run again 2026-08-26** (`6c75bcc`,
+issue-78-log-level-numeric T4), this time on the `LOG_LEVEL` half the entry
+names: same 17-vs-6 tool split, and with `LOG_LEVEL` deleted from the child env
+the repo-root spawn ran at **DEBUG** (the repo `.env:19`) while the temp-cwd
+spawn ran at **INFO**. Had the probe stayed at the repo root it would have
+"confirmed" a default install logs DEBUG. The trap is intact and unchanged. **Re-run 2026-08-27** (`1501080`, issue-82 display-band-coherence T7): temp cwd with
+`ENABLED_TOOLS` unset reported **6** tools against **17** from the repo root, run as an
+explicit control before any live read. The finding that made it worth running here:
+`get_air_quality` is **absent** from that default preset while `get_weather_summary` is
+**present**, so the summary is the *only* way a default install reaches the air-quality
+rendering under test — the same [G19] asymmetry this entry's 2026-08-25 evidence found
+for lightning, now on a second tool. Related: [G10] (the same
+dotenv-cwd hazard, inverted), [G19] (the check this defeats). Lint candidate — a
+probe helper that always spawns from a clean temp cwd would close it
+mechanically.
+
+---
 
 ## G64 — `publish.yml` runs the live-network integration files, so an upstream refusing GitHub's runner fails the publish after the tag and release page already exist
 

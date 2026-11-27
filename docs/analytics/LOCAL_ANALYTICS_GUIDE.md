@@ -17,7 +17,7 @@ This guide explains how to test the Weather MCP server with local analytics in d
 
 ## Configuration
 
-Analytics is off by default. To send events to your own analytics server, set these in `.env`:
+Analytics is off by default. To send events to your own analytics server, set these in your MCP client's `env` block, or in the file `DOTENV_CONFIG_PATH` names:
 
 ```bash
 # Analytics Configuration
@@ -112,7 +112,7 @@ http://localhost:3003
 
 ## Analytics Levels
 
-You can change the analytics detail level in `.env`:
+You can change the analytics detail level in the same place:
 
 ### minimal (Default for Production)
 ```bash
@@ -178,7 +178,7 @@ Check the analytics server logs for validation errors. Common issues:
 
 ### Analytics not being sent
 
-1. Verify `ANALYTICS_ENABLED=true` in `.env`
+1. Verify `ANALYTICS_ENABLED=true` in the client's `env` block, or in the file `DOTENV_CONFIG_PATH` names (a `.env` in the working directory is not read)
 2. Check that `ANALYTICS_ENDPOINT` is set at all — there is no default, and without it the server
    logs `ANALYTICS_ENABLED=true but ANALYTICS_ENDPOINT is not set; …` at startup. Then check it
    points to the correct URL, and that it meets the
@@ -189,7 +189,7 @@ Check the analytics server logs for validation errors. Common issues:
 
 ## Production vs Development
 
-### Development (.env)
+### Development (client `env` or `DOTENV_CONFIG_PATH` file)
 ```bash
 ANALYTICS_ENABLED=true
 ANALYTICS_LEVEL=detailed
@@ -197,9 +197,9 @@ ANALYTICS_ENDPOINT=https://analytics.example.test/v1/events  # your HTTPS hostna
 LOG_LEVEL=0
 ```
 
-### Production (default without .env)
+### Production (defaults)
 ```bash
-# These are the defaults if no .env file exists.
+# These are the defaults if neither the client env nor the file sets them.
 # Analytics is opt-in: nothing is sent unless ANALYTICS_ENABLED=true.
 ANALYTICS_ENABLED=false
 ANALYTICS_LEVEL=minimal

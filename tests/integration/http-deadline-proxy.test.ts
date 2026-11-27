@@ -28,7 +28,7 @@ import { join } from 'node:path';
  *
  * Makes no external call: every target is `.invalid` or a loopback origin, and every tunnel ends
  * at that origin. The proxy variables are set only in each child's environment (G119); the cwd is
- * a fresh temp directory so the repo `.env` is never loaded (G26).
+ * a fresh temp directory, so the run depends on nothing in the repo tree.
  */
 
 const TSX_LOADER = import.meta.resolve('tsx');

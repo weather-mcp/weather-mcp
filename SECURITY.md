@@ -6,6 +6,7 @@ We release patches for security vulnerabilities for the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 1.36.x   | :white_check_mark: |
 | 1.35.x   | :white_check_mark: |
 | 1.34.x   | :white_check_mark: |
 | 1.33.x   | :white_check_mark: |
@@ -158,6 +159,7 @@ updates:
 ### Environment Security
 
 - Never commit `.env` files or API keys to version control
+- The server reads no `.env` from its working directory, only the file `DOTENV_CONFIG_PATH` names, so a project an MCP client opens cannot configure it
 - No tool requires a credential. Four optional keys add coverage (see [Optional API keys](README.md#optional-api-keys)); set them only in the environment
 - Use environment variables for configuration (see README.md)
 

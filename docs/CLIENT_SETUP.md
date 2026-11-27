@@ -50,6 +50,10 @@ npm run build
 
 Then note the absolute path to your `weather-mcp/dist/index.js` file.
 
+### Settings
+
+Every setting is optional and goes in the client's `env` block, shown in the examples below. To keep settings in a `.env` file instead, add `"DOTENV_CONFIG_PATH": "/path/to/weather-mcp.env"` to that block. The server reads only that file. It never reads a `.env` from its working directory, because a client starts it inside whatever project is open. A setting in the `env` block wins over the same one in the file.
+
 ---
 
 ## Claude Desktop
