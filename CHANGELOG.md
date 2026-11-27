@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+When the official alert service for India, the Philippines or Indonesia stopped answering, the server kept asking it again before giving up, so a request for alerts there took several times longer than it should have before it reported the problem. It also left those repeat requests running in the background after it had answered. This release gives up after the first request that times out, the way it already does for the US, Canada, Europe and the weather forecasts. Alerts that arrive normally look exactly as before.
+
 ### Fixed
 
 - **The national alert feeds for India, the Philippines and Indonesia no longer retry a request that timed out.** When one of those feeds stopped answering, the server tried the same request up to four times before giving up, so `get_alerts` and the alerts section of `get_weather_summary` answered several times later than one timeout. The abandoned retries also kept running in the background after the answer was sent. Measured live on 2026-11-27, while the Philippine feed was not answering: the answer came after about 25 seconds before this change and after about 5 seconds with it. Now a timed-out request fails after the first attempt, and nothing keeps running afterwards. A timed-out alert document is fetched once and counted as unavailable, as before. Rate limits and server errors are still retried. These feeds now match NOAA, Open-Meteo, MeteoAlarm and GeoMet. The error message text is unchanged. (`src/services/nationalCap.ts`)
