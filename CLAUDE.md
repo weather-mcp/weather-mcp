@@ -86,6 +86,7 @@ src/
 │   ├── requestSpacer.ts     # Per-upstream request-start spacing by synchronous slot reservation (pure)
 │   ├── httpDeadline.ts      # withRequestDeadline — one wall-clock deadline per axios request (proxy included), emitted as axios's own ECONNABORTED; every axios.create passes it; hands a tunnelled https request proxy: false and a per-request TunnelAgent on its own signal
 │   ├── toolBudget.ts        # Per-tool-call wall-clock budget (max(API_TIMEOUT_MS, 55 s)) carried in an AsyncLocalStorage; read by httpDeadline at the seam and by the lightning query, written by the dispatch; arms no timer (pure)
+│   ├── callerAudience.ts    # Per-tool-call caller audience (local owner or remote caller) in an AsyncLocalStorage; written by the dispatch, read by errorTextForCaller and the saved-location renders; "local" outside a scope (pure)
 │   ├── proxyTunnel.ts       # Per-request CONNECT tunnel agent hooked on the deadline's signal; tunnelProxyFor mirrors axios's proxy-from-env selection (no logging)
 │   ├── savedLocationShape.ts  # Saved-location record-shape contract — entry predicate, write-side validator, read-side describer and stored-field readers; the write-only size limits (pure)
 │   ├── serviceStatusCoverage.ts  # check_service_status's probed/not-checked upstream lists; drift-guarded against src/services/ (pure)

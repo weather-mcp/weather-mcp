@@ -2,6 +2,8 @@
  * Custom error classes for better error handling and logging
  */
 
+import { isRemoteCaller } from '../utils/callerAudience.js';
+
 /**
  * Closed set of services that can raise a sanitized ApiError
  */
@@ -358,6 +360,85 @@ export function isRetryableError(error: Error): boolean {
 }
 
 /**
+ * What a remote caller reads in place of a runtime or library error's own text.
+ * It names no class, path or value. The operator's log has the class and code.
+ */
+export const REMOTE_INTERNAL_ERROR_MESSAGE =
+  "The server could not complete this request because of an internal error. The server's log has the details.";
+
+/** Built-in error classes the runtime throws. None is ever a message this project wrote for a user. */
+const RUNTIME_ERROR_CLASSES: ReadonlyArray<new (...args: never[]) => Error> = [
+  TypeError,
+  RangeError,
+  ReferenceError,
+  SyntaxError,
+  URIError,
+  EvalError,
+  AggregateError,
+];
+
+/** A string own-or-inherited property, read so that a hostile getter cannot throw out of the caller. */
+function readStringProperty(value: object, key: string): string | undefined {
+  try {
+    const found: unknown = (value as Record<string, unknown>)[key];
+    return typeof found === 'string' ? found : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The text of a caught error that the current caller may read.
+ *
+ * A local caller (stdio, and any path that sets no audience) gets the error's
+ * own message, unchanged. A remote caller (the HTTP entry) gets:
+ *
+ * - the error's `remoteMessage`, when it carries one — the same statement with
+ *   no host detail (the saved-location store's errors do);
+ * - {@link REMOTE_INTERNAL_ERROR_MESSAGE} for anything that is not an `Error`,
+ *   for a built-in runtime class (`TypeError` and its siblings), and for any
+ *   non-`ApiError` carrying a string `code` or `syscall` — an `fs` error, a
+ *   Node `ERR_*` error, a module-load failure, a raw axios error. Those
+ *   messages are written by the runtime or a library, and they carry absolute
+ *   paths, property names and addresses;
+ * - the error's own message otherwise. A plain `Error` with a fixed,
+ *   pre-written message is this project's convention for peripheral services,
+ *   and several are contract disclosures on safety data, so they pass through.
+ *
+ * Every site that puts a caught error's text into a tool result goes through
+ * this function, never through `error.message`.
+ */
+export function errorTextForCaller(error: unknown): string {
+  if (!isRemoteCaller()) {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const remoteMessage = readStringProperty(error, 'remoteMessage');
+    if (remoteMessage) {
+      return remoteMessage;
+    }
+  }
+
+  if (!(error instanceof Error)) {
+    return REMOTE_INTERNAL_ERROR_MESSAGE;
+  }
+
+  if (RUNTIME_ERROR_CLASSES.some((runtimeClass) => error instanceof runtimeClass)) {
+    return REMOTE_INTERNAL_ERROR_MESSAGE;
+  }
+
+  if (
+    !(error instanceof ApiError) &&
+    (readStringProperty(error, 'code') !== undefined || readStringProperty(error, 'syscall') !== undefined)
+  ) {
+    return REMOTE_INTERNAL_ERROR_MESSAGE;
+  }
+
+  return error.message;
+}
+
+/**
  * Format error for user display
  */
 export function formatErrorForUser(error: Error): string {
@@ -369,8 +450,9 @@ export function formatErrorForUser(error: Error): string {
     return `Validation Error: ${error.message}`;
   }
 
-  // Sanitize generic errors to avoid leaking sensitive information
-  const sanitizedMessage = error.message
+  // Sanitize generic errors to avoid leaking sensitive information. A remote
+  // caller reads a path-free message, or a fixed sentence for a runtime error.
+  const sanitizedMessage = errorTextForCaller(error)
     .replace(/ECONNREFUSED/, 'Connection refused')
     .replace(/ETIMEDOUT/, 'Connection timed out')
     .replace(/ENOTFOUND/, 'Service not found');
