@@ -68,12 +68,25 @@ export function extractSnowDepth(observation: ObservationProperties): SnowData['
 }
 
 /**
+ * Print an accumulation window's two ends as calendar dates. With `timeZone`,
+ * the dates are the location's; without it, the server's (the pre-existing
+ * output, kept for callers that pass none).
+ */
+function formatPeriod(startTime: Date, endTime: Date, timeZone?: string): string {
+  const options: Intl.DateTimeFormatOptions | undefined = timeZone ? { timeZone } : undefined;
+  return `${startTime.toLocaleDateString(undefined, options)} - ${endTime.toLocaleDateString(undefined, options)}`;
+}
+
+/**
  * Extract snowfall forecast from gridpoint data for a specific time period
+ *
+ * @param timeZone - IANA zone the period's two dates print in (the location's). Absent: the server's zone.
  */
 export function extractSnowfallForecast(
   gridpoint: GridpointProperties,
   startTime?: Date,
-  endTime?: Date
+  endTime?: Date,
+  timeZone?: string
 ): SnowData['snowfallAmount'] | undefined {
   if (!gridpoint.snowfallAmount || gridpoint.snowfallAmount.values.length === 0) {
     return undefined;
@@ -113,19 +126,20 @@ export function extractSnowfallForecast(
   return {
     value: Math.round(inches * 10) / 10, // Round to 1 decimal
     unit: 'in',
-    period: startTime && endTime ?
-      `${startTime.toLocaleDateString()} - ${endTime.toLocaleDateString()}` :
-      undefined
+    period: startTime && endTime ? formatPeriod(startTime, endTime, timeZone) : undefined
   };
 }
 
 /**
  * Extract ice accumulation forecast from gridpoint data
+ *
+ * @param timeZone - IANA zone the period's two dates print in (the location's). Absent: the server's zone.
  */
 export function extractIceAccumulation(
   gridpoint: GridpointProperties,
   startTime?: Date,
-  endTime?: Date
+  endTime?: Date,
+  timeZone?: string
 ): SnowData['iceAccumulation'] | undefined {
   if (!gridpoint.iceAccumulation || gridpoint.iceAccumulation.values.length === 0) {
     return undefined;
@@ -163,9 +177,7 @@ export function extractIceAccumulation(
   return {
     value: Math.round(inches * 100) / 100, // Round to 2 decimals (ice is often small amounts)
     unit: 'in',
-    period: startTime && endTime ?
-      `${startTime.toLocaleDateString()} - ${endTime.toLocaleDateString()}` :
-      undefined
+    period: startTime && endTime ? formatPeriod(startTime, endTime, timeZone) : undefined
   };
 }
 

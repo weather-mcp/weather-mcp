@@ -849,8 +849,8 @@ async function formatNOAAForecast(
     const endTime = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
     // Extract snowfall and ice accumulation
-    const snowfall = extractSnowfallForecast(gridpointData.properties, now, endTime);
-    const ice = extractIceAccumulation(gridpointData.properties, now, endTime);
+    const snowfall = extractSnowfallForecast(gridpointData.properties, now, endTime, timezone);
+    const ice = extractIceAccumulation(gridpointData.properties, now, endTime, timezone);
 
     const winterData = {
       snowfallAmount: snowfall,
