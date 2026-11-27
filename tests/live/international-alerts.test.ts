@@ -25,13 +25,17 @@
  * Block 2 makes **live** network calls — a small MeteoAlarm country feed
  * (`gb`) and a live MSC GeoMet bbox query (Toronto) — with no mocking
  * applied at all, so it is unaffected by Block 1's instance-scoped spies.
- * It follows this project's tolerant-of-live-network-flake convention: the
- * `live` project's timeout governs, shape-only assertions (array-ness and element
- * field types — never a specific warning, count, or value), and the test
- * catches and logs a network error instead of failing the suite. This file
- * therefore belongs to the project's live-network integration set (see the
- * "Flaky live-network tests" memory) — re-run before blaming a diff if only
- * the Block 2 tests go red.
+ * The `live` project's timeout governs, and the assertions are shape-only
+ * (array-ness and element field types — never a specific warning, count, or
+ * value). Each test catches only around the service call (GOTCHAS G9). It
+ * skips (logs and passes) **only** when the error is one of the service's own
+ * fixed transport messages, matched exactly by
+ * `tests/helpers/liveAlertTransport.ts`. Everything else is rethrown and fails
+ * the suite: a refused feed shape (`… returned an unexpected shape`), a 4xx
+ * from a moved or refusing endpoint, an unclassified `request failed`, and any
+ * assertion error. Every `expect` runs after the catch, and an empty upstream
+ * is logged, so a green run with no per-item checks says so. A transport skip
+ * is network flake: re-run before blaming a diff. A red is a finding.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -45,9 +49,11 @@ import type { NominatimService } from '../../src/services/nominatim.js';
 import type {
   MeteoAlarmCapAlert,
   MeteoAlarmCapInfo,
-  MeteoAlarmFeedResponse
+  MeteoAlarmFeedResponse,
+  MeteoAlarmWarning
 } from '../../src/types/meteoalarm.js';
 import type { GeoMetAlertFeature, GeoMetFeatureCollection } from '../../src/types/geomet.js';
+import { isGeoMetTransportFailure, isMeteoAlarmTransportFailure } from '../helpers/liveAlertTransport.js';
 
 /** Never touched by the coordinate-only resolution path exercised in this file. */
 const UNUSED = {} as never;
@@ -301,48 +307,69 @@ describe('International alerts — live smoke test (tolerant of network flake)',
   it('fetches a real MeteoAlarm country feed (United Kingdom)', async () => {
     const meteoAlarmService = new MeteoAlarmService();
 
+    let warnings: MeteoAlarmWarning[] | undefined;
     try {
-      const warnings = await meteoAlarmService.getWarnings('gb');
-
-      expect(Array.isArray(warnings)).toBe(true);
-      for (const warning of warnings) {
-        expect(typeof warning.identifier).toBe('string');
-        expect(warning.identifier.length).toBeGreaterThan(0);
-        expect(Array.isArray(warning.areaDesc)).toBe(true);
-      }
-
-      console.log('\n=== Live MeteoAlarm smoke test: gb feed ===');
-      console.log(`${warnings.length} warning(s) returned`);
+      warnings = await meteoAlarmService.getWarnings('gb');
     } catch (error) {
-      // Tolerant of live-network flake: log and pass rather than fail the
-      // suite (see file header — this joins the project's live-network
-      // integration set).
-      console.warn(
-        '\n=== Live MeteoAlarm smoke test skipped (network error) ===\n',
-        error instanceof Error ? error.message : String(error)
-      );
+      // Skip only on MeteoAlarm's own fixed transport messages (G9); rethrow
+      // everything else, a refused feed shape included.
+      if (isMeteoAlarmTransportFailure(error)) {
+        console.warn(
+          '\n=== Live MeteoAlarm smoke test skipped (transport failure) ===\n',
+          error instanceof Error ? error.message : String(error)
+        );
+        return;
+      }
+      throw error;
+    }
+    if (warnings === undefined) {
+      throw new Error('MeteoAlarm getWarnings resolved to undefined');
+    }
+
+    expect(Array.isArray(warnings)).toBe(true);
+    console.log('\n=== Live MeteoAlarm smoke test: gb feed ===');
+    console.log(`${warnings.length} warning(s) returned`);
+    if (warnings.length === 0) {
+      console.log('Empty upstream: no active warnings, so the per-warning field checks did not run.');
+    }
+    for (const warning of warnings) {
+      expect(typeof warning.identifier).toBe('string');
+      expect(warning.identifier.length).toBeGreaterThan(0);
+      expect(Array.isArray(warning.areaDesc)).toBe(true);
     }
   });
 
   it('fetches real MSC GeoMet alerts for a bbox with known coverage (Toronto)', async () => {
     const geoMetService = new GeoMetService();
 
+    let alerts: GeoMetAlertFeature[] | undefined;
     try {
-      const alerts = await geoMetService.getAlerts(43.6532, -79.3832);
-
-      expect(Array.isArray(alerts)).toBe(true);
-      for (const alert of alerts) {
-        expect(alert.type).toBe('Feature');
-        expect(typeof alert.properties).toBe('object');
-      }
-
-      console.log('\n=== Live GeoMet smoke test: Toronto bbox ===');
-      console.log(`${alerts.length} alert(s) returned`);
+      alerts = await geoMetService.getAlerts(43.6532, -79.3832);
     } catch (error) {
-      console.warn(
-        '\n=== Live GeoMet smoke test skipped (network error) ===\n',
-        error instanceof Error ? error.message : String(error)
-      );
+      // Skip only on GeoMet's own fixed transport messages (G9); rethrow
+      // everything else, a refused collection shape and a 4xx included.
+      if (isGeoMetTransportFailure(error)) {
+        console.warn(
+          '\n=== Live GeoMet smoke test skipped (transport failure) ===\n',
+          error instanceof Error ? error.message : String(error)
+        );
+        return;
+      }
+      throw error;
+    }
+    if (alerts === undefined) {
+      throw new Error('GeoMet getAlerts resolved to undefined');
+    }
+
+    expect(Array.isArray(alerts)).toBe(true);
+    console.log('\n=== Live GeoMet smoke test: Toronto bbox ===');
+    console.log(`${alerts.length} alert(s) returned`);
+    if (alerts.length === 0) {
+      console.log('Empty upstream: no active alerts, so the per-alert field checks did not run.');
+    }
+    for (const alert of alerts) {
+      expect(alert.type).toBe('Feature');
+      expect(typeof alert.properties).toBe('object');
     }
   });
 });

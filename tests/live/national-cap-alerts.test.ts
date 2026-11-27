@@ -24,11 +24,9 @@
  * paying for it stays well inside the test timeout (see
  * `BMKG_SMOKE_MAX_ENTRIES` below).
  *
- * **Tolerant-but-not-silent.** Unlike `tests/live/international-alerts.test.ts`
- * (whose live smoke wraps its `expect` calls *inside* the tolerant
- * `try/catch`, so a shape regression would be swallowed and logged as a
- * network flake), every `expect` in this file sits *after* its catch block,
- * gated on the result being defined. `isTransportFailure` decides, for each
+ * **Tolerant-but-not-silent** (GOTCHAS G9). Every `expect` in this file sits
+ * *after* its catch block, gated on the result being defined, so a shape
+ * regression can never be swallowed and logged as a network flake. `isTransportFailure` decides, for each
  * caught error, whether it is one of the service's own fixed transport
  * strings (connection refused, timeout, rate limit, 5xx) — those are logged
  * and skipped — or anything else (an XML validation error, a root/envelope
