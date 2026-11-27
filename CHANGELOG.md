@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **A `.env` in the working directory is no longer read. This is a breaking change.** Both servers loaded `./.env` from wherever the MCP client started them, and a client such as Claude Code starts them inside the open project. So any project you opened could configure the server through its own `.env`: route its traffic through a proxy, turn off TLS certificate checks, send usage events to another analytics endpoint, change the lightning broker, or supply API keys. A `.env` is now read only from the path in `DOTENV_CONFIG_PATH`. **If you relied on `./.env`, add `"DOTENV_CONFIG_PATH": "/path/to/.env"` to your client's `env` block**, or move the settings into that block. Settings in the `env` block still win over the file. Two smaller fixes come with it: `DOTENV_DEBUG` can no longer write dotenv's debug text onto the stdio channel, and a configured file that cannot be read now gives one line on stderr with its error code instead of silence. Thanks to MagicCactus42 for the report and the fix (#131). (`src/config/envFile.ts`)
+
 ## [1.35.32] - 2026-11-27
 
 The remote server (`weather-mcp-http`) told its callers more about the machine it runs on than they need: the full path of the saved-locations file, and the raw text of internal errors. One stray error could also stop it for every caller at once. And a wrong `NCEI_API_TOKEN` went unnoticed, because NCEI's refusal was never recognised. This release fixes all three. The local stdio server's output is unchanged, apart from the new token note.

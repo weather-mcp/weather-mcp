@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/@dangahagan%2Fweather-mcp.svg)](https://www.npmjs.com/package/@dangahagan/weather-mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dgahagan/weather-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-6%2C029%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
+[![Tests](https://img.shields.io/badge/tests-6%2C055%20passing-brightgreen)](./docs/testing/TEST_SUITE_README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 **Give your AI assistant real weather data — 17 tools, zero API keys, zero signup, zero cost.**
@@ -58,7 +58,7 @@ Choose this one if you want:
 
 - **Genuinely free** — every data source is a free public API. No trial that expires, no credit card, no rate-limited "free tier" bait.
 - **No API keys** — install to first forecast in under a minute. Nothing to configure, nothing to leak into a repo. ([Four optional keys](#optional-api-keys) add extras if you want them; the default configuration needs none.)
-- **Fully open source** — MIT licensed, readable TypeScript, 6,029 tests. Audit it, fork it, fix it.
+- **Fully open source** — MIT licensed, readable TypeScript, 6,055 tests. Audit it, fork it, fix it.
 - **Privacy-respecting** — your queries go directly from your machine to public weather APIs. No middleman server, and no telemetry unless you opt in.
 - **Breadth** — 17 tools covering weather, safety hazards (lightning, floods, wildfires), marine conditions, air quality, and historical data back to 1940. Most weather MCPs stop at forecasts.
 
@@ -201,7 +201,7 @@ Restart your MCP client after upgrading. See [CHANGELOG.md](./CHANGELOG.md) for 
 
 **Most users need zero configuration.** Everything below is optional.
 
-Settings can go in a `.env` file (see [`.env.example`](./.env.example)) or directly in your MCP client config:
+Settings go in your MCP client config's `env` block:
 
 ```json
 {
@@ -218,6 +218,8 @@ Settings can go in a `.env` file (see [`.env.example`](./.env.example)) or direc
   }
 }
 ```
+
+You can also keep settings in a `.env` file (see [`.env.example`](./.env.example)). Name its absolute path in the client config, for example `"DOTENV_CONFIG_PATH": "/path/to/weather-mcp.env"`. That is the only `.env` the server reads. It never reads a `.env` from its working directory: an MCP client starts the server inside whatever project is open, and that project's `.env` could otherwise reconfigure the server. Settings in the `env` block win over the file.
 
 ### Tool Selection
 
@@ -398,7 +400,7 @@ npm run build          # Compile TypeScript
 npm run dev            # Run in development mode
 npm test               # Offline tests: unit + integration (what CI runs)
 npm run test:live      # Live-network tests against the real upstreams, by hand
-npm test && npm run test:live   # Run all 6,029 tests
+npm test && npm run test:live   # Run all 6,055 tests
 npm run test:coverage  # Coverage report
 npm run audit          # Dependency vulnerability scan
 ```

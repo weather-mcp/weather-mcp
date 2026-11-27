@@ -19,8 +19,8 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 
 ```
 src/
-├── index.ts                 # Stdio entry point: dotenv, LocationStore, lightning pre-warm wiring, main(), shutdown triggers (stdin EOF, transport close, signals), process guards
-├── http.ts                  # Streamable HTTP entry (weather-mcp-http): dotenv, WebCrypto floor, config + issuer discovery (refuse to start), JWKS, LocationStore, listen, pre-warm, SIGTERM/SIGINT-only shutdown, process guards; marks its callers remote
+├── index.ts                 # Stdio entry point: explicit `.env` loader (first import), LocationStore, lightning pre-warm wiring, main(), shutdown triggers (stdin EOF, transport close, signals), process guards
+├── http.ts                  # Streamable HTTP entry (weather-mcp-http): explicit `.env` loader (first import), WebCrypto floor, config + issuer discovery (refuse to start), JWKS, LocationStore, listen, pre-warm, SIGTERM/SIGINT-only shutdown, process guards; marks its callers remote
 ├── server/weatherServer.ts  # createWeatherServer() factory: services, schema fragments, TOOL_DEFINITIONS, dispatch
 ├── server/lightningPrewarm.ts  # Saved-location lightning pre-warm: gate, guarded store read, refresh timer (never evicts)
 ├── server/shutdown.ts        # Shutdown coordinator: run-once, ordered steps, one ref'd deadline that bounds teardown, stderr only
@@ -483,9 +483,18 @@ LOG_LEVEL=1                    # 0/DEBUG, 1/INFO, 2/WARN, 3/ERROR — number or 
 # LOG_PII=false                # true logs full-precision coordinates, geocoding
                                # queries, saved-location aliases and failed-call error
                                # text. Never the saved name or broker credentials.
+
+# .env file
+# DOTENV_CONFIG_PATH=/path/to/.env   # The only .env the server reads; never ./.env (src/config/envFile.ts)
 ```
 
-Cache and API variables are validated in `src/config/cache.ts`; `LOG_LEVEL` is parsed
+**The server's configuration comes from its process environment and an explicitly named file,
+never from the directory it was started in.** An MCP client starts the server inside the open
+project, so a `./.env` would let that project configure it. `src/config/envFile.ts` is the first
+import of both entries. It passes every dotenv option explicitly, so no other `DOTENV_*` variable
+changes its behaviour, and a variable the client set always wins over the file.
+
+`DOTENV_CONFIG_PATH` is read in `src/config/envFile.ts`; cache and API variables are validated in `src/config/cache.ts`; `LOG_LEVEL` is parsed
 in `src/utils/logger.ts`, which is also the one read site for `LOG_PII`
 (`isPiiLoggingEnabled`); unit variables are parsed and validated in
 `src/config/units.ts`; optional keys in `src/config/api.ts`.
@@ -706,7 +715,8 @@ tools use to skip the reverse-geocode lookup.
 ### Debugging
 
 ```bash
-# Run in development mode
+# Run in development mode (loads the repo .env through scripts/dev-entry.mjs,
+# which names it in DOTENV_CONFIG_PATH unless one is already set; a spawned dist/ does not)
 npm run dev
 
 # Enable debug logging
@@ -739,8 +749,8 @@ The publish path enforces a stricter, narrower gate: `npm audit --omit=dev --aud
 `npm run lint` runs ESLint over `src/`, `tests/` and `scripts/` with the flat config in
 `eslint.config.js`, which lists its own ignores (flat config reads no `.gitignore`). Four
 rule families: `typescript-eslint`'s `recommended` preset, `no-console` in `src/` (off only in
-the logger, `src/index.ts`'s fatal record and the three config parsers that run before the
-logger exists — never a blanket `allow`), `import-x/no-cycle`, and the two type-aware promise
+the logger, `src/index.ts`'s fatal record, the three config parsers and the `.env` loader that
+run before the logger exists — never a blanket `allow`), `import-x/no-cycle`, and the two type-aware promise
 rules `@typescript-eslint/no-floating-promises` and `@typescript-eslint/no-misused-promises`
 over `src/` and `tests/`. The typed rules read types through `tsconfig.eslint.json`, a
 lint-only program the build never reads: a linted file it omits is a parse error, so a new
@@ -766,14 +776,14 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 - [ ] Security event logging where appropriate
 - [ ] Tests for new functionality (unit + integration); existing lock tests pass unedited
 - [ ] Documentation updated (inline comments + README + docs/TOOLS.md + CHANGELOG)
-- [ ] No console outside the logger and config parsers — enforced by `npm run lint`
+- [ ] No console outside the logger, the config parsers and the `.env` loader — enforced by `npm run lint`
 - [ ] No hardcoded values (use config/)
 - [ ] Rendered output read against live points, not just tests
 
 ## Project Status
 
 - **Version:** 1.35.32 — Production Ready ✅
-- **Test Coverage:** 6,029 tests, 100% pass rate
+- **Test Coverage:** 6,055 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):

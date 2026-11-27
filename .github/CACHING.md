@@ -110,7 +110,7 @@ To disable caching entirely:
 export CACHE_ENABLED=false
 ```
 
-Or in your `.env` file:
+Or in the `.env` file that `DOTENV_CONFIG_PATH` names (a `.env` in the working directory is not read):
 
 ```
 CACHE_ENABLED=false
