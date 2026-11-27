@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.3] - 2026-11-27
+
 When the official alert service for India, the Philippines or Indonesia stopped answering, the server kept asking it again before giving up, so a request for alerts there took several times longer than it should have before it reported the problem. It also left those repeat requests running in the background after it had answered. This release gives up after the first request that times out, the way it already does for the US, Canada, Europe and the weather forecasts. Alerts that arrive normally look exactly as before.
 
 ### Fixed
@@ -2569,7 +2571,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.2...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...HEAD
+[1.36.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.2...v1.36.3
 [1.36.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.1...v1.36.2
 [1.36.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.0...v1.36.1
 [1.36.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.32...v1.36.0
