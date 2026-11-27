@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Two places on the US (NOAA) path printed times by the server's own clock instead of the location's: the observation times in recent US weather history, and the dates of the snowfall and ice forecast period. On a server set to a different time zone than the place you asked about, such as a container, a remote host, or any question about somewhere else, those times were hours off and the snowfall period could start on the wrong day. This release prints them in the location's time zone, like every other time the server shows.
+
 ### Fixed
 
-- **NOAA historical observation times and the forecast snowfall and ice period now use the location's time zone, not the server's.** On a server whose clock is set to another zone (a container, a remote host, or any query about somewhere else), `get_historical_weather` printed recent US observation times in the server's zone, and the winter-weather section of `get_forecast` and `get_weather_summary` could show the wrong date for the start of the snowfall period. The historical NOAA output now also names the zone, in a new `**Timezone:**` line under the data source. On a server whose clock is already in the location's zone, the times and dates are unchanged. (`src/handlers/historicalWeatherHandler.ts`, `src/utils/snow.ts`)
+- **Recent US weather history and the snowfall and ice forecast period now use the location's time zone, not the server's.** `get_historical_weather` printed each NOAA observation time, and the note that a station stopped reporting, in the server's zone. The winter-weather section of `get_forecast` and `get_weather_summary` could show the period starting a day early or late. On a server whose clock is already in the location's zone, the times and dates are unchanged.
+
+### Changed
+
+- **Recent US weather history now names its time zone.** The NOAA output of `get_historical_weather` has a new `**Timezone:**` line under the data source, so the times above it can be read correctly. The format of each time is unchanged.
 
 ## [1.36.3] - 2026-11-27
 
