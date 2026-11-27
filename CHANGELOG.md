@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The checks that confirm the European (MeteoAlarm) and Canadian (MSC GeoMet) alert feeds still answer in the shape the server expects could not fail. They treated every error as a network blip, including a feed that changed its format or moved its address. Those are the failures that would make `get_alerts` refuse to answer for Europe or Canada, so the check meant to warn about them before a release was blind to them. This release makes those checks fail when they should. Nothing the server returns changes.
+
+### Testing
+
+- **The live MeteoAlarm and GeoMet feed checks now fail on a real problem.** They pass over a timeout, a refused connection, a rate limit or a server error, which are passing network conditions. They fail on anything else: a feed body in an unexpected shape, a "not found" or "forbidden" answer, an unrecognised error, or a failed check. When a feed has no active warnings, the check says so instead of passing silently.
+- **The list of network conditions each check tolerates is itself tested offline.** It is pinned against the exact messages each feed client produces, so a reworded message fails the regular test suite at once instead of surfacing at the next outage.
+
 ## [1.36.0] - 2026-11-27
 
 The server read a `.env` file from whatever directory your MCP client started it in, and some clients start it inside the project you have open. A project could therefore change how the server connects, where it sends data, and which keys it uses, without you noticing. This release stops that. **It is a breaking change for anyone who kept settings in a `.env` next to where the server runs:** name the file with `DOTENV_CONFIG_PATH`, or move the settings into your client's `env` block. Weather output is unchanged.
