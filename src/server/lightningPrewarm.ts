@@ -24,6 +24,7 @@ import {
   PREWARM_REFRESH_INTERVAL_MS,
   type PrewarmOutcome
 } from '../services/blitzortung.js';
+import { parseEnvBoolean } from '../utils/envBoolean.js';
 import { logger } from '../utils/logger.js';
 import { readStoredCoordinates } from '../utils/savedLocationShape.js';
 
@@ -35,7 +36,8 @@ export interface PrewarmScheduler {
 export interface LightningPrewarmDeps {
   /** `toolConfig.isEnabled('get_lightning_activity')`. */
   toolEnabled: boolean;
-  /** The raw `WEATHER_LIGHTNING_PREWARM` value; `'false'` opts out. */
+  /** The raw `WEATHER_LIGHTNING_PREWARM` value, read with `parseEnvBoolean`: `false` or `0`
+   *  (any case, trimmed) opts out; an unrecognized value warns and pre-warms. */
   optOutValue: string | undefined;
   /** Synchronous store read. May throw when the file is unreadable. The values are the
    *  raw contents of a hand-editable file, so they are `unknown`: an entry without usable
@@ -61,8 +63,15 @@ const defaultScheduler: PrewarmScheduler = {
 };
 
 export function startLightningPrewarm(deps: LightningPrewarmDeps): LightningPrewarmHandle {
-  if (deps.optOutValue === 'false' || !deps.toolEnabled) {
+  if (!deps.toolEnabled) {
     return { stop: () => {} };
+  }
+  const optOut = parseEnvBoolean(deps.optOutValue);
+  if (optOut === false) {
+    return { stop: () => {} };
+  }
+  if (optOut === 'invalid') {
+    logger.warn('Unrecognized WEATHER_LIGHTNING_PREWARM value; pre-warming (expected true, false, 1 or 0)');
   }
 
   const scheduler = deps.scheduler ?? defaultScheduler;
