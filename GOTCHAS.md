@@ -443,7 +443,7 @@ both systems: `get_wildfire_info` (`100 km (62.1 miles)`, NIFC and FIRMS) and th
 Before counting the metric half of the matrix as coverage, diff imperial against metric on one side:
 an identical pair means the axis was not exercised, and a unit change on that path needs a probe that
 reaches a unit-dependent line (the Open-Meteo and EA river paths read `resolveUnitPreferences`).
-**Status:** active, **extended 2026-08-27, 2026-09-02, 2026-09-03 and 2026-09-29**, **re-run 2026-09-01**
+**Status:** active, **extended 2026-08-27, 2026-09-02, 2026-09-03, 2026-09-29 and 2026-11-27** (RF-37: a back-to-back normals sweep hit Open-Meteo's archive rate limit on the second spawn, so the branch rendered the retrieval-failure note and the hash differed; re-running in both orders matched. Read the stderr for `Rate limit exceeded` before calling a normals diff real), **re-run 2026-09-01**
 (openmeteo-nullable-scalar-types T1–T3: the plan told the sweep in advance that
 a probe landing on a wire null would differ from base by exactly the omitted
 line and to record that as the fix, not drift — Sydney Heads (two `Peak Period`
@@ -7824,6 +7824,77 @@ wrote unconditionally. Fixed in `70b50db`, pinned by `tests/unit/cache-disabled-
 
 **Status:** active. Lint candidate: the Verify loop is mechanical. A structural alternative is to move
 the switch into `Cache` itself.
+
+---
+
+## G170 — A host-path survey keyed on field names misses accessors and successful responses
+
+**Trigger:** claiming that some caller's output contains no host path (a remote caller, a log line,
+a published example), or hardening error text against one.
+
+**Rule:** enumerate every render a caller receives, **successful ones included**, and search for the
+path accessors (`getStorePath`, `homedir`, `cwd`, path getters) as well as the backing fields and the
+interpolated error messages. Search case-insensitively. An error formatter cannot remove a path
+printed in a successful answer.
+
+**Why:** the RF-37 design found the four path-bearing throws in `locationStore.ts` by grepping
+`storePath` case-sensitively. It missed `getStorePath()` in `savedLocationsHandler.ts`, which printed
+`*Storage location: <path>*` at the end of every `save_location` and `list_saved_locations` answer,
+plus a malformed-entry remedy and a thrown error. A test on a corrupt store passed while every healthy
+list leaked the path, and the docs task would have published "remote callers never receive a host
+path".
+
+**Verify:** `grep -rniE 'storepath|storedir|homedir|process\.cwd|__dirname' src/handlers src/utils src/server`
+lists every candidate; each must be gated on `isRemoteCaller()` or never reach a tool result.
+
+**Evidence:** 2026-11-27, plan-review codex R1 on RF-37; fixed in `9d01346`, pinned by
+`tests/unit/saved-locations-remote-output.test.ts` and `tests/integration/http-app.test.ts` row 16.
+
+**Status:** active. Related: [G123] (the same enumeration for log lines).
+
+---
+
+## G171 — An `AsyncLocalStorage` scope opened inside a `try` does not cover its `catch`
+
+**Trigger:** carrying per-call context (a budget, an audience, a request id) in an
+`AsyncLocalStorage` and reading it while formatting the call's error.
+
+**Rule:** a `catch` runs after `storage.run(...)` has returned, so the store is gone. Open the scope
+again around the error handling, from the same value, as the dispatch in
+`src/server/weatherServer.ts` does for `formatErrorForUser`. Test the thrown path, not only the
+successful one.
+
+**Why:** `runWithCallerAudience` wrapped the dispatch's `try` body, and `formatErrorForUser` ran in
+the `catch` at the dispatch level. Without the second scope every thrown error reached a remote
+caller with the local text, store path included, while every successful response was correct.
+
+**Verify:** remove the catch-side `runWithCallerAudience` in `weatherServer.ts`; the two
+unreadable-store rows of `tests/unit/remote-caller-dispatch.test.ts` go red.
+
+**Evidence:** 2026-11-27, RF-37 T3 (`16c184a`). Found by reading the dispatch before writing it.
+
+**Status:** active. Related: [G43] (per-request state across an `await`).
+
+---
+
+## G172 — A new test turns `check-doc-versions.sh` red until the count is rewritten
+
+**Trigger:** a task adds tests and lists `./scripts/check-doc-versions.sh` among its acceptance
+checks, while the test-count rewrite is left to a later docs task.
+
+**Rule:** do not gate a test-adding task on the whole script. Its test-count check compares the live
+count exactly against eight sites in five files (`scripts/lib/derived-facts.mjs`, `DOC_SITES`), so
+it is red from the first new `it` until
+`TEST_COUNT=$(scripts/lib/collect-test-count.sh) && node scripts/lib/derived-facts.mjs write-sites "$TEST_COUNT"`
+runs. Gate earlier tasks on the section they touch (the architecture map) and run the whole script,
+with `FORCE_COLOR` unset (G38), once the count is written.
+
+**Why:** it recurred: `plan-cache-config-eviction` worked around it by hand, and the RF-37 plan
+required the script in T1 and T7 before a plan review caught it.
+
+**Evidence:** 2026-11-27, plan-review codex R2 on RF-37; T8 `7708c47` wrote 6,029 at all eight sites.
+
+**Status:** active. Related: [G12], [G22], [G38].
 
 ---
 
