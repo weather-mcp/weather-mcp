@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-11-27
+
+The server read a `.env` file from whatever directory your MCP client started it in, and some clients start it inside the project you have open. A project could therefore change how the server connects, where it sends data, and which keys it uses, without you noticing. This release stops that. **It is a breaking change for anyone who kept settings in a `.env` next to where the server runs:** name the file with `DOTENV_CONFIG_PATH`, or move the settings into your client's `env` block. Weather output is unchanged.
+
+### Changed
+
+- **A `.env` file is read only when you name it.** Set `"DOTENV_CONFIG_PATH": "/path/to/.env"` in your MCP client's `env` block to keep using one. Without it, the server reads no `.env` at all, wherever it is started. Settings in the `env` block itself work exactly as before and still win over the file.
+
 ### Security
 
 - **A `.env` in the working directory is no longer read. This is a breaking change.** Both servers loaded `./.env` from wherever the MCP client started them, and a client such as Claude Code starts them inside the open project. So any project you opened could configure the server through its own `.env`: route its traffic through a proxy, turn off TLS certificate checks, send usage events to another analytics endpoint, change the lightning broker, or supply API keys. A `.env` is now read only from the path in `DOTENV_CONFIG_PATH`. **If you relied on `./.env`, add `"DOTENV_CONFIG_PATH": "/path/to/.env"` to your client's `env` block**, or move the settings into that block. Settings in the `env` block still win over the file. Two smaller fixes come with it: `DOTENV_DEBUG` can no longer write dotenv's debug text onto the stdio channel, and a configured file that cannot be read now gives one line on stderr with its error code instead of silence. Thanks to MagicCactus42 for the report and the fix (#131). (`src/config/envFile.ts`)
@@ -2538,7 +2546,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.32...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.0...HEAD
+[1.36.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.32...v1.36.0
 [1.35.32]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.31...v1.35.32
 [1.35.31]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.30...v1.35.31
 [1.35.30]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.29...v1.35.30
