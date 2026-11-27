@@ -7921,6 +7921,40 @@ Pago read `November 27, 2026 at 6:00 PM GMT+13` for an instant that is November 
 
 ---
 
+## G177 — A `maxRedirects: 0` client times out at 5 s on a silent direct connection, and the message names `API_TIMEOUT_MS`
+
+**Trigger:** measuring or reasoning about how long a request to an unresponsive upstream takes,
+in a service whose `axios.create` sets `maxRedirects: 0` (`jma`, `environmentAgency`, `basemap`,
+`nationalCap`, `rainviewer`, `ncei`, `metno`); or modelling an outage with a loopback
+black-hole proxy (`HTTPS_PROXY` at a socket that never answers).
+
+**Rule:** time a timeout against a real direct black hole as well as through a proxy, and read
+the elapsed time rather than the message. A proxy probe models the `withRequestDeadline` path only.
+Do not write "fails at the configured timeout" into a CHANGELOG or a QA verdict for these
+services until a direct probe shows it.
+
+**Why:** with `maxRedirects: 0`, axios uses Node's native `https` and `https.globalAgent`. On
+Node 22 that agent has `keepAlive: true, timeout: 5000`, so a socket silent for 5 s is cut at 5 s,
+and axios rejects with its own `ECONNABORTED` / `timeout of 30000ms exceeded`. Through
+`HTTPS_PROXY`, `withRequestDeadline` hands the request a per-request tunnel agent instead, so the
+same request waits the full `API_TIMEOUT_MS`. The two probes disagree by a factor of six, and the
+message text agrees with the wrong one.
+
+**Verify:** `node -e "console.log(require('https').globalAgent.options.timeout)"` prints `5000`.
+Then an axios instance with `{ timeout: 30000, maxRedirects: 0 }` against a black-holed host
+rejects at about 5 s, and without `maxRedirects: 0` at about 30 s.
+
+**Evidence:** 2026-11-27, `national-cap-timeout-no-retry` T3 (`qa-national-cap-timeout-no-retry.md`
+section 2). The proxy black hole gave 40.0 s → 30.0 s for `getWarnings('ph')`; PAGASA was
+black-holed live, and the same call took 24.7 s → 5.0 s. The first CHANGELOG bullet (`72c3c88`)
+quoted the proxy figures and was corrected in `303c867`.
+
+**Status:** active. The underlying 5 s cap is a ROADMAP Hardening row ("`maxRedirects: 0` clients
+time out at 5 s"); retire this entry when that row ships a per-instance agent. Lint candidate: none.
+Related: [G114], [G175].
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the

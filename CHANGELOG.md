@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.3] - 2026-11-27
+
+When the official alert service for India, the Philippines or Indonesia stopped answering, the server kept asking it again before giving up, so a request for alerts there took several times longer than it should have before it reported the problem. It also left those repeat requests running in the background after it had answered. This release gives up after the first request that times out, the way it already does for the US, Canada, Europe and the weather forecasts. Alerts that arrive normally look exactly as before.
+
+### Fixed
+
+- **The national alert feeds for India, the Philippines and Indonesia no longer retry a request that timed out.** When one of those feeds stopped answering, the server tried the same request up to four times before giving up, so `get_alerts` and the alerts section of `get_weather_summary` answered several times later than one timeout. The abandoned retries also kept running in the background after the answer was sent. Measured live on 2026-11-27, while the Philippine feed was not answering: the answer came after about 25 seconds before this change and after about 5 seconds with it. Now a timed-out request fails after the first attempt, and nothing keeps running afterwards. A timed-out alert document is fetched once and counted as unavailable, as before. Rate limits and server errors are still retried. These feeds now match NOAA, Open-Meteo, MeteoAlarm and GeoMet. The error message text is unchanged. (`src/services/nationalCap.ts`)
+
 ## [1.36.2] - 2026-11-27
 
 In American Samoa the server showed local times a full day ahead, so an alert that ran out on Tuesday evening read as running until Wednesday evening. Tokelau was a day behind, and two Alaskan villages on the Bering Strait were 21 hours ahead. This release puts those places on their real local time. Nothing changes anywhere else.
@@ -2563,7 +2571,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.2...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...HEAD
+[1.36.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.2...v1.36.3
 [1.36.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.1...v1.36.2
 [1.36.1]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.0...v1.36.1
 [1.36.0]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.32...v1.36.0
