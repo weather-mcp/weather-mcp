@@ -37,7 +37,7 @@ import {
   formatStageLevel,
   bandRiverLevel
 } from '../utils/eaGauges.js';
-import { RateLimitError } from '../errors/ApiError.js';
+import { RateLimitError, errorTextForCaller } from '../errors/ApiError.js';
 import type { NWPSGauge, GaugeStatus, NWPSStageFlowResponse, StageFlowDataPoint, FloodCategories } from '../types/noaa.js';
 import type { OpenMeteoFloodResponse } from '../types/openmeteo.js';
 import type { DetailLevel } from '../utils/validation.js';
@@ -499,7 +499,7 @@ async function formatNOAARiverConditions(
     output += `- Temporary service unavailability\n`;
     output += `- Network connectivity issues\n`;
     output += `- Location outside NOAA coverage area (US only)\n\n`;
-    output += `Error details: ${error instanceof Error ? error.message : String(error)}\n`;
+    output += `Error details: ${errorTextForCaller(error)}\n`;
   }
 
   output += `\n---\n`;

@@ -11,6 +11,7 @@ import { CacheConfig } from '../config/cache.js';
 import { getDefaultLocation } from '../config/defaultLocation.js';
 import { NominatimService } from '../services/nominatim.js';
 import { logger, describeErrorForLogging } from './logger.js';
+import { errorTextForCaller } from '../errors/ApiError.js';
 
 export interface LocationInput {
   latitude?: number;
@@ -509,7 +510,7 @@ async function resolveDefaultLocation(
     throw new Error(
       `Could not resolve WEATHER_DEFAULT_LOCATION="${raw}" — it is not a saved ` +
       `location alias, a "lat,lon" pair, or a geocodable place name.\n\n` +
-      `${error instanceof Error ? error.message : String(error)}`
+      `${errorTextForCaller(error)}`
     );
   }
 }

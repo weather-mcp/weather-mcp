@@ -22,6 +22,7 @@ import { resolveLocationAsync, formatLocationLine } from '../utils/locationResol
 import { validateDetail, validateForecastDays, DetailLevel } from '../utils/validation.js';
 import { UnitArgs } from '../utils/unitPreferences.js';
 import { logger, describeErrorForLogging } from '../utils/logger.js';
+import { errorTextForCaller } from '../errors/ApiError.js';
 import { handleGetCurrentConditions } from './currentConditionsHandler.js';
 import { handleGetForecast } from './forecastHandler.js';
 import { handleGetAlerts } from './alertsHandler.js';
@@ -294,7 +295,7 @@ export async function handleGetWeatherSummary(
       body += textOf(sectionResult).trim();
       body += `\n\n---\n\n`;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorTextForCaller(error);
       logger.warn('Weather summary section failed', { section, ...describeErrorForLogging(error) });
       body += `## ${section} (unavailable)\n\n`;
       body += `⚠️ Could not retrieve ${section} data for this location: ${message}\n\n`;

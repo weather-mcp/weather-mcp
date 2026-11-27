@@ -22,7 +22,7 @@ import {
 import { ApiConstants, FormatConstants, DisplayThresholds } from '../config/displayThresholds.js';
 import { isInUS } from '../utils/geography.js';
 import { formatWallClockDate, formatWallClockDateTime } from '../utils/timezone.js';
-import { ApiError, DataNotFoundError, InvalidLocationError } from '../errors/ApiError.js';
+import { ApiError, DataNotFoundError, InvalidLocationError, errorTextForCaller } from '../errors/ApiError.js';
 import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 
 /** Note shown when an auto-routed NOAA request falls back to Open-Meteo. */
@@ -267,7 +267,7 @@ export async function handleGetHistoricalWeather(
       // Typed API errors pass through so the dispatch renders the service's own
       // message; anything else is wrapped with the historical prefix.
       if (error instanceof ApiError) throw error;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? errorTextForCaller(error) : 'Unknown error';
       throw new Error(`Unable to retrieve historical data: ${errorMessage}`);
     }
   };
