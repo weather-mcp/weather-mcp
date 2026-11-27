@@ -255,7 +255,9 @@ export class EnvironmentAgencyService {
    * `finally`, so a rejection is retried rather than remembered.
    */
   private async pull<T>(cacheKey: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
-    const cached = this.cache.get(cacheKey);
+    // CACHE_ENABLED=false bypasses the cache on read and write; the in-flight
+    // map still collapses concurrent same-key callers onto one request.
+    const cached = CacheConfig.enabled ? this.cache.get(cacheKey) : undefined;
     if (cached !== undefined) {
       return cached as T;
     }
@@ -267,7 +269,9 @@ export class EnvironmentAgencyService {
 
     const pull = (async () => {
       const value = await fetcher();
-      this.cache.set(cacheKey, value, ttlMs);
+      if (CacheConfig.enabled) {
+        this.cache.set(cacheKey, value, ttlMs);
+      }
       return value;
     })().finally(() => {
       this.inFlight.delete(cacheKey);

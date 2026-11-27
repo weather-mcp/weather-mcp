@@ -1,9 +1,10 @@
 /**
- * In-memory cache with TTL (Time To Live) and LRU (Least Recently Used) eviction
+ * In-memory cache with TTL (Time To Live), expired-first then LRU (Least Recently Used) eviction
  *
  * Features:
  * - Configurable TTL per cache entry
- * - LRU eviction when max size is reached
+ * - At max size, expired entries are removed first; a live entry is evicted
+ *   (least recently used) only if the cache is still full
  * - Type-safe generic implementation
  * - Cache statistics tracking (hits, misses, evictions)
  */
@@ -83,9 +84,14 @@ export class Cache<T = unknown> {
   set(key: string, value: T, ttlMs: number): void {
     const now = Date.now();
 
-    // If cache is at max size and key doesn't exist, evict LRU entry
+    // At max size with a new key: sweep expired entries first, and evict the
+    // least-recently-used live entry only if that freed nothing. A dead entry
+    // must never outlive a live one. The sweep is not counted as an eviction.
     if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
-      this.evictLRU();
+      this.cleanupExpired();
+      if (this.cache.size >= this.maxSize) {
+        this.evictLRU();
+      }
     }
 
     const entry: CacheEntry<T> = {
@@ -99,7 +105,7 @@ export class Cache<T = unknown> {
   }
 
   /**
-   * Evict the least recently used entry
+   * Evict the least recently used entry. Counted in `stats.evictions`.
    */
   private evictLRU(): void {
     let oldestKey: string | null = null;
@@ -112,7 +118,8 @@ export class Cache<T = unknown> {
       }
     }
 
-    if (oldestKey) {
+    // `!== null`, not truthiness: '' is a valid key (`generateKey()` with no parts).
+    if (oldestKey !== null) {
       this.cache.delete(oldestKey);
       this.stats.evictions++;
     }

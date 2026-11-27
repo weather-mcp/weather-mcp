@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.31] - 2026-11-26
+
+Turning the cache off did not always turn it off. `CACHE_ENABLED=FALSE` (capital letters) left caching on, and even `CACHE_ENABLED=false` was ignored by the river-level, Japanese-warning and MET Norway caches, which kept serving stored answers while `check_service_status` said caching was disabled. `WEATHER_LIGHTNING_PREWARM=FALSE` still opened the lightning connection. A mistyped number such as `CACHE_MAX_SIZE=1000abc` was quietly read as a different number. This release makes these settings mean what they say, and warns when a value is not understood.
+
+### Changed
+
+- **`CACHE_ENABLED` and `WEATHER_LIGHTNING_PREWARM` accept `false` and `0` in any case.** `FALSE`, `False` and `0` now turn caching off and skip the lightning pre-warm. Before, only the exact lowercase `false` worked for the pre-warm, and `false` or `0` for the cache. **A setup that wrote `FALSE` and has been running with caching or the pre-warm on will now have it off**, which is what the setting always asked for. A value that is not `true`, `false`, `1` or `0` now prints one warning on stderr and keeps the default (on). (`src/utils/envBoolean.ts`, `src/config/cache.ts`, `src/server/lightningPrewarm.ts`)
+- **`CACHE_MAX_SIZE` and `API_TIMEOUT_MS` must be whole numbers.** A value such as `1000abc`, `1.5` or `1e5` used to be cut down to a different number without a word: `API_TIMEOUT_MS=1e5` became 5 seconds. It now warns and uses the default. Values that were already whole numbers behave exactly as before, including the clamp to the allowed range. (`src/config/cache.ts`)
+
+### Fixed
+
+- **`CACHE_ENABLED=false` turns off every cache.** The Environment Agency river, JMA warning and MET Norway fallback-forecast caches ignored it. With the cache off they now ask the upstream every time, and they send no conditional-request header, because there is no stored answer to revalidate. (`src/services/environmentAgency.ts`, `src/services/jma.ts`, `src/services/metno.ts`)
+- **A full cache drops expired entries before live ones.** It used to evict the least recently used entry even while expired entries were still held, so a live forecast could be dropped while a dead alert answer stayed. The `Evictions` count in `check_service_status` now counts only live entries pushed out, so it can read lower for the same traffic. (`src/utils/cache.ts`)
+
 ## [1.35.30] - 2026-11-25
 
 `save_location` could save a street address far from where the same text pointed everywhere else. It looked up a query through a different path from `city_name` and `search_location`, one that never asked Census.gov, which is the service that matches a US street address. `350 Fifth Avenue, New York, NY` was saved near Albany, 219 km from the Empire State Building that `city_name` returned for the same text. Every later weather call on that saved name, alerts included, reported the wrong town. `save_location` now uses the same lookup as `city_name`. Place names such as `Seattle, WA` or `Paris, France` already matched and are unchanged.
@@ -2502,7 +2516,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.30...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.31...HEAD
+[1.35.31]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.30...v1.35.31
 [1.35.30]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.29...v1.35.30
 [1.35.29]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.28...v1.35.29
 [1.35.28]: https://github.com/weather-mcp/weather-mcp/compare/v1.35.27...v1.35.28

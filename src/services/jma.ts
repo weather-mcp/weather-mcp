@@ -278,7 +278,9 @@ export class JmaService {
    * retried rather than remembered.
    */
   private async pull<T>(cacheKey: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
-    const cached = this.cache.get(cacheKey);
+    // CACHE_ENABLED=false bypasses the cache on read and write; the in-flight
+    // map still collapses concurrent same-key callers onto one request.
+    const cached = CacheConfig.enabled ? this.cache.get(cacheKey) : undefined;
     if (cached !== undefined) {
       return cached as T;
     }
@@ -289,7 +291,9 @@ export class JmaService {
 
     const pull = (async () => {
       const value = await fetcher();
-      this.cache.set(cacheKey, value, ttlMs);
+      if (CacheConfig.enabled) {
+        this.cache.set(cacheKey, value, ttlMs);
+      }
       return value;
     })().finally(() => {
       this.inFlight.delete(cacheKey);
@@ -312,7 +316,11 @@ export class JmaService {
     // joins with an unescaped `:` (G5).
     const cacheKey = Cache.generateKey('jma', 'index');
 
-    const cached = this.cache.get(cacheKey) as CachedIndex | undefined;
+    // CACHE_ENABLED=false: no retained parse, so no If-None-Match is sent and
+    // nothing is written back below.
+    const cached = CacheConfig.enabled
+      ? (this.cache.get(cacheKey) as CachedIndex | undefined)
+      : undefined;
     if (cached && this.now() - cached.revalidatedAt < INDEX_FRESHNESS_MS) {
       return cached.result;
     }
@@ -360,7 +368,9 @@ export class JmaService {
       // only the freshness stamp moves.
       if (response.status === 304 && cached) {
         const revalidated: CachedIndex = { ...cached, revalidatedAt: this.now() };
-        this.cache.set(cacheKey, revalidated, CacheConfig.ttl.jmaIndex);
+        if (CacheConfig.enabled) {
+          this.cache.set(cacheKey, revalidated, CacheConfig.ttl.jmaIndex);
+        }
         return revalidated;
       }
 
@@ -373,7 +383,9 @@ export class JmaService {
         ...(typeof etagHeader === 'string' ? { etag: etagHeader } : {}),
         revalidatedAt: this.now()
       };
-      this.cache.set(cacheKey, fresh, CacheConfig.ttl.jmaIndex);
+      if (CacheConfig.enabled) {
+        this.cache.set(cacheKey, fresh, CacheConfig.ttl.jmaIndex);
+      }
       return fresh;
     })().finally(() => {
       this.inFlight.delete(cacheKey);

@@ -187,7 +187,9 @@ export class MetnoService {
     // it cannot shift the boundary of any earlier component.
     const cacheKey = Cache.generateKey('metno', 'forecast', lat, lon, timezone);
 
-    const cached = this.cache.get(cacheKey);
+    // CACHE_ENABLED=false: no retained aggregate, so no If-Modified-Since is
+    // sent and nothing is written back in `pull`.
+    const cached = CacheConfig.enabled ? this.cache.get(cacheKey) : undefined;
     if (cached && this.now() - cached.revalidatedAt < METNO_FRESHNESS_MS) {
       return cached.result;
     }
@@ -252,7 +254,9 @@ export class MetnoService {
     // re-aggregation — only the freshness stamp moves.
     if (response.status === 304 && cached) {
       const revalidated: CachedForecast = { ...cached, revalidatedAt: this.now() };
-      this.cache.set(cacheKey, revalidated, CacheConfig.ttl.metnoForecast);
+      if (CacheConfig.enabled) {
+        this.cache.set(cacheKey, revalidated, CacheConfig.ttl.metnoForecast);
+      }
       return revalidated;
     }
 
@@ -264,7 +268,9 @@ export class MetnoService {
       ...(typeof lastModified === 'string' ? { lastModified } : {}),
       revalidatedAt: this.now(),
     };
-    this.cache.set(cacheKey, fresh, CacheConfig.ttl.metnoForecast);
+    if (CacheConfig.enabled) {
+      this.cache.set(cacheKey, fresh, CacheConfig.ttl.metnoForecast);
+    }
     return fresh;
   }
 

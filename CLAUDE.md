@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.35.30 (Production Ready)
+- **Version:** 1.35.31 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -78,6 +78,7 @@ src/
 │   ├── criticalAlert.ts     # Life-threatening-alert gate, selection, banner copy (pure)
 │   ├── nwsJurisdiction.ts   # NWS alert-authority country codes: code-alone and code-plus-territory-box sets (pure)
 │   ├── displayBanding.ts    # displayValue — round to the render site's precision before banding (pure)
+│   ├── envBoolean.ts        # parseEnvBoolean — true/false/1/0, any case, else 'invalid'; returns, never warns (pure)
 │   ├── nowcast.ts           # minutely_15 nowcast: model superset boxes, 3-state response classification, quarter bands, hourly-probability pick (pure)
 │   ├── finiteSample.ts      # finiteSampleAt — one series sample, or undefined when null/non-finite (pure)
 │   ├── gridpointSeries.ts   # NWS gridpoint validTime → interval; value at an instant; max over a window; all-zero predicate (`isAllZero`); unit guard (`gridpointToDisplayUnit`); bounded with a securityEvent warn (pure)
@@ -276,6 +277,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 - **The MQTT broker URL** (`BLITZORTUNG_MQTT_URL`) is in the same class: it can carry credentials in userinfo or the query, and `mqtt` forwards both. Never log it raw; `redactUrlForLogging` (`src/utils/logger.ts`) is the accessor, and it has no `LOG_PII` opt-in.
 - **Default logs never identify a place.** No query, alias, saved name, notes or error message from a user-driven path, and no coordinate finer than 2 dp, at any level. `LOG_LEVEL` is verbosity; `LOG_PII` is identifiability; neither lifts the broker-URL redaction. See *Logging*.
 - **Env vars are permanent and per-feature** — a new Google-backed feature gets its own var (key restrictions make a shared var break silently).
+- **A general-purpose boolean env var reads through `parseEnvBoolean`** (`src/utils/envBoolean.ts`): `true`/`false`/`1`/`0`, trimmed, any case. The caller owns its warning channel and its default, so an unrecognized value warns and never silently means "on". Fail-closed privacy flags (`LOG_PII`, `ANALYTICS_ENABLED`) compare `=== 'true'` on purpose and do not move onto it without a separate decision.
 - **Standing key policy:** no tool ever *requires* a key; a keyed feature needs a usable free tier; say plainly when a "free tier" still needs a billing account.
 - **Attribution strings that a licence mandates are exact** (`Source: Includes weather data from Google`, `Source: Includes pollen data from Google`) — do not reword. Licensed alert text renders verbatim with issue times as published.
 - Persist nothing from Google APIs beyond the in-memory cache (ToS).
@@ -417,12 +419,13 @@ if (series.values.length > maxEntries) {
 
 ```bash
 # Cache Configuration
-CACHE_ENABLED=true              # Enable/disable caching (default: true)
-CACHE_MAX_SIZE=1000            # Max entries per cache (100-10000, default: 1000); the composite-map
-                               # cache is fixed at 32 entries, and base-map tiles above 32 KiB are not cached
+CACHE_ENABLED=true              # Enable/disable caching (default: true); true/false/1/0, any case — anything else
+                               # warns and stays on. false reaches every service cache
+CACHE_MAX_SIZE=1000            # Max entries per cache (100-10000, default: 1000; a whole number, else warn + default);
+                               # the composite-map cache is fixed at 32 entries, and base-map tiles above 32 KiB are not cached
 
 # API Configuration
-API_TIMEOUT_MS=30000           # API timeout in milliseconds (5000-120000, default: 30000) — the requests of one tool call share max(API_TIMEOUT_MS, 55 s)
+API_TIMEOUT_MS=30000           # API timeout in milliseconds (5000-120000, default: 30000; a whole number, else warn + default) — the requests of one tool call share max(API_TIMEOUT_MS, 55 s)
 
 # Tool selection
 ENABLED_TOOLS=basic            # Preset (basic | standard | full | all) and/or names,
@@ -435,8 +438,8 @@ WEATHER_DEFAULT_LOCATION=home  # saved alias | "lat,lon" | free-text place name
 WEATHER_LIGHTNING_PREWARM=true # Subscribe saved locations so lightning coverage accumulates
                                # before the first query, and keep them subscribed while they
                                # stay saved (re-read every 30 min; a removed one ages out within
-                               # about an hour). Default: true. Set false to skip it and the
-                               # MQTT connection it opens. No effect when get_lightning_activity
+                               # about an hour). Default: true. Set false (or 0, any case) to skip
+                               # it and the MQTT connection it opens; anything else warns and pre-warms. No effect when get_lightning_activity
                                # is disabled (default basic preset: ENABLED_TOOLS=basic,+lightning).
 
 # Units / Localization
@@ -505,7 +508,7 @@ via `src/utils/unitFormat.ts`.
 
 ### Cache Implementation
 
-- **Algorithm:** LRU (Least Recently Used) eviction
+- **Algorithm:** at max size, expired entries are swept first; a live entry is evicted (LRU) only if the cache is still full. `stats.evictions` counts live evictions only
 - **Size limits:** Configurable max size (default 1000 entries)
 - **Automatic cleanup:** Every 5 minutes
 - **Graceful shutdown:** on stdin EOF, transport close, SIGTERM or SIGINT — one bounded, idempotent run (`src/server/shutdown.ts`); housekeeping timers are `unref()`'d, so they never hold the process; the analytics flush runs under its own deadline inside that budget and never sets the exit code. The HTTP entry (`src/http.ts`) uses the same coordinator with **SIGTERM and SIGINT only** — never stdin, which is at EOF from the first tick in a container started without `-i` — and its first step stops accepting connections (`server.close()`, forced after 400 ms)
@@ -766,15 +769,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.35.30 — Production Ready ✅
-- **Test Coverage:** 5,830 tests, 100% pass rate
+- **Version:** 1.35.31 — Production Ready ✅
+- **Test Coverage:** 5,892 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.35.31:** CACHE_ENABLED and the lightning pre-warm opt-out mean what they say, in any case
 - **New in v1.35.30:** save_location saves a query at the same place city_name resolves it to
 - **New in v1.35.29:** A historical range ending in the last week is refreshed hourly instead of cached for good
-- **New in v1.35.28:** NOAA marine conditions answer from Open-Meteo where NOAA publishes no wave forecast, instead of a calm sea
 
 ## Useful References
 
@@ -797,7 +800,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-25 (v1.35.30)
+**Last Updated:** 2026-11-26 (v1.35.31)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
