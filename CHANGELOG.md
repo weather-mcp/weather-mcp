@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+US forecasts showed their times in the location's local time but never said which zone that was, while forecasts for every other country did. This release adds the missing label, so a forecast read from another time zone is no longer ambiguous.
+
 ### Changed
 
 - **US forecasts now say which time zone their times are in.** A `get_forecast` answer for a US location, and the forecast section of `get_weather_summary`, now carry a `**Timezone:**` line directly under the elevation, naming the zone that every time below it is shown in (for example `America/Denver`). Forecasts for other countries already had this line; US forecasts showed local times with no label, so a reader in another zone had to guess. The times themselves are unchanged.
