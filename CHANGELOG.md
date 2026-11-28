@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The 5 s connect timeout on the keyless alert-feed, river, forecast-fallback, climate-normals and imagery requests is now set by the server.** These requests (the alert feeds for India, the Philippines, Indonesia and Japan, Great Britain's river gauges, the MET Norway forecast fallback, US climate normals, and radar and base-map imagery) fail at 5 s when a connection does not open, and at the configured `API_TIMEOUT_MS` once connected. The 5 s used to come from Node's default connection settings, so it was undocumented and a Node release could move it; behaviour on Node 20 and later is unchanged. The `API_TIMEOUT_MS` description now says so.
+
 ## [1.36.4] - 2026-11-27
 
 Two places on the US (NOAA) path printed times by the server's own clock instead of the location's: the observation times in recent US weather history, and the dates of the snowfall and ice forecast period. On a server set to a different time zone than the place you asked about, such as a container, a remote host, or any question about somewhere else, those times were hours off and the snowfall period could start on the wrong day. This release prints them in the location's time zone, like every other time the server shows.
