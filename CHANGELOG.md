@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Internal: an unused place-search code path is gone.** Every place search has gone through the shared geocoder since v1.35.30. This release deletes the older second path, along with its separate 30-day cache and its log lines. No answer changes, and the cache-lifetime check from v1.36.7 no longer needs an exception.
+
 ## [1.36.9] - 2026-11-28
 
 On Umnak Island in the eastern Aleutians, including the village of Nikolski, several tools showed times one hour behind the local clock. This release corrects the time zone there. Nothing changes anywhere else.

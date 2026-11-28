@@ -48,7 +48,7 @@ src/
 ├── services/                # External API clients (one per upstream)
 │   ├── noaa.ts              # NOAA Weather API (forecast, observations, alerts, NWPS rivers)
 │   ├── openmeteo.ts         # Open-Meteo (forecast, archive, AQ, marine, flood, model comparison, ensemble)
-│   ├── nominatim.ts         # Nominatim/OSM geocoding + country-level reverseCountry
+│   ├── nominatim.ts         # Nominatim/OSM country-level reverseCountry (forward geocoding is geocoding.ts)
 │   ├── geocoding.ts         # Multi-provider geocoding with automatic fallback
 │   ├── meteoalarm.ts        # EUMETNET MeteoAlarm — European national warnings
 │   ├── geomet.ts            # MSC GeoMet — Canadian alerts
@@ -289,7 +289,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 ### Caching and concurrency
 
-- TTLs live in `CacheConfig.ttl.*` (`src/config/cache.ts`); reuse an existing entry when the data's volatility matches rather than adding one (Google alerts reuse `alerts`), and add a named entry when you'd otherwise hardcode `Infinity`. `tests/unit/cache-ttl-wiring.test.ts` fails on a numeric, literal-only or `Infinity` TTL at a `cache.set` call in `src/`, with one allowlisted site (`nominatim.ts` `fetchSearch`, which roadmap row 105 removes); it does not see a literal passed through a `pull(cacheKey, ttlMs, …)` wrapper.
+- TTLs live in `CacheConfig.ttl.*` (`src/config/cache.ts`); reuse an existing entry when the data's volatility matches rather than adding one (Google alerts reuse `alerts`), and add a named entry when you'd otherwise hardcode `Infinity`. `tests/unit/cache-ttl-wiring.test.ts` fails on a numeric, literal-only or `Infinity` TTL at a `cache.set` call in `src/` (its allowlist is empty), and pins each rewired write to its own entry; it does not see a literal passed through a `pull(cacheKey, ttlMs, …)` wrapper.
 - Cache the *table*, not the per-date slice, for anything derived from a bulk pull (normals).
 - Dedupe concurrent same-key pulls with a `Map<string, Promise<T>>` deleted in `finally`, so a rejected pull is never cached nor left behind.
 - A per-upstream rate budget is one `RequestSpacer` (`src/utils/requestSpacer.ts`) per upstream, built in the composition root and passed to every client of that upstream. It reserves each start slot synchronously before any `await` (G20) and spaces **starts**, not completions, so a slow or failed request never stalls the next. On every wake it re-checks the last *actual* start against a monotonic clock (`performance.now`) and sleeps the remainder, so overdue timers delivered together after an event-loop stall still dispatch one interval apart; the read, compare and record after each wake are one synchronous run (G20). Nominatim's is shared by `NominatimService` and `GeocodingService`'s provider, and it is per process.
