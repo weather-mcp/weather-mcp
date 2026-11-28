@@ -130,6 +130,14 @@ export const CacheConfig = {
     // value is one full-year 366-slot table per location
     normals: Infinity,
 
+    // Open-Meteo air-quality forecast (openmeteo.ts getAirQuality).
+    // The air-quality model updates hourly.
+    airQuality: 1 * HOUR,
+
+    // Open-Meteo marine forecast (openmeteo.ts getMarine).
+    // Marine conditions update hourly.
+    marine: 1 * HOUR,
+
     // Service health check status
     // Check freshness periodically
     serviceStatus: 5 * MINUTE,
@@ -196,9 +204,13 @@ export const CacheConfig = {
     // resolved (including a "no country" open-ocean result) it's permanent.
     reverseCountry: Infinity,
 
+    // NIFC WFIGS current fire perimeters (nifc.ts queryFirePerimeters).
+    // WFIGS refreshes the perimeter layer about every 30 minutes.
+    firePerimeters: 30 * MINUTE,
+
     // NASA FIRMS Area API bbox query (keyed path). NRT detections land
-    // within ~3 h of overpass; 30 min matches the NIFC perimeter refresh
-    // cadence.
+    // within ~3 h of overpass; 30 min is the same value as firePerimeters,
+    // set on its own so tuning one never moves the other.
     firmsAreaQuery: 30 * MINUTE,
 
     // NASA FIRMS regional flat-file fetch (keyless path). Caches the parsed

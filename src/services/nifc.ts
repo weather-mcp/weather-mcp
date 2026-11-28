@@ -127,8 +127,8 @@ export class NIFCService {
 
       const result = await this.queryFeatureServer(west, south, east, north);
 
-      // Cache for 30 minutes (fire data updates frequently)
-      this.cache.set(cacheKey, result, 1800000);
+      // Cached for CacheConfig.ttl.firePerimeters (WFIGS refresh cadence)
+      this.cache.set(cacheKey, result, CacheConfig.ttl.firePerimeters);
       return result;
     }
 
@@ -150,7 +150,7 @@ export class NIFCService {
     // `features` (measured live 2026-11-25). That is an error, never an empty
     // list (G4). Thrown outside the request `catch`, so it is never mapped to
     // `Failed to query NIFC fire perimeters.`, and before
-    // `queryFirePerimeters`'s 30-minute `cache.set`, so it is never cached.
+    // `queryFirePerimeters`'s `cache.set` (`ttl.firePerimeters`), so it is never cached.
     // Nothing from the body is logged.
     if (!isFeatureListEnvelope(body)) {
       logger.warn('NIFC returned an unexpected response', { status: 200, securityEvent: true });

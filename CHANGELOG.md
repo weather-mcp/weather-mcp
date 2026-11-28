@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.7] - 2026-11-27
+
+A maintenance release with no change to any answer. Five of the server's caches had their lifetimes written as bare numbers inside the code that fetches the data, where nobody reviewing the cache settings would see them, among them the wildfire perimeter cache. Every cache lifetime now lives in one place, and a check fails the build if a new one is written as a bare number.
+
+### Changed
+
+- **Every cache lifetime is now a named setting.** Wildfire perimeters (30 minutes), air quality (1 hour), marine conditions (1 hour), the global forecast (2 hours) and US climate normals (kept for the life of the process) now read their lifetimes from the server's one cache configuration. The values themselves are unchanged, so no answer is fresher or staler than before.
+- **A build-time check now refuses a cache lifetime written as a bare number,** and checks that each of these five caches uses its own setting rather than another one that happens to hold the same number. One older location-search cache is temporarily exempt until the unused code it belongs to is removed.
+
 ## [1.36.6] - 2026-11-27
 
 Twelve of the server's upstream services had no limit on how large an answer could be, and followed redirects without bound. One huge or broken answer could fill the server's memory, and when one arrived it was often retried several times and reported as a library error or a network fault. This release gives every upstream a measured size limit and refuses every redirect, each with a plain, fixed message. Successful answers are unchanged.
@@ -2599,7 +2608,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.6...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.7...HEAD
+[1.36.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.6...v1.36.7
 [1.36.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.5...v1.36.6
 [1.36.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...v1.36.5
 [1.36.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...v1.36.4

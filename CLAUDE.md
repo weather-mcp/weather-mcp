@@ -7,7 +7,7 @@ This document provides context and guidelines for AI assistants (Claude, etc.) w
 **Weather MCP Server** is a Model Context Protocol (MCP) server providing weather data from NOAA, Open-Meteo, and a set of other keyless public APIs. It enables AI assistants to fetch real-time weather forecasts, current conditions, historical data, air quality, marine conditions, severe weather alerts, river levels, wildfire activity, lightning, and radar imagery — worldwide, with the best available authority per country.
 
 - **Language:** TypeScript (Node.js)
-- **Version:** 1.36.6 (Production Ready)
+- **Version:** 1.36.7 (Production Ready)
 - **License:** MIT
 - **MCP SDK:** `@modelcontextprotocol/sdk` (see `package.json` for the pinned range)
 - **Data model:** zero-cost, zero-key by default — every tool works without any API key; a few optional keys extend coverage (see [Configuration](#configuration))
@@ -289,7 +289,7 @@ These are the cross-cutting rules that recur across releases. Each was learned t
 
 ### Caching and concurrency
 
-- TTLs live in `CacheConfig.ttl.*` (`src/config/cache.ts`); reuse an existing entry when the data's volatility matches rather than adding one (Google alerts reuse `alerts`), and add a named entry when you'd otherwise hardcode `Infinity`.
+- TTLs live in `CacheConfig.ttl.*` (`src/config/cache.ts`); reuse an existing entry when the data's volatility matches rather than adding one (Google alerts reuse `alerts`), and add a named entry when you'd otherwise hardcode `Infinity`. `tests/unit/cache-ttl-wiring.test.ts` fails on a numeric, literal-only or `Infinity` TTL at a `cache.set` call in `src/`, with one allowlisted site (`nominatim.ts` `fetchSearch`, which roadmap row 105 removes); it does not see a literal passed through a `pull(cacheKey, ttlMs, …)` wrapper.
 - Cache the *table*, not the per-date slice, for anything derived from a bulk pull (normals).
 - Dedupe concurrent same-key pulls with a `Map<string, Promise<T>>` deleted in `finally`, so a rejected pull is never cached nor left behind.
 - A per-upstream rate budget is one `RequestSpacer` (`src/utils/requestSpacer.ts`) per upstream, built in the composition root and passed to every client of that upstream. It reserves each start slot synchronously before any `await` (G20) and spaces **starts**, not completions, so a slow or failed request never stalls the next. On every wake it re-checks the last *actual* start against a monotonic clock (`performance.now`) and sleeps the remainder, so overdue timers delivered together after an event-loop stall still dispatch one interval apart; the read, compare and record after each wake are one synchronous run (G20). Nominatim's is shared by `NominatimService` and `GeocodingService`'s provider, and it is per process.
@@ -783,15 +783,15 @@ to 7. Collapse the pair to one entry when typescript-eslint supports TS 7
 
 ## Project Status
 
-- **Version:** 1.36.6 — Production Ready ✅
-- **Test Coverage:** 6,311 tests, 100% pass rate
+- **Version:** 1.36.7 — Production Ready ✅
+- **Test Coverage:** 6,328 tests, 100% pass rate
 - **Security Rating:** A- (Excellent, 93/100) · **Code Quality:** A+ (Excellent, 97.5/100)
 
 Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends the new line and prunes the list to the newest three — detail lives in `CHANGELOG.md` and the plan docs under `.devdocs/archive/completed/`):
 
+- **New in v1.36.7:** Every cache lifetime is a named setting, and a build check refuses a bare-number one
 - **New in v1.36.6:** Every upstream answer has a measured size limit, and no redirect is followed
 - **New in v1.36.5:** An unreachable alert-feed, river, forecast-fallback, normals or imagery upstream fails at a 5 s connect timeout the server now sets itself
-- **New in v1.36.4:** US weather history times and the snowfall period now use the location's time zone, not the server's
 
 ## Useful References
 
@@ -814,7 +814,7 @@ Recent releases (one line each; `scripts/update-docs-for-release.sh` prepends th
 
 ---
 
-**Last Updated:** 2026-11-27 (v1.36.6)
+**Last Updated:** 2026-11-27 (v1.36.7)
 
 This document should be updated whenever major architectural changes are made or new patterns are introduced — not for every release.
 
