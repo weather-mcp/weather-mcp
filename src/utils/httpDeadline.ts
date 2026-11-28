@@ -108,12 +108,17 @@ function tunnelProxy(config: InternalAxiosRequestConfig): URL | undefined {
 
 /**
  * The agent key and agent to inject for a non-tunnelled native-transport request, or undefined:
- * only `maxRedirects === 0`, an `http:`/`https:` target, and no caller agent for that protocol.
+ * only `maxRedirects === 0`, no caller `proxy` (`false` is direct and counts as none), an
+ * `http:`/`https:` target, and no caller agent for that protocol.
  */
 function nativeAgentInjection(
   config: InternalAxiosRequestConfig
 ): { httpAgent: http.Agent } | { httpsAgent: https.Agent } | undefined {
   if (config.maxRedirects !== 0) {
+    return undefined;
+  }
+  if (config.proxy !== undefined && config.proxy !== false) {
+    // A caller-chosen proxy is tunnelled by axios with its own agent; never second-guess it.
     return undefined;
   }
   const href = resolvedHref(config);

@@ -129,7 +129,11 @@ describe('native-transport agent injection', () => {
         'maxRedirects 0 http: with a caller httpAgent',
         makeConfig({ url: 'http://upstream.example/path', maxRedirects: 0, httpAgent: callerHttp })
       ],
-      ['an unparseable url', makeConfig({ url: 'http://[bad', maxRedirects: 0 })]
+      ['an unparseable url', makeConfig({ url: 'http://[bad', maxRedirects: 0 })],
+      [
+        'maxRedirects 0 with a caller proxy object',
+        makeConfig({ maxRedirects: 0, proxy: { protocol: 'http', host: '127.0.0.1', port: 3128 } })
+      ]
     ];
     for (const [name, config] of cases) {
       it(name, () => {
@@ -159,6 +163,13 @@ describe('native-transport agent injection', () => {
     expect(seen.proxy).toBe(false);
     expect(seen.httpsAgent).toBeInstanceOf(https.Agent);
     expect(seen.httpsAgent).not.toBe(native);
+  });
+
+  it('(g2) proxy: false is direct, so the native agent is still injected', () => {
+    const seen = seenFor(makeConfig({ maxRedirects: 0, proxy: false }));
+    expect(seen.proxy).toBe(false);
+    expect(seen.httpsAgent).toBeInstanceOf(https.Agent);
+    expect((seen.httpsAgent as https.Agent).options.timeout).toBe(5000);
   });
 
   it('(h) no timeout outside a tool budget: the same config object, no agent', () => {
