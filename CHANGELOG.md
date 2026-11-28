@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.10] - 2026-11-28
+
 A clean-up release. It removes a place-search code path that nothing has used since v1.35.30, and it closes a small privacy gap found while checking the logs that remain: one error line could copy a coordinate into the default logs. No answer changes.
 
 ### Changed
@@ -2634,7 +2636,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.9...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.10...HEAD
+[1.36.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.9...v1.36.10
 [1.36.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.8...v1.36.9
 [1.36.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.7...v1.36.8
 [1.36.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.6...v1.36.7
