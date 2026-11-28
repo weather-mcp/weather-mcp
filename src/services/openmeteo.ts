@@ -740,8 +740,8 @@ export class OpenMeteoService {
       const response = await this.makeRequestToForecast<OpenMeteoForecastResponse>('/forecast', params);
       this.validateForecastResponse(response, hourly);
 
-      // Cache for 2 hours (forecasts update regularly)
-      this.cache.set(cacheKey, response, 2 * 60 * 60 * 1000);
+      // Cached for CacheConfig.ttl.forecast
+      this.cache.set(cacheKey, response, CacheConfig.ttl.forecast);
 
       return response;
     }
@@ -1213,8 +1213,7 @@ export class OpenMeteoService {
       const response = await this.makeRequestToForecast<OpenMeteoModelComparisonResponse>('/forecast', params);
       this.validateModelComparisonResponse(response);
 
-      // TTL from config (not the getForecast's hardcoded 2h literal) — see D8;
-      // getForecast's own hardcoded TTL is intentionally left untouched.
+      // TTL from config, the same entry getForecast reads — see D8.
       this.cache.set(cacheKey, response, CacheConfig.ttl.forecast);
 
       return response;
@@ -1490,8 +1489,8 @@ export class OpenMeteoService {
       const response = await this.makeRequestToAirQuality<OpenMeteoAirQualityResponse>('/air-quality', params);
       this.validateAirQualityResponse(response, forecast);
 
-      // Cache for 1 hour (air quality updates hourly)
-      this.cache.set(cacheKey, response, 60 * 60 * 1000);
+      // Cached for CacheConfig.ttl.airQuality
+      this.cache.set(cacheKey, response, CacheConfig.ttl.airQuality);
 
       return response;
     }
@@ -1648,8 +1647,8 @@ export class OpenMeteoService {
       const response = await this.makeRequestToMarine<OpenMeteoMarineResponse>('/marine', params);
       this.validateMarineResponse(response, forecast);
 
-      // Cache for 1 hour (marine conditions update hourly)
-      this.cache.set(cacheKey, response, 60 * 60 * 1000);
+      // Cached for CacheConfig.ttl.marine
+      this.cache.set(cacheKey, response, CacheConfig.ttl.marine);
 
       return response;
     }

@@ -266,7 +266,7 @@ export class NCEIService {
       });
 
       if (CacheConfig.enabled) {
-        this.cache.set(cacheKey, normals, Infinity);
+        this.cache.set(cacheKey, normals, CacheConfig.ttl.normals);
       }
       return normals;
     }
