@@ -8042,6 +8042,27 @@ Restore with `git restore examples/`.
 **Status:** active. Lint candidate: the capture script could warn when `DOTENV_CONFIG_PATH` is unset and a
 selected capture's committed output names a keyed source.
 
+## G182 — A naive wall clock cannot choose the zone abbreviation inside a repeated DST hour
+
+**Trigger:** labelling a naive (offset-free) location time with a zone abbreviation —
+`formatInTimezoneWithZone` on an Open-Meteo `current.time`, `hourly.time[]` or any other wall clock.
+
+**Rule:** pin the wall clock to the response's own offset (`utc_offset_seconds`) before taking the label,
+and keep the label only if the pinned instant shows the same wall clock (`formatOpenMeteoTime`,
+`src/handlers/currentConditionsHandler.ts`). Never let the pinned instant change the printed clock.
+
+**Why:** in the repeated fall-back hour (01:30 on a US DST end) a naive clock names two instants. Luxon
+resolves it to the standard-time one, so a reading taken in daylight time is labelled `CST` instead of
+`CDT`. The clock digits are right, which is why every fixture outside that hour passes.
+
+**Verify:** `node -e "const {DateTime}=require('luxon'); console.log(DateTime.fromISO('2026-11-01T01:30',{zone:'America/Chicago'}).offsetNameShort, DateTime.fromISO('2026-11-01T01:30-05:00',{zone:'America/Chicago'}).offsetNameShort)"`
+prints `CST CDT`.
+
+**Evidence:** 2026-11-28, diff review codex BLOCKER-1 on `feat/current-conditions-time-zone`; fixed in `9b16302`.
+
+**Status:** active. Unverified residue: whether `utc_offset_seconds` is the request-time offset or the
+`current.time` bucket's.
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
