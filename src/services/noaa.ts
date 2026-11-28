@@ -83,6 +83,23 @@ function usableNWPSGauges(data: unknown): NWPSGauge[] {
   return usable;
 }
 
+/**
+ * Response-size cap for the main `api.weather.gov` client. Design sweep 2026-11-27: the largest decoded
+ * body the code can request was `/stations/<id>/observations?limit=500` at 1,955,559 bytes (the code
+ * clamps `limit` to 500). The cap is ≥ 8× that, rounded up to a multiple of 4 MiB (2 MiB floor).
+ * An answer over it fails as "NOAA response too large" and is not retried.
+ */
+const NOAA_MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Response-size cap for the NWPS client. Design sweep 2026-11-27: a 6°×6° `/gauges` bbox list was
+ * 490,251 bytes and one gauge's `/stageflow` 473,297. ≥ 8×, rounded up to a multiple of 4 MiB.
+ */
+const NWPS_MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+
+/** The fixed user-facing sentence of an oversize answer from either NOAA client. */
+const NOAA_TOO_LARGE_MESSAGE = 'NOAA response too large';
+
 export interface NOAAServiceConfig {
   userAgent?: string;
   baseURL?: string;
@@ -133,6 +150,9 @@ export class NOAAService {
         'User-Agent': userAgent,
         'Accept': 'application/geo+json'
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: NOAA_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -144,6 +164,9 @@ export class NOAAService {
         'User-Agent': userAgent,
         'Accept': 'application/json'
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: NWPS_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -163,8 +186,36 @@ export class NOAAService {
    * Handle API errors with retry logic and helpful status information
    */
   private async handleError(error: AxiosError): Promise<never> {
+    // An oversize answer, checked *before* the `response` branch: the rejection carries no `response`
+    // at all, so it would otherwise fall to the generic branch, which is retryable and forwards the raw
+    // axios text. Gated on the code *and* the message, so another ERR_BAD_RESPONSE keeps today's path.
+    if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+      throw new ApiError(
+        NOAA_TOO_LARGE_MESSAGE,
+        502,
+        'NOAA',
+        `${NOAA_TOO_LARGE_MESSAGE}: the service answered with more data than this server accepts.`,
+        ['https://weather-gov.github.io/api/reporting-issues'],
+        false
+      );
+    }
+
     if (error.response) {
       const status = error.response.status;
+
+      // A 3xx is never followed (`maxRedirects: 0`), so it is a fixed, non-retried error. It is
+      // decided before any read of the body.
+      if (status >= 300 && status < 400) {
+        throw new ApiError(
+          `NOAA returned status ${status}`,
+          status,
+          'NOAA',
+          `NOAA returned status ${status}, a redirect this server does not follow.`,
+          ['https://weather-gov.github.io/api/reporting-issues'],
+          false
+        );
+      }
+
       const data = error.response.data as NOAAErrorResponse;
 
       // Rate limit error - suggest retry

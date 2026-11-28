@@ -42,6 +42,20 @@ import {
 /** 1 request per second (Nominatim usage policy). */
 export const NOMINATIM_MIN_INTERVAL_MS = 1000;
 
+/**
+ * Response-size cap. Design sweep 2026-11-27: `/search?q=Springfield&limit=50` with address,
+ * extra-tag and name details was 34,863 decoded bytes. ≥ 8× that gives the 2 MiB floor.
+ */
+const NOMINATIM_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
+/** The fixed user-facing sentence of an oversize Nominatim answer. */
+const NOMINATIM_TOO_LARGE_MESSAGE = 'Nominatim response too large';
+
+const NOMINATIM_HELP_LINKS = [
+  'https://nominatim.org/release-docs/latest/api/Search/',
+  'https://wiki.openstreetmap.org/wiki/Nominatim'
+];
+
 export interface NominatimServiceConfig {
   baseURL?: string;
   timeout?: number;
@@ -74,6 +88,9 @@ export class NominatimService {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: NOMINATIM_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -89,8 +106,36 @@ export class NominatimService {
    * @private
    */
   private async handleError(error: AxiosError): Promise<never> {
+    // An oversize answer, checked *before* the `response` branch: the rejection carries no `response`,
+    // so it would otherwise reach the generic branch and forward the raw axios text. Gated on the code
+    // *and* the message, so another ERR_BAD_RESPONSE keeps today's path.
+    if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+      throw new ApiError(
+        NOMINATIM_TOO_LARGE_MESSAGE,
+        502,
+        'Nominatim',
+        `${NOMINATIM_TOO_LARGE_MESSAGE}: the service answered with more data than this server accepts.`,
+        NOMINATIM_HELP_LINKS,
+        false
+      );
+    }
+
     if (error.response) {
       const status = error.response.status;
+
+      // A 3xx is never followed (`maxRedirects: 0`), so it is a fixed error, decided before any read of
+      // the body, which may be null or a string here.
+      if (status >= 300 && status < 400) {
+        throw new ApiError(
+          `Nominatim returned status ${status}`,
+          status,
+          'Nominatim',
+          `Nominatim returned status ${status}, a redirect this server does not follow.`,
+          NOMINATIM_HELP_LINKS,
+          false
+        );
+      }
+
       const data = error.response.data as NominatimErrorResponse;
 
       // Bad request
