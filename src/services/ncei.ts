@@ -67,7 +67,10 @@ const MISSING_VALUE_THRESHOLD = -100;
  * (`/datasets`), 717 bytes (`/stations`, five rows) and 3,794 bytes (`/data`,
  * one month of daily normals). 1 MiB is over 250 times the largest.
  */
-const NCEI_MAX_RESPONSE_BYTES = 1024 * 1024;
+export const NCEI_MAX_RESPONSE_BYTES = 1024 * 1024;
+
+/** The fixed user-facing sentence of an oversize answer. */
+const NCEI_TOO_LARGE_MESSAGE = 'NCEI response too large';
 
 /** The fixed text of a rejected token. It never carries the token. */
 const NCEI_TOKEN_REJECTED_MESSAGE =
@@ -380,8 +383,19 @@ export class NCEIService {
       message?: string;
       code?: string;
     };
+    // An oversize answer, before the `response` branch. Gated on the code *and* the message:
+    // `ERR_BAD_RESPONSE` alone also covers a 5xx.
+    if (e.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(e.message ?? '')) {
+      throw new ServiceUnavailableError('NCEI', NCEI_TOO_LARGE_MESSAGE);
+    }
+
     if (e.response) {
       const status = e.response.status;
+      // A 3xx is never followed (`maxRedirects: 0`); decided before any read of the body, and
+      // never a token rejection.
+      if (status >= 300 && status < 400) {
+        throw new ServiceUnavailableError('NCEI', `NCEI API returned status ${status}`);
+      }
       const data = e.response.data;
       const message = (typeof data === 'object' && data !== null ? data.message : undefined) || e.message;
 

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.12] - 2026-11-28
+
+A quiet maintenance release. It brings the optional NCEI climate-normals client in line with every other service: an answer that is too large or that redirects now ends in a short fixed error instead of the HTTP library's own wording. No weather output changes. It also tightens one of the project's internal checks, so a commented-out safety setting can no longer pass it.
+
+### Fixed
+
+- **NCEI errors carry fixed text for an oversize or redirected answer.** With `NCEI_API_TOKEN` set, an NCEI answer that is too large, or one that redirects, now carries a short fixed error text (`NCEI response too large`, `NCEI API returned status 301`) in place of the HTTP library's own text. NCEI's error mapper had not been given these two fixed answers. Nothing shows this text today: climate normals still fall back to Open-Meteo, and the output does not change.
+
 ## [1.36.11] - 2026-11-28
 
 US weather alerts now say what time zone their times are in. Before this release, a NOAA alert's start and expiry times were bare clock times, such as "Expires: Nov 28, 2026, 3:00 PM". Someone reading from another zone, or an assistant passing the warning on, had to guess the zone. Alerts from the other countries' authorities already carried their offset.
@@ -2644,7 +2652,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.11...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.12...HEAD
+[1.36.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.11...v1.36.12
 [1.36.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.10...v1.36.11
 [1.36.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.9...v1.36.10
 [1.36.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.8...v1.36.9
