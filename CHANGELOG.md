@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.12] - 2026-11-28
+
 A quiet maintenance release. It brings the optional NCEI climate-normals client in line with every other service: an answer that is too large or that redirects now ends in a short fixed error instead of the HTTP library's own wording. No weather output changes. It also tightens one of the project's internal checks, so a commented-out safety setting can no longer pass it.
 
 ### Fixed
@@ -2650,7 +2652,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.11...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.12...HEAD
+[1.36.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.11...v1.36.12
 [1.36.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.10...v1.36.11
 [1.36.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.9...v1.36.10
 [1.36.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.8...v1.36.9
