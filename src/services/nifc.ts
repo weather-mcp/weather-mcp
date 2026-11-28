@@ -30,6 +30,12 @@ function isFeatureListEnvelope(body: unknown): body is NIFCQueryResponse {
     && body.features.every(isPlainObject);
 }
 
+/**
+ * Response-size cap. Design sweep 2026-11-27: the perimeter query with no bounding box (every current
+ * US perimeter) was 1,070,545 decoded bytes. ≥ 8×, rounded up to a multiple of 4 MiB.
+ */
+const NIFC_MAX_RESPONSE_BYTES = 12 * 1024 * 1024;
+
 export interface NIFCServiceConfig {
   baseURL?: string;
   timeout?: number;
@@ -54,6 +60,9 @@ export class NIFCService {
       headers: {
         'Accept': 'application/json'
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: NIFC_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
   }
@@ -199,6 +208,11 @@ export class NIFCService {
       // Every message is fixed text: transport and upstream wording never reach
       // the user. Timeouts first, then the shared connection-failure set (G138).
       if (axios.isAxiosError(error)) {
+        // An oversize answer carries no `response`. Gated on the code *and* the message: another
+        // ERR_BAD_RESPONSE keeps the generic fixed text at the end. Contract path: it throws, never "no fires".
+        if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+          throw new Error('NIFC service response too large.');
+        }
         if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
           throw new Error('NIFC service request timed out. The service may be temporarily unavailable.');
         }

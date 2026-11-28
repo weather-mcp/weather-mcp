@@ -80,7 +80,9 @@ plainly:
 
 - **It fires only on a transient failure, and only on `auto`.** An Open-Meteo
   400 means a bad coordinate or a bug on our side, and falling back there would
-  hide that defect permanently, so a 400 still propagates. A forced
+  hide that defect permanently, so a 400 still propagates. So do an answer over
+  the server's size limit (`Open-Meteo response too large`) and a redirect
+  (`Open-Meteo returned status 3xx`): neither is transient. A forced
   `source: "openmeteo"` also still propagates, because you named that authority.
 - **MET Norway's horizon is shorter.** It publishes about nine days against
   Open-Meteo's sixteen, so a `days: 14` request answered by the fallback renders

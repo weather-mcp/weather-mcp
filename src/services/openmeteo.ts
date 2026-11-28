@@ -108,6 +108,28 @@ function isTransientFailure(error: unknown): boolean {
   return error instanceof Error && isRetryableError(error);
 }
 
+/**
+ * Response-size cap for the archive client (`get_historical_weather`, climate normals). Design sweep
+ * 2026-11-27: daily, 13 variables, 1940-01-01 → 2026-11-20 was 2,298,520 decoded bytes, the widest
+ * range the code can request. ≥ 8×, rounded up to a multiple of 4 MiB (2 MiB floor).
+ */
+const OPENMETEO_ARCHIVE_MAX_RESPONSE_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Response-size cap for the forecast, air-quality, marine, flood and ensemble clients. Design sweep
+ * 2026-11-27: the largest was a 15-day ECMWF ENS hourly request at 181,605 bytes; a 16-day hourly
+ * forecast was 31,339. ≥ 8× the largest gives the 2 MiB floor.
+ */
+export const OPENMETEO_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
+/** The fixed user-facing sentence of an oversize answer from any Open-Meteo client. */
+const OPENMETEO_TOO_LARGE_MESSAGE = 'Open-Meteo response too large';
+
+const OPENMETEO_HELP_LINKS = [
+  'https://open-meteo.com/en/docs',
+  'https://github.com/open-meteo/open-meteo/issues'
+];
+
 export interface OpenMeteoServiceConfig {
   baseURL?: string;
   forecastURL?: string;
@@ -170,6 +192,9 @@ export class OpenMeteoService {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: OPENMETEO_ARCHIVE_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -181,6 +206,9 @@ export class OpenMeteoService {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: OPENMETEO_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -192,6 +220,9 @@ export class OpenMeteoService {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: OPENMETEO_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -203,6 +234,9 @@ export class OpenMeteoService {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: OPENMETEO_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -214,6 +248,9 @@ export class OpenMeteoService {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: OPENMETEO_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -225,6 +262,9 @@ export class OpenMeteoService {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: OPENMETEO_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -264,8 +304,37 @@ export class OpenMeteoService {
    * Handle API errors with helpful status information
    */
   private async handleError(error: AxiosError): Promise<never> {
+    // An oversize answer, checked *before* the `response` branch: the rejection carries no `response`
+    // at all, so it would otherwise fall to the generic branch, which is retryable and forwards the raw
+    // axios text. Gated on the code *and* the message, so another ERR_BAD_RESPONSE keeps today's path.
+    // Not retryable, so `get_forecast` does not fall back to MET Norway on it either (decided at triage).
+    if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+      throw new ApiError(
+        OPENMETEO_TOO_LARGE_MESSAGE,
+        502,
+        'OpenMeteo',
+        `${OPENMETEO_TOO_LARGE_MESSAGE}: the service answered with more data than this server accepts.`,
+        OPENMETEO_HELP_LINKS,
+        false
+      );
+    }
+
     if (error.response) {
       const status = error.response.status;
+
+      // A 3xx is never followed (`maxRedirects: 0`), so it is a fixed, non-retried error. It is
+      // decided before any read of the body, which may be null or a string here.
+      if (status >= 300 && status < 400) {
+        throw new ApiError(
+          `Open-Meteo returned status ${status}`,
+          status,
+          'OpenMeteo',
+          `Open-Meteo returned status ${status}, a redirect this server does not follow.`,
+          OPENMETEO_HELP_LINKS,
+          false
+        );
+      }
+
       const data = error.response.data as OpenMeteoErrorResponse;
 
       // Bad request

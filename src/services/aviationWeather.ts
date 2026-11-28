@@ -153,6 +153,12 @@ function parseMetarResponseBody(data: unknown): MetarObservation[] {
 }
 
 /**
+ * Response-size cap. Design sweep 2026-11-27: a 20°×30° METAR bounding-box request was 183,548
+ * decoded bytes. ≥ 8× that gives the 2 MiB floor.
+ */
+const AVIATIONWEATHER_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
+/**
  * NOAA Aviation Weather Center METAR API client. No API key required.
  */
 export class AviationWeatherService {
@@ -177,6 +183,9 @@ export class AviationWeatherService {
         'Accept': 'application/json',
         'User-Agent': METAR_USER_AGENT
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: AVIATIONWEATHER_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -271,8 +280,37 @@ export class AviationWeatherService {
    */
   private async handleError(error: unknown): Promise<never> {
     if (isAxiosLikeError(error)) {
+      // An oversize answer, before the `response` branch (it carries none). A plain, non-retryable
+      // ApiError, never a ServiceUnavailableError: `makeRequest` retries every one of those whose
+      // `causeCode` is not a timeout, which would download the body four times (G137). Gated on the
+      // code *and* the message, so another ERR_BAD_RESPONSE keeps today's path.
+      if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+        throw new ApiError(
+          'AviationWeather API response too large',
+          502,
+          'AviationWeather',
+          'AviationWeather API response too large',
+          [],
+          false
+        );
+      }
+
       if (error.response) {
         const { status, data, headers } = error.response;
+
+        // A 3xx is never followed (`maxRedirects: 0`). Decided before the body is read, so no body
+        // text is forwarded as `detail`, and before TRANSIENT_STATUSES.
+        if (status >= 300 && status < 400) {
+          throw new ApiError(
+            `AviationWeather API returned status ${status}`,
+            status,
+            'AviationWeather',
+            `AviationWeather API returned status ${status}`,
+            [],
+            false
+          );
+        }
+
         const contentType = headers?.['content-type'];
         const detail = sanitizedErrorDetail(status, data, contentType);
 

@@ -36,6 +36,13 @@ export function rfc3986ParamsSerializer(params: Record<string, unknown>): string
 const PROVIDER_RESULT_FLOOR = 5;
 
 /**
+ * Response-size cap shared by the three provider clients. Design sweep 2026-11-27: the largest
+ * geocoding answer (Nominatim `/search?q=Springfield&limit=50` with details) was 34,863 decoded
+ * bytes. ≥ 8× that gives the 2 MiB floor.
+ */
+const GEOCODING_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
+/**
  * Geocoding result with standardized format across all providers
  */
 export interface GeocodingResult {
@@ -78,9 +85,9 @@ export class GeocodingServiceUnavailableError extends Error {
 }
 
 /**
- * A provider did not answer. The message is one of three fixed forms naming the
+ * A provider did not answer. The message is one of four fixed forms naming the
  * provider — `<Name> timed out`, `<Name> rate-limited the request`,
- * `<Name> is unavailable` — and never carries the query, a URL or upstream text.
+ * `<Name> response too large`, `<Name> is unavailable` — and never carries the query, a URL or upstream text.
  * Exported for tests only.
  */
 export class GeocodingProviderFailure extends Error {
@@ -108,6 +115,10 @@ function failureFor(name: string, error: unknown): GeocodingProviderFailure | nu
   if (axios.isAxiosError(error)) {
     if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
       return new GeocodingProviderFailure(`${name} timed out`);
+    }
+    // An oversize answer carries no `response`. Gated on the code *and* the message.
+    if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+      return new GeocodingProviderFailure(`${name} response too large`);
     }
     const status = error.response?.status;
     if (status === 429) {
@@ -147,6 +158,9 @@ class CensusGovProvider implements GeocodingProvider {
         'Accept': 'application/json'
       },
       paramsSerializer: { serialize: rfc3986ParamsSerializer },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: GEOCODING_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -240,6 +254,9 @@ class NominatimProvider implements GeocodingProvider {
         'Accept': 'application/json'
       },
       paramsSerializer: { serialize: rfc3986ParamsSerializer },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: GEOCODING_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -346,6 +363,9 @@ class OpenMeteoProvider implements GeocodingProvider {
         'Accept': 'application/json'
       },
       paramsSerializer: { serialize: rfc3986ParamsSerializer },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: GEOCODING_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
   }

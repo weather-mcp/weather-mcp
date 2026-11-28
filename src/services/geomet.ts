@@ -38,6 +38,12 @@ const BBOX_HALF_EXTENT = 0.25;
 const ENDED_STATUS_VALUES = new Set(['ended', 'expired']);
 
 /**
+ * Response-size cap. Design sweep 2026-11-27: a `weather-alerts` bbox covering all of Canada was
+ * 270,899 decoded bytes (the code asks for ±0.25°). ≥ 8×, rounded up to a multiple of 4 MiB.
+ */
+const GEOMET_MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+
+/**
  * Minimal structural shape of an axios-style error, checked without `any`.
  * Deliberately carries no `message` fields: `handleError` never forwards
  * upstream body text or the HTTP client's own text.
@@ -166,6 +172,9 @@ export class GeoMetService {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: GEOMET_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -256,6 +265,18 @@ export class GeoMetService {
    */
   private async handleError(error: unknown): Promise<never> {
     if (isAxiosLikeError(error)) {
+      // An oversize answer, before the `response` branch: the rejection carries none. Gated on the code
+      // *and* the message, so another ERR_BAD_RESPONSE keeps the generic fixed text below. Contract path:
+      // it throws, never an empty alert list.
+      const axiosMessage = (error as { message?: unknown }).message;
+      if (
+        error.code === 'ERR_BAD_RESPONSE' &&
+        typeof axiosMessage === 'string' &&
+        /maxContentLength/.test(axiosMessage)
+      ) {
+        throw new GeoMetRequestError('GeoMet response too large', false);
+      }
+
       if (error.response) {
         const status = error.response.status;
 

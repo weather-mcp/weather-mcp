@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.6] - 2026-11-27
+
+Twelve of the server's upstream services had no limit on how large an answer could be, and followed redirects without bound. One huge or broken answer could fill the server's memory, and when one arrived it was often retried several times and reported as a library error or a network fault. This release gives every upstream a measured size limit and refuses every redirect, each with a plain, fixed message. Successful answers are unchanged.
+
+### Fixed
+
+- **Every upstream request now refuses a redirect and an oversized answer, and says so plainly.** Each of the twelve services that set no limit before (NOAA, Open-Meteo, Nominatim, the place-name lookup providers, AviationWeather, ACIS, GeoMet, MeteoAlarm, NIFC, Google Pollen, Google Weather and NASA FIRMS) now has a response-size limit of at least eight times the largest answer measured in a sweep on 2026-11-27. An answer over it fails with `<Service> response too large` and is not retried. Before, NOAA, Open-Meteo and METAR downloaded such an answer four times and showed a library error, and the Google and FIRMS services called it a network fault. A redirect is never followed: it fails with a fixed "returned status" message and is not retried, where NOAA used to retry it. Neither failure makes `get_forecast` fall back from Open-Meteo to MET Norway, because neither is transient. On `get_alerts` and `get_wildfire_info` both are errors, never an empty answer. These clients also now fail at 5 s when a direct connection does not open, like the rest; a connected but slow upstream still gets `API_TIMEOUT_MS`. Successful answers are unchanged.
+
 ## [1.36.5] - 2026-11-27
 
 When some of the keyless upstreams are down outright, the server gives up on them after 5 seconds instead of waiting for the full request timeout. That limit came from Node's own default connection settings, not from the server: nothing documented it, and a Node upgrade could have changed it without notice. This release sets it in the server and documents it. On Node 22, where it was measured, nothing you can see changes.
@@ -2591,7 +2599,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.5...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.6...HEAD
+[1.36.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.5...v1.36.6
 [1.36.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...v1.36.5
 [1.36.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...v1.36.4
 [1.36.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.2...v1.36.3
