@@ -979,6 +979,49 @@ function formatOpenMeteoFireWeather(
   return output;
 }
 
+
+/**
+ * Pin Open-Meteo's naive `current.time` (a location wall clock, no offset) to the response's
+ * `utc_offset_seconds`, so the zone label names the offset the reading was taken in. A naive clock
+ * inside the repeated fall-back hour (01:30 on a US DST end) is otherwise read as standard time and
+ * labelled CST for a CDT reading. The wall clock printed is unchanged. A string that already carries
+ * an offset, or a missing or non-finite offset, is returned as it came, which is the naive read.
+ */
+function withUtcOffset(time: string, offsetSeconds: number | null | undefined): string {
+  if (typeof offsetSeconds !== 'number' || !Number.isFinite(offsetSeconds)) {
+    return time;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(time)) {
+    return time;
+  }
+  const sign = offsetSeconds < 0 ? '-' : '+';
+  const minutes = Math.round(Math.abs(offsetSeconds) / 60);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${time}${sign}${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+}
+
+/**
+ * Open-Meteo's `**Time:**` text: the naive wall clock, labelled with the zone of the offset the reading
+ * was taken in (`withUtcOffset`). The offset-pinned label is used only when the pinned instant shows the
+ * same wall clock as the naive read, so the printed clock can never move; an offset that disagrees with
+ * the zone falls back to the naive read and its label.
+ */
+function formatOpenMeteoTime(
+  time: string,
+  offsetSeconds: number | null | undefined,
+  timezone: string,
+  timeFormat: '12h' | '24h'
+): string {
+  const naive = formatInTimezoneWithZone(time, timezone, 'medium', timeFormat);
+  const pinned = withUtcOffset(time, offsetSeconds);
+  if (pinned === time) {
+    return naive;
+  }
+  const sameClock =
+    formatInTimezone(pinned, timezone, 'medium', timeFormat) === formatInTimezone(time, timezone, 'medium', timeFormat);
+  return sameClock ? formatInTimezoneWithZone(pinned, timezone, 'medium', timeFormat) : naive;
+}
+
 /**
  * Format current conditions from Open-Meteo model data (non-US locations).
  *
@@ -1012,7 +1055,7 @@ async function formatOpenMeteoCurrentConditions(
   const timezone = response.timezone;
 
   let output = `# Current Weather Conditions\n\n`;
-  output += `**Time:** ${formatInTimezoneWithZone(current.time, timezone, 'medium', prefs.timeFormat)}\n\n`;
+  output += `**Time:** ${formatOpenMeteoTime(current.time, response.utc_offset_seconds, timezone, prefs.timeFormat)}\n\n`;
 
   if (current.weather_code != null) {
     output += `**Conditions:** ${openMeteoService.getWeatherDescription(current.weather_code)}\n`;

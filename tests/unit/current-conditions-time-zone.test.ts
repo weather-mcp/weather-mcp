@@ -309,6 +309,53 @@ describe('current-conditions time zone label', () => {
     });
   });
 
+  describe('Open-Meteo path in the repeated fall-back hour (diff review codex BLOCKER-1)', () => {
+    // US DST ends 2026-11-01 at 02:00 CDT, so 01:30 happens twice: first at UTC-5 (CDT), then at UTC-6 (CST).
+    it('labels the first 01:30 CDT when the response offset is UTC-5', async () => {
+      const response = buildOpenMeteoCurrentResponse({ time: '2026-11-01T01:30' }, 'America/Chicago', {
+        utc_offset_seconds: -18000,
+      });
+      const text = textOf(await callHandler({ ...LONDON }, {}, buildSupportFakes(response)));
+
+      expect(extract(text, TIME_LINE)).toBe('Nov 1, 2026, 1:30 AM CDT');
+    });
+
+    it('labels the second 01:30 CST when the response offset is UTC-6', async () => {
+      const response = buildOpenMeteoCurrentResponse({ time: '2026-11-01T01:30' }, 'America/Chicago', {
+        utc_offset_seconds: -21600,
+      });
+      const text = textOf(await callHandler({ ...LONDON }, {}, buildSupportFakes(response)));
+
+      expect(extract(text, TIME_LINE)).toBe('Nov 1, 2026, 1:30 AM CST');
+    });
+
+    it('never moves the printed clock when the offset disagrees with the zone (falls back to the naive read)', async () => {
+      const response = buildOpenMeteoCurrentResponse({ time: '2024-07-01T12:00' }, 'America/Chicago', {
+        utc_offset_seconds: 0,
+      });
+      const text = textOf(await callHandler({ ...LONDON }, {}, buildSupportFakes(response)));
+
+      expect(extract(text, TIME_LINE)).toBe(expectedClock('2024-07-01T12:00', 'America/Chicago'));
+    });
+
+    it('carries the CDT label through get_weather_summary (G19)', async () => {
+      const response = buildOpenMeteoCurrentResponse({ time: '2026-11-01T01:30' }, 'America/Chicago', {
+        utc_offset_seconds: -18000,
+      });
+      const support = buildSupportFakes(response);
+      const result = await handleGetWeatherSummary(
+        { ...LONDON, include: ['current'] },
+        {} as unknown as NOAAService,
+        support.openMeteo as unknown as OpenMeteoService,
+        support.ncei as unknown as NCEIService,
+        support.locationStore as unknown as LocationStore,
+        support.geocoding as unknown as GeocodingService
+      );
+
+      expect(extract(textOf(result), TIME_LINE)).toBe('Nov 1, 2026, 1:30 AM CDT');
+    });
+  });
+
   describe('get_weather_summary current section', () => {
     it('labels the NOAA observation time in the summary', async () => {
       const noaa = {
