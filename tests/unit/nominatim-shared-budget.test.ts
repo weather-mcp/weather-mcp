@@ -16,20 +16,6 @@ import { GeocodingService } from '../../src/services/geocoding.js';
 
 const MUNICH = { lat: 48.1372, lon: 11.5755 };
 const REVERSE_DE = { data: { address: { country_code: 'de' } } };
-const SEARCH_ONE = {
-  data: [
-    {
-      place_id: 1,
-      licence: 'x',
-      osm_type: 'node',
-      osm_id: 1,
-      lat: '47.3769',
-      lon: '8.5417',
-      display_name: 'Zqplace, Zqland'
-    }
-  ]
-};
-
 type Sleep = (ms: number) => Promise<void>;
 
 function makeSpacer(): { spacer: RequestSpacer; sleep: ReturnType<typeof vi.fn<Sleep>>; clock: { t: number } } {
@@ -76,23 +62,6 @@ describe('single-flight', () => {
     expect(get).toHaveBeenCalledTimes(1);
     expect(results).toEqual(['de', 'de', 'de']);
     expect(sleep).not.toHaveBeenCalled();
-  });
-
-  it('sends three concurrent same-key searchLocation calls once', async () => {
-    const { spacer } = makeSpacer();
-    const svc = new NominatimService({ spacer });
-    const get = stubGet(svc).mockResolvedValue(SEARCH_ONE);
-
-    const [a, b, c] = await Promise.all([
-      svc.searchLocation('Zqquery Street 7731', 1),
-      svc.searchLocation('Zqquery Street 7731', 1),
-      svc.searchLocation('Zqquery Street 7731', 1)
-    ]);
-
-    expect(get).toHaveBeenCalledTimes(1);
-    expect(a.results).toHaveLength(1);
-    expect(b).toEqual(a);
-    expect(c).toEqual(a);
   });
 
   it('dedupes with the cache disabled, and keeps nothing afterwards', async () => {

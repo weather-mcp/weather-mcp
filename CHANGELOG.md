@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.10] - 2026-11-28
+
+A clean-up release. It removes a place-search code path that nothing has used since v1.35.30, and it closes a small privacy gap found while checking the logs that remain: one error line could copy a coordinate into the default logs. No answer changes.
+
+### Changed
+
+- **Default logs no longer copy the reverse-geocoder's error text.** When OpenStreetMap's Nominatim rejected a request, the server logged its error message as it came. That message can quote the coordinates that were sent, which the default logs must never carry more precisely than two decimal places. It is now logged only with `LOG_PII=true`. What a caller sees is unchanged.
+
+### Removed
+
+- **Internal: an unused place-search code path is gone.** Every place search has gone through the shared geocoder since v1.35.30. This release deletes the older second path, along with its separate 30-day cache and its log lines. No answer changes, and the cache-lifetime check from v1.36.7 no longer needs an exception.
+
 ## [1.36.9] - 2026-11-28
 
 On Umnak Island in the eastern Aleutians, including the village of Nikolski, several tools showed times one hour behind the local clock. This release corrects the time zone there. Nothing changes anywhere else.
@@ -2624,7 +2636,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.9...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.10...HEAD
+[1.36.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.9...v1.36.10
 [1.36.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.8...v1.36.9
 [1.36.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.7...v1.36.8
 [1.36.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.6...v1.36.7

@@ -318,25 +318,29 @@ describe('success-path log privacy', () => {
     const svc = new NominatimService();
     const get = vi
       .spyOn((svc as unknown as { client: AxiosInstance }).client, 'get')
-      .mockResolvedValue({
-        data: [
-          {
-            place_id: 1,
-            licence: 'x',
-            osm_type: 'node',
-            osm_id: 1,
-            lat: '47.618273',
-            lon: '-122.351946',
-            display_name: NAME
-          }
-        ]
-      });
+      .mockResolvedValue({ data: { address: { country_code: 'us' } } });
     vi.spyOn(svc as unknown as { enforceRateLimit: () => Promise<void> }, 'enforceRateLimit')
       .mockResolvedValue();
-    await svc.searchLocation(QUERY, 1);
-    await svc.searchLocation(QUERY, 1);
+    await svc.reverseCountry(47.618273, -122.351946);
+    await svc.reverseCountry(47.618273, -122.351946);
     expect(get).toHaveBeenCalledTimes(1);
     return { get };
+  };
+
+  /** Drives NominatimService's error mapper at 400 (body quoting a 6-dp coordinate), 429 and 403. */
+  const NOMINATIM_400_ERROR = 'Invalid coordinates 47.618273,-122.351946';
+  const driveNominatimErrors = async (): Promise<void> => {
+    const svc = new NominatimService();
+    const handleError = (e: AxiosError): Promise<never> =>
+      (svc as unknown as { handleError: (e: AxiosError) => Promise<never> }).handleError(e);
+    const at = (status: number, data: unknown): AxiosError => {
+      const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
+      const response = { status, statusText: '', headers: {}, config, data } as AxiosResponse;
+      return new AxiosError(`Request failed with status code ${status}`, 'ERR_BAD_REQUEST', config, undefined, response);
+    };
+    await expect(handleError(at(400, { error: NOMINATIM_400_ERROR }))).rejects.toThrow();
+    await expect(handleError(at(429, {}))).rejects.toThrow();
+    await expect(handleError(at(403, {}))).rejects.toThrow();
   };
 
   const driveGeocoding = async (): Promise<void> => {
@@ -532,17 +536,29 @@ describe('success-path log privacy', () => {
       }
     });
 
-    it('nominatim lines carry no query, name or coordinates', async () => {
+    it('nominatim reverse-country lines carry no coordinate finer than 2 dp', async () => {
       await driveNominatim();
-      const req = find('Nominatim API request');
+      const req = find('Nominatim reverse geocoding request');
       expect(req).toHaveLength(1);
-      expect(req[0].metadata).toEqual({ limit: 1 });
-      expect(find('Nominatim search completed')[0].metadata).toMatchObject({ resultCount: 1 });
-      const hit = find('Nominatim cache hit');
+      expect(req[0].metadata).toEqual({ lat: 47.62, lon: -122.35 });
+      const hit = find('Nominatim reverse-country cache hit');
       expect(hit).toHaveLength(1);
-      expect('metadata' in hit[0]).toBe(false);
+      expect(hit[0].metadata).toEqual({ lat: 47.62, lon: -122.35 });
       const all = whole();
-      for (const needle of [QUERY, NAME, '47.618', '122.351']) {
+      for (const needle of ['47.618', '122.351']) {
+        expect(all).not.toContain(needle);
+      }
+    });
+
+    it('nominatim error lines (400, 429, 403) carry no upstream error text or coordinate', async () => {
+      await driveNominatimErrors();
+      const bad = find('Invalid request parameters');
+      expect(bad).toHaveLength(1);
+      expect(bad[0].metadata).toEqual({ service: 'Nominatim', securityEvent: true });
+      expect(find('Rate limit exceeded')).toHaveLength(1);
+      expect(find('Nominatim access forbidden')).toHaveLength(1);
+      const all = whole();
+      for (const needle of ['47.618', '122.351']) {
         expect(all).not.toContain(needle);
       }
     });
@@ -631,12 +647,20 @@ describe('success-path log privacy', () => {
       expect(whole()).not.toContain(NAME);
     });
 
-    it('nominatim lines carry the query but never the name', async () => {
+    it('nominatim reverse-country lines carry the full coordinates', async () => {
       await driveNominatim();
-      expect(find('Nominatim API request')[0].metadata).toEqual({ query: QUERY, limit: 1 });
-      expect(find('Nominatim search completed')[0].metadata?.query).toBe(QUERY);
-      expect(find('Nominatim cache hit')[0].metadata).toEqual({ query: QUERY });
-      expect(whole()).not.toContain(NAME);
+      const full = { lat: 47.618273, lon: -122.351946 };
+      expect(find('Nominatim reverse geocoding request')[0].metadata).toEqual(full);
+      expect(find('Nominatim reverse-country cache hit')[0].metadata).toEqual(full);
+    });
+
+    it('the nominatim 400 line carries the upstream error text', async () => {
+      await driveNominatimErrors();
+      expect(find('Invalid request parameters')[0].metadata).toEqual({
+        service: 'Nominatim',
+        error: NOMINATIM_400_ERROR,
+        securityEvent: true,
+      });
     });
 
     it('geocoding debug lines carry the query', async () => {
