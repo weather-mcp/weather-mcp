@@ -7993,6 +7993,30 @@ carried `limit=5`.
 
 **Status:** active.
 
+## G180 — A plain-object fixture cannot prove a field was never read; an accessor can
+
+**Trigger:** a test (or a plan's mutation list) that claims an ordering or a "never read" property —
+"decided before any read of the body", "the token is never consulted", "the cache is not touched" —
+and supplies the field as a plain object literal.
+
+**Rule:** supply the field through a getter that counts reads (or throws), and assert the count. A
+plain object proves only that the value did not reach the output; a code path can read it and discard
+it and the test stays green. Do not record such an ordering as "untestable" until an accessor has been
+tried.
+
+**Why:** `plan-ncei-oversize-text` T1 recorded mutation (d) — the 3xx test moved below the
+`e.response.data` read — as uncatchable, because every 3xx row passed `data` as an object. The diff
+review wrote a getter-backed `response.data` probe that was green on the real mapper and red under the
+reorder.
+
+**Verify:** in `tests/unit/ncei-error-text.test.ts`, move NCEI's 3xx branch below the
+`const message = …` line in a scratch copy of `src/services/ncei.ts`: the row "decides a 302 before any
+read of response.data" fails `expected 1 to be +0`.
+
+**Evidence:** 2026-11-28, diff review codex MAJOR-1 on `feat/ncei-oversize-text`; fixed in `a08a314`.
+
+**Status:** active.
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
