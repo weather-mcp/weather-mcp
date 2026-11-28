@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.5] - 2026-11-27
+
 When some of the keyless upstreams are down outright, the server gives up on them after 5 seconds instead of waiting for the full request timeout. That limit came from Node's own default connection settings, not from the server: nothing documented it, and a Node upgrade could have changed it without notice. This release sets it in the server and documents it. On Node 22, where it was measured, nothing you can see changes.
 
 ### Fixed
@@ -2589,7 +2591,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.5...HEAD
+[1.36.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...v1.36.5
 [1.36.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...v1.36.4
 [1.36.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.2...v1.36.3
 [1.36.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.1...v1.36.2
