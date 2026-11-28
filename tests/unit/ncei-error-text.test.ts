@@ -130,6 +130,24 @@ describe('NCEI 3xx answer', () => {
   });
 });
 
+describe('NCEI 3xx answer: the body is never read', () => {
+  it('decides a 302 before any read of response.data (accessor counts reads)', async () => {
+    const { onRejected } = build();
+    let reads = 0;
+    const response = {
+      status: 302,
+      get data(): unknown {
+        reads++;
+        return { message: 'zqbody7731 moved' };
+      }
+    };
+    const error = await rejectionOf(onRejected({ message: 'Request failed with status code 302', response }));
+
+    expect((error as ApiError).userMessage).toBe('NCEI API returned status 302');
+    expect(reads).toBe(0);
+  });
+});
+
 describe('neither answer is remembered', () => {
   it.each([
     ['a 302', redirect(302)],
