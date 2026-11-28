@@ -8017,6 +8017,52 @@ read of response.data" fails `expected 1 to be +0`.
 
 **Status:** active.
 
+## G181 — A keyless `npm run examples` silently swaps a keyed capture's source
+
+**Trigger:** regenerating an `examples/` file that holds a capture taken with an optional key — today
+`wildfire-awareness.md` (`athens-hotspots`, FIRMS multi-day) and `historical-climate.md`
+(`chicago-normals`, NCEI normals), and any capture that names a Google source.
+
+**Rule:** run the capture with `DOTENV_CONFIG_PATH=$PWD/.env npm run examples <filter>`. Before staging,
+diff every `Source:`/`Data source:` line and every "requires a free … key" line against the committed
+capture. A changed source is a stop, not drift.
+
+**Why:** `scripts/capture-examples.mjs:275` passes `process.env` to the server, and since v1.36.0 the
+server reads `.env` only through `DOTENV_CONFIG_PATH` (`src/config/envFile.ts`). A plain run is keyless, and
+every keyed path degrades by design: FIRMS falls to a 24 h window, normals fall from NCEI to Open-Meteo.
+Neither is an error, so G97's error grep passes. The only visible signal was a one-sided deletion in one
+file and `*Source: NCEI*` → `*Source: Open-Meteo*` in the other.
+
+**Verify:** `npm run examples historical` with `DOTENV_CONFIG_PATH` unset, then
+`git diff examples/historical-climate.md | grep Source:` shows `-*Source: NCEI*` / `+*Source: Open-Meteo*`.
+Restore with `git restore examples/`.
+
+**Evidence:** 2026-11-28, `current-conditions-time-zone` T1 (`54af72d`).
+
+**Status:** active. Lint candidate: the capture script could warn when `DOTENV_CONFIG_PATH` is unset and a
+selected capture's committed output names a keyed source.
+
+## G182 — A naive wall clock cannot choose the zone abbreviation inside a repeated DST hour
+
+**Trigger:** labelling a naive (offset-free) location time with a zone abbreviation —
+`formatInTimezoneWithZone` on an Open-Meteo `current.time`, `hourly.time[]` or any other wall clock.
+
+**Rule:** pin the wall clock to the response's own offset (`utc_offset_seconds`) before taking the label,
+and keep the label only if the pinned instant shows the same wall clock (`formatOpenMeteoTime`,
+`src/handlers/currentConditionsHandler.ts`). Never let the pinned instant change the printed clock.
+
+**Why:** in the repeated fall-back hour (01:30 on a US DST end) a naive clock names two instants. Luxon
+resolves it to the standard-time one, so a reading taken in daylight time is labelled `CST` instead of
+`CDT`. The clock digits are right, which is why every fixture outside that hour passes.
+
+**Verify:** `node -e "const {DateTime}=require('luxon'); console.log(DateTime.fromISO('2026-11-01T01:30',{zone:'America/Chicago'}).offsetNameShort, DateTime.fromISO('2026-11-01T01:30-05:00',{zone:'America/Chicago'}).offsetNameShort)"`
+prints `CST CDT`.
+
+**Evidence:** 2026-11-28, diff review codex BLOCKER-1 on `feat/current-conditions-time-zone`; fixed in `9b16302`.
+
+**Status:** active. Unverified residue: whether `utc_offset_seconds` is the request-time offset or the
+`current.time` bucket's.
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the

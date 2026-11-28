@@ -315,9 +315,9 @@ get_historical_weather({
 **Claude Code answered** (using `get_current_conditions` with `include_normals: true`):
 
 <!-- answer-2 -->
-Today is running **a little cooler than normal**. Chicago Midway is reporting **46°F under clear skies** just before 1 PM, with a wind chill of 41°F, against a normal high of 52°F and normal low of 39°F for November 14. So the early afternoon is sitting about six degrees below where a typical mid-November day peaks.
+Tonight is running **a little milder than normal**. Chicago Midway is reporting **37°F** at 2:40 AM CST, with a wind chill of 31°F, against a normal high of 44°F and normal low of 32°F for November 28. So the small hours are sitting about five degrees above where a typical late-November night bottoms out.
 
-For perspective, the books on this date go back to 1928: the **record high is 78°F (1971)** and the record low is 12°F (1940). Today threatens neither.
+For perspective, the books on this date go back to 1928: the **record high is 69°F (1998)** and the record low is -3°F (1930). Today threatens neither.
 <!-- /answer-2 -->
 
 <!-- capture:chicago-normals -->
@@ -340,28 +340,26 @@ get_current_conditions({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KMDW
-**Time:** Nov 14, 2026, 12:55 PM (15 minutes ago)
+**Time:** Nov 28, 2026, 2:40 AM CST (22 minutes ago)
 
-**Conditions:** Clear
-**Temperature:** 46°F
-**Feels Like (Wind Chill):** 41°F
-**Dewpoint:** 30°F
-**Humidity:** 53%
-**Wind:** 11 mph from 340°
-**Pressure:** 30.24 inHg
+**Temperature:** 37°F
+**Feels Like (Wind Chill):** 31°F
+**Dewpoint:** 28°F
+**Humidity:** 70%
+**Wind:** 9 mph from 250°
+**Pressure:** 29.73 inHg
 **Visibility:** 10.0 miles (clear)
-**Cloud Cover:** Clear at 12500ft
 
 ## 📊 Climate Context
 
-**Normal High:** 52°F
-**Normal Low:** 39°F
+**Normal High:** 44°F
+**Normal Low:** 32°F
 **Normal Precipitation:** 0.11 in
 
 *Climate normals based on 1991-2020 data*
 *Source: NCEI*
 
-**Records for Nov 14:** High 78°F (1971) · Low 12°F (1940) — records since 1928
+**Records for Nov 28:** High 69°F (1998) · Low -3°F (1930) — records since 1928
 Records: NOAA Regional Climate Centers (ACIS)
 
 ---
@@ -376,5 +374,5 @@ Records: NOAA Regional Climate Centers (ACIS)
 **Features shown:** `get_historical_weather` — any date range back to 1940, anywhere (Open-Meteo archive) · `include_normals` — 30-year normal high/low with departure from normal, plus the US record high/low for the date and the year it was set (NOAA Regional Climate Centers).
 
 <!-- capture-stamp -->
-*Captured 2026-11-14 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-11-28 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->

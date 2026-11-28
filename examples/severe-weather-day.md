@@ -5,7 +5,7 @@
 **Claude Code answered** (using `get_weather_summary`):
 
 <!-- answer -->
-The story in Oklahoma City is **wind**, not storms. It's currently **45°F** with 10-mile visibility (KOKC station reading from 25 minutes ago, feels like 41°F with a 6 mph breeze), overnight is 39°F and mostly clear, and Saturday reaches 64°F — dry throughout, with precipitation chances of 0 to 2% across the next four periods.
+The story in Oklahoma City is **wind**, not storms. It's currently **43°F and clear** (KOKC station reading from 31 minutes ago, feels like 39°F with a 6 mph breeze), overnight is 39°F and mostly clear, and Saturday reaches 64°F — dry throughout, with precipitation chances of 0 to 2% across the next four periods.
 
 There's one active alert: a **Wind Advisory from NWS Norman, from 9 PM Saturday until 8 AM Sunday** — northwest winds of 20 to 30 mph with gusts up to 50 mph. Plan around it: secure loose outdoor objects on Saturday, and expect a difficult drive for high-profile vehicles overnight into Sunday (Saturday night's forecast already shows 10 to 25 mph west wind).
 <!-- /answer -->
@@ -37,13 +37,15 @@ get_weather_summary({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KOKC
-**Time:** Nov 28, 2026, 12:50 AM (25 minutes ago)
+**Time:** Nov 28, 2026, 2:30 AM CST (31 minutes ago)
 
-**Temperature:** 45°F
-**Feels Like (Wind Chill):** 41°F
-**Wind:** 6 mph from 200°
-**Pressure:** 29.91 inHg
+**Conditions:** Clear
+**Temperature:** 43°F
+**Feels Like (Wind Chill):** 39°F
+**Wind:** 6 mph from 180°
+**Pressure:** 29.88 inHg
 **Visibility:** 10.0 miles (clear)
+**Cloud Cover:** Clear at 12500ft
 
 ---
 *Data source: NOAA National Weather Service*
@@ -91,7 +93,7 @@ get_weather_summary({
 
 **Location:** 35.4730, -97.5171
 **Status:** Active alerts only
-**Updated:** Nov 28, 2026, 1:14 AM CST
+**Updated:** Nov 28, 2026, 3:00 AM CST
 
 ⚠️ **1 active alert found**
 
@@ -157,7 +159,7 @@ get_alerts({
 
 **Location:** 35.4676, -97.5164
 **Status:** Active alerts only
-**Updated:** Nov 28, 2026, 1:14 AM CST
+**Updated:** Nov 28, 2026, 3:00 AM CST
 
 ⚠️ **1 active alert found**
 
@@ -235,14 +237,14 @@ get_weather_imagery({
 
 ## 🎬 Animation Frames (13 frames)
 
-### Frame 1 - 2026-11-28T05:10:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/648f8518ab8d/512/6/14/25/4/1_1.png
+### Frame 1 - 2026-11-28T07:00:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/d572b257d385/512/6/14/25/4/1_1.png
 
-### Frame 7 - 2026-11-28T06:10:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/e8cb55f0e2bd/512/6/14/25/4/1_1.png
+### Frame 7 - 2026-11-28T08:00:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/dd6691cb0fdf/512/6/14/25/4/1_1.png
 
-### Frame 13 - 2026-11-28T07:10:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/b1191385d77a/512/6/14/25/4/1_1.png
+### Frame 13 - 2026-11-28T09:00:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/84b1fbee4cc7/512/6/14/25/4/1_1.png
 
 *Showing 3 of 13 frames for brevity — use detail="full" for all frames*
 
@@ -254,7 +256,7 @@ get_weather_imagery({
 ⚠️ **DISCLAIMER:** RainViewer provides global precipitation radar. Data may have 5-10 minute delay. For official forecasts, consult local meteorological services.
 
 ---
-*Generated: 2026-11-28T07:15:12.133Z*
+*Generated: 2026-11-28T09:00:58.497Z*
 *Data source: RainViewer*
 ````
 

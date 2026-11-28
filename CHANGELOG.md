@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.13] - 2026-11-28
+
+Current conditions now say what time zone their observation time is in. Since v1.36.11 the NOAA alert times did, and the METAR path always had. The NOAA and Open-Meteo readings still printed a bare clock, so a reader elsewhere had to guess the zone.
+
+### Changed
+
+- **Current-conditions times name their time zone.** In `get_current_conditions` on the NOAA and Open-Meteo paths, and in the current section of `get_weather_summary`, the `**Time:**` line now ends its clock in the zone abbreviation for that moment, for example `Nov 28, 2026, 12:50 AM CST (25 minutes ago)`. The NOAA note that says a nearer station has not reported since a given time labels that time too. This matches METAR's `**Observed:**` line and the NOAA alert times from v1.36.11. Many non-US zones have no short name in the time-zone data and show a GMT offset instead (`GMT+1` in Berlin in winter). In the hour that repeats when daylight saving ends, the Open-Meteo reading is labelled by the offset it was actually taken in, so the first 1:30 AM reads `CDT` and the second `CST`.
+
 ## [1.36.12] - 2026-11-28
 
 A quiet maintenance release. It brings the optional NCEI climate-normals client in line with every other service: an answer that is too large or that redirects now ends in a short fixed error instead of the HTTP library's own wording. No weather output changes. It also tightens one of the project's internal checks, so a commented-out safety setting can no longer pass it.
@@ -2652,7 +2660,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.12...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.13...HEAD
+[1.36.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.12...v1.36.13
 [1.36.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.11...v1.36.12
 [1.36.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.10...v1.36.11
 [1.36.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.9...v1.36.10
