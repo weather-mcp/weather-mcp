@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.11] - 2026-11-28
+
 US weather alerts now say what time zone their times are in. Before this release, a NOAA alert's start and expiry times were bare clock times, such as "Expires: Nov 28, 2026, 3:00 PM". Someone reading from another zone, or an assistant passing the warning on, had to guess the zone. Alerts from the other countries' authorities already carried their offset.
 
 ### Changed
@@ -2642,7 +2644,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.10...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.11...HEAD
+[1.36.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.10...v1.36.11
 [1.36.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.9...v1.36.10
 [1.36.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.8...v1.36.9
 [1.36.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.7...v1.36.8
