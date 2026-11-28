@@ -30,7 +30,13 @@
  *   connected one still gets the request's own timeout. follow-redirects (any other `maxRedirects`)
  *   arms its own socket timer on `socket`, so those requests are left alone. The cut ends as axios's
  *   own `ECONNABORTED`, so no mapper changes (G138). Node 19+'s global agent carries the same 5 s;
- *   pinning it here means a Node default cannot move it.
+ *   pinning it here means a Node default cannot move it. **The cut needs a request timeout.** The
+ *   agent's timeout only emits `timeout`; axios installs the listener that destroys the request only
+ *   when `config.timeout` is set. A request with no timeout (and no tool budget) returns at the early
+ *   path below with no agent, and injecting one there would cut nothing in either phase: measured
+ *   2026-11-28 on Node 22, a black-hole connect and a silent connected socket both still pending at
+ *   12 s with the agent, against 5.01 s for the same agent with a timeout. Every client in `src/` sets
+ *   a timeout, and inside a tool call the budget supplies one, so no request reaches that path.
  * - A caller's own `signal` is chained in, and a caller's cancel stays axios's `ERR_CANCELED`.
  * - The deadline timer is ref'd (G114) and cleared on every settle path, with the caller-signal
  *   listener, so the timer itself holds a process for at most `timeout`.
