@@ -7972,6 +7972,27 @@ Related: [G10], [G177].
 
 ---
 
+## G179 — `api.weather.gov/alerts/active` rejects `limit`; `/alerts` accepts it
+
+**Trigger:** writing or running a live check that picks a US point with an active alert from
+`https://api.weather.gov/alerts/active?...` (a plan's live-read recipe, a test drive, a QA probe).
+
+**Rule:** do not pass `limit` to `/alerts/active`. Query it unbounded (it answered 283 features on
+2026-11-28, small enough to filter locally) and pick the point from the features. `limit` is valid on
+the historical `/alerts` endpoint only, which G76's Verify line uses.
+
+**Why:** `/alerts/active?status=actual&message_type=alert&limit=5` answers HTTP **400** with
+`"Query parameter \"limit\" is not recognized"`. A script that pipes the body straight into a JSON
+reader then fails on a missing `features` key, which reads like an empty feed rather than a bad request.
+
+**Verify:** `curl -s -o /dev/null -w '%{http_code}' 'https://api.weather.gov/alerts/active?limit=5'`
+prints `400`, and the same URL without `limit` prints `200`.
+
+**Evidence:** 2026-11-28, `plan-noaa-alert-time-zone` T3 live read (`5f970e4`); the impl plan's recipe
+carried `limit=5`.
+
+**Status:** active.
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the

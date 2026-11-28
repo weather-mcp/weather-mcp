@@ -56,6 +56,46 @@ export function formatInTimezone(
 }
 
 /**
+ * Format an ISO 8601 datetime string in the specified timezone and name the zone.
+ * Returns `formatInTimezone(...)`, a single space (U+0020), then the short zone name
+ * (e.g. "CDT") at the instant being formatted.
+ *
+ * The label is per instant: an alert that straddles a DST change labels each end
+ * differently (CDT, then CST). A naive wall-clock string is read in the target zone,
+ * as `formatInTimezone` reads it, so it gets the abbreviation of that local moment.
+ * 'full' and 'long' are excluded from the type: 'full' (DATETIME_FULL) already carries
+ * a zone, so it would print twice. Many non-US zones have no short name in ICU's en-US
+ * data and print an offset (e.g. "GMT+10" for Pacific/Guam). That is correct output.
+ * If the parse is invalid or the label is empty, the clock comes back unlabelled.
+ * @param isoString - ISO 8601 datetime string
+ * @param timezone - IANA timezone identifier
+ * @param format - 'medium' or 'short'
+ * @param timeFormat - '12h' or '24h'
+ * @returns Formatted datetime followed by the zone abbreviation, or the bare clock
+ */
+export function formatInTimezoneWithZone(
+  isoString: string,
+  timezone: string,
+  format: 'medium' | 'short' = 'medium',
+  timeFormat: '12h' | '24h' = '12h'
+): string {
+  const clock = formatInTimezone(isoString, timezone, format, timeFormat);
+  try {
+    const zonedDt = DateTime.fromISO(isoString, { zone: timezone });
+    if (!zonedDt.isValid) {
+      return clock;
+    }
+    const label = zonedDt.offsetNameShort;
+    if (!label) {
+      return clock;
+    }
+    return `${clock} ${label}`;
+  } catch {
+    return clock;
+  }
+}
+
+/**
  * Format a date-only ISO string in the specified timezone
  * @param isoString - ISO 8601 datetime string
  * @param timezone - IANA timezone identifier

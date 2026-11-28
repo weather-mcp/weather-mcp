@@ -5,9 +5,9 @@
 **Claude Code answered** (using `get_weather_summary`):
 
 <!-- answer -->
-The story in Oklahoma City is **wind**, not storms. It's currently **45°F and clear** (KOKC station reading from 47 minutes ago, feels like 40°F with an 8 mph breeze), tonight is 39°F and partly cloudy, and Saturday reaches 62°F — dry throughout, with precipitation chances of 0 to 1% across the next four periods.
+The story in Oklahoma City is **wind**, not storms. It's currently **45°F** with 10-mile visibility (KOKC station reading from 25 minutes ago, feels like 41°F with a 6 mph breeze), overnight is 39°F and mostly clear, and Saturday reaches 64°F — dry throughout, with precipitation chances of 0 to 2% across the next four periods.
 
-There's one active alert: a **Wind Advisory from NWS Norman, from 9 PM Saturday until 8 AM Sunday** — northwest winds of 20 to 30 mph with gusts up to 55 mph. Plan around it: secure loose outdoor objects on Saturday, and expect a difficult drive for high-profile vehicles overnight into Sunday (Saturday night's forecast already shows 8 to 24 mph west wind).
+There's one active alert: a **Wind Advisory from NWS Norman, from 9 PM Saturday until 8 AM Sunday** — northwest winds of 20 to 30 mph with gusts up to 50 mph. Plan around it: secure loose outdoor objects on Saturday, and expect a difficult drive for high-profile vehicles overnight into Sunday (Saturday night's forecast already shows 10 to 25 mph west wind).
 <!-- /answer -->
 
 <!-- capture:summary -->
@@ -37,15 +37,13 @@ get_weather_summary({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KOKC
-**Time:** Nov 27, 2026, 10:10 PM (47 minutes ago)
+**Time:** Nov 28, 2026, 12:50 AM (25 minutes ago)
 
-**Conditions:** Clear
 **Temperature:** 45°F
-**Feels Like (Wind Chill):** 40°F
-**Wind:** 8 mph from 190°
+**Feels Like (Wind Chill):** 41°F
+**Wind:** 6 mph from 200°
 **Pressure:** 29.91 inHg
 **Visibility:** 10.0 miles (clear)
-**Cloud Cover:** Clear at 12500ft
 
 ---
 *Data source: NOAA National Weather Service*
@@ -57,31 +55,31 @@ get_weather_summary({
 **Location:** 35.4730, -97.5171
 **Elevation:** 1211ft
 **Timezone:** America/Chicago
-**Updated:** Nov 27, 2026, 12:26 PM
+**Updated:** Nov 28, 2026, 12:31 AM
 **Showing:** 4 periods
 
-## Tonight
+## Overnight
 **Temperature:** 39°F
 **Precipitation Chance:** 0%
-**Wind:** 2 to 6 mph W
-**Forecast:** Partly Cloudy
+**Wind:** 1 to 5 mph WSW
+**Forecast:** Mostly Clear
 
 ## Saturday
-**Temperature:** 62°F
+**Temperature:** 64°F
 **Precipitation Chance:** 0%
-**Wind:** 1 to 14 mph S
+**Wind:** 1 to 13 mph SSE
 **Forecast:** Partly Sunny
 
 ## Saturday Night
 **Temperature:** 40°F
-**Precipitation Chance:** 1%
-**Wind:** 8 to 24 mph W
-**Forecast:** Mostly Clear
+**Precipitation Chance:** 2%
+**Wind:** 10 to 25 mph W
+**Forecast:** Partly Cloudy
 
 ## Sunday
-**Temperature:** 52°F
+**Temperature:** 51°F
 **Precipitation Chance:** 0%
-**Wind:** 5 to 16 mph NNW
+**Wind:** 8 to 22 mph NNW
 **Forecast:** Sunny
 
 ---
@@ -93,20 +91,20 @@ get_weather_summary({
 
 **Location:** 35.4730, -97.5171
 **Status:** Active alerts only
-**Updated:** Nov 27, 2026, 10:56 PM
+**Updated:** Nov 28, 2026, 1:14 AM CST
 
 ⚠️ **1 active alert found**
 
 🟡 **Wind Advisory**
 ---
-**Wind Advisory issued November 27 at 11:55AM CST until November 29 at 8:00AM CST by NWS Norman OK**
+**Wind Advisory issued November 28 at 12:35AM CST until November 29 at 8:00AM CST by NWS Norman OK**
 
 **Severity:** Moderate | **Urgency:** Expected | **Certainty:** Likely
-**Area:** Alfalfa; Grant; Kay; Major; Garfield; Noble; Blaine; Kingfisher; Logan; Payne; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Stephens; Garvin; Murray; Pontotoc; Coal; Cotton; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan; Hardeman; Foard; Wilbarger; Wichita; Knox; Baylor; Archer; Clay
-**Effective:** Nov 27, 2026, 11:55 AM
-**Expires:** Nov 28, 2026, 2:00 AM
-**Onset:** Nov 28, 2026, 9:00 PM
-**Ends:** Nov 29, 2026, 8:00 AM
+**Area:** Grant; Kay; Garfield; Noble; Kingfisher; Logan; Payne; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Stephens; Garvin; Murray; Pontotoc; Coal; Cotton; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan; Wichita; Baylor; Archer; Clay
+**Effective:** Nov 28, 2026, 12:35 AM CST
+**Expires:** Nov 28, 2026, 3:00 PM CST
+**Onset:** Nov 28, 2026, 9:00 PM CST
+**Ends:** Nov 29, 2026, 8:00 AM CST
 
 **Recommended Response:** Execute
 **Sender:** NWS Norman OK
@@ -131,8 +129,8 @@ get_weather_summary({
 <!-- answer-2 -->
 Full text of the Wind Advisory:
 
-- **What:** northwest winds 20 to 30 mph with gusts up to 55 mph expected.
-- **Where:** portions of central, east central, northern, northwest, southeast, southern, and southwest Oklahoma, and northern Texas.
+- **What:** northwest winds 20 to 30 mph with gusts up to 50 mph expected.
+- **Where:** portions of central, east central, northern, southeast, southern, and southwest Oklahoma, and northern Texas.
 - **When:** from 9 PM Saturday to 8 AM CST Sunday.
 - **Impacts:** gusty winds will blow around unsecured objects; tree limbs could be blown down and a few power outages may result.
 - **Instructions from NWS:** winds this strong can make driving difficult, especially for high-profile vehicles. Use extra caution.
@@ -159,29 +157,29 @@ get_alerts({
 
 **Location:** 35.4676, -97.5164
 **Status:** Active alerts only
-**Updated:** Nov 27, 2026, 10:56 PM
+**Updated:** Nov 28, 2026, 1:14 AM CST
 
 ⚠️ **1 active alert found**
 
 🟡 **Wind Advisory**
 ---
-**Wind Advisory issued November 27 at 11:55AM CST until November 29 at 8:00AM CST by NWS Norman OK**
+**Wind Advisory issued November 28 at 12:35AM CST until November 29 at 8:00AM CST by NWS Norman OK**
 
 **Severity:** Moderate | **Urgency:** Expected | **Certainty:** Likely
-**Area:** Alfalfa; Grant; Kay; Major; Garfield; Noble; Blaine; Kingfisher; Logan; Payne; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Stephens; Garvin; Murray; Pontotoc; Coal; Cotton; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan; Hardeman; Foard; Wilbarger; Wichita; Knox; Baylor; Archer; Clay
-**Effective:** Nov 27, 2026, 11:55 AM
-**Expires:** Nov 28, 2026, 2:00 AM
-**Onset:** Nov 28, 2026, 9:00 PM
-**Ends:** Nov 29, 2026, 8:00 AM
+**Area:** Grant; Kay; Garfield; Noble; Kingfisher; Logan; Payne; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Stephens; Garvin; Murray; Pontotoc; Coal; Cotton; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan; Wichita; Baylor; Archer; Clay
+**Effective:** Nov 28, 2026, 12:35 AM CST
+**Expires:** Nov 28, 2026, 3:00 PM CST
+**Onset:** Nov 28, 2026, 9:00 PM CST
+**Ends:** Nov 29, 2026, 8:00 AM CST
 
 **Description:**
-* WHAT...Northwest winds 20 to 30 mph with gusts up to 55 mph
+* WHAT...Northwest winds 20 to 30 mph with gusts up to 50 mph
 expected.
 
-* WHERE...Portions of central, east central, northern, northwest,
-southeast, southern, and southwest Oklahoma and northern Texas.
+* WHERE...Portions of central, east central, northern, southeast,
+southern, and southwest Oklahoma and northern Texas.
 
-* WHEN...From 9 PM Saturday to 8 AM CST Sunday.
+* WHEN...From 9 PM this evening to 8 AM CST Sunday.
 
 * IMPACTS...Gusty winds will blow around unsecured objects. Tree
 limbs could be blown down and a few power outages may result.
@@ -203,7 +201,7 @@ profile vehicles. Use extra caution.
 > **You:** Show me the radar.
 
 <!-- answer-3 -->
-Here's the animated radar for the past couple of hours — 13 frames from RainViewer (the links below open the tiles directly). Consistent with today's zero precipitation chances (0% tonight, 0% Saturday), there's nothing on it: the wind is the story, arriving Saturday night, not rain.
+Here's the animated radar for the past couple of hours — 13 frames from RainViewer (the links below open the tiles directly). Consistent with today's zero precipitation chances (0% overnight, 0% Saturday), there's nothing on it: the wind is the story, arriving Saturday night, not rain.
 
 *Two things to know if you click those frame URLs: RainViewer only retains about two hours of history, so links in this captured output have long since expired — and even a live tile over dry skies renders as a blank white square, because radar tiles are transparent precipitation overlays with nothing to draw when it isn't raining. For what a tile with actual weather on it looks like, see the committed snapshot in [the Tokyo example](./weekend-trip-planning.md).*
 <!-- /answer-3 -->
@@ -237,14 +235,14 @@ get_weather_imagery({
 
 ## 🎬 Animation Frames (13 frames)
 
-### Frame 1 - 2026-11-28T02:50:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/7307a6baedaf/512/6/14/25/4/1_1.png
+### Frame 1 - 2026-11-28T05:10:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/648f8518ab8d/512/6/14/25/4/1_1.png
 
-### Frame 7 - 2026-11-28T03:50:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/412d9495aeab/512/6/14/25/4/1_1.png
+### Frame 7 - 2026-11-28T06:10:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/e8cb55f0e2bd/512/6/14/25/4/1_1.png
 
-### Frame 13 - 2026-11-28T04:50:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/676d34b36b9f/512/6/14/25/4/1_1.png
+### Frame 13 - 2026-11-28T07:10:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/b1191385d77a/512/6/14/25/4/1_1.png
 
 *Showing 3 of 13 frames for brevity — use detail="full" for all frames*
 
@@ -256,7 +254,7 @@ get_weather_imagery({
 ⚠️ **DISCLAIMER:** RainViewer provides global precipitation radar. Data may have 5-10 minute delay. For official forecasts, consult local meteorological services.
 
 ---
-*Generated: 2026-11-28T04:56:39.363Z*
+*Generated: 2026-11-28T07:15:12.133Z*
 *Data source: RainViewer*
 ````
 

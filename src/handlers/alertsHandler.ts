@@ -65,7 +65,7 @@ import {
   ResolvedLocation
 } from '../utils/locationResolver.js';
 import { validateOptionalBoolean, validateDetail } from '../utils/validation.js';
-import { formatInTimezone, guessTimezoneFromCoords } from '../utils/timezone.js';
+import { formatInTimezoneWithZone, guessTimezoneFromCoords } from '../utils/timezone.js';
 import { isInUS, isInNwsTerritory } from '../utils/geography.js';
 import { isNwsCountryCode } from '../utils/nwsJurisdiction.js';
 import { MAX_INDEX_ITEMS } from '../utils/capParse.js';
@@ -205,9 +205,12 @@ export async function handleGetAlerts(
 }
 
 /**
- * The original US path — prologue (station timezone side-call) and renderer
- * preserved verbatim so US output stays byte-identical
- * (locked by tests/unit/alerts-detail.test.ts passing unedited).
+ * The original US path — prologue (station timezone side-call) and renderer.
+ * Every time it prints (`**Updated:**`, `**Effective:**`, `**Expires:**`,
+ * `**Onset:**`, `**Ends:**`) ends in the zone abbreviation for that instant
+ * (`formatInTimezoneWithZone`), so a DST straddle labels each end on its own.
+ * Everything else is unchanged; tests/unit/alerts-detail.test.ts, which asserts
+ * no time, still passes unedited.
  */
 async function handleNoaaAlerts(
   resolved: ResolvedLocation,
@@ -241,7 +244,7 @@ async function handleNoaaAlerts(
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Status:** ${active_only ? 'Active alerts only' : 'All alerts'}\n`;
   if (alertsData.updated) {
-    output += `**Updated:** ${formatInTimezone(alertsData.updated, timezone)}\n`;
+    output += `**Updated:** ${formatInTimezoneWithZone(alertsData.updated, timezone)}\n`;
   }
   output += `\n`;
 
@@ -289,15 +292,15 @@ async function handleNoaaAlerts(
 
       output += `**Severity:** ${props.severity} | **Urgency:** ${props.urgency} | **Certainty:** ${props.certainty}\n`;
       output += `**Area:** ${props.areaDesc}\n`;
-      output += `**Effective:** ${formatInTimezone(props.effective, timezone)}\n`;
-      output += `**Expires:** ${formatInTimezone(props.expires, timezone)}\n`;
+      output += `**Effective:** ${formatInTimezoneWithZone(props.effective, timezone)}\n`;
+      output += `**Expires:** ${formatInTimezoneWithZone(props.expires, timezone)}\n`;
 
       if (props.onset && props.onset !== props.effective) {
-        output += `**Onset:** ${formatInTimezone(props.onset, timezone)}\n`;
+        output += `**Onset:** ${formatInTimezoneWithZone(props.onset, timezone)}\n`;
       }
 
       if (props.ends) {
-        output += `**Ends:** ${formatInTimezone(props.ends, timezone)}\n`;
+        output += `**Ends:** ${formatInTimezoneWithZone(props.ends, timezone)}\n`;
       }
 
       // Full NWS description text is verbose; include it only at detail=full.
