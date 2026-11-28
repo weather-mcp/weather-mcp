@@ -8017,6 +8017,31 @@ read of response.data" fails `expected 1 to be +0`.
 
 **Status:** active.
 
+## G181 — A keyless `npm run examples` silently swaps a keyed capture's source
+
+**Trigger:** regenerating an `examples/` file that holds a capture taken with an optional key — today
+`wildfire-awareness.md` (`athens-hotspots`, FIRMS multi-day) and `historical-climate.md`
+(`chicago-normals`, NCEI normals), and any capture that names a Google source.
+
+**Rule:** run the capture with `DOTENV_CONFIG_PATH=$PWD/.env npm run examples <filter>`. Before staging,
+diff every `Source:`/`Data source:` line and every "requires a free … key" line against the committed
+capture. A changed source is a stop, not drift.
+
+**Why:** `scripts/capture-examples.mjs:275` passes `process.env` to the server, and since v1.36.0 the
+server reads `.env` only through `DOTENV_CONFIG_PATH` (`src/config/envFile.ts`). A plain run is keyless, and
+every keyed path degrades by design: FIRMS falls to a 24 h window, normals fall from NCEI to Open-Meteo.
+Neither is an error, so G97's error grep passes. The only visible signal was a one-sided deletion in one
+file and `*Source: NCEI*` → `*Source: Open-Meteo*` in the other.
+
+**Verify:** `npm run examples historical` with `DOTENV_CONFIG_PATH` unset, then
+`git diff examples/historical-climate.md | grep Source:` shows `-*Source: NCEI*` / `+*Source: Open-Meteo*`.
+Restore with `git restore examples/`.
+
+**Evidence:** 2026-11-28, `current-conditions-time-zone` T1 (`54af72d`).
+
+**Status:** active. Lint candidate: the capture script could warn when `DOTENV_CONFIG_PATH` is unset and a
+selected capture's committed output names a keyed source.
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
