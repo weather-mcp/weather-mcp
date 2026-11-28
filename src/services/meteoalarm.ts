@@ -199,6 +199,14 @@ class MeteoAlarmRequestError extends Error {
 }
 
 /**
+ * Response-size cap. Design sweep 2026-11-27: `feeds-germany` was 8,631,036 decoded bytes, the largest
+ * of nine member feeds probed, in late November. ≥ 8×, rounded up to a multiple of 4 MiB. The headroom
+ * is large on purpose: a storm day multiplies the feed, and a cap near today's size would turn that day
+ * into an alerts outage for the whole country.
+ */
+const METEOALARM_MAX_RESPONSE_BYTES = 68 * 1024 * 1024;
+
+/**
  * MeteoAlarm country feed client. No API key required.
  */
 export class MeteoAlarmService {
@@ -221,6 +229,9 @@ export class MeteoAlarmService {
         'Accept': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: METEOALARM_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -234,7 +245,7 @@ export class MeteoAlarmService {
    * Fetch the current warnings for a MeteoAlarm member country.
    *
    * The **parsed** (unfiltered) warning list is cached for the alerts TTL —
-   * one worst-case 2.8 MB country fetch per 5 minutes — and
+   * one worst-case country fetch (`feeds-germany`, 8.6 MB decoded on 2026-11-27) per 5 minutes — and
    * `filterActiveWarnings` runs on every return so expiry and supersession
    * are always evaluated against the caller's `now`.
    *
@@ -308,6 +319,18 @@ export class MeteoAlarmService {
    */
   private async handleError(error: unknown): Promise<never> {
     if (isAxiosLikeError(error)) {
+      // An oversize answer, before the `response` branch: the rejection carries none. Gated on the code
+      // *and* the message, so another ERR_BAD_RESPONSE keeps the generic fixed text below. Contract path:
+      // it throws, never an empty alert list.
+      const axiosMessage = (error as { message?: unknown }).message;
+      if (
+        error.code === 'ERR_BAD_RESPONSE' &&
+        typeof axiosMessage === 'string' &&
+        /maxContentLength/.test(axiosMessage)
+      ) {
+        throw new MeteoAlarmRequestError('MeteoAlarm response too large', false);
+      }
+
       if (error.response) {
         const status = error.response.status;
         if (status === 429) {
