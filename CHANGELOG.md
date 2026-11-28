@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.13] - 2026-11-28
+
 Current conditions now say what time zone their observation time is in. Since v1.36.11 the NOAA alert times did, and the METAR path always had. The NOAA and Open-Meteo readings still printed a bare clock, so a reader elsewhere had to guess the zone.
 
 ### Changed
@@ -2658,7 +2660,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.12...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.13...HEAD
+[1.36.13]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.12...v1.36.13
 [1.36.12]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.11...v1.36.12
 [1.36.11]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.10...v1.36.11
 [1.36.10]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.9...v1.36.10
