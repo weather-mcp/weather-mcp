@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+A maintenance release with no change to any answer. Five of the server's caches had their lifetimes written as bare numbers inside the code that fetches the data, where nobody reviewing the cache settings would see them, among them the wildfire perimeter cache. Every cache lifetime now lives in one place, and a check fails the build if a new one is written as a bare number.
+
 ### Changed
 
-- The service cache TTLs that were written as bare numbers are now named `CacheConfig.ttl` entries: `firePerimeters` (NIFC fire perimeters), `airQuality` and `marine` (Open-Meteo) are new, and the Open-Meteo forecast and the NCEI climate normals table now read the existing `forecast` and `normals` entries. Every value is unchanged. A unit test now fails on a hardcoded TTL at a cache write, with one allowlisted Nominatim site that roadmap row 105 removes.
+- **Every cache lifetime is now a named setting.** Wildfire perimeters (30 minutes), air quality (1 hour), marine conditions (1 hour), the global forecast (2 hours) and US climate normals (kept for the life of the process) now read their lifetimes from the server's one cache configuration. The values themselves are unchanged, so no answer is fresher or staler than before.
+- **A build-time check now refuses a cache lifetime written as a bare number,** and checks that each of these five caches uses its own setting rather than another one that happens to hold the same number. One older location-search cache is temporarily exempt until the unused code it belongs to is removed.
 
 ## [1.36.6] - 2026-11-27
 
