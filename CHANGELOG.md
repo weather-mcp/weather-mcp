@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+A clean-up release. It removes a place-search code path that nothing has used since v1.35.30, and it closes a small privacy gap found while checking the logs that remain: one error line could copy a coordinate into the default logs. No answer changes.
+
 ### Changed
 
 - **Default logs no longer copy the reverse-geocoder's error text.** When OpenStreetMap's Nominatim rejected a request, the server logged its error message as it came. That message can quote the coordinates that were sent, which the default logs must never carry more precisely than two decimal places. It is now logged only with `LOG_PII=true`. What a caller sees is unchanged.
