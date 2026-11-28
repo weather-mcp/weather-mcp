@@ -318,23 +318,11 @@ describe('success-path log privacy', () => {
     const svc = new NominatimService();
     const get = vi
       .spyOn((svc as unknown as { client: AxiosInstance }).client, 'get')
-      .mockResolvedValue({
-        data: [
-          {
-            place_id: 1,
-            licence: 'x',
-            osm_type: 'node',
-            osm_id: 1,
-            lat: '47.618273',
-            lon: '-122.351946',
-            display_name: NAME
-          }
-        ]
-      });
+      .mockResolvedValue({ data: { address: { country_code: 'us' } } });
     vi.spyOn(svc as unknown as { enforceRateLimit: () => Promise<void> }, 'enforceRateLimit')
       .mockResolvedValue();
-    await svc.searchLocation(QUERY, 1);
-    await svc.searchLocation(QUERY, 1);
+    await svc.reverseCountry(47.618273, -122.351946);
+    await svc.reverseCountry(47.618273, -122.351946);
     expect(get).toHaveBeenCalledTimes(1);
     return { get };
   };
@@ -532,17 +520,16 @@ describe('success-path log privacy', () => {
       }
     });
 
-    it('nominatim lines carry no query, name or coordinates', async () => {
+    it('nominatim reverse-country lines carry no coordinate finer than 2 dp', async () => {
       await driveNominatim();
-      const req = find('Nominatim API request');
+      const req = find('Nominatim reverse geocoding request');
       expect(req).toHaveLength(1);
-      expect(req[0].metadata).toEqual({ limit: 1 });
-      expect(find('Nominatim search completed')[0].metadata).toMatchObject({ resultCount: 1 });
-      const hit = find('Nominatim cache hit');
+      expect(req[0].metadata).toEqual({ lat: 47.62, lon: -122.35 });
+      const hit = find('Nominatim reverse-country cache hit');
       expect(hit).toHaveLength(1);
-      expect('metadata' in hit[0]).toBe(false);
+      expect(hit[0].metadata).toEqual({ lat: 47.62, lon: -122.35 });
       const all = whole();
-      for (const needle of [QUERY, NAME, '47.618', '122.351']) {
+      for (const needle of ['47.618', '122.351']) {
         expect(all).not.toContain(needle);
       }
     });
@@ -631,12 +618,11 @@ describe('success-path log privacy', () => {
       expect(whole()).not.toContain(NAME);
     });
 
-    it('nominatim lines carry the query but never the name', async () => {
+    it('nominatim reverse-country lines carry the full coordinates', async () => {
       await driveNominatim();
-      expect(find('Nominatim API request')[0].metadata).toEqual({ query: QUERY, limit: 1 });
-      expect(find('Nominatim search completed')[0].metadata?.query).toBe(QUERY);
-      expect(find('Nominatim cache hit')[0].metadata).toEqual({ query: QUERY });
-      expect(whole()).not.toContain(NAME);
+      const full = { lat: 47.618273, lon: -122.351946 };
+      expect(find('Nominatim reverse geocoding request')[0].metadata).toEqual(full);
+      expect(find('Nominatim reverse-country cache hit')[0].metadata).toEqual(full);
     });
 
     it('geocoding debug lines carry the query', async () => {
