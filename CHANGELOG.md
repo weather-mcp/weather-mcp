@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Current conditions now say what time zone their observation time is in. Since v1.36.11 the NOAA alert times did, and the METAR path always had. The NOAA and Open-Meteo readings still printed a bare clock, so a reader elsewhere had to guess the zone.
+
 ### Changed
 
-- **Current-conditions times name their time zone.** In `get_current_conditions` on the NOAA and Open-Meteo paths, and in the current section of `get_weather_summary`, the `**Time:**` line now ends its clock in the zone abbreviation for that moment, for example `Nov 28, 2026, 12:50 AM CST (25 minutes ago)`. The NOAA note that says a nearer station has not reported since a given time labels that time too. This matches METAR's `**Observed:**` line and the NOAA alert times from v1.36.11. Many non-US zones have no short name in the time-zone data and show a GMT offset instead (`GMT+1` in Berlin in winter).
+- **Current-conditions times name their time zone.** In `get_current_conditions` on the NOAA and Open-Meteo paths, and in the current section of `get_weather_summary`, the `**Time:**` line now ends its clock in the zone abbreviation for that moment, for example `Nov 28, 2026, 12:50 AM CST (25 minutes ago)`. The NOAA note that says a nearer station has not reported since a given time labels that time too. This matches METAR's `**Observed:**` line and the NOAA alert times from v1.36.11. Many non-US zones have no short name in the time-zone data and show a GMT offset instead (`GMT+1` in Berlin in winter). In the hour that repeats when daylight saving ends, the Open-Meteo reading is labelled by the offset it was actually taken in, so the first 1:30 AM reads `CDT` and the second `CST`.
 
 ## [1.36.12] - 2026-11-28
 
