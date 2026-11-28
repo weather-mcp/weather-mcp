@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **NCEI errors carry fixed text for an oversize or redirected answer.** With `NCEI_API_TOKEN` set, an NCEI answer that is too large, or one that redirects, now carries a short fixed error text (`NCEI response too large`, `NCEI API returned status 301`) in place of the HTTP library's own text. NCEI's error mapper had not been given these two fixed answers. Nothing shows this text today: climate normals still fall back to Open-Meteo, and the output does not change.
+
 ## [1.36.11] - 2026-11-28
 
 US weather alerts now say what time zone their times are in. Before this release, a NOAA alert's start and expiry times were bare clock times, such as "Expires: Nov 28, 2026, 3:00 PM". Someone reading from another zone, or an assistant passing the warning on, had to guess the zone. Alerts from the other countries' authorities already carried their offset.
