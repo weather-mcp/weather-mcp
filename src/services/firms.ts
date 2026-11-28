@@ -64,6 +64,14 @@ export interface FIRMSServiceConfig {
   mapKey?: string;
 }
 
+/**
+ * Response-size cap for every FIRMS request (Area API, regional flat files, data availability).
+ * Design sweep 2026-11-27: `J1_VIIRS_C2_Global_24h.csv` was 7,371,195 decoded bytes, the largest
+ * file the code can fetch, in late November; fire season can multiply it. ≥ 8×, rounded up to a
+ * multiple of 4 MiB.
+ */
+const FIRMS_MAX_RESPONSE_BYTES = 60 * 1024 * 1024;
+
 const AREA_API_BASE = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv';
 const FLAT_FILE_ROOT = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire';
 const DATA_AVAILABILITY_BASE = 'https://firms.modaps.eosdis.nasa.gov/api/data_availability/csv';
@@ -100,6 +108,9 @@ export class FIRMSService {
       headers: {
         'Accept': 'text/csv'
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: FIRMS_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
   }
@@ -404,6 +415,12 @@ export class FIRMSService {
  */
 function mapAreaApiError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
+    // An oversize answer, first: it carries no `response`, so it would otherwise be reported as a
+    // network failure. Gated on the code *and* the message. Fixed text: never the axios message, which
+    // could name the request.
+    if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+      return new Error('FIRMS service response too large.');
+    }
     if (error.code === 'ECONNABORTED') {
       return new Error('FIRMS service request timed out. The service may be temporarily unavailable.');
     }
@@ -438,6 +455,12 @@ function mapAreaApiError(error: unknown): Error {
  */
 function mapRegionFileError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
+    // An oversize answer, first: it carries no `response`, so it would otherwise be reported as a
+    // network failure. Gated on the code *and* the message. Fixed text: never the axios message, which
+    // could name the request.
+    if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+      return new Error('FIRMS service response too large.');
+    }
     if (error.code === 'ECONNABORTED') {
       return new Error('FIRMS service request timed out. The service may be temporarily unavailable.');
     }

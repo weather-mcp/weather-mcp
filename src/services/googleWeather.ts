@@ -83,6 +83,12 @@ export interface PublicAlertsResult {
   covered: boolean;
 }
 
+/**
+ * Response-size cap. Design sweep 2026-11-27: the largest of four `publicAlerts:lookup` answers
+ * (São Paulo) was 3,430 decoded bytes. ≥ 8× that gives the 2 MiB floor.
+ */
+const GOOGLE_WEATHER_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
 const PUBLIC_ALERTS_URL = 'https://weather.googleapis.com/v1/publicAlerts:lookup';
 
 // **Live-verified 2026-08-18** (T6): a rejected key returns HTTP 400 with a
@@ -162,6 +168,9 @@ export class GoogleWeatherService {
       headers: {
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: GOOGLE_WEATHER_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
   }
@@ -373,6 +382,12 @@ function isLocationUnsupported(error: unknown): boolean {
  */
 function mapPublicAlertsError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
+    // An oversize answer, first: it carries no `response`, so it would otherwise be reported as a
+    // network failure. Gated on the code *and* the message. Fixed text: never the axios message, which
+    // could name the request.
+    if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+      return new Error('Google Weather API response too large.');
+    }
     if (error.code === 'ECONNABORTED') {
       return new Error(
         'Google Weather API request timed out. The service may be temporarily unavailable.'

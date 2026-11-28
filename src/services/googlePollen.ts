@@ -54,6 +54,12 @@ export interface GooglePollenServiceConfig {
   apiKey?: string;
 }
 
+/**
+ * Response-size cap. Design sweep 2026-11-27: a one-day Tokyo lookup was 657 decoded bytes.
+ * ≥ 8× that gives the 2 MiB floor.
+ */
+const GOOGLE_POLLEN_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
 const POLLEN_API_URL = 'https://pollen.googleapis.com/v1/forecast:lookup';
 
 // **Live-verified 2026-08-18** (upstream (f) in the design plan): a rejected
@@ -100,6 +106,9 @@ export class GooglePollenService {
       headers: {
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: GOOGLE_POLLEN_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
   }
@@ -275,6 +284,12 @@ function isLocationUnavailable(error: unknown): boolean {
  */
 function mapPollenApiError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
+    // An oversize answer, first: it carries no `response`, so it would otherwise be reported as a
+    // network failure. Gated on the code *and* the message. Fixed text: never the axios message, which
+    // could name the request.
+    if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+      return new Error('Google Pollen API response too large.');
+    }
     if (error.code === 'ECONNABORTED') {
       return new Error(
         'Google Pollen API request timed out. The service may be temporarily unavailable.'
