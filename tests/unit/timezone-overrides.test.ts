@@ -17,11 +17,12 @@ const EXPECTED_BOXES = [
   { minLat: 62.8, maxLat: 64.0, minLon: -172.25, maxLon: -168.4, zone: 'America/Nome' },
   { minLat: 65.6, maxLat: 66.0, minLon: -168.975, maxLon: -168.7, zone: 'America/Nome' },
   { minLat: 65.36, maxLat: 65.64, minLon: -170.65, maxLon: -168.98, zone: 'Asia/Anadyr' },
+  { minLat: 52.5, maxLat: 53.5, minLon: -169.34, maxLon: -168.7, zone: 'America/Nome' },
 ] as const;
 
 describe('timezone overrides', () => {
   describe('the table matches the measured design table', () => {
-    it('has exactly the five measured boxes, bound for bound', () => {
+    it('has exactly the six measured boxes, bound for bound', () => {
       expect(
         TIMEZONE_OVERRIDE_BOXES.map(({ minLat, maxLat, minLon, maxLon, zone }) => ({ minLat, maxLat, minLon, maxLon, zone }))
       ).toEqual(EXPECTED_BOXES);
@@ -78,6 +79,8 @@ describe('timezone overrides', () => {
       ['Fakaofo', -9.38, -171.25, 'Pacific/Fakaofo'],
       ['Gambell', 63.78, -171.74, 'America/Nome'],
       ['Little Diomede', 65.76, -168.93, 'America/Nome'],
+      ['Nikolski', 52.94, -168.86, 'America/Nome'],
+      ['Samalga Island', 52.78, -169.25, 'America/Nome'],
     ] as const)('%s → %s', (_place, lat, lon, zone) => {
       expect(guessTimezoneFromCoords(lat, lon)).toBe(zone);
     });
@@ -91,6 +94,7 @@ describe('timezone overrides', () => {
       ['Fakaofo', -9.38, -171.25, 'Pacific/Pago_Pago'],
       ['Gambell', 63.78, -171.74, 'Asia/Anadyr'],
       ['Rose Atoll', -14.55, -168.15, 'Pacific/Rarotonga'],
+      ['Nikolski', 52.94, -168.86, 'America/Adak'],
     ] as const)('tz-lookup alone puts %s in %s', (_place, lat, lon, zone) => {
       expect(tzLookup(lat, lon)).toBe(zone);
     });
@@ -102,6 +106,12 @@ describe('timezone overrides', () => {
       ['Upolu east tip', -14.03, -171.41, 'Pacific/Apia'],
       ['Big Diomede', 65.78, -169.07, 'Asia/Anadyr'],
       ['Swains Island', -11.06, -171.08, 'Pacific/Pago_Pago'],
+      ['Atka', 52.2, -174.2, 'America/Adak'],
+      ['west of Samalga Pass', 53.0, -169.6, 'America/Adak'],
+      // A real geo-tz Adak point between −169.5 and −169.34: it is what turns the
+      // rejected −169.5 west edge red.
+      ['Hawaii–Aleutian side of Samalga Pass', 53.2, -169.49, 'America/Adak'],
+      ['Unalaska', 53.88, -166.54, 'America/Nome'],
     ] as const)('%s keeps %s', (_place, lat, lon, zone) => {
       expect(timezoneOverrideFor(lat, lon)).toBeUndefined();
       expect(guessTimezoneFromCoords(lat, lon)).toBe(zone);
@@ -113,6 +123,7 @@ describe('timezone overrides', () => {
       ['Savoonga', 63.69, -170.48, 'America/Nome'],
       ['Nukunonu', -9.2, -171.85, 'Pacific/Fakaofo'],
       ['Atafu', -8.54, -172.52, 'Pacific/Fakaofo'],
+      ['Umnak east end, inside the box', 53.4, -168.72, 'America/Nome'],
     ] as const)('%s: tz-lookup and the override agree on %s', (_place, lat, lon, zone) => {
       expect(tzLookup(lat, lon)).toBe(zone);
       expect(timezoneOverrideFor(lat, lon)).toBe(zone);
@@ -129,6 +140,18 @@ describe('timezone overrides', () => {
     it('American Samoa west edge stops short of Upolu', () => {
       expect(timezoneOverrideFor(-14.05, -171.09)).toBe('Pacific/Pago_Pago');
       expect(timezoneOverrideFor(-14.05, -171.11)).toBeUndefined();
+    });
+
+    it('Umnak west edge is −169.34, east of every geo-tz Adak point', () => {
+      expect(timezoneOverrideFor(53.0, -169.34)).toBe('America/Nome');
+      // −169.35 is in the Samalga Pass wedge: geo-tz says Nome there, and the wedge is
+      // deliberately left out of the box. This row pins the edge, not a correct zone.
+      expect(timezoneOverrideFor(53.0, -169.35)).toBeUndefined();
+    });
+
+    it('Umnak east edge is −168.7', () => {
+      expect(timezoneOverrideFor(53.0, -168.7)).toBe('America/Nome');
+      expect(timezoneOverrideFor(53.0, -168.69)).toBeUndefined();
     });
   });
 

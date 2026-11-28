@@ -1,5 +1,8 @@
 /**
- * Point-override boxes for the places where `tz-lookup` is a calendar day wrong.
+ * Point-override boxes for the places where `tz-lookup` is a calendar day wrong, and
+ * for one place where it is an hour wrong: the Adak/Nome line at Umnak, which
+ * `tz-lookup` draws on a meridian near −168.75 while the real line runs diagonally
+ * through Samalga Pass, so Nikolski reads `America/Adak` instead of `America/Nome`.
  *
  * `tz-lookup` 6.1.25 (pinned in `package.json`) stores coarse polygons, and at the
  * date line coarse is not an hour off but a whole day: Tutuila resolves to
@@ -14,7 +17,8 @@
  * were measured on 2026-11-27 against `geo-tz` 8.1.10 (full-resolution
  * timezone-boundary-builder polygons) at 0.01°: every non-`Etc/` zone `geo-tz`
  * reports inside a box is that box's zone, and the neighbours that must stay out
- * (Apia, Upolu's east tip, Big Diomede, Swains) do. Re-measure before editing an
+ * (Apia, Upolu's east tip, Big Diomede, Swains, Atka and the Hawaii–Aleutian side of
+ * Samalga Pass) do. Re-measure before editing an
  * edge — see the GOTCHAS entry for the sweep method.
  *
  * **They are owned by the zone question.** Never derive them from, or merge them
@@ -26,6 +30,12 @@
  * **Why the Little Diomede west edge is −168.975.** The US–Russia line runs at
  * −168.978 between the two Diomedes; `geo-tz` reads `Asia/Anadyr` at −168.980 and
  * `America/Nome` at −168.975 across the whole box latitude.
+ *
+ * **Why the Umnak west edge is −169.34.** It is 0.01° east of the furthest-east
+ * `America/Adak` point `geo-tz` holds in the area (−169.35), so no Adak point is inside
+ * the box. The cost is an open-water wedge in Samalga Pass (lat 52.57–53.08, lon
+ * −169.49 to −169.34; 462 points at 0.01°) that keeps `tz-lookup`'s Adak answer. A
+ * west edge at −169.5 would put 504 Adak points inside the box.
  *
  * Open sea inside a box gets the box's zone rather than a nautical `Etc/GMT±n`
  * zone, deliberately — a caller asking about the water off Tutuila wants Samoa
@@ -70,6 +80,7 @@ export const TIMEZONE_OVERRIDE_BOXES: readonly TimezoneOverrideBox[] = Object.fr
   box('St Lawrence Island', 62.8, 64.0, -172.25, -168.4, 'America/Nome'),
   box('Little Diomede and US waters north of it', 65.6, 66.0, -168.975, -168.7, 'America/Nome'),
   box('Russian waters south of Big Diomede', 65.36, 65.64, -170.65, -168.98, 'Asia/Anadyr'),
+  box('Umnak, Samalga and Nikolski (Alaska time east of Samalga Pass)', 52.5, 53.5, -169.34, -168.7, 'America/Nome'),
 ]);
 
 /**

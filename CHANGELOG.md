@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.9] - 2026-11-28
+
+On Umnak Island in the eastern Aleutians, including the village of Nikolski, several tools showed times one hour behind the local clock. This release corrects the time zone there. Nothing changes anywhere else.
+
+### Fixed
+
+- **Times at Umnak Island and Nikolski, Alaska, are now shown in Alaska time.** They were shown in Hawaii–Aleutian time, one hour behind, because the time-zone data the server uses places the Adak/Nome boundary too far east. This affected alert effective and expiry times, the life-threatening alert banner, the backup forecast used when the main forecast source is unreachable, airport observations, river and wildfire times, and recent US historical times. The Hawaii–Aleutian islands west of Samalga Pass, Atka and Adak among them, keep Hawaii–Aleutian time.
+
 ## [1.36.8] - 2026-11-28
 
 US forecasts showed their times in the location's local time but never said which zone that was, while forecasts for every other country did. This release adds the missing label, so a forecast read from another time zone is no longer ambiguous.
@@ -2616,7 +2624,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.8...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.9...HEAD
+[1.36.9]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.8...v1.36.9
 [1.36.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.7...v1.36.8
 [1.36.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.6...v1.36.7
 [1.36.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.5...v1.36.6
