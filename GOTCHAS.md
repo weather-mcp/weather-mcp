@@ -7930,6 +7930,37 @@ Pago read `November 27, 2026 at 6:00 PM GMT+13` for an instant that is November 
 
 ---
 
+## G178 — A live sweep that probes the redirect target certifies the wrong URL
+
+**Trigger:** measuring an upstream live to settle a client option that depends on the URL:
+`maxRedirects`, `maxContentLength`, a status-code mapping, or a cache key. This matters most when
+deciding that a client may refuse redirects (`maxRedirects: 0`).
+
+**Rule:** probe the URL the code **builds**, from the template in `src/services/`, never a URL you
+reached by following one. Write the sweep's request list from a grep of the client's `get(`/`url =`
+sites, and probe with redirects **off** (`curl` without `-L`, `fetch` with `redirect: 'manual'`).
+Then confirm on the built dist: a byte-identity pair against the base catches what the sweep missed.
+
+**Why:** NWS answers the shorthand `/points/{lat},{lon}/stations` with a 301 to
+`/gridpoints/{wfo}/{x},{y}/stations`. The upstream-response-bounds design sweep probed the gridpoint
+URL, a page it already knew, saw 200, and recorded "no request the code makes redirects". With
+`maxRedirects: 0`, every US `get_current_conditions` and recent `get_historical_weather` call then
+failed with "NOAA returned status 301". All unit and integration tests were green, because they
+stub the adapter by status, not by URL.
+
+**Verify:** `curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H 'User-Agent: x'
+https://api.weather.gov/points/39.7400,-104.9900/stations` prints `301` and a `/gridpoints/` URL.
+
+**Evidence:** 2026-11-27, upstream-response-bounds T8. The byte-identity pair against `main` showed
+`cc-denver-imp` DIFF, and the branch rendered the 301 message. It was fixed in `ecc6ab3`:
+`getStations` builds the gridpoint URL from the cached `/points` answer. Lock:
+`tests/unit/upstream-bounds-core.test.ts` ("asks the canonical gridpoint URL").
+
+**Status:** active. Lint candidate: none (a URL template's redirect behaviour is upstream state).
+Related: [G10], [G177].
+
+---
+
 ## Graveyard
 
 *(When an entry's trap is refactored away, move it here with the reason and the
@@ -7937,7 +7968,7 @@ commit that removed it — never delete, never renumber.)*
 
 ## G177 — A `maxRedirects: 0` client times out at 5 s on a silent direct connection, and the message names `API_TIMEOUT_MS`
 
-**Retired:** 2026-11-27, by native-transport-connect-timeout (`92307ad`). `withRequestDeadline` now hands a non-tunnelled `maxRedirects: 0` request with no caller agent a shared keep-alive agent with `timeout: CONNECT_TIMEOUT_MS` (5 s), so the 5 s is the server's, not Node's. Measured against `10.255.255.1` (QA `qa-native-transport-connect-timeout.md`): on `main` @ `006b333` a native request with Node's global agent replaced by one with no timeout ran to the full 12 s; on the branch it cut at 5,012 ms either way, and a connected server that never answers still ran to the request's own timeout (`tests/integration/http-deadline-native-agent.test.ts`). **What survives:** time a timeout against a real direct black hole as well as through a proxy, and read the elapsed time rather than the message. A proxy probe models only the tunnel path, which keeps its own per-request agent and waits the full `API_TIMEOUT_MS`; the follow-redirects clients (every client that does not set `maxRedirects: 0`) also wait `API_TIMEOUT_MS` for a dead host. The 5 s cuts the connect phase only.
+**Retired:** 2026-11-27, by native-transport-connect-timeout (`92307ad`). `withRequestDeadline` now hands a non-tunnelled `maxRedirects: 0` request with no caller agent a shared keep-alive agent with `timeout: CONNECT_TIMEOUT_MS` (5 s), so the 5 s is the server's, not Node's. Measured against `10.255.255.1` (QA `qa-native-transport-connect-timeout.md`): on `main` @ `006b333` a native request with Node's global agent replaced by one with no timeout ran to the full 12 s; on the branch it cut at 5,012 ms either way, and a connected server that never answers still ran to the request's own timeout (`tests/integration/http-deadline-native-agent.test.ts`). **What survives:** time a timeout against a real direct black hole as well as through a proxy, and read the elapsed time rather than the message. A proxy probe models only the tunnel path, which keeps its own per-request agent and waits the full `API_TIMEOUT_MS`. Since upstream-response-bounds (`36c55ee`, 2026-11-27), no `src/` client uses follow-redirects, so every non-tunnelled request gets the 5 s connect cut. The 5 s cuts the connect phase only.
 
 **Trigger:** measuring or reasoning about how long a request to an unresponsive upstream takes,
 in a service whose `axios.create` sets `maxRedirects: 0` (`jma`, `environmentAgency`, `basemap`,
@@ -7965,9 +7996,8 @@ section 2). The proxy black hole gave 40.0 s → 30.0 s for `getWarnings('ph')`;
 black-holed live, and the same call took 24.7 s → 5.0 s. The first CHANGELOG bullet (`72c3c88`)
 quoted the proxy figures and was corrected in `303c867`.
 
-**Status:** active. The underlying 5 s cap is a ROADMAP Hardening row ("`maxRedirects: 0` clients
-time out at 5 s"); retire this entry when that row ships a per-instance agent. Lint candidate: none.
-Related: [G114], [G175].
+**Status:** retired (see the top of this entry; the Hardening row shipped in v1.36.5). Lint candidate:
+none. Related: [G114], [G175], [G178].
 
 ## G26 — The repo's own `.env` means a probe from the repo root is not testing the default configuration
 
