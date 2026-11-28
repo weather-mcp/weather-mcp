@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Every upstream request now refuses a redirect and an oversized answer, and says so plainly.** Each of the twelve services that set no limit before (NOAA, Open-Meteo, Nominatim, the place-name lookup providers, AviationWeather, ACIS, GeoMet, MeteoAlarm, NIFC, Google Pollen, Google Weather and NASA FIRMS) now has a response-size limit of at least eight times the largest answer measured in a sweep on 2026-11-27. An answer over it fails with "<Service> response too large" and is not retried. Before, NOAA, Open-Meteo and METAR downloaded such an answer four times and showed a library error, and the Google and FIRMS services called it a network fault. A redirect is never followed: it fails with a fixed "returned status" message and is not retried, where NOAA used to retry it. Neither failure makes `get_forecast` fall back from Open-Meteo to MET Norway, because neither is transient. On `get_alerts` and `get_wildfire_info` both are errors, never an empty answer. These clients also now fail at 5 s when a direct connection does not open, like the rest; a connected but slow upstream still gets `API_TIMEOUT_MS`. Successful answers are unchanged.
+
 ## [1.36.5] - 2026-11-27
 
 When some of the keyless upstreams are down outright, the server gives up on them after 5 seconds instead of waiting for the full request timeout. That limit came from Node's own default connection settings, not from the server: nothing documented it, and a Node upgrade could have changed it without notice. This release sets it in the server and documents it. On Node 22, where it was measured, nothing you can see changes.

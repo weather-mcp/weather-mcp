@@ -49,10 +49,11 @@ a proxy that never answers, `get_alerts` in the US answers at 55 s with:
 NOAA API Error: The NOAA weather service is temporarily unavailable. Please try again in a few minutes.
 ```
 
-One connection limit is shorter. On the keyless alert feeds for India, the Philippines, Indonesia and Japan, Great Britain's river gauges, the MET Norway forecast fallback, US climate normals, and radar and base-map imagery, a connection that does not open within
-5 seconds fails at 5 seconds with that service's timed-out message. Once the
-connection is open, the request gets its full timeout. An upstream that is down
-outright therefore fails these requests fast, rather than at `API_TIMEOUT_MS`.
+One connection limit is shorter. On every upstream request made directly (not through a proxy), a
+connection that does not open within 5 seconds fails at 5 seconds with that service's timed-out
+message. Once the connection is open, the request gets its full timeout. An upstream that is down
+outright therefore fails fast, rather than at `API_TIMEOUT_MS`. A request sent through
+`HTTPS_PROXY` keeps the full timeout for its connection.
 
 `get_weather_summary` shows each section it could not fetch as
 `## <section> (unavailable)`. A lightning section started with the budget spent
@@ -106,6 +107,13 @@ American Samoa to NOAA, and NOAA decides which points it accepts. At a remote
 point it does not accept (for example Farallon de Pajaros, at the north end of
 the Northern Marianas), you get this error. It is an error result, never an
 empty alert list, so it never reads as an all-clear.
+
+#### Redirects
+
+The server never follows a redirect. If NOAA answers a request with a 3xx, you see
+`NOAA returned status 3xx, a redirect this server does not follow.`, and it is not
+retried. No request the server makes is redirected today: the code always sends
+coordinates at four decimals, which is the precision NOAA serves without a redirect.
 
 #### Connection Issues
 ```
@@ -163,7 +171,10 @@ fallback does not apply or does not help:
 - **You forced `source: "openmeteo"`.** Naming the authority means the error
   propagates; the server does not substitute a different one behind your back.
 - **The failure is permanent, not transient.** A 400 on a bad coordinate is
-  ours to fix, not an outage, so it is never retried elsewhere.
+  ours to fix, not an outage, so it is never retried elsewhere. The same holds
+  for `Open-Meteo response too large` and `Open-Meteo returned status 3xx`
+  (see [Response Too Large](#response-too-large)): neither is retried, and
+  neither falls back to MET Norway.
 - **MET Norway also failed.** The **original Open-Meteo error** is what
   propagates — MET Norway's own message never surfaces.
 - **You asked for the 15-minute nowcast (`granularity: "minutely"`).** MET
@@ -250,6 +261,7 @@ GeoMet API returned status 404
 GeoMet API returned an unexpected shape
 GeoMet request timed out
 Unable to connect to GeoMet API
+GeoMet response too large
 GeoMet request failed
 Unknown error occurred while contacting GeoMet API
 ```
@@ -276,6 +288,7 @@ MeteoAlarm API server error (status 503)
 MeteoAlarm API returned status 404
 MeteoAlarm request timed out
 Unable to connect to the MeteoAlarm feed service
+MeteoAlarm response too large
 MeteoAlarm request failed
 Unknown error occurred while contacting MeteoAlarm
 MeteoAlarm feed returned an unexpected shape
@@ -301,6 +314,7 @@ Invalid query parameters for Google Weather API.
 Google Weather API quota exceeded. Please try again later.
 Google Weather API request timed out. The service may be temporarily unavailable.
 Google Weather API returned an error response.
+Google Weather API response too large.
 Failed to reach Google Weather API. Please check your network connection.
 Failed to fetch weather alerts from Google Weather API.
 Google Weather API returned an unexpected response.
@@ -327,11 +341,14 @@ once.
 AviationWeather API request timed out
 Unable to connect to AviationWeather API
 AviationWeather API returned status 503
+AviationWeather API returned status 301
+AviationWeather API response too large
 Unknown error occurred while contacting AviationWeather API
 ```
 
-For a status error, a short plain-text body or a JSON `message` field of 200 characters or fewer
-from the upstream is shown in place of `AviationWeather API returned status <N>`. An HTML page or a
+A redirect (3xx) and an answer over the size limit are not retried, and show only the fixed text
+above. For any other status error, a short plain-text body or a JSON `message` field of 200
+characters or fewer from the upstream is shown in place of `AviationWeather API returned status <N>`. An HTML page or a
 longer body is never shown. Another network failure, such as a reset connection, is retried like a
 failed connection and shows the HTTP client's own error text.
 
@@ -344,6 +361,37 @@ For more information:
 
 A timeout, a failed connection, another network failure, a gateway error (502, 503 or 504) and an
 unknown error all end with this link. An error for any other status shows no link.
+
+### Response Too Large
+
+Every upstream answer has a size limit, so one unexpected, huge answer cannot exhaust the server's
+memory. Each limit is at least eight times the largest answer that service gave in a measurement on
+2026-11-27, so a normal answer, even on a busy storm or fire-season day, is far below it. An answer
+over the limit fails with a fixed message naming the service:
+
+```
+NOAA response too large
+Open-Meteo response too large
+Nominatim response too large
+AviationWeather API response too large
+ACIS response too large
+GeoMet response too large
+MeteoAlarm response too large
+NIFC service response too large.
+Google Pollen API response too large.
+Google Weather API response too large.
+FIRMS service response too large.
+<Provider> response too large        (a place-name lookup; the next provider is tried)
+```
+
+It means the service answered with more data than this server accepts. It is not a network fault,
+and it is not retried, because the same request would get the same answer. On a safety path
+(`get_alerts`, `get_wildfire_info`) it is an error, never an empty "no alerts" or "no fires" answer.
+The optional sections that use these services (climate records, pollen, FIRMS feed freshness) leave
+themselves out, exactly as they do on any other failure.
+
+The server also never follows a redirect. A 3xx answer fails with that service's fixed
+`returned status <N>` message and is not retried.
 
 ### Optional Dependency Errors
 
@@ -550,7 +598,7 @@ Error details: NIFC service request timed out. The service may be temporarily un
 ```
 
 **The report does not say "no fires" when this happens.** It says the data could not be retrieved.
-The `Error details:` line is one of seven fixed messages:
+The `Error details:` line is one of eight fixed messages:
 
 | Failure | Message |
 |---|---|
@@ -559,7 +607,8 @@ The `Error details:` line is one of seven fixed messages:
 | HTTP 400 | `Invalid query parameters for NIFC service.` |
 | HTTP 503 | `NIFC service is temporarily unavailable. Please try again later.` |
 | HTTP 200 whose body is not a fire-perimeter list (an ArcGIS error object, a maintenance page, an empty answer) | `NIFC service returned an unexpected response.` |
-| Any other HTTP status | `NIFC service returned HTTP <status>.` |
+| Any other HTTP status, including a redirect (the server never follows one) | `NIFC service returned HTTP <status>.` |
+| An answer over the size limit (see [Response Too Large](#response-too-large)) | `NIFC service response too large.` |
 | Anything else | `Failed to query NIFC fire perimeters.` |
 
 No network-library text is shown. The stderr log line `NIFC query failed` carries the error type,
