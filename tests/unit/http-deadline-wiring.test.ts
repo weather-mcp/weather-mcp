@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
+import { codeOnly } from '../helpers/codeOnly.js';
 
 // Tripwire: every axios.create( call in src/ must pass the wall-clock deadline adapter, and
 // every direct axios.<method>( call must pass a named config constant whose literal does.
+// Both predicates read the span through codeOnly, so a commented-out adapter never counts.
 
 const REQUIRED = 'adapter: withRequestDeadline()';
 const MARKER = 'axios.create(';
@@ -91,7 +93,7 @@ function configHasDeadline(source: string, name: string): boolean {
     } else if (ch === '}') {
       depth--;
       if (depth === 0) {
-        return source.slice(start, i + 1).includes(REQUIRED);
+        return codeOnly(source.slice(start, i + 1)).includes(REQUIRED);
       }
     }
   }
@@ -99,7 +101,7 @@ function configHasDeadline(source: string, name: string): boolean {
 }
 
 function hasDeadline(site: CreateSite): boolean {
-  return site.text.includes(REQUIRED);
+  return codeOnly(site.text).includes(REQUIRED);
 }
 
 function listTs(dir: URL): URL[] {
@@ -176,5 +178,18 @@ describe('http deadline wiring', () => {
     expect(withKey).toHaveLength(1);
     expect(hasDeadline(without[0])).toBe(false);
     expect(hasDeadline(withKey[0])).toBe(true);
+  });
+
+  it('positive control: a commented-out or string-only adapter does not count', () => {
+    const lineComment = findCreateSites(`const c = axios.create({\n  baseURL: 'x',\n  // ${REQUIRED},\n});`);
+    const blockComment = findCreateSites(`const c = axios.create({\n  baseURL: 'x',\n  /* ${REQUIRED}, */\n});`);
+    const inString = findCreateSites(`const c = axios.create({\n  baseURL: '${REQUIRED}',\n});`);
+    expect(hasDeadline(lineComment[0])).toBe(false);
+    expect(hasDeadline(blockComment[0])).toBe(false);
+    expect(hasDeadline(inString[0])).toBe(false);
+
+    const call = 'const r = await axios.get(url, CFG);';
+    const commented = `const CFG: AxiosRequestConfig = {\n  timeout: 1,\n  // ${REQUIRED},\n};\n` + call;
+    expect(configHasDeadline(commented, 'CFG')).toBe(false);
   });
 });
