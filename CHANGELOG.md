@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Current-conditions times name their time zone.** In `get_current_conditions` on the NOAA and Open-Meteo paths, and in the current section of `get_weather_summary`, the `**Time:**` line now ends its clock in the zone abbreviation for that moment, for example `Nov 28, 2026, 12:50 AM CST (25 minutes ago)`. The NOAA note that says a nearer station has not reported since a given time labels that time too. This matches METAR's `**Observed:**` line and the NOAA alert times from v1.36.11. Many non-US zones have no short name in the time-zone data and show a GMT offset instead (`GMT+1` in Berlin in winter).
+
 ## [1.36.12] - 2026-11-28
 
 A quiet maintenance release. It brings the optional NCEI climate-normals client in line with every other service: an answer that is too large or that redirects now ends in a short fixed error instead of the HTTP library's own wording. No weather output changes. It also tightens one of the project's internal checks, so a commented-out safety setting can no longer pass it.

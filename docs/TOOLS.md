@@ -350,7 +350,7 @@ What's the weather right now in Tokyo?
   displayed**, so the number and its label can never disagree)
 - Thermal-stress context in extreme conditions (automatic, see below)
 - A life-threatening alert banner at the very top of the response, when the National Weather Service has one active for the point (the United States and its NWS-served territories — see [Life-threatening alert banner](#life-threatening-alert-banner))
-- All timestamps in local timezone
+- All timestamps in local timezone, with the zone abbreviation (e.g. `12:50 AM CST`)
 
 **Returns (international, via Open-Meteo):**
 - Current temperature and feels-like (when it diverges meaningfully from actual)
@@ -364,7 +364,7 @@ What's the weather right now in Tokyo?
   deficit, topsoil moisture) when the model reports those values
 - Thermal-stress context in extreme conditions (automatic, see below)
 - **No** life-threatening alert banner at an international point. It is gated on the location being one NWS serves, not on the source or the data path — so a point in an NWS-served territory, whose weather still renders through Open-Meteo, is eligible for it
-- All timestamps in the location's local timezone
+- All timestamps in the location's local timezone, with the zone abbreviation (`GMT+1` where the time-zone data has no short name)
 
 Visibility, snow depth, and cloud layer detail are not available on the
 international path. Neither are NOAA's published fire-danger indices (Haines,
