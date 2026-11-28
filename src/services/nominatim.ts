@@ -1,9 +1,11 @@
 /**
- * Service for interacting with the Nominatim Geocoding API
- * Documentation: https://nominatim.org/release-docs/latest/api/Search/
+ * Reverse client for the Nominatim API, country level only.
+ * Documentation: https://nominatim.org/release-docs/latest/api/Reverse/
  *
- * Nominatim is the geocoding service powering OpenStreetMap.
- * It provides better coverage for small towns and villages compared to GeoNames.
+ * Nominatim is the geocoding service powering OpenStreetMap. This service
+ * resolves a coordinate to a country code. Forward (name to coordinates)
+ * search lives in `GeocodingService` (`geocoding.ts`), whose Nominatim
+ * provider shares this service's request spacer.
  *
  * Usage Policy: https://operations.osmfoundation.org/policies/nominatim/
  * - Maximum 1 request per second
@@ -20,15 +22,12 @@
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 import type {
-  NominatimLocation,
   NominatimErrorResponse,
-  MappedGeocodingResponse,
-  MappedGeocodingLocation,
   NominatimReverseResponse
 } from '../types/nominatim.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
-import { logger, redactCoordinatesForLogging, isPiiLoggingEnabled } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
 import { RequestSpacer } from '../utils/requestSpacer.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
@@ -69,7 +68,6 @@ export class NominatimService {
   private readonly spacer: RequestSpacer;
   // Single-flight: concurrent lookups for one cache key share one request.
   // Entries are deleted in `finally`, so a rejected pull is never kept.
-  private readonly searchInFlight = new Map<string, Promise<MappedGeocodingResponse>>();
   private readonly reverseInFlight = new Map<string, Promise<string | null>>();
 
   constructor(config: NominatimServiceConfig = {}) {
@@ -234,197 +232,6 @@ export class NominatimService {
         waitTimeMs: Math.round(waitMs)
       });
     });
-  }
-
-  /**
-   * Map Nominatim location to GeocodingLocation format for compatibility
-   * @private
-   */
-  private mapLocation(location: NominatimLocation): MappedGeocodingLocation {
-    // Determine the best "name" for the location
-    let name = location.display_name.split(',')[0].trim();
-
-    // If we have address details, use the most specific place name
-    if (location.address) {
-      name = location.address.village
-        || location.address.town
-        || location.address.city
-        || location.address.municipality
-        || location.address.suburb
-        || name;
-    }
-
-    // Map Nominatim OSM type to GeoNames-style feature code
-    const featureCode = this.mapFeatureCode(location.type);
-
-    return {
-      id: location.place_id,
-      name,
-      latitude: parseFloat(location.lat),
-      longitude: parseFloat(location.lon),
-      feature_code: featureCode,
-      country_code: location.address?.country_code?.toUpperCase(),
-      country: location.address?.country,
-      admin1: location.address?.state,
-      admin2: location.address?.county,
-      admin3: location.address?.suburb,
-      admin4: location.address?.village || location.address?.town
-    };
-  }
-
-  /**
-   * Map OSM place types to GeoNames-style feature codes
-   * @private
-   */
-  private mapFeatureCode(osmType: string | undefined): string | undefined {
-    if (!osmType) return undefined;
-
-    const typeMap: { [key: string]: string } = {
-      'city': 'PPLC',
-      'town': 'PPL',
-      'village': 'PPL',
-      'hamlet': 'PPL',
-      'suburb': 'PPLX',
-      'administrative': 'ADM1',
-      'island': 'ISL',
-      'mountain': 'MT',
-      'lake': 'LAKE',
-      'airport': 'AIRP',
-      'park': 'PRK'
-    };
-
-    return typeMap[osmType] || 'PPL'; // Default to populated place
-  }
-
-  /**
-   * Search for locations by name using Nominatim
-   *
-   * @param query - Location name to search for (e.g., "Paris", "New York, NY", "Tokyo")
-   * @param limit - Maximum number of results to return (default: 5, max: 50)
-   * @param language - Language for results (default: 'en')
-   * @returns Geocoding results with coordinates and metadata
-   */
-  async searchLocation(
-    query: string,
-    limit: number = 5,
-    language: string = 'en'
-  ): Promise<MappedGeocodingResponse> {
-    if (!query || query.trim().length === 0) {
-      throw new InvalidLocationError(
-        'Nominatim',
-        'Search query cannot be empty'
-      );
-    }
-
-    if (query.trim().length === 1) {
-      throw new InvalidLocationError(
-        'Nominatim',
-        'Search query must be at least 2 characters long'
-      );
-    }
-
-    // Validate limit (Nominatim recommends max 50)
-    if (limit < 1 || limit > 50) {
-      throw new InvalidLocationError(
-        'Nominatim',
-        'Limit must be between 1 and 50'
-      );
-    }
-
-    const cacheKey = Cache.generateKey('nominatim-geocoding', query, limit, language);
-
-    // Check cache first
-    if (CacheConfig.enabled) {
-      const cached = this.cache.get(cacheKey);
-      if (cached) {
-        logger.info('Nominatim cache hit', isPiiLoggingEnabled() ? { query } : undefined);
-        return cached as MappedGeocodingResponse;
-      }
-    }
-
-    // No await between this check and the publish below (G20). The pull is
-    // started inside `.then` so the memo is published before its body runs (G113).
-    const pending = this.searchInFlight.get(cacheKey);
-    if (pending) return pending;
-    const pull = Promise.resolve()
-      .then(() => this.fetchSearch(query, limit, language, cacheKey))
-      .finally(() => { this.searchInFlight.delete(cacheKey); });
-    this.searchInFlight.set(cacheKey, pull);
-    return pull;
-  }
-
-  /**
-   * The network half of `searchLocation`, run once per in-flight key.
-   * @private
-   */
-  private async fetchSearch(
-    query: string,
-    limit: number,
-    language: string,
-    cacheKey: string
-  ): Promise<MappedGeocodingResponse> {
-    if (CacheConfig.enabled) {
-      // Enforce rate limiting before making request
-      await this.enforceRateLimit();
-
-      const startTime = Date.now();
-      const params = {
-        q: query.trim(),
-        format: 'json',
-        limit,
-        addressdetails: 1,
-        'accept-language': language
-      };
-
-      logger.info('Nominatim API request', { ...(isPiiLoggingEnabled() ? { query } : {}), limit });
-      const response = await this.client.get<NominatimLocation[]>('/search', { params });
-      const generationTime = Date.now() - startTime;
-
-      // Map Nominatim results to GeocodingResponse format
-      const mappedResults: MappedGeocodingLocation[] = response.data.map((loc: NominatimLocation) =>
-        this.mapLocation(loc)
-      );
-
-      const result: MappedGeocodingResponse = {
-        results: mappedResults,
-        generationtime_ms: generationTime
-      };
-
-      // Cache for 30 days (locations don't change frequently)
-      this.cache.set(cacheKey, result, 30 * 24 * 60 * 60 * 1000);
-
-      logger.info('Nominatim search completed', {
-        ...(isPiiLoggingEnabled() ? { query } : {}),
-        resultCount: mappedResults.length,
-        generationTimeMs: generationTime
-      });
-
-      return result;
-    }
-
-    // No caching - still enforce rate limiting
-    await this.enforceRateLimit();
-
-    const startTime = Date.now();
-    const params = {
-      q: query.trim(),
-      format: 'json',
-      limit,
-      addressdetails: 1,
-      'accept-language': language
-    };
-
-    const response = await this.client.get<NominatimLocation[]>('/search', { params });
-    const generationTime = Date.now() - startTime;
-
-    const mappedResults: MappedGeocodingLocation[] = response.data.map((loc: NominatimLocation) =>
-      this.mapLocation(loc)
-    );
-
-    return {
-      results: mappedResults,
-      generationtime_ms: generationTime
-    };
   }
 
   /**

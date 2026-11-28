@@ -7,17 +7,16 @@ import { readFileSync, readdirSync } from 'node:fs';
  * literal-only expression, or `Infinity` as its TTL. Scans by call (parenthesis-matched, arguments
  * split at top level), so a call spread over nine lines is seen like a one-liner.
  *
- * One reviewed exception: `fetchSearch` in `src/services/nominatim.ts`, reached only from
- * `searchLocation`. ROADMAP row 105 deletes it and must delete the allowlist entry too (a stale
- * entry fails this test).
+ * There are no reviewed exceptions. An allowlist entry needs a reason, and a stale or ambiguous
+ * entry fails this test.
  *
  * Known limit: a literal passed to a `pull(cacheKey, ttlMs, ...)` wrapper (`environmentAgency.ts`,
  * `jma.ts`) is not seen, because the wrapper is not a `.cache.set(` call. Today every caller passes
  * `CacheConfig.ttl.*`.
  *
  * The scan runs on `codeOnly` text (comments removed, string contents blanked), so a commented-out
- * literal never fires. The allowlist compares against that same stripped text: the allowlisted TTL
- * is a pure numeric expression and contains no string, so stripping cannot change it.
+ * literal never fires. The allowlist compares against that same stripped text, so an entry's `ttl`
+ * must be written in the code-only form (comments removed, string contents blanked).
  */
 
 function listTs(dir: URL): URL[] {
@@ -138,14 +137,7 @@ interface AllowEntry {
 }
 
 // Reviewed exceptions: a literal TTL that is not (yet) a CacheConfig entry.
-const ALLOWLIST: AllowEntry[] = [
-  {
-    file: 'src/services/nominatim.ts',
-    ttl: '30 * 24 * 60 * 60 * 1000',
-    reason:
-      'fetchSearch, reached only from searchLocation; ROADMAP row 105 deletes it and must delete this entry',
-  },
-];
+const ALLOWLIST: AllowEntry[] = [];
 
 /** Every rule violation in `writes` against `allowlist`, one readable line each. */
 function violations(writes: CacheWrite[], allowlist: AllowEntry[]): string[] {
@@ -218,8 +210,7 @@ const allWrites = sources.flatMap((s) => findCacheWrites(s.file, s.text));
 
 describe('cache TTL wiring', () => {
   it('finds the cache writes (the scan is not vacuous)', () => {
-    // Real count is recorded in the task report. The floor sits below it on purpose, so ROADMAP
-    // row 105 deleting one site does not trip it.
+    // Real count is recorded in the task report. The floor sits below it on purpose.
     expect(allWrites.length).toBeGreaterThanOrEqual(40);
   });
 
