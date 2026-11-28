@@ -491,27 +491,33 @@ export class NOAAService {
   }
 
   /**
-   * Get nearest observation stations for a location
+   * Get nearest observation stations for a location.
+   *
+   * Asks the canonical `/gridpoints/{wfo}/{x},{y}/stations` URL, built from the point's grid. NWS
+   * answers the shorthand `/points/{lat},{lon}/stations` with a 301 to that URL, and this client
+   * never follows a redirect (`maxRedirects: 0`), so the shorthand would fail every US
+   * current-conditions request. The `/points` answer is cached with no expiry, so after a point's
+   * first request this costs nothing extra.
    */
   async getStations(latitude: number, longitude: number, maxRetries?: number): Promise<StationCollectionResponse> {
-    // Check cache first (if enabled)
+    const cacheKey = Cache.generateKey('stations', latitude.toFixed(4), longitude.toFixed(4));
     if (CacheConfig.enabled) {
-      const cacheKey = Cache.generateKey('stations', latitude.toFixed(4), longitude.toFixed(4));
       const cached = this.cache.get(cacheKey);
       if (cached) {
         return cached as StationCollectionResponse;
       }
-
-      const url = `/points/${latitude.toFixed(4)},${longitude.toFixed(4)}/stations`;
-      const result = await this.makeRequest<StationCollectionResponse>(url, maxRetries);
-
-      // Cache with stations TTL (24 hours - stations rarely change)
-      this.cache.set(cacheKey, result, CacheConfig.ttl.stations);
-      return result;
     }
 
-    const url = `/points/${latitude.toFixed(4)},${longitude.toFixed(4)}/stations`;
-    return this.makeRequest<StationCollectionResponse>(url, maxRetries);
+    const pointData = await this.getPointData(latitude, longitude, maxRetries);
+    const { gridId, gridX, gridY } = pointData.properties;
+    const url = `/gridpoints/${gridId}/${gridX},${gridY}/stations`;
+    const result = await this.makeRequest<StationCollectionResponse>(url, maxRetries);
+
+    if (CacheConfig.enabled) {
+      // Cache with stations TTL (24 hours - stations rarely change)
+      this.cache.set(cacheKey, result, CacheConfig.ttl.stations);
+    }
+    return result;
   }
 
   /**

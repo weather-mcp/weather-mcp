@@ -285,3 +285,56 @@ describe('upstream bounds: an Open-Meteo oversize does not fall back to MET Norw
     expect(metno.getForecast).not.toHaveBeenCalled();
   });
 });
+
+describe('upstream bounds: NOAA getStations asks the canonical gridpoint URL (T8 live finding)', () => {
+  const originalEnabled = CacheConfig.enabled;
+
+  beforeEach(() => {
+    (CacheConfig as { enabled: boolean }).enabled = false;
+  });
+
+  afterEach(() => {
+    (CacheConfig as { enabled: boolean }).enabled = originalEnabled;
+    vi.restoreAllMocks();
+  });
+
+  it('requests /points then /gridpoints/{wfo}/{x},{y}/stations, never the /points/…/stations shorthand NWS 301s', async () => {
+    const s = new NOAAService();
+    const urls: string[] = [];
+    clientOf(s, 'client').defaults.adapter = (config: InternalAxiosRequestConfig) => {
+      urls.push(String(config.url));
+      const data = String(config.url).startsWith('/points/')
+        ? { properties: { gridId: 'BOU', gridX: 63, gridY: 62 } }
+        : { features: [{ properties: { stationIdentifier: 'KBJC' } }] };
+      return Promise.resolve({ data, status: 200, statusText: 'OK', headers: {}, config, request: {} });
+    };
+    const result = await s.getStations(39.74, -104.99);
+    expect(urls).toEqual(['/points/39.7400,-104.9900', '/gridpoints/BOU/63,62/stations']);
+    expect(urls.some((u) => /^\/points\/[^/]+\/stations/.test(u))).toBe(false);
+    expect(result.features).toHaveLength(1);
+  });
+
+  it('a 301 on the stations request is still the fixed, non-retried error', async () => {
+    vi.useFakeTimers();
+    try {
+      const s = new NOAAService();
+      let n = 0;
+      clientOf(s, 'client').defaults.adapter = (config: InternalAxiosRequestConfig) => {
+        n += 1;
+        if (String(config.url).startsWith('/points/')) {
+          return Promise.resolve({
+            data: { properties: { gridId: 'BOU', gridX: 63, gridY: 62 } },
+            status: 200, statusText: 'OK', headers: {}, config, request: {}
+          });
+        }
+        const response = { data: null, status: 301, statusText: '301', headers: {}, config, request: {} };
+        return Promise.reject(new AxiosError('Request failed with status code 301', undefined, config, {}, response));
+      };
+      const result = await settleRejection(() => s.getStations(39.74, -104.99));
+      expect((result as ApiError).message).toBe('NOAA returned status 301');
+      expect(n).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
