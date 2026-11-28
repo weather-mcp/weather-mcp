@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.7] - 2026-11-27
+
 A maintenance release with no change to any answer. Five of the server's caches had their lifetimes written as bare numbers inside the code that fetches the data, where nobody reviewing the cache settings would see them, among them the wildfire perimeter cache. Every cache lifetime now lives in one place, and a check fails the build if a new one is written as a bare number.
 
 ### Changed
@@ -2606,7 +2608,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.6...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.7...HEAD
+[1.36.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.6...v1.36.7
 [1.36.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.5...v1.36.6
 [1.36.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...v1.36.5
 [1.36.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...v1.36.4
