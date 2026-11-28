@@ -81,7 +81,7 @@ beforeAll(async () => {
     delete process.env[name];
   }
   savedCache = CacheConfig.enabled;
-  CacheConfig.enabled = false;
+  (CacheConfig as { enabled: boolean }).enabled = false;
   savedLevel = logger.getLevel();
   logger.setLevel(LogLevel.ERROR + 1);
 
@@ -108,7 +108,7 @@ afterAll(async () => {
     if (savedEnv[name] === undefined) delete process.env[name];
     else process.env[name] = savedEnv[name];
   }
-  CacheConfig.enabled = savedCache;
+  (CacheConfig as { enabled: boolean }).enabled = savedCache;
   logger.setLevel(savedLevel);
 });
 

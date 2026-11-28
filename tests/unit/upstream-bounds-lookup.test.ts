@@ -105,7 +105,7 @@ describe('upstream bounds: METAR, ACIS and geocoding failure mapping', () => {
       expect((result as ApiError).message).toBe('AviationWeather API response too large');
       expect((result as ApiError).isRetryable).toBe(false);
       expect(adapter.calls()).toBe(1);
-      const text = formatErrorForUser(result);
+      const text = formatErrorForUser(result as Error);
       expect(text).toContain('AviationWeather API response too large');
       expect(text).not.toContain('maxContentLength');
       expect(text).not.toContain('http');
@@ -125,14 +125,14 @@ describe('upstream bounds: METAR, ACIS and geocoding failure mapping', () => {
       expect((result as ApiError).message).toBe('AviationWeather API returned status 301');
       expect((result as ApiError).isRetryable).toBe(false);
       expect(adapter.calls()).toBe(1);
-      expect(formatErrorForUser(result)).not.toContain('<html>');
+      expect(formatErrorForUser(result as Error)).not.toContain('<html>');
     });
 
     it('3xx with a short plain-text body does not forward it as detail', async () => {
       const { client, call } = make();
       scriptAdapter(client, { status: 302, data: 'Moved to elsewhere' });
       const result = await settleRejection(call);
-      expect(formatErrorForUser(result)).not.toContain('elsewhere');
+      expect(formatErrorForUser(result as Error)).not.toContain('elsewhere');
     });
 
     it('control: ENOTFOUND keeps its existing outage mapping and retries', async () => {

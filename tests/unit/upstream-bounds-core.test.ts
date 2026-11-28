@@ -162,7 +162,7 @@ describe('upstream bounds: NOAA, Open-Meteo and Nominatim failure mapping', () =
       expect((result as ApiError).message).toBe(target.tooLarge);
       expect((result as ApiError).isRetryable).toBe(false);
       expect(adapter.calls()).toBe(1);
-      const text = formatErrorForUser(result);
+      const text = formatErrorForUser(result as Error);
       expect(text).toContain(target.tooLarge);
       expect(text).not.toContain('maxContentLength');
       expect(text).not.toContain('2097152');
@@ -181,7 +181,7 @@ describe('upstream bounds: NOAA, Open-Meteo and Nominatim failure mapping', () =
       expect((result as ApiError).message).toBe(target.redirect);
       expect((result as ApiError).isRetryable).toBe(false);
       expect(adapter.calls()).toBe(1);
-      expect(formatErrorForUser(result)).not.toContain('<html>');
+      expect(formatErrorForUser(result as Error)).not.toContain('<html>');
     });
 
     it('control: ENOTFOUND keeps its existing outage mapping', async () => {

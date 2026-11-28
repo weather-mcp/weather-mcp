@@ -95,8 +95,46 @@ function listTs(dir: URL): URL[] {
 const REDIRECTS_OFF = /\bmaxRedirects: 0(?![\w.])/;
 const SIZE_CAP = /\bmaxContentLength:/;
 
+/**
+ * The span with comments removed and string contents blanked, so a key that is commented out, or
+ * that appears only inside a string, never counts as set (diff review codex-C1). Quotes are kept, so
+ * a `//` inside a URL string is not mistaken for a comment.
+ */
+function codeOnly(text: string): string {
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (ch === '/' && next === '/') {
+      while (i < text.length && text[i] !== '\n') i++;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      const close = text.indexOf('*/', i + 2);
+      i = close === -1 ? text.length : close + 2;
+      out += ' ';
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      out += ch;
+      i++;
+      while (i < text.length && text[i] !== ch) {
+        i += text[i] === '\\' ? 2 : 1;
+      }
+      out += ch;
+      i++;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
 function literalHasBounds(text: string): boolean {
-  return REDIRECTS_OFF.test(text) && SIZE_CAP.test(text);
+  const code = codeOnly(text);
+  return REDIRECTS_OFF.test(code) && SIZE_CAP.test(code);
 }
 
 /** True when `name` is declared in `source` as an object literal that carries both bounds. */
@@ -191,6 +229,20 @@ describe('http bounds wiring', () => {
     expect(hasBounds(five[0])).toBe(false);
     expect(hasBounds(octalish[0])).toBe(false);
     expect(hasBounds(hex[0])).toBe(false);
+  });
+
+  it('positive control: a key that is commented out or only inside a string does not count (codex-C1)', () => {
+    const make = (keys: string): CreateSite[] =>
+      findCreateSites(`const c = axios.create({\n  baseURL: 'https://x.example//path',\n${keys}});`);
+    const lineComment = make('  // maxRedirects: 0,\n  maxContentLength: 1024,\n');
+    const blockComment = make('  maxRedirects: 0,\n  /* maxContentLength: 1024, */\n');
+    const inString = make("  note: 'maxRedirects: 0',\n  maxContentLength: 1024,\n");
+    const realWithUrl = make('  maxRedirects: 0,\n  maxContentLength: 1024, // design sweep\n');
+    expect(hasBounds(lineComment[0])).toBe(false);
+    expect(hasBounds(blockComment[0])).toBe(false);
+    expect(hasBounds(inString[0])).toBe(false);
+    expect(hasBounds(realWithUrl[0])).toBe(true);
+    expect(configHasBounds("const CFG = {\n  // maxRedirects: 0,\n  maxContentLength: 1,\n};", 'CFG')).toBe(false);
   });
 
   it('positive control: the direct-call predicate needs a named config with both keys', () => {
