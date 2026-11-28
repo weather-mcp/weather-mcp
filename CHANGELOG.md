@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+A quiet maintenance release. It brings the optional NCEI climate-normals client in line with every other service: an answer that is too large or that redirects now ends in a short fixed error instead of the HTTP library's own wording. No weather output changes. It also tightens one of the project's internal checks, so a commented-out safety setting can no longer pass it.
+
 ### Fixed
 
 - **NCEI errors carry fixed text for an oversize or redirected answer.** With `NCEI_API_TOKEN` set, an NCEI answer that is too large, or one that redirects, now carries a short fixed error text (`NCEI response too large`, `NCEI API returned status 301`) in place of the HTTP library's own text. NCEI's error mapper had not been given these two fixed answers. Nothing shows this text today: climate normals still fall back to Open-Meteo, and the output does not change.
