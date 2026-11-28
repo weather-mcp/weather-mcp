@@ -284,7 +284,7 @@ describe('get_weather_summary — a saved territory code survives a failed rever
 
 /** Captured from `main` @ 01f1810 for exactly this fixture, before the router edit. */
 const SEATTLE_US_LITERAL = 
-  '**Location:** place (47.6000, -122.3000)\n\n# Weather Alerts\n\n**Location:** 47.6000, -122.3000\n**Status:** Active alerts only\n**Updated:** Nov 10, 2026, 4:00 PM\n\n✅ **No active weather alerts for this location.**\n\nThe area is currently clear of weather warnings, watches, and advisories.\n---\n*Data source: NOAA National Weather Service*\n';
+  '**Location:** place (47.6000, -122.3000)\n\n# Weather Alerts\n\n**Location:** 47.6000, -122.3000\n**Status:** Active alerts only\n**Updated:** Nov 10, 2026, 4:00 PM PST\n\n✅ **No active weather alerts for this location.**\n\nThe area is currently clear of weather warnings, watches, and advisories.\n---\n*Data source: NOAA National Weather Service*\n';
 
 describe('get_alerts — the us branch is byte-identical', () => {
   it('a saved us code at Seattle renders the pre-change text exactly', async () => {
