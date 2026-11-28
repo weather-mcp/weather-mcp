@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **NOAA alert times name their time zone.** In `get_alerts` for the US and its territories, and in the alerts section of `get_weather_summary`, every alert time now ends in the zone abbreviation for that moment: the `**Effective:**`, `**Expires:**`, `**Onset:**` and `**Ends:**` lines and the header's `**Updated:**` line, for example `Nov 28, 2026, 3:00 PM CST`. Before, these were bare clocks and a reader had to guess the zone. An alert that spans a daylight-saving change shows each end in its own zone name (`CDT`, then `CST`). The Pacific territories show a GMT offset (`GMT+10` for Guam), which is how the time-zone data names those zones. Alert times from the other authorities already carried their offset and do not change.
+
 ## [1.36.10] - 2026-11-28
 
 A clean-up release. It removes a place-search code path that nothing has used since v1.35.30, and it closes a small privacy gap found while checking the logs that remain: one error line could copy a coordinate into the default logs. No answer changes.
