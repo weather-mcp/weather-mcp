@@ -5463,10 +5463,14 @@ argument (`scripts/capture-examples.mjs:435-436`), so
 for a captured failure before staging:
 
 ```bash
-git diff --stat examples/ && git diff examples/ | grep -nE '^\+.*(❌|Error retrieving|Unable to fetch|Rate limit exceeded)'
+git diff --stat examples/ && git diff examples/ | grep -nE '^\+.*(❌|Error retrieving|Unable to fetch|Rate limit exceeded|\(unavailable\)|Could not retrieve)'
 ```
 
-Any hit is a stop. A capture that lost hundreds of lines is the same signal by
+The last two alternatives are `get_weather_summary`'s partial-failure wording
+(`## <section> (unavailable)`, `⚠️ Could not retrieve <section> data`,
+`src/handlers/weatherSummaryHandler.ts:297-302`): a summary capture whose one
+section failed carries neither `❌` nor `Error retrieving` (added 2026-11-28,
+noaa-forecast-timezone-line plan review codex-R2). Any hit is a stop. A capture that lost hundreds of lines is the same signal by
 another route — check `git diff --stat` for a large one-sided deletion.
 
 **Why:** the script's success message is about **transport**, not content. A

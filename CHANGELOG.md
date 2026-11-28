@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.8] - 2026-11-28
+
+US forecasts showed their times in the location's local time but never said which zone that was, while forecasts for every other country did. This release adds the missing label, so a forecast read from another time zone is no longer ambiguous.
+
+### Changed
+
+- **US forecasts now say which time zone their times are in.** A `get_forecast` answer for a US location, and the forecast section of `get_weather_summary`, now carry a `**Timezone:**` line directly under the elevation, naming the zone that every time below it is shown in (for example `America/Denver`). Forecasts for other countries already had this line; US forecasts showed local times with no label, so a reader in another zone had to guess. The times themselves are unchanged.
+
 ## [1.36.7] - 2026-11-27
 
 A maintenance release with no change to any answer. Five of the server's caches had their lifetimes written as bare numbers inside the code that fetches the data, where nobody reviewing the cache settings would see them, among them the wildfire perimeter cache. Every cache lifetime now lives in one place, and a check fails the build if a new one is written as a bare number.
@@ -2608,7 +2616,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.7...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.8...HEAD
+[1.36.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.7...v1.36.8
 [1.36.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.6...v1.36.7
 [1.36.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.5...v1.36.6
 [1.36.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...v1.36.5

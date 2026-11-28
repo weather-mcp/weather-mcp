@@ -5,9 +5,9 @@
 **Claude Code answered** (using `get_weather_summary`):
 
 <!-- answer -->
-The story in Oklahoma City today is **extreme heat**, not storms. It's currently **99°F and clear** (KOKC station reading from 28 minutes ago), heading for 101°F this afternoon and 101°F again Wednesday — dry until Wednesday night, when a 66% chance of showers and thunderstorms moves in.
+The story in Oklahoma City is **wind**, not storms. It's currently **45°F and clear** (KOKC station reading from 47 minutes ago, feels like 40°F with an 8 mph breeze), tonight is 39°F and partly cloudy, and Saturday reaches 62°F — dry throughout, with precipitation chances of 0 to 1% across the next four periods.
 
-There's one active alert: a **Heat Advisory from NWS Norman, in effect until Wednesday 7 PM** — so this isn't a one-day spike, it's a multi-day event. Plan around it: outdoor time early morning or after sunset (still 81°F tonight), and hydrate aggressively.
+There's one active alert: a **Wind Advisory from NWS Norman, from 9 PM Saturday until 8 AM Sunday** — northwest winds of 20 to 30 mph with gusts up to 55 mph. Plan around it: secure loose outdoor objects on Saturday, and expect a difficult drive for high-profile vehicles overnight into Sunday (Saturday night's forecast already shows 8 to 24 mph west wind).
 <!-- /answer -->
 
 <!-- capture:summary -->
@@ -37,12 +37,13 @@ get_weather_summary({
 # Current Weather Conditions
 
 **Station:** https://api.weather.gov/stations/KOKC
-**Time:** Sep 8, 2026, 12:50 PM (28 minutes ago)
+**Time:** Nov 27, 2026, 10:10 PM (47 minutes ago)
 
 **Conditions:** Clear
-**Temperature:** 99°F
-**Wind:** 16 mph from 150°
-**Pressure:** 30.05 inHg
+**Temperature:** 45°F
+**Feels Like (Wind Chill):** 40°F
+**Wind:** 8 mph from 190°
+**Pressure:** 29.91 inHg
 **Visibility:** 10.0 miles (clear)
 **Cloud Cover:** Clear at 12500ft
 
@@ -55,32 +56,33 @@ get_weather_summary({
 
 **Location:** 35.4730, -97.5171
 **Elevation:** 1211ft
-**Updated:** Sep 8, 2026, 12:13 PM
+**Timezone:** America/Chicago
+**Updated:** Nov 27, 2026, 12:26 PM
 **Showing:** 4 periods
 
-## This Afternoon
-**Temperature:** 101°F
-**Precipitation Chance:** 1%
-**Wind:** 12 mph S
-**Forecast:** Sunny
-
 ## Tonight
-**Temperature:** 81°F
+**Temperature:** 39°F
+**Precipitation Chance:** 0%
+**Wind:** 2 to 6 mph W
+**Forecast:** Partly Cloudy
+
+## Saturday
+**Temperature:** 62°F
+**Precipitation Chance:** 0%
+**Wind:** 1 to 14 mph S
+**Forecast:** Partly Sunny
+
+## Saturday Night
+**Temperature:** 40°F
 **Precipitation Chance:** 1%
-**Wind:** 12 mph S
-**Forecast:** Clear
+**Wind:** 8 to 24 mph W
+**Forecast:** Mostly Clear
 
-## Wednesday
-**Temperature:** 101°F
-**Precipitation Chance:** 6%
-**Wind:** 10 mph SSW
+## Sunday
+**Temperature:** 52°F
+**Precipitation Chance:** 0%
+**Wind:** 5 to 16 mph NNW
 **Forecast:** Sunny
-
-## Wednesday Night
-**Temperature:** 77°F
-**Precipitation Chance:** 66%
-**Wind:** 6 to 9 mph S
-**Forecast:** Showers And Thunderstorms Likely
 
 ---
 *Data source: NOAA National Weather Service (US)*
@@ -91,33 +93,20 @@ get_weather_summary({
 
 **Location:** 35.4730, -97.5171
 **Status:** Active alerts only
-**Updated:** Sep 8, 2026, 1:17 PM
+**Updated:** Nov 27, 2026, 10:56 PM
 
-⚠️ **2 active alerts found**
+⚠️ **1 active alert found**
 
-🟡 **Heat Advisory**
+🟡 **Wind Advisory**
 ---
-**Heat Advisory issued September 8 at 12:05PM CDT until September 8 at 7:00PM CDT by NWS Norman OK**
+**Wind Advisory issued November 27 at 11:55AM CST until November 29 at 8:00AM CST by NWS Norman OK**
 
 **Severity:** Moderate | **Urgency:** Expected | **Certainty:** Likely
-**Area:** Woods; Alfalfa; Grant; Kay; Major; Garfield; Noble; Blaine; Kingfisher; Logan; Payne; Caddo; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Kiowa; Jackson; Tillman; Comanche; Stephens; Garvin; Murray; Pontotoc; Coal; Cotton; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan; Wilbarger; Wichita; Baylor; Archer; Clay
-**Effective:** Sep 8, 2026, 12:05 PM
-**Expires:** Sep 9, 2026, 4:00 AM
-**Ends:** Sep 8, 2026, 7:00 PM
-
-**Recommended Response:** Execute
-**Sender:** NWS Norman OK
-
-🟡 **Heat Advisory**
----
-**Heat Advisory issued September 8 at 12:05PM CDT until September 9 at 7:00PM CDT by NWS Norman OK**
-
-**Severity:** Moderate | **Urgency:** Expected | **Certainty:** Likely
-**Area:** Woods; Alfalfa; Grant; Kay; Major; Garfield; Noble; Blaine; Kingfisher; Logan; Payne; Caddo; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Kiowa; Jackson; Tillman; Comanche; Stephens; Garvin; Murray; Pontotoc; Coal; Cotton; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan; Wilbarger; Wichita; Baylor; Archer; Clay
-**Effective:** Sep 8, 2026, 12:05 PM
-**Expires:** Sep 9, 2026, 4:00 AM
-**Onset:** Sep 9, 2026, 12:00 PM
-**Ends:** Sep 9, 2026, 7:00 PM
+**Area:** Alfalfa; Grant; Kay; Major; Garfield; Noble; Blaine; Kingfisher; Logan; Payne; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Stephens; Garvin; Murray; Pontotoc; Coal; Cotton; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan; Hardeman; Foard; Wilbarger; Wichita; Knox; Baylor; Archer; Clay
+**Effective:** Nov 27, 2026, 11:55 AM
+**Expires:** Nov 28, 2026, 2:00 AM
+**Onset:** Nov 28, 2026, 9:00 PM
+**Ends:** Nov 29, 2026, 8:00 AM
 
 **Recommended Response:** Execute
 **Sender:** NWS Norman OK
@@ -140,13 +129,13 @@ get_weather_summary({
 **Claude Code answered** (using `get_alerts` with `detail: "full"`):
 
 <!-- answer-2 -->
-Full text of the Heat Advisory:
+Full text of the Wind Advisory:
 
-- **What:** heat index values up to 109 expected (both advisories).
+- **What:** northwest winds 20 to 30 mph with gusts up to 55 mph expected.
 - **Where:** portions of central, east central, northern, northwest, southeast, southern, and southwest Oklahoma, and northern Texas.
-- **When:** until 7 PM CDT this evening for the first advisory; from noon to 7 PM CDT Wednesday for the second.
-- **Impacts:** hot temperatures and high humidity may cause heat illnesses.
-- **Instructions from NWS:** drink plenty of fluids, stay in an air-conditioned room, stay out of the sun, and check up on relatives and neighbors.
+- **When:** from 9 PM Saturday to 8 AM CST Sunday.
+- **Impacts:** gusty winds will blow around unsecured objects; tree limbs could be blown down and a few power outages may result.
+- **Instructions from NWS:** winds this strong can make driving difficult, especially for high-profile vehicles. Use extra caution.
 <!-- /answer-2 -->
 
 <!-- capture:alerts-full -->
@@ -170,67 +159,36 @@ get_alerts({
 
 **Location:** 35.4676, -97.5164
 **Status:** Active alerts only
-**Updated:** Sep 8, 2026, 1:17 PM
+**Updated:** Nov 27, 2026, 10:56 PM
 
-⚠️ **2 active alerts found**
+⚠️ **1 active alert found**
 
-🟡 **Heat Advisory**
+🟡 **Wind Advisory**
 ---
-**Heat Advisory issued September 8 at 12:05PM CDT until September 8 at 7:00PM CDT by NWS Norman OK**
+**Wind Advisory issued November 27 at 11:55AM CST until November 29 at 8:00AM CST by NWS Norman OK**
 
 **Severity:** Moderate | **Urgency:** Expected | **Certainty:** Likely
-**Area:** Woods; Alfalfa; Grant; Kay; Major; Garfield; Noble; Blaine; Kingfisher; Logan; Payne; Caddo; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Kiowa; Jackson; Tillman; Comanche; Stephens; Garvin; Murray; Pontotoc; Coal; Cotton; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan; Wilbarger; Wichita; Baylor; Archer; Clay
-**Effective:** Sep 8, 2026, 12:05 PM
-**Expires:** Sep 9, 2026, 4:00 AM
-**Ends:** Sep 8, 2026, 7:00 PM
+**Area:** Alfalfa; Grant; Kay; Major; Garfield; Noble; Blaine; Kingfisher; Logan; Payne; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Stephens; Garvin; Murray; Pontotoc; Coal; Cotton; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan; Hardeman; Foard; Wilbarger; Wichita; Knox; Baylor; Archer; Clay
+**Effective:** Nov 27, 2026, 11:55 AM
+**Expires:** Nov 28, 2026, 2:00 AM
+**Onset:** Nov 28, 2026, 9:00 PM
+**Ends:** Nov 29, 2026, 8:00 AM
 
 **Description:**
-* WHAT...For the first Heat Advisory, heat index values up to 109.
-For the second Heat Advisory, heat index values up to 109 expected.
+* WHAT...Northwest winds 20 to 30 mph with gusts up to 55 mph
+expected.
 
 * WHERE...Portions of central, east central, northern, northwest,
 southeast, southern, and southwest Oklahoma and northern Texas.
 
-* WHEN...For the first Heat Advisory, until 7 PM CDT this evening.
-For the second Heat Advisory, from noon to 7 PM CDT Wednesday.
+* WHEN...From 9 PM Saturday to 8 AM CST Sunday.
 
-* IMPACTS...Hot temperatures and high humidity may cause heat
-illnesses.
-
-**Instructions:**
-Drink plenty of fluids, stay in an air-conditioned room, stay out of
-the sun, and check up on relatives and neighbors.
-
-**Recommended Response:** Execute
-**Sender:** NWS Norman OK
-
-🟡 **Heat Advisory**
----
-**Heat Advisory issued September 8 at 12:05PM CDT until September 9 at 7:00PM CDT by NWS Norman OK**
-
-**Severity:** Moderate | **Urgency:** Expected | **Certainty:** Likely
-**Area:** Woods; Alfalfa; Grant; Kay; Major; Garfield; Noble; Blaine; Kingfisher; Logan; Payne; Caddo; Canadian; Oklahoma; Lincoln; Grady; McClain; Cleveland; Pottawatomie; Seminole; Hughes; Kiowa; Jackson; Tillman; Comanche; Stephens; Garvin; Murray; Pontotoc; Coal; Cotton; Jefferson; Carter; Johnston; Atoka; Love; Marshall; Bryan; Wilbarger; Wichita; Baylor; Archer; Clay
-**Effective:** Sep 8, 2026, 12:05 PM
-**Expires:** Sep 9, 2026, 4:00 AM
-**Onset:** Sep 9, 2026, 12:00 PM
-**Ends:** Sep 9, 2026, 7:00 PM
-
-**Description:**
-* WHAT...For the first Heat Advisory, heat index values up to 109.
-For the second Heat Advisory, heat index values up to 109 expected.
-
-* WHERE...Portions of central, east central, northern, northwest,
-southeast, southern, and southwest Oklahoma and northern Texas.
-
-* WHEN...For the first Heat Advisory, until 7 PM CDT this evening.
-For the second Heat Advisory, from noon to 7 PM CDT Wednesday.
-
-* IMPACTS...Hot temperatures and high humidity may cause heat
-illnesses.
+* IMPACTS...Gusty winds will blow around unsecured objects. Tree
+limbs could be blown down and a few power outages may result.
 
 **Instructions:**
-Drink plenty of fluids, stay in an air-conditioned room, stay out of
-the sun, and check up on relatives and neighbors.
+Winds this strong can make driving difficult, especially for high
+profile vehicles. Use extra caution.
 
 **Recommended Response:** Execute
 **Sender:** NWS Norman OK
@@ -245,7 +203,7 @@ the sun, and check up on relatives and neighbors.
 > **You:** Show me the radar.
 
 <!-- answer-3 -->
-Here's the animated radar for the past hour — 13 frames from RainViewer (the links below open the tiles directly). Consistent with today's near-zero precipitation chances (1% this afternoon, 1% tonight), there's nothing on it: the heat is today's story, with the 66% chance of storms not arriving until Wednesday night.
+Here's the animated radar for the past couple of hours — 13 frames from RainViewer (the links below open the tiles directly). Consistent with today's zero precipitation chances (0% tonight, 0% Saturday), there's nothing on it: the wind is the story, arriving Saturday night, not rain.
 
 *Two things to know if you click those frame URLs: RainViewer only retains about two hours of history, so links in this captured output have long since expired — and even a live tile over dry skies renders as a blank white square, because radar tiles are transparent precipitation overlays with nothing to draw when it isn't raining. For what a tile with actual weather on it looks like, see the committed snapshot in [the Tokyo example](./weekend-trip-planning.md).*
 <!-- /answer-3 -->
@@ -279,14 +237,14 @@ get_weather_imagery({
 
 ## 🎬 Animation Frames (13 frames)
 
-### Frame 1 - 2026-09-08T16:10:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/4746a5a43ba3/512/6/14/25/4/1_1.png
+### Frame 1 - 2026-11-28T02:50:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/7307a6baedaf/512/6/14/25/4/1_1.png
 
-### Frame 7 - 2026-09-08T17:10:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/f1a100fcbbc5/512/6/14/25/4/1_1.png
+### Frame 7 - 2026-11-28T03:50:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/412d9495aeab/512/6/14/25/4/1_1.png
 
-### Frame 13 - 2026-09-08T18:10:00.000Z
-**Image URL:** https://tilecache.rainviewer.com/v2/radar/5475b75f8b4f/512/6/14/25/4/1_1.png
+### Frame 13 - 2026-11-28T04:50:00.000Z
+**Image URL:** https://tilecache.rainviewer.com/v2/radar/676d34b36b9f/512/6/14/25/4/1_1.png
 
 *Showing 3 of 13 frames for brevity — use detail="full" for all frames*
 
@@ -298,7 +256,7 @@ get_weather_imagery({
 ⚠️ **DISCLAIMER:** RainViewer provides global precipitation radar. Data may have 5-10 minute delay. For official forecasts, consult local meteorological services.
 
 ---
-*Generated: 2026-09-08T18:18:23.532Z*
+*Generated: 2026-11-28T04:56:39.363Z*
 *Data source: RainViewer*
 ````
 
@@ -310,5 +268,5 @@ get_weather_imagery({
 **Features shown:** `get_weather_summary` one-call overview (current + forecast + alerts) · `get_alerts` `detail` levels (`standard` vs `full` alert text) · `get_weather_imagery` animated radar (RainViewer).
 
 <!-- capture-stamp -->
-*Captured 2026-09-08 — raw output is live data and will differ when regenerated (`npm run examples`).*
+*Captured 2026-11-28 — raw output is live data and will differ when regenerated (`npm run examples`).*
 <!-- /capture-stamp -->
