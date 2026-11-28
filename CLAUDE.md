@@ -96,7 +96,7 @@ src/
 │   ├── locationResolver.ts  # location_name / city_name / lat-lon → coordinates; shared country-code resolution
 │   ├── geography.ts         # isInUS and region helpers
 │   ├── timezone.ts          # Local-time formatting, formatObservationAge
-│   ├── timezoneOverrides.ts # Point-override boxes for tz-lookup's date-line defects (AS, Tokelau, St Lawrence Is.); consulted first by guessTimezoneFromCoords (pure)
+│   ├── timezoneOverrides.ts # Point-override boxes for tz-lookup's date-line defects (AS, Tokelau, St Lawrence Is., Umnak); consulted first by guessTimezoneFromCoords (pure)
 │   ├── normals.ts / records.ts / astronomy.ts        # Climate normals, US records, almanac
 │   ├── modelComparison.ts / ensembleSpread.ts        # Forecast agreement + member spread (pure)
 │   ├── fireWeather.ts / thermalStress.ts             # Fire indices incl. Fosberg; wind chill, frostbite, WBGT (pure)

@@ -129,9 +129,9 @@ export function getTimezoneAbbreviation(timezone: string, datetime?: Date): stri
  * back to a coarse US longitude heuristic and finally UTC if the lookup fails
  * (e.g. invalid coordinates).
  *
- * A handful of date-line areas where `tz-lookup` is a calendar day wrong (American
- * Samoa, Tokelau, St Lawrence Island) are answered first by the override boxes in
- * `./timezoneOverrides.ts`.
+ * A handful of areas where `tz-lookup` is wrong — a calendar day at the date line
+ * (American Samoa, Tokelau, St Lawrence Island), an hour at Umnak (Adak/Nome line) —
+ * are answered first by the override boxes in `./timezoneOverrides.ts`.
  *
  * @param latitude - Latitude
  * @param longitude - Longitude
