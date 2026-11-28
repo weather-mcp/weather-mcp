@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The service cache TTLs that were written as bare numbers are now named `CacheConfig.ttl` entries: `firePerimeters` (NIFC fire perimeters), `airQuality` and `marine` (Open-Meteo) are new, and the Open-Meteo forecast and the NCEI climate normals table now read the existing `forecast` and `normals` entries. Every value is unchanged. A unit test now fails on a hardcoded TTL at a cache write, with one allowlisted Nominatim site that roadmap row 105 removes.
+
 ## [1.36.6] - 2026-11-27
 
 Twelve of the server's upstream services had no limit on how large an answer could be, and followed redirects without bound. One huge or broken answer could fill the server's memory, and when one arrived it was often retried several times and reported as a library error or a network fault. This release gives every upstream a measured size limit and refuses every redirect, each with a plain, fixed message. Successful answers are unchanged.
