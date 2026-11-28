@@ -694,6 +694,9 @@ async function formatNOAAForecast(
   let output = `# Weather Forecast (${granularity === 'hourly' ? 'Hourly' : 'Daily'})\n\n`;
   output += `**Location:** ${latitude.toFixed(4)}, ${longitude.toFixed(4)}\n`;
   output += `**Elevation:** ${formatElevationFromM(forecast.properties.elevation.value, prefs)}\n`;
+  // Names the zone that formats `**Updated:**` and every period time, so the label cannot
+  // disagree with them. Unconditional: `timezone` is always a non-empty string.
+  output += `**Timezone:** ${timezone}\n`;
   // Truthiness alone is not enough: `formatInTimezone` returns the literal
   // string "Invalid Date" for a non-empty value `Date.parse` cannot read, and
   // the hourly note below points at this line as the forecaster's cadence — so
