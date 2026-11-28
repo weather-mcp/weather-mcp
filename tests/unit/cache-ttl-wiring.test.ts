@@ -103,7 +103,8 @@ interface CacheWrite {
   args: string[];
 }
 
-const CALL_HEAD = /\b(?:this\.)?\w*[cC]ache\.set\s*\(/g;
+// `cache.set(` and `cache?.set(` both count; a write spelled any other way is out of scope.
+const CALL_HEAD = /\b(?:this\.)?\w*[cC]ache\??\.set\s*\(/g;
 
 function findCacheWrites(file: string, rawSource: string): CacheWrite[] {
   const src = codeOnly(rawSource.replace(/\r\n/g, '\n'));
@@ -180,6 +181,34 @@ function violations(writes: CacheWrite[], allowlist: AllowEntry[]): string[] {
   return problems;
 }
 
+/**
+ * A class member declaration at two-space indent: `  async getForecast(`, `  private foo<T>(`.
+ * The nearest one above a write names the method that write belongs to.
+ */
+const MEMBER_DECL = /^ {2}(?:(?:private|public|protected|static)\s+)*(?:async\s+)?(\w+)\s*(?:<[^>]*>)?\(/;
+
+function enclosingMember(rawSource: string, line: number): string | undefined {
+  const lines = rawSource.replace(/\r\n/g, '\n').split('\n').slice(0, line);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = MEMBER_DECL.exec(lines[i] ?? '');
+    if (m) return m[1];
+  }
+  return undefined;
+}
+
+/**
+ * The five writes named-cache-ttls rewired, each pinned to its own entry. Two entries can hold
+ * the same number (`firePerimeters` and `firmsAreaQuery`, `airQuality` and `marine`), so a value
+ * pin cannot see one swapped for the other; this can.
+ */
+const PINNED_TTLS: { file: string; member: string; ttl: string }[] = [
+  { file: 'src/services/nifc.ts', member: 'queryFirePerimeters', ttl: 'CacheConfig.ttl.firePerimeters' },
+  { file: 'src/services/openmeteo.ts', member: 'getForecast', ttl: 'CacheConfig.ttl.forecast' },
+  { file: 'src/services/openmeteo.ts', member: 'getAirQuality', ttl: 'CacheConfig.ttl.airQuality' },
+  { file: 'src/services/openmeteo.ts', member: 'getMarine', ttl: 'CacheConfig.ttl.marine' },
+  { file: 'src/services/ncei.ts', member: 'getClimateNormals', ttl: 'CacheConfig.ttl.normals' },
+];
+
 const SRC = new URL('../../src/', import.meta.url);
 const sources = listTs(SRC).map((url) => ({
   file: `src/${url.href.slice(SRC.href.length)}`,
@@ -196,7 +225,7 @@ describe('cache TTL wiring', () => {
 
   it('agrees with an independent line count in every file (no scanner blind spot)', () => {
     // A regex literal such as /'/ can make a string-aware scanner swallow later calls (G121).
-    const head = /\b(?:this\.)?\w*[cC]ache\.set\s*\(/;
+    const head = /\b(?:this\.)?\w*[cC]ache\??\.set\s*\(/;
     const mismatches: string[] = [];
     for (const s of sources) {
       const scanned = allWrites.filter((w) => w.file === s.file).length;
@@ -236,6 +265,27 @@ describe('cache TTL wiring', () => {
       { file: 'src/x.ts', line: 9, args: ['k', 'v', '1000'] },
     ];
     expect(violations(two, [entry]).join()).toContain('ambiguous allowlist entry');
+  });
+
+  it('each rewired write reads its own named entry, not a same-valued sibling', () => {
+    const problems: string[] = [];
+    for (const pin of PINNED_TTLS) {
+      const text = sources.find((s) => s.file === pin.file)?.text ?? '';
+      const ttls = allWrites
+        .filter((w) => w.file === pin.file && w.args.length >= 3)
+        .filter((w) => enclosingMember(text, w.line) === pin.member)
+        .map((w) => w.args[2]);
+      if (ttls.length !== 1 || ttls[0] !== pin.ttl) {
+        problems.push(`${pin.file} ${pin.member}: expected one write with ${pin.ttl}, found [${ttls.join(', ')}]`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('sees an optional-chained write', () => {
+    const found = findCacheWrites('src/x.ts', 'this.cache?.set(k, v, 1800000);');
+    expect(found).toHaveLength(1);
+    expect(violations(found, [])).toHaveLength(1);
   });
 
   it('does not match in-flight maps and sees multi-line calls', () => {
