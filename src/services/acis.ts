@@ -84,6 +84,12 @@ export function dayOfYearIndex(month: number, day: number): number {
 }
 
 /**
+ * Response-size cap. Design sweep 2026-11-27: a wide `/StnMeta` bounding-box request was 15,596
+ * decoded bytes. ≥ 8× that gives the 2 MiB floor.
+ */
+const ACIS_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
+/**
  * RCC ACIS API client.
  *
  * Provides US daily temperature records (highs/lows by calendar date, with
@@ -109,6 +115,9 @@ export class AcisService {
         'Content-Type': 'application/json',
         'User-Agent': getUserAgent()
       },
+      // A 3xx is an error, never followed.
+      maxRedirects: 0,
+      maxContentLength: ACIS_MAX_RESPONSE_BYTES,
       adapter: withRequestDeadline(),
     });
 
@@ -261,8 +270,17 @@ export class AcisService {
    */
   private async handleError(error: unknown): Promise<never> {
     if (isAxiosLikeError(error)) {
+      // An oversize answer, before the `response` branch. Gated on the code *and* the message.
+      if (error.code === 'ERR_BAD_RESPONSE' && /maxContentLength/.test(error.message ?? '')) {
+        throw new Error('ACIS response too large');
+      }
+
       if (error.response) {
         const status = error.response.status;
+        // A 3xx is never followed (`maxRedirects: 0`); decided before any read of the body.
+        if (status >= 300 && status < 400) {
+          throw new Error(`ACIS API returned status ${status}`);
+        }
         const message = error.response.data?.message;
         throw new Error(message || `ACIS API returned status ${status}`);
       }
