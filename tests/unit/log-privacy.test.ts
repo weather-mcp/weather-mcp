@@ -327,6 +327,22 @@ describe('success-path log privacy', () => {
     return { get };
   };
 
+  /** Drives NominatimService's error mapper at 400 (body quoting a 6-dp coordinate), 429 and 403. */
+  const NOMINATIM_400_ERROR = 'Invalid coordinates 47.618273,-122.351946';
+  const driveNominatimErrors = async (): Promise<void> => {
+    const svc = new NominatimService();
+    const handleError = (e: AxiosError): Promise<never> =>
+      (svc as unknown as { handleError: (e: AxiosError) => Promise<never> }).handleError(e);
+    const at = (status: number, data: unknown): AxiosError => {
+      const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
+      const response = { status, statusText: '', headers: {}, config, data } as AxiosResponse;
+      return new AxiosError(`Request failed with status code ${status}`, 'ERR_BAD_REQUEST', config, undefined, response);
+    };
+    await expect(handleError(at(400, { error: NOMINATIM_400_ERROR }))).rejects.toThrow();
+    await expect(handleError(at(429, {}))).rejects.toThrow();
+    await expect(handleError(at(403, {}))).rejects.toThrow();
+  };
+
   const driveGeocoding = async (): Promise<void> => {
     const svc = new GeocodingService();
     const providers = svc as unknown as Record<'census' | 'nominatim' | 'openmeteo', { client: AxiosInstance }>;
@@ -534,6 +550,19 @@ describe('success-path log privacy', () => {
       }
     });
 
+    it('nominatim error lines (400, 429, 403) carry no upstream error text or coordinate', async () => {
+      await driveNominatimErrors();
+      const bad = find('Invalid request parameters');
+      expect(bad).toHaveLength(1);
+      expect(bad[0].metadata).toEqual({ service: 'Nominatim', securityEvent: true });
+      expect(find('Rate limit exceeded')).toHaveLength(1);
+      expect(find('Nominatim access forbidden')).toHaveLength(1);
+      const all = whole();
+      for (const needle of ['47.618', '122.351']) {
+        expect(all).not.toContain(needle);
+      }
+    });
+
     it('geocoding debug lines carry no query', async () => {
       await driveGeocoding();
       const lines = records().filter((r) => /^(Census\.gov|Nominatim|Open-Meteo) geocode/.test(r.message));
@@ -623,6 +652,15 @@ describe('success-path log privacy', () => {
       const full = { lat: 47.618273, lon: -122.351946 };
       expect(find('Nominatim reverse geocoding request')[0].metadata).toEqual(full);
       expect(find('Nominatim reverse-country cache hit')[0].metadata).toEqual(full);
+    });
+
+    it('the nominatim 400 line carries the upstream error text', async () => {
+      await driveNominatimErrors();
+      expect(find('Invalid request parameters')[0].metadata).toEqual({
+        service: 'Nominatim',
+        error: NOMINATIM_400_ERROR,
+        securityEvent: true,
+      });
     });
 
     it('geocoding debug lines carry the query', async () => {

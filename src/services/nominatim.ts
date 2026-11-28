@@ -27,7 +27,7 @@ import type {
 } from '../types/nominatim.js';
 import { Cache } from '../utils/cache.js';
 import { CacheConfig } from '../config/cache.js';
-import { logger, redactCoordinatesForLogging } from '../utils/logger.js';
+import { logger, redactCoordinatesForLogging, isPiiLoggingEnabled } from '../utils/logger.js';
 import { getUserAgent } from '../utils/version.js';
 import { RequestSpacer } from '../utils/requestSpacer.js';
 import { withRequestDeadline } from '../utils/httpDeadline.js';
@@ -138,9 +138,11 @@ export class NominatimService {
 
       // Bad request
       if (status === 400) {
+        // `data.error` is upstream text about the request and can quote what was sent (the
+        // coordinates), so default logs carry only the fixed fields; LOG_PII adds it.
         logger.warn('Invalid request parameters', {
           service: 'Nominatim',
-          error: data.error,
+          ...(isPiiLoggingEnabled() ? { error: data.error } : {}),
           securityEvent: true
         });
         throw new InvalidLocationError(
