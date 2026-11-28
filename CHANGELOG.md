@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+When some of the keyless upstreams are down outright, the server gives up on them after 5 seconds instead of waiting for the full request timeout. That limit came from Node's own default connection settings, not from the server: nothing documented it, and a Node upgrade could have changed it without notice. This release sets it in the server and documents it. On Node 22, where it was measured, nothing you can see changes.
+
 ### Fixed
 
-- **The 5 s connect timeout on the keyless alert-feed, river, forecast-fallback, climate-normals and imagery requests is now set by the server.** These requests (the alert feeds for India, the Philippines, Indonesia and Japan, Great Britain's river gauges, the MET Norway forecast fallback, US climate normals, and radar and base-map imagery) fail at 5 s when a connection does not open, and at the configured `API_TIMEOUT_MS` once connected. The 5 s used to come from Node's default connection settings, so it was undocumented and a Node release could move it; the server now sets the same value Node has used by default since Node 19, so on Node 22, where it was measured, behaviour is unchanged. The `API_TIMEOUT_MS` description now says so.
+- **An unreachable upstream now fails after 5 seconds on these requests because the server sets it, not Node.** This covers the alert feeds for India, the Philippines, Indonesia and Japan, Great Britain's river gauges, the MET Norway forecast fallback, US climate normals, and radar and base-map imagery. A connection that does not open within 5 seconds fails then, with that service's usual timed-out message; once the connection is open, the request gets the full `API_TIMEOUT_MS`. The other upstreams still wait `API_TIMEOUT_MS` for a host that never answers. The value is the one Node has used by default since Node 19, so behaviour is unchanged on Node 22. The `API_TIMEOUT_MS` description in the README now says this.
 
 ## [1.36.4] - 2026-11-27
 
