@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.8] - 2026-11-28
+
 US forecasts showed their times in the location's local time but never said which zone that was, while forecasts for every other country did. This release adds the missing label, so a forecast read from another time zone is no longer ambiguous.
 
 ### Changed
@@ -2614,7 +2616,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.7...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.8...HEAD
+[1.36.8]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.7...v1.36.8
 [1.36.7]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.6...v1.36.7
 [1.36.6]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.5...v1.36.6
 [1.36.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...v1.36.5
