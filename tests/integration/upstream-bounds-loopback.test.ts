@@ -13,7 +13,8 @@ import type { AddressInfo } from 'node:net';
 import { NOAAService } from '../../src/services/noaa.js';
 import { MeteoAlarmService } from '../../src/services/meteoalarm.js';
 import { OpenMeteoService, OPENMETEO_MAX_RESPONSE_BYTES } from '../../src/services/openmeteo.js';
-import { formatErrorForUser } from '../../src/errors/ApiError.js';
+import { NCEIService, NCEI_MAX_RESPONSE_BYTES } from '../../src/services/ncei.js';
+import { formatErrorForUser, type ApiError } from '../../src/errors/ApiError.js';
 import { CacheConfig } from '../../src/config/cache.js';
 import { logger, LogLevel } from '../../src/utils/logger.js';
 
@@ -22,7 +23,10 @@ const PROXY_VARS = [
   'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy'
 ] as const;
 
-type Mode = 'redirect' | 'oversize' | 'exact';
+// Synthetic, and spelled so a leak-scan hit on this file is recognisable (G112).
+const NCEI_FIXTURE_TOKEN = 'tk-ncei-hyg-7731';
+
+type Mode = 'redirect' | 'oversize' | 'exact' | 'ncei-oversize';
 
 interface Fixture {
   server: http.Server;
@@ -95,7 +99,7 @@ beforeAll(async () => {
       res.end();
       return;
     }
-    const size = mode === 'oversize' ? OPENMETEO_MAX_RESPONSE_BYTES + 1 : OPENMETEO_MAX_RESPONSE_BYTES;
+    const size = mode === 'ncei-oversize' ? NCEI_MAX_RESPONSE_BYTES + 1 : mode === 'oversize' ? OPENMETEO_MAX_RESPONSE_BYTES + 1 : OPENMETEO_MAX_RESPONSE_BYTES;
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(jsonPadded(size));
   });
@@ -158,5 +162,26 @@ describe('upstream response bounds on the real transport', () => {
       expect(outcome.message).not.toContain('too large');
     }
     expect(origin.hits).toBe(1);
+  });
+
+  it('(e) NCEI does not follow a 301 and ends in the fixed status text', async () => {
+    mode = 'redirect';
+    const service = new NCEIService({ baseURL: origin.url, token: NCEI_FIXTURE_TOKEN });
+    const error = await rejection(service.getClimateNormals(39.7456, -97.0892, 7, 15));
+    expect((error as ApiError).userMessage).toBe('NCEI API returned status 301');
+    expect(origin.hits).toBe(1);
+    expect(target.hits).toBe(0);
+    expectCleanRender(error, 'NCEI API returned status 301');
+    expect(formatErrorForUser(error)).not.toContain(NCEI_FIXTURE_TOKEN);
+  });
+
+  it('(f) NCEI rejects a body one byte over its cap, once', async () => {
+    mode = 'ncei-oversize';
+    const service = new NCEIService({ baseURL: origin.url, token: NCEI_FIXTURE_TOKEN });
+    const error = await rejection(service.getClimateNormals(39.7456, -97.0892, 7, 15));
+    expect((error as ApiError).userMessage).toBe('NCEI response too large');
+    expect(origin.hits).toBe(1);
+    expectCleanRender(error, 'NCEI response too large');
+    expect(formatErrorForUser(error)).not.toContain(NCEI_FIXTURE_TOKEN);
   });
 });
