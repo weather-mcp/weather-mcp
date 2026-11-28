@@ -7906,7 +7906,10 @@ upstream fixed that place, and the box should be re-measured and retired, not th
 not an hour. It resolves Pago Pago to `Pacific/Apia` (UTC+13, not `Pacific/Pago_Pago` UTC−11),
 Fakaofo to `Pacific/Pago_Pago` (not `Pacific/Fakaofo`), and Gambell and Little Diomede to
 `Asia/Anadyr` (not `America/Nome`). Open-Meteo's `timezone=auto` is right at all of them, so the
-error shows only on paths that call `guessTimezoneFromCoords`: the critical-alert banner,
+error shows only on paths that call `guessTimezoneFromCoords`. At Umnak the coarse polygon is an
+hour wrong, not a day: it draws the Adak/Nome line on a meridian near −168.75, while the real line
+runs diagonally through Samalga Pass, so Nikolski read `America/Adak` (UTC−10) instead of
+`America/Nome` (UTC−9). These are the paths that call it: the critical-alert banner,
 `get_alerts` without a station zone, the met.no fallback, METAR, river and wildfire. The
 maintained fork `@photostructure/tz-lookup` 11.8.0 has the same three errors, so swapping
 packages does not fix it. The routing box `isInNwsTerritory` was tuned to where api.weather.gov
@@ -7921,11 +7924,15 @@ that differ. Grids and expected results, as measured on 2026-11-27:
 - 0.05° date-line band (lat −25..70, lon ±165..180), ≥ 1 h: the same, plus Rose Atoll
   (`Pacific/Rarotonga`, 1 h) and the Aleutian `America/Adak`/`America/Nome` strip near Umnak;
 - 0.02° date-line band against the overridden function: 10 residual open-water points on the
-  US–Russia maritime line south of the Diomedes at ≥ 6 h; the same plus the Aleutian 1 h strip at
-  ≥ 1 h (out of scope; revisit on a user report). Run each `node` script from outside the
+  US–Russia maritime line south of the Diomedes at ≥ 6 h. At ≥ 1 h the Aleutian strip is now
+  covered by the Umnak box; its residue, measured at 0.01° over lat 51–56, lon −172 to −164, is
+  the Samalga Pass wedge: 462 open-water points in lat 52.57–53.08, lon −169.49 to −169.34. The
+  cause is the box's straight west edge against the diagonal line. It holds until a user reports a
+  wrong time for a vessel in the pass. A west edge at −169.5 would put 504 Adak points inside the
+  box. Run each `node` script from outside the
   download directory and pass the package paths as arguments.
 
-**Evidence:** 2026-11-27, plan-dateline-timezone-overrides T1 (`9ea36b2`) and T2 (`a09b44d`).
+**Evidence:** 2026-11-27, plan-dateline-timezone-overrides T1 (`9ea36b2`) and T2 (`a09b44d`). 2026-11-28, plan-aleutian-nome-override T1 (`189c55f`): the Umnak box.
 First seen in the v1.35.14 test drive (`qa-alert-territory-trim-cancel-drive.md`, Observation 1):
 keyless saved-`AS` `get_alerts` printed alert times a day ahead. Before T1, the banner at Pago
 Pago read `November 27, 2026 at 6:00 PM GMT+13` for an instant that is November 26, 6 PM local.
