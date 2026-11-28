@@ -82,6 +82,7 @@ import {
 import { extractSnowDepth, formatSnowData, hasWinterWeather } from '../utils/snow.js';
 import {
   formatInTimezone,
+  formatInTimezoneWithZone,
   guessTimezoneFromCoords,
   getTimezoneAbbreviation,
   formatObservationAge
@@ -479,7 +480,7 @@ async function formatNOAACurrentConditions(
     const nearestId = nearest.properties.stationIdentifier;
     const chosenName = `${picked.station.properties.name} (${picked.station.properties.stationIdentifier})`;
     if (fallback.station === nearest) {
-      const lastReport = formatInTimezone(
+      const lastReport = formatInTimezoneWithZone(
         fallback.observation.properties.timestamp, timezone, 'medium', prefs.timeFormat
       );
       substitutionNote = `*Nearest station (${nearestId}) has not reported since ${lastReport}; showing ${chosenName} instead.*`;
@@ -492,7 +493,7 @@ async function formatNOAACurrentConditions(
   let output = `# Current Weather Conditions\n\n`;
   output += `**Station:** ${props.station}\n`;
   // D2a: always show the observation's age beside its timestamp.
-  output += `**Time:** ${formatInTimezone(props.timestamp, timezone, 'medium', prefs.timeFormat)} (${formatObservationAge(picked.ageMinutes)})\n`;
+  output += `**Time:** ${formatInTimezoneWithZone(props.timestamp, timezone, 'medium', prefs.timeFormat)} (${formatObservationAge(picked.ageMinutes)})\n`;
   if (substitutionNote) {
     output += `\n${substitutionNote}\n`;
   }
@@ -1011,7 +1012,7 @@ async function formatOpenMeteoCurrentConditions(
   const timezone = response.timezone;
 
   let output = `# Current Weather Conditions\n\n`;
-  output += `**Time:** ${formatInTimezone(current.time, timezone, 'medium', prefs.timeFormat)}\n\n`;
+  output += `**Time:** ${formatInTimezoneWithZone(current.time, timezone, 'medium', prefs.timeFormat)}\n\n`;
 
   if (current.weather_code != null) {
     output += `**Conditions:** ${openMeteoService.getWeatherDescription(current.weather_code)}\n`;
@@ -1353,9 +1354,11 @@ async function formatMetarCurrentConditions(
   output += `of the requested point, elev ${formatElevationFromM(obs.elev, prefs)}\n`;
 
   const age = formatObservationAge(pick.ageMinutes);
-  // The zone abbreviation is spelled out here, unlike the other two paths,
-  // because this clock is the *station's* rather than the requested point's —
-  // an unlabeled time would be ambiguous exactly where the station is distant.
+  // The METAR path keeps getTimezoneAbbreviation rather than
+  // formatInTimezoneWithZone. getTimezoneAbbreviation falls back to ZZZZ where
+  // ICU has no short name, so this line's output stays as it was. The label
+  // matters here because this clock is the *station's*, not the requested
+  // point's, and the station may be distant.
   const zoneLabel = getTimezoneAbbreviation(timezone, new Date(obs.obsTime * 1000));
   output += `**Observed:** ${formatInTimezone(observedIso, timezone, 'medium', prefs.timeFormat)}`;
   output += `${zoneLabel ? ` ${zoneLabel}` : ''} (${age})\n`;
