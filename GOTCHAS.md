@@ -1957,7 +1957,7 @@ byte-for-byte on both sides, and the base worktree's release dry run printed the
 same), it is unrelated to the `FORCE_COLOR` bug above, and it changes no exit
 code. Do not "fix" it as part of unrelated work.
 
-**Status:** active. **Verify line re-run 2026-09-03** (jma-service-residuals T4) — this time against the bug rather than around it: `FORCE_COLOR=1 ./scripts/check-doc-versions.sh` printed `❌ server.json description length: \033[0;31m[33m98[39m\033[0m (registry limit is 100)` and exited 1, while `env -u FORCE_COLOR` over the same unchanged `server.json` passed. The trap is intact, the mechanism is exactly as described, and `server.json` still must not be edited to satisfy it. **Not re-tested 2026-08-28** (openmeteo-nullable-series-types
+**Status:** active. **Empty is still set (2026-11-27, native-transport-connect-timeout T3):** `FORCE_COLOR= ./scripts/check-doc-versions.sh` (an empty assignment) still coloured the description length and printed the false `❌` for `98`; only `env -u FORCE_COLOR` clears it. **Verify line re-run 2026-09-03** (jma-service-residuals T4) — this time against the bug rather than around it: `FORCE_COLOR=1 ./scripts/check-doc-versions.sh` printed `❌ server.json description length: \033[0;31m[33m98[39m\033[0m (registry limit is 100)` and exited 1, while `env -u FORCE_COLOR` over the same unchanged `server.json` passed. The trap is intact, the mechanism is exactly as described, and `server.json` still must not be edited to satisfy it. **Not re-tested 2026-08-28** (openmeteo-nullable-series-types
 T6): the run invoked the script as `env -u FORCE_COLOR` throughout and it reported
 `server.json description length: 98 (≤ 100)` correctly. That is the workaround
 working, **not** evidence the underlying bug is gone — do not read a clean run
@@ -6501,6 +6501,15 @@ process's own `process.env` is never mutated. The parent dead-proxy probe then s
 because each child overwrites its own proxy variables
 (`tests/integration/http-deadline-proxy.test.ts`).
 
+**Direct-path variant** (2026-11-27, native-transport-connect-timeout T1/T2, `92307ad`, `45bc401`;
+plan-review codex-R1): a test that asserts what the deadline seam does to a **non-proxied**
+request must clear all eight names for its duration, not only the two `HTTPS_PROXY` forms.
+`tunnelProxyFor` calls `proxy-from-env`, which also reads `ALL_PROXY`/`all_proxy`, so an inherited
+`ALL_PROXY` silently routes the "direct" rows down the tunnel branch and they fail for the wrong
+reason. Snapshot, delete and restore `HTTPS_PROXY`, `https_proxy`, `HTTP_PROXY`, `http_proxy`,
+`ALL_PROXY`, `all_proxy`, `NO_PROXY`, `no_proxy` (`tests/unit/http-deadline-tunnel.test.ts`'s
+`PROXY_VARS`).
+
 **Network-namespace variant** (2026-11-13, live-test-isolation T7, `d51f1f4`): `unshare -rn` is
 the stronger "no network" probe, but a fresh namespace has `lo` **down**, so every loopback test
 fails with it and the probe reads as a broken gate. The first offline release-prep run went red on
@@ -7921,7 +7930,14 @@ Pago read `November 27, 2026 at 6:00 PM GMT+13` for an instant that is November 
 
 ---
 
+## Graveyard
+
+*(When an entry's trap is refactored away, move it here with the reason and the
+commit that removed it — never delete, never renumber.)*
+
 ## G177 — A `maxRedirects: 0` client times out at 5 s on a silent direct connection, and the message names `API_TIMEOUT_MS`
+
+**Retired:** 2026-11-27, by native-transport-connect-timeout (`92307ad`). `withRequestDeadline` now hands a non-tunnelled `maxRedirects: 0` request with no caller agent a shared keep-alive agent with `timeout: CONNECT_TIMEOUT_MS` (5 s), so the 5 s is the server's, not Node's. Measured against `10.255.255.1` (QA `qa-native-transport-connect-timeout.md`): on `main` @ `006b333` a native request with Node's global agent replaced by one with no timeout ran to the full 12 s; on the branch it cut at 5,012 ms either way, and a connected server that never answers still ran to the request's own timeout (`tests/integration/http-deadline-native-agent.test.ts`). **What survives:** time a timeout against a real direct black hole as well as through a proxy, and read the elapsed time rather than the message. A proxy probe models only the tunnel path, which keeps its own per-request agent and waits the full `API_TIMEOUT_MS`; the follow-redirects clients (every client that does not set `maxRedirects: 0`) also wait `API_TIMEOUT_MS` for a dead host. The 5 s cuts the connect phase only.
 
 **Trigger:** measuring or reasoning about how long a request to an unresponsive upstream takes,
 in a service whose `axios.create` sets `maxRedirects: 0` (`jma`, `environmentAgency`, `basemap`,
@@ -7952,13 +7968,6 @@ quoted the proxy figures and was corrected in `303c867`.
 **Status:** active. The underlying 5 s cap is a ROADMAP Hardening row ("`maxRedirects: 0` clients
 time out at 5 s"); retire this entry when that row ships a per-instance agent. Lint candidate: none.
 Related: [G114], [G175].
-
----
-
-## Graveyard
-
-*(When an entry's trap is refactored away, move it here with the reason and the
-commit that removed it — never delete, never renumber.)*
 
 ## G26 — The repo's own `.env` means a probe from the repo root is not testing the default configuration
 

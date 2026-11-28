@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.5] - 2026-11-27
+
+When some of the keyless upstreams are down outright, the server gives up on them after 5 seconds instead of waiting for the full request timeout. That limit came from Node's own default connection settings, not from the server: nothing documented it, and a Node upgrade could have changed it without notice. This release sets it in the server and documents it. On Node 22, where it was measured, nothing you can see changes.
+
+### Fixed
+
+- **An unreachable upstream now fails after 5 seconds on these requests because the server sets it, not Node.** This covers the alert feeds for India, the Philippines, Indonesia and Japan, Great Britain's river gauges, the MET Norway forecast fallback, US climate normals, and radar and base-map imagery. A connection that does not open within 5 seconds fails then, with that service's usual timed-out message; once the connection is open, the request gets the full `API_TIMEOUT_MS`. The other upstreams still wait `API_TIMEOUT_MS` for a host that never answers. The value is the one Node has used by default since Node 19, so behaviour is unchanged on Node 22. The `API_TIMEOUT_MS` description in the README now says this.
+
 ## [1.36.4] - 2026-11-27
 
 Two places on the US (NOAA) path printed times by the server's own clock instead of the location's: the observation times in recent US weather history, and the dates of the snowfall and ice forecast period. On a server set to a different time zone than the place you asked about, such as a container, a remote host, or any question about somewhere else, those times were hours off and the snowfall period could start on the wrong day. This release prints them in the location's time zone, like every other time the server shows.
@@ -2583,7 +2591,8 @@ With v1.4.0 tool configuration system, users have full control:
 - MCP server implementation
 - Claude Code integration
 
-[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...HEAD
+[Unreleased]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.5...HEAD
+[1.36.5]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.4...v1.36.5
 [1.36.4]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.3...v1.36.4
 [1.36.3]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.2...v1.36.3
 [1.36.2]: https://github.com/weather-mcp/weather-mcp/compare/v1.36.1...v1.36.2

@@ -23,6 +23,14 @@
  *   `proxy: false` is load-bearing: without it axios's `setProxy` (`lib/adapters/http.js`) swaps
  *   any non-https-proxy-agent `httpsAgent` for its own tunnel. A request with no timeout has no
  *   signal and keeps axios's own tunnel; every client in `src/` sets a timeout.
+ * - A non-tunnelled `maxRedirects: 0` request whose caller set no agent for the target's protocol
+ *   gets a shared, lazily built keep-alive agent with `timeout: CONNECT_TIMEOUT_MS`. Node's native
+ *   `ClientRequest` replaces the agent's socket timeout with axios's `req.setTimeout` once the
+ *   socket connects, so the 5 s bounds the connect phase only: a dead host fails at 5 s, a slow but
+ *   connected one still gets the request's own timeout. follow-redirects (any other `maxRedirects`)
+ *   arms its own socket timer on `socket`, so those requests are left alone. The cut ends as axios's
+ *   own `ECONNABORTED`, so no mapper changes (G138). Node 19+'s global agent carries the same 5 s;
+ *   pinning it here means a Node default cannot move it.
  * - A caller's own `signal` is chained in, and a caller's cancel stays axios's `ERR_CANCELED`.
  * - The deadline timer is ref'd (G114) and cleared on every settle path, with the caller-signal
  *   listener, so the timer itself holds a process for at most `timeout`.
@@ -40,6 +48,8 @@
  * Node 18 compatible: no `AbortSignal.any`, no `AbortSignal.timeout`.
  */
 
+import http from 'node:http';
+import https from 'node:https';
 import axios from 'axios';
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { createTunnelAgent, tunnelProxyFor } from './proxyTunnel.js';
@@ -54,6 +64,37 @@ type ReasonedSignal = NonNullable<InternalAxiosRequestConfig['signal']> & {
 const DEADLINE = Symbol('httpDeadline.deadline');
 
 /**
+ * How long a native-transport (`maxRedirects: 0`) request may wait for its connection to open.
+ * Node 19+'s global-agent value, pinned so a Node default cannot move it. It cuts a connection that
+ * has not opened, on the native transport only; once connected, the request's own timeout applies.
+ */
+export const CONNECT_TIMEOUT_MS = 5000;
+
+let nativeHttpAgent: http.Agent | undefined;
+let nativeHttpsAgent: https.Agent | undefined;
+
+/** The shared native-transport `https:` agent, built on first use. */
+function nativeHttpsAgentShared(): https.Agent {
+  nativeHttpsAgent ??= new https.Agent({ keepAlive: true, timeout: CONNECT_TIMEOUT_MS });
+  return nativeHttpsAgent;
+}
+
+/** The shared native-transport `http:` agent, built on first use. */
+function nativeHttpAgentShared(): http.Agent {
+  nativeHttpAgent ??= new http.Agent({ keepAlive: true, timeout: CONNECT_TIMEOUT_MS });
+  return nativeHttpAgent;
+}
+
+/** The request's resolved URL, or undefined when it does not parse. */
+function resolvedHref(config: InternalAxiosRequestConfig): string | undefined {
+  try {
+    return new URL(config.url ?? '', config.baseURL).href;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * The proxy to tunnel `config` through: an `https:` target, no caller `proxy`, and a proxy that
  * `proxy-from-env` selects. Anything else, including a URL that does not parse, is no tunnel.
  */
@@ -61,13 +102,36 @@ function tunnelProxy(config: InternalAxiosRequestConfig): URL | undefined {
   if (config.proxy !== undefined) {
     return undefined;
   }
-  let href: string;
-  try {
-    href = new URL(config.url ?? '', config.baseURL).href;
-  } catch {
+  const href = resolvedHref(config);
+  return href !== undefined && href.startsWith('https:') ? tunnelProxyFor(href) : undefined;
+}
+
+/**
+ * The agent key and agent to inject for a non-tunnelled native-transport request, or undefined:
+ * only `maxRedirects === 0`, no caller `proxy` (`false` is direct and counts as none), an
+ * `http:`/`https:` target, and no caller agent for that protocol.
+ */
+function nativeAgentInjection(
+  config: InternalAxiosRequestConfig
+): { httpAgent: http.Agent } | { httpsAgent: https.Agent } | undefined {
+  if (config.maxRedirects !== 0) {
     return undefined;
   }
-  return href.startsWith('https:') ? tunnelProxyFor(href) : undefined;
+  if (config.proxy !== undefined && config.proxy !== false) {
+    // A caller-chosen proxy is tunnelled by axios with its own agent; never second-guess it.
+    return undefined;
+  }
+  const href = resolvedHref(config);
+  if (href === undefined) {
+    return undefined;
+  }
+  if (href.startsWith('https:')) {
+    return config.httpsAgent == null ? { httpsAgent: nativeHttpsAgentShared() } : undefined;
+  }
+  if (href.startsWith('http:')) {
+    return config.httpAgent == null ? { httpAgent: nativeHttpAgentShared() } : undefined;
+  }
+  return undefined;
 }
 
 function deadlineError(timeout: number, config: InternalAxiosRequestConfig, request?: unknown) {
@@ -144,7 +208,7 @@ export function withRequestDeadline(inner?: AxiosAdapter): AxiosAdapter {
         const proxy = tunnelProxy(config);
         pending =
           proxy === undefined
-            ? adapter({ ...config, signal: controller.signal })
+            ? adapter({ ...config, signal: controller.signal, ...nativeAgentInjection(config) })
             : adapter({
                 ...config,
                 signal: controller.signal,

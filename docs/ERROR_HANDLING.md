@@ -49,6 +49,11 @@ a proxy that never answers, `get_alerts` in the US answers at 55 s with:
 NOAA API Error: The NOAA weather service is temporarily unavailable. Please try again in a few minutes.
 ```
 
+One connection limit is shorter. On the keyless alert feeds for India, the Philippines, Indonesia and Japan, Great Britain's river gauges, the MET Norway forecast fallback, US climate normals, and radar and base-map imagery, a connection that does not open within
+5 seconds fails at 5 seconds with that service's timed-out message. Once the
+connection is open, the request gets its full timeout. An upstream that is down
+outright therefore fails these requests fast, rather than at `API_TIMEOUT_MS`.
+
 `get_weather_summary` shows each section it could not fetch as
 `## <section> (unavailable)`. A lightning section started with the budget spent
 shows its *Live feed unavailable* note. A spent budget is never an all-clear on
